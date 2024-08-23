@@ -1,0 +1,23 @@
+[project]
+name = "matchypatchy"
+version = "0.0.1"
+authors = [
+  { name="Kyra Swanson", email="tswanson@sdzwa.org" },
+]
+description = "GUI tool for human validation of AI-powered animal re-identification"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/onservationtechlab/matchypatchy"
+Issues = "https://github.com/onservationtechlab/matchypatchy/issues"
+
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
