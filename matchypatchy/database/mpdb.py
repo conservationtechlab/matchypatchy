@@ -62,10 +62,19 @@ class MatchyPatchyDB():
         db.close()
         return rows
     
-    def fetch_column(self, table, column):
+    def fetch_columns(self, table, columns):
+        # check if columns is list, concat
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
-        cursor.execute(f'SELECT {column} FROM {table};')
+        cursor.execute(f'SELECT id, {columns} FROM {table};')
+        rows = cursor.fetchall()  # returns in tuple
+        db.close()
+        return dict(rows)
+    
+    def fetch_rows(self, table, row_cond, columns="*"):
+        db = sqlite3.connect(self.filepath)
+        cursor = db.cursor()
+        cursor.execute(f'SELECT {columns} FROM {table} WHERE {row_cond};')
         rows = cursor.fetchall()  # returns in tuple
         db.close()
         return [el[0] for el in rows]
