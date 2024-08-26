@@ -4,13 +4,14 @@ Main Function
 '''
 
 from .gui import display_intro
-from .database import setup
+from .database import mpdb
 
-def main():
-    mpDB = setup.MatchyPatchyDB()
+
+
+def main(filepath='matchypatchy.db'):
+    mpDB = mpdb.MatchyPatchyDB(filepath)
     display_intro.main(mpDB)
-    tables = setup.validate()
-    print(tables)
+
 
 if __name__ == "__main__":
     main()
