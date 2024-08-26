@@ -4,9 +4,9 @@ Main Function
 '''
 #!/usr/bin/env python
 
-from matchypatchy.database import setup
+from matchypatchy.database import mpdb
 
-mpDB = setup.MatchyPatchyDB()
+mpDB = mpdb.MatchyPatchyDB()
 tables = mpDB.validate()
 print(tables)
 
