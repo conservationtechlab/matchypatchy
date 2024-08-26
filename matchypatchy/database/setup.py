@@ -11,9 +11,9 @@ def setup_database(filepath='matchypatchy.db'):
     
     # EMBEDDING
     db.enable_load_extension(True)
-    #sqlite_vec.load(db)
+    sqlite_vec.load(db)
     db.enable_load_extension(False)
-    #cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152])")
+    cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152])")
     
     # SURVEY
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
@@ -80,20 +80,6 @@ def setup_database(filepath='matchypatchy.db'):
     db.commit()
     print('Database initiated.')
     db.close()
-
-
-class MatchyPatchyDB():
-    def __init__(self, filepath='matchypatchy.db'):
-        self.filepath = filepath
-        setup_database(self.filepath)
-    
-    def validate(self):
-        db = sqlite3.connect(self.filepath)
-        cursor = db.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        db.close()
-        return tables
 
 
 if __name__ == "__main__":
