@@ -1,9 +1,7 @@
-import csv
 import sqlite3
-import sqlite_vec
+from matchypatchy import sqlite_vec
 # fetch from master table
 #cursor.execute("SELECT name FROM sqlite_master")
-
 
 
 def setup_database(filepath='matchypatchy.db'):
@@ -80,6 +78,7 @@ def setup_database(filepath='matchypatchy.db'):
 
     # Commit changes and close connection
     db.commit()
+    print('Database initiated.')
     db.close()
     return True
 
