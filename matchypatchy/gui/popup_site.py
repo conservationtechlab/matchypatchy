@@ -3,7 +3,68 @@
 '''
 from PyQt6 import QtCore, QtWidgets
 
-class SurveyPopup(QtWidgets.QDialog):
+from ..database import mpdb
+
+class SitePopup(QtWidgets.QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        fullLayout = QtWidgets.QVBoxLayout(self)
+
+        self.container = QtWidgets.QWidget(objectName='container')
+        fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
+                                     QtWidgets.QSizePolicy.Policy.Maximum)
+        
+        layout = QtWidgets.QVBoxLayout(self.container)
+
+
+        # SITE LIST
+        # fetch from database
+        self.site_list = QtWidgets.QListWidget()
+        layout.addWidget(self.site_list)
+        self.site_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.site_list.itemSelectionChanged.connect(self.checkInput)
+ 
+        # buttons
+        button_layout = QtWidgets.QHBoxLayout()
+        button_survey_new =  QtWidgets.QPushButton("New")
+        button_survey_new.clicked.connect(self.add_site)
+        button_layout.addWidget(button_survey_new)
+
+        self.button_site_edit =  QtWidgets.QPushButton("Edit")
+        self.button_site_edit.clicked.connect(self.edit_site)
+        self.button_site_edit.setEnabled(False)
+        button_layout.addWidget(self.button_site_edit)
+
+        buttonBox = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        button_layout.addWidget(buttonBox)
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
+        layout.addLayout(button_layout)
+
+
+    def checkInput(self):
+        self.button_site_edit.setEnabled(False)
+
+    def get_sites(self,parent):
+        self.sites = parent.mpDB.select("site",columns=("id","name",),)
+        self.survey_id = parent.active_survey
+
+    def add_site(self):
+        dialog = SitePopup(self)
+        if dialog.exec():
+            confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
+                                         dialog.get_long(),self.survey_id[0])
+            if confirm:
+                self.survey_select.addItems([dialog.get_name()])
+        del dialog
+    
+    def edit_site(self):
+        return True
+    
+
+class SiteFillPopup(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         fullLayout = QtWidgets.QVBoxLayout(self)
@@ -19,8 +80,16 @@ class SurveyPopup(QtWidgets.QDialog):
         layout.setContentsMargins(
             buttonSize * 2, buttonSize, buttonSize * 2, buttonSize)
 
+        '''
+        site_id INTEGER PRIMARY KEY,
+                            name TEXT NOT NULL,
+                            lat REAL NOT NULL,
+                            long REAL NOT NULL,
+                            survey_id INTEGER NOT NULL,
+        '''
+
         title = QtWidgets.QLabel(
-            'Enter a new Survey', 
+            'Enter a new Site', 
             objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
@@ -39,7 +108,7 @@ class SurveyPopup(QtWidgets.QDialog):
         self.year_start = QtWidgets.QLineEdit()
         layout.addWidget(self.year_start)
 
-        layout.addWidget(QtWidgets.QLabel('End Year'))
+        layout.addWidget(QtWidgets.QLabel(parent.survey_id))
         self.year_end = QtWidgets.QLineEdit()
         layout.addWidget(self.year_end)
 
@@ -47,7 +116,7 @@ class SurveyPopup(QtWidgets.QDialog):
             QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
-        buttonBox.rejected.connect(self.cancel)
+        buttonBox.rejected.connect(self.reject)
         self.okButton = buttonBox.button(buttonBox.StandardButton.Ok)
         self.okButton.setEnabled(False)
 
@@ -85,6 +154,3 @@ class SurveyPopup(QtWidgets.QDialog):
     def accept_verify(self):
         if self.get_name() and self.get_region() and self.get_year_start():
             self.accept()
-
-    def cancel(self):
-        self.reject()
