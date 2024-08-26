@@ -1,9 +1,7 @@
-import csv
 import sqlite3
-import sqlite_vec
+from matchypatchy import sqlite_vec
 # fetch from master table
 #cursor.execute("SELECT name FROM sqlite_master")
-
 
 
 def setup_database(filepath='matchypatchy.db'):
@@ -80,16 +78,17 @@ def setup_database(filepath='matchypatchy.db'):
 
     # Commit changes and close connection
     db.commit()
+    print('Database initiated.')
     db.close()
 
 
 class MatchyPatchyDB():
     def __init__(self, filepath='matchypatchy.db'):
         self.filepath = filepath
-        setup_database(filepath)
+        setup_database(self.filepath)
     
-    def validate(filepath='matchypatchy.db'):
-        db = sqlite3.connect(filepath)
+    def validate(self):
+        db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
