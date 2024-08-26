@@ -10,9 +10,9 @@ def setup_database(filepath='matchypatchy.db'):
     cursor = db.cursor()
     
     # EMBEDDING
-    db.enable_load_extension(True)
+    #db.enable_load_extension(True)
     #sqlite_vec.load(db)
-    db.enable_load_extension(False)
+    #db.enable_load_extension(False)
     #cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152])")
     
     # SURVEY
