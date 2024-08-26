@@ -48,7 +48,7 @@ class SitePopup(QtWidgets.QDialog):
         self.button_site_edit.setEnabled(False)
 
     def get_sites(self,parent):
-        self.sites = parent.mpDB.select("site",columns=("id","name",),)
+        self.sites = parent.mpDB.fetch_rows("site",columns=("id","name",),)
         self.survey_id = parent.active_survey
 
     def add_site(self):

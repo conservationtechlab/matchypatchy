@@ -8,7 +8,7 @@ from . import setup
 class MatchyPatchyDB():
     def __init__(self, filepath='matchypatchy.db'):
         self.filepath = filepath
-        self.initiate = setup.setup_database(filepath)
+        self.initiate = setup.setup_database(self.filepath)
     
     def validate(self):
         db = sqlite3.connect(self.filepath)

@@ -28,7 +28,6 @@ class MainWindow(QMainWindow):
         survey_layout.addWidget(survey_label,0)
         self.survey_select = QComboBox()
         self.update_survey()
-        self.select_survey()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         survey_layout.addWidget(self.survey_select,2)
 
@@ -92,7 +91,9 @@ class MainWindow(QMainWindow):
         self.survey_select.clear() 
         survey_names = self.mpDB.fetch_columns(table='survey',columns='name')
         self.survey_names_invert = dict((v,k) for k,v in survey_names.items()) # swap id,name
-        self.survey_select.addItems(self.survey_names_invert.keys())        
+        if self.survey_names_invert:
+            self.survey_select.addItems(self.survey_names_invert.keys())   
+            self.select_survey()     
 
     def select_survey(self):
         self.active_survey = [self.survey_names_invert[self.survey_select.currentText()],
@@ -118,7 +119,7 @@ class MainWindow(QMainWindow):
         
 
 
-def main(mpDB):
+def main_display(mpDB):
     """
     Launch GUI
 
@@ -133,4 +134,4 @@ def main(mpDB):
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    main()
+    main_display()

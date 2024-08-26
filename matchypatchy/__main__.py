@@ -9,7 +9,7 @@ from .database import mpdb
 
 def main(filepath='matchypatchy.db'):
     mpDB = mpdb.MatchyPatchyDB(filepath)
-    display_intro.main(mpDB)
+    display_intro.main_display(mpDB)
 
 
 if __name__ == "__main__":
