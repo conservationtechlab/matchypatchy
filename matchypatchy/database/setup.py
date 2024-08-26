@@ -19,7 +19,7 @@ def setup_database(filepath='matchypatchy.db'):
     
     # SURVEY
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
-                        survey_id INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
                         year_start INTEGER NOT NULL,
                         year_end INTEGER,
@@ -27,26 +27,26 @@ def setup_database(filepath='matchypatchy.db'):
 
     # SITE
     cursor.execute('''CREATE TABLE IF NOT EXISTS site (
-                        site_id INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
                         lat REAL NOT NULL,
                         long REAL NOT NULL,
                         survey_id INTEGER NOT NULL,
-                        FOREIGN KEY (survey_id) REFERENCES survey (survey_id) )''')
+                        FOREIGN KEY (survey_id) REFERENCES survey (id) )''')
 
     # MEDIA
     cursor.execute('''CREATE TABLE IF NOT EXISTS media (
-                        file_id INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY,
                         filepath TEXT NOT NULL,
                         ext TEXT NOT NULL,
                         datetime TEXT,
                         comment TEXT,
                         site_id INTEGER NOT NULL,
-                        FOREIGN KEY (site_id) REFERENCES site (site_id) )''')
+                        FOREIGN KEY (site_id) REFERENCES site (id) )''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
-                        rid INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY,
                         frame INTEGER NOT NULL,
                         bbox_x REAL NOT NULL,
                         bbox_y REAL NOT NULL,
@@ -57,9 +57,9 @@ def setup_database(filepath='matchypatchy.db'):
                         reviewed INTEGER NOT NULL,
                         iid INTEGER,
                         emb_id INTEGER,
-                        FOREIGN KEY(file_id) REFERENCES media (file_id)
-                        FOREIGN KEY(species_id) REFERENCES species (species_id)
-                        FOREIGN KEY(iid) REFERENCES individual (iid)
+                        FOREIGN KEY(file_id) REFERENCES media (id)
+                        FOREIGN KEY(species_id) REFERENCES species (id)
+                        FOREIGN KEY(iid) REFERENCES individual (id)
                         FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) )''')
     
     # SPECIES
@@ -70,11 +70,11 @@ def setup_database(filepath='matchypatchy.db'):
     
     # INDIVIDUAL
     cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
-                        iid INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY,
                         species_id INT NOT NULL,
                         name TEXT NOT NULL,
                         sex TEXT,
-                        FOREIGN KEY(species_id) REFERENCES species (species_id)
+                        FOREIGN KEY(species_id) REFERENCES species (id)
                     )''')
 
 
