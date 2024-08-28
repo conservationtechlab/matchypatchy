@@ -6,6 +6,7 @@ from PyQt6 import QtCore, QtWidgets
 class SurveyPopup(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
+        self.setWindowTitle("Survey")
         fullLayout = QtWidgets.QVBoxLayout(self)
 
         self.container = QtWidgets.QWidget(objectName='container')
@@ -13,6 +14,7 @@ class SurveyPopup(QtWidgets.QDialog):
         self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
                                      QtWidgets.QSizePolicy.Policy.Maximum)
 
+        
         buttonSize = self.fontMetrics().height() 
 
         layout = QtWidgets.QVBoxLayout(self.container)
