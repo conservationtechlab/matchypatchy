@@ -27,7 +27,6 @@ class MainWindow(QMainWindow):
         survey_label = QLabel("Survey:")
         survey_layout.addWidget(survey_label,0)
         self.survey_select = QComboBox()
-        self.update_survey()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         survey_layout.addWidget(self.survey_select,2)
 
@@ -36,10 +35,13 @@ class MainWindow(QMainWindow):
         survey_layout.addWidget(button_survey_new,1)
 
         # Sites
-        button_site_manage =  QPushButton("Manage Sites")
-        button_site_manage.clicked.connect(self.new_site)
-        survey_layout.addWidget(button_site_manage,1)
+        self.button_site_manage =  QPushButton("Manage Sites")
+        self.button_site_manage.clicked.connect(self.new_site)
+        survey_layout.addWidget(self.button_site_manage,1)
+        self.button_manage_site_flag = False
+        self.button_site_manage.setEnabled(self.button_manage_site_flag)
 
+        self.update_survey()
         layout.addLayout(survey_layout)
 
         # Bottom Layer
@@ -90,17 +92,22 @@ class MainWindow(QMainWindow):
     def update_survey(self):
         self.survey_select.clear() 
         survey_names = self.mpDB.fetch_columns(table='survey',columns='name')
-        self.survey_names_invert = dict((v,k) for k,v in survey_names.items()) # swap id,name
-        if self.survey_names_invert:
-            self.survey_select.addItems(self.survey_names_invert.keys())   
-            self.select_survey()     
+        self.survey_list = dict(survey_names)
+        self.survey_list_ordered = list(survey_names)
+        if self.survey_list_ordered:
+            self.survey_select.addItems([el[1] for el in survey_names])
+        self.button_manage_site_flag = self.select_survey()
+        self.button_site_manage.setEnabled(self.button_manage_site_flag)     
 
     def select_survey(self):
-        self.active_survey = [self.survey_names_invert[self.survey_select.currentText()],
-                              self.survey_select.currentText()]
-        print(self.active_survey)
+        try:
+            self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
+            return True
+        except IndexError:
+            return False
 
     def new_site(self):
+        self.select_survey()
         # create new from scratch, be able to import list from another survey
         dialog = SitePopup(self)
         if dialog.exec():

@@ -20,11 +20,13 @@ class SitePopup(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self.container)
 
         # SITE LIST
+        self.survey_id = parent.active_survey
+        self.mpDB = parent.mpDB
         # fetch from database
-        self.site_list = QtWidgets.QListWidget()
-        layout.addWidget(self.site_list)
-        self.site_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
-        self.site_list.itemSelectionChanged.connect(self.checkInput)
+        self.site_select = QtWidgets.QListWidget()
+        layout.addWidget(self.site_select)
+        self.site_select.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.site_select.itemSelectionChanged.connect(self.set_editdel)
  
         # Buttons
         button_layout = QtWidgets.QHBoxLayout()
@@ -48,14 +50,26 @@ class SitePopup(QtWidgets.QDialog):
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
+        
+        self.update_sites()
 
 
-    def checkInput(self):
-        self.button_site_edit.setEnabled(False)
+    def set_editdel(self):
+        # currentRow() returns -1 if nothing selected
+        flag = bool(self.site_select.currentRow()+1) 
+        self.button_site_edit.setEnabled(flag)
+        self.button_site_del.setEnabled(flag)
 
-    def get_sites(self,parent):
-        self.sites = parent.mpDB.fetch_rows("site",columns=("id","name",),)
-        self.survey_id = parent.active_survey
+    def update_sites(self):
+        self.site_select.clear()
+        cond = f'survey_id={self.survey_id[0]}'
+        sites = self.mpDB.fetch_rows("site", cond, columns="id, name")
+        self.site_list = dict(sites)
+        self.site_list_ordered = sites
+        if self.site_list_ordered:
+            self.site_select.addItems([el[1] for el in sites])
+        self.set_editdel()   
+        
 
     def add_site(self):
         dialog = SiteFillPopup(self)
@@ -63,28 +77,27 @@ class SitePopup(QtWidgets.QDialog):
             confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
                                          dialog.get_long(),self.survey_id[0])
             if confirm:
-                self.survey_select.addItems([dialog.get_name()])
+                self.site_select.addItems([dialog.get_name()])
         del dialog
     
     def edit_site(self):
         return True
     
     def delete_site(self):
-        selected = self.site_list.selectedIndexes()
-        sitename = self.site_list.selectedItems()
-        
-        dialog = ConfirmPopup(self, f'Are you sure you want to delete {sitename}')
+        selected = self.site_select.currentItem().text()
+        prompt = f'Are you sure you want to delete {selected}?'
+        print(prompt)
+        dialog = ConfirmPopup(self, prompt)
         if dialog.exec():
-            # delete site 
-            confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
-                                         dialog.get_long(),self.survey_id[0])
-            if confirm:
-                self.survey_select.addItems([dialog.get_name()])
+            row = self.site_list_ordered[self.site_select.currentRow()][0]
+            cond = f'id={row}'
+            self.mpDB.delete("site",cond)
         del dialog
+        self.update_sites()
 
 
 class SiteFillPopup(QtWidgets.QDialog):
-    def __init__(self, parent):
+    def __init__(self, parent, name=None, lat=None, long=None):
         super().__init__(parent)
         self.setWindowTitle("Edit Site")
         fullLayout = QtWidgets.QVBoxLayout(self)
@@ -116,21 +129,20 @@ class SiteFillPopup(QtWidgets.QDialog):
         # name
         layout.addWidget(QtWidgets.QLabel('Name'))
         self.name = QtWidgets.QLineEdit()
+        self.name.setText(name)
         layout.addWidget(self.name)
 
         #region
-        layout.addWidget(QtWidgets.QLabel('Region'))
-        self.region = QtWidgets.QLineEdit()
-        layout.addWidget(self.region)
+        layout.addWidget(QtWidgets.QLabel('Latitude'))
+        self.lat = QtWidgets.QLineEdit()
+        self.lat.setText(lat)
+        layout.addWidget(self.lat)
 
         # start year
-        layout.addWidget(QtWidgets.QLabel('Start Year'))
-        self.year_start = QtWidgets.QLineEdit()
-        layout.addWidget(self.year_start)
-
-        layout.addWidget(QtWidgets.QLabel(parent.survey_id))
-        self.year_end = QtWidgets.QLineEdit()
-        layout.addWidget(self.year_end)
+        layout.addWidget(QtWidgets.QLabel('Longitude'))
+        self.long = QtWidgets.QLineEdit()
+        self.long.setText(long)
+        layout.addWidget(self.long)
 
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
@@ -141,36 +153,30 @@ class SiteFillPopup(QtWidgets.QDialog):
         self.okButton.setEnabled(False)
 
         self.name.textChanged.connect(self.checkInput)
-        self.region.textChanged.connect(self.checkInput)
-        self.year_start.textChanged.connect(self.checkInput)
-        self.year_end.textChanged.connect(self.checkInput)
+        self.lat.textChanged.connect(self.checkInput)
+        self.long.textChanged.connect(self.checkInput)
 
         self.name.returnPressed.connect(lambda:
-                self.region.setFocus())
-        self.region.returnPressed.connect(lambda:
-                self.year_start.setFocus())
-        self.year_start.returnPressed.connect(lambda:
-                self.year_end.setFocus())
-        self.year_end.returnPressed.connect(self.accept_verify)
+                self.lat.setFocus())
+        self.lat.returnPressed.connect(lambda:
+                self.long.setFocus())
+        self.long.returnPressed.connect(self.accept_verify)
 
         self.name.setFocus()
 
     def checkInput(self):
         # year end not necessary
-        self.okButton.setEnabled(bool(self.get_name() and self.get_region() and self.get_year_start()))
+        self.okButton.setEnabled(bool(self.get_name() and self.get_lat() and self.get_long()))
 
     def get_name(self):
         return self.name.text()
 
-    def get_region(self):
-        return self.region.text()
+    def get_lat(self):
+        return self.lat.text()
     
-    def get_year_start(self):
-        return self.year_start.text()
-
-    def get_year_end(self):
-        return self.year_end.text()
+    def get_long(self):
+        return self.long.text()
 
     def accept_verify(self):
-        if self.get_name() and self.get_region() and self.get_year_start():
+        if self.get_name() and self.get_lat() and self.get_long():
             self.accept()
