@@ -31,7 +31,7 @@ class MatchyPatchyDB():
             db.close()
             return True
         except sqlite3.Error as error:
-            print("Failed to insert into survey table", error)
+            print("Failed to add survey", error)
             if db:
                 db.close()
             return False
@@ -49,7 +49,25 @@ class MatchyPatchyDB():
             db.close()
             return True
         except sqlite3.Error as error:
-            print("Failed to insert into survey table", error)
+            print("Failed to add site", error)
+            if db:
+                db.close()
+            return False
+        
+    def add_media(self, filepath, ext, site_id, datetime=None, comment=None):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            insert_survey = """INSERT INTO site
+                            (filepath, ext, datetime, comment, site_id) 
+                            VALUES (?, ?, ?, ?, ?);"""
+            data_tuple = (filepath, ext, datetime, comment, site_id)
+            cursor.execute(insert_survey, data_tuple)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.Error as error:
+            print(f"Failed to add media: {filepath}.", error)
             if db:
                 db.close()
             return False
@@ -86,14 +104,28 @@ class MatchyPatchyDB():
         cursor.execute(f'SELECT id, {columns} FROM {table};')
         rows = cursor.fetchall()  # returns in tuple
         db.close()
-        return dict(rows)
+        return rows
     
     def fetch_rows(self, table, row_cond, columns="*"):
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
-        command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
-        print(command)
-        cursor.execute(command)
+        cursor.execute(f'SELECT {columns} FROM {table} WHERE {row_cond};')
         rows = cursor.fetchall()  # returns in tuple
         db.close()
         return rows
+
+    def delete(self, table, cond):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = f'DELETE FROM {table} WHERE {cond};'
+            print(command)
+            cursor.execute(command)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.Error as error:
+            print("Failed to delete", error)
+            if db:
+                db.close()
+            return False
