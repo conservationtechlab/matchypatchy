@@ -4,6 +4,7 @@
 from PyQt6 import QtCore, QtWidgets
 
 from ..database import mpdb
+from .popup_confirm import ConfirmPopup
 
 class SitePopup(QtWidgets.QDialog):
     def __init__(self, parent):
@@ -29,16 +30,21 @@ class SitePopup(QtWidgets.QDialog):
         self.site_select.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.site_select.itemSelectionChanged.connect(self.check_selection)
  
-        # buttons
+        # Buttons
         button_layout = QtWidgets.QHBoxLayout()
         button_survey_new =  QtWidgets.QPushButton("New")
         button_survey_new.clicked.connect(self.add_site)
         button_layout.addWidget(button_survey_new)
 
-        self.button_site_edit =  QtWidgets.QPushButton("Edit")
+        self.button_site_edit = QtWidgets.QPushButton("Edit")
         self.button_site_edit.clicked.connect(self.edit_site)
         self.button_site_edit.setEnabled(False)
         button_layout.addWidget(self.button_site_edit)
+        
+        self.button_site_del = QtWidgets.QPushButton("Delete")
+        self.button_site_del.clicked.connect(self.delete_site)
+        self.button_site_del.setEnabled(False)
+        button_layout.addWidget(self.button_site_del)
 
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
@@ -46,19 +52,25 @@ class SitePopup(QtWidgets.QDialog):
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
+        
+        self.update_sites()
 
 
-    def check_selection(self):
-        self.button_site_edit.setEnabled(True)
+    def set_editdel(self):
+        # currentRow() returns -1 if nothing selected
+        flag = bool(self.site_select.currentRow()+1) 
+        self.button_site_edit.setEnabled(flag)
+        self.button_site_del.setEnabled(flag)
 
-    def get_sites(self):
-        self.site_select.clear() 
+    def update_sites(self):
+        self.site_select.clear()
         cond = f'survey_id={self.survey_id[0]}'
-        sites = self.mpDB.fetch_rows('site',cond,columns='id, name')
+        sites = self.mpDB.fetch_rows("site", cond, columns="id, name")
         self.site_list = dict(sites)
-        self.site_list_sequential = list(sites)
-        if self.site_list_sequential:
-            self.site_select.addItems([el[1] for el in self.site_list_sequential])   
+        self.site_list_ordered = sites
+        if self.site_list_ordered:
+            self.site_select.addItems([el[1] for el in sites])
+        self.set_editdel()   
 
     def add_site(self):
         dialog = SiteFillPopup(self)
@@ -80,10 +92,23 @@ class SitePopup(QtWidgets.QDialog):
         del dialog
         self.sites = self.get_sites()
     
+    def delete_site(self):
+        selected = self.site_select.currentItem().text()
+        prompt = f'Are you sure you want to delete {selected}?'
+        print(prompt)
+        dialog = ConfirmPopup(self, prompt)
+        if dialog.exec():
+            row = self.site_list_ordered[self.site_select.currentRow()][0]
+            cond = f'id={row}'
+            self.mpDB.delete("site",cond)
+        del dialog
+        self.update_sites()
+
 
 class SiteFillPopup(QtWidgets.QDialog):
     def __init__(self, parent, name=None, lat=None, long=None):
         super().__init__(parent)
+        self.setWindowTitle("Edit Site")
         fullLayout = QtWidgets.QVBoxLayout(self)
 
         self.container = QtWidgets.QWidget(objectName='container')
