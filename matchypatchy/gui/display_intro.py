@@ -89,14 +89,14 @@ class MainWindow(QMainWindow):
 
     def update_survey(self):
         self.survey_select.clear() 
-        survey_names = self.mpDB.fetch_columns(table='survey',columns='name')
-        self.survey_names_invert = dict((v,k) for k,v in survey_names.items()) # swap id,name
-        if self.survey_names_invert:
-            self.survey_select.addItems(self.survey_names_invert.keys())   
+        survey_list = self.mpDB.fetch_columns(table='survey',columns='name')
+        self.survey_list_invert = dict((v,k) for k,v in survey_list.items()) # swap id,name
+        if self.survey_list_invert:
+            self.survey_select.addItems(self.survey_list_invert.keys())   
             self.select_survey()     
 
     def select_survey(self):
-        self.active_survey = [self.survey_names_invert[self.survey_select.currentText()],
+        self.active_survey = [self.survey_list_invert[self.survey_select.currentText()],
                               self.survey_select.currentText()]
         print(self.active_survey)
 

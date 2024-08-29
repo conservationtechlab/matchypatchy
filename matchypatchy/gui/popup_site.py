@@ -8,6 +8,10 @@ from ..database import mpdb
 class SitePopup(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
+        #inherit survey information, db object
+        self.mpDB = parent.mpDB
+        self.survey_id = parent.active_survey
+
         fullLayout = QtWidgets.QVBoxLayout(self)
 
         self.container = QtWidgets.QWidget(objectName='container')
@@ -17,13 +21,13 @@ class SitePopup(QtWidgets.QDialog):
         
         layout = QtWidgets.QVBoxLayout(self.container)
 
-
         # SITE LIST
-        # fetch from database
-        self.site_list = QtWidgets.QListWidget()
-        layout.addWidget(self.site_list)
-        self.site_list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
-        self.site_list.itemSelectionChanged.connect(self.checkInput)
+        # fetch from database 
+        self.site_select = QtWidgets.QListWidget()
+        layout.addWidget(self.site_select) 
+        self.sites = self.get_sites()
+        self.site_select.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.site_select.itemSelectionChanged.connect(self.check_selection)
  
         # buttons
         button_layout = QtWidgets.QHBoxLayout()
@@ -44,28 +48,41 @@ class SitePopup(QtWidgets.QDialog):
         layout.addLayout(button_layout)
 
 
-    def checkInput(self):
-        self.button_site_edit.setEnabled(False)
+    def check_selection(self):
+        self.button_site_edit.setEnabled(True)
 
-    def get_sites(self,parent):
-        self.sites = parent.mpDB.fetch_rows("site",columns=("id","name",),)
-        self.survey_id = parent.active_survey
+    def get_sites(self):
+        self.site_select.clear() 
+        cond = f'survey_id={self.survey_id[0]}'
+        sites = self.mpDB.fetch_rows('site',cond,columns='id, name')
+        self.site_list = dict(sites)
+        self.site_list_sequential = list(sites)
+        if self.site_list_sequential:
+            self.site_select.addItems([el[1] for el in self.site_list_sequential])   
 
     def add_site(self):
-        dialog = SitePopup(self)
+        dialog = SiteFillPopup(self)
         if dialog.exec():
             confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
                                          dialog.get_long(),self.survey_id[0])
-            if confirm:
-                self.survey_select.addItems([dialog.get_name()])
         del dialog
-    
+        self.sites = self.get_sites()
+
     def edit_site(self):
-        return True
+        selected_site = self.site_select.selectedIndexes()
+        id = self.site_list_sequential[selected_site[0].row()][0]
+        cond = f'id={id}'
+        id, name, lat, long = self.mpDB.fetch_rows('site',cond,columns='id, name, lat, long')[0]
+        dialog = SiteFillPopup(self, name=name, lat=lat, long=long)
+        if dialog.exec():
+            replace_dict = {"name":f"'{dialog.get_name()}'", "lat":dialog.get_lat(), "long":dialog.get_long()}
+            confirm = self.mpDB.edit_row("site",id,replace_dict)
+        del dialog
+        self.sites = self.get_sites()
     
 
 class SiteFillPopup(QtWidgets.QDialog):
-    def __init__(self, parent):
+    def __init__(self, parent, name=None, lat=None, long=None):
         super().__init__(parent)
         fullLayout = QtWidgets.QVBoxLayout(self)
 
@@ -80,37 +97,28 @@ class SiteFillPopup(QtWidgets.QDialog):
         layout.setContentsMargins(
             buttonSize * 2, buttonSize, buttonSize * 2, buttonSize)
 
-        '''
-        site_id INTEGER PRIMARY KEY,
-                            name TEXT NOT NULL,
-                            lat REAL NOT NULL,
-                            long REAL NOT NULL,
-                            survey_id INTEGER NOT NULL,
-        '''
-
         title = QtWidgets.QLabel(
-            'Enter a new Site', 
+            f'Edit Site for {parent.survey_id[1]}', 
             objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         # name
         layout.addWidget(QtWidgets.QLabel('Name'))
         self.name = QtWidgets.QLineEdit()
+        self.name.setText(name)
         layout.addWidget(self.name)
 
         #region
-        layout.addWidget(QtWidgets.QLabel('Region'))
-        self.region = QtWidgets.QLineEdit()
-        layout.addWidget(self.region)
+        layout.addWidget(QtWidgets.QLabel('Latitude'))
+        self.lat = QtWidgets.QLineEdit()
+        self.lat.setText(str(lat))
+        layout.addWidget(self.lat)
 
         # start year
-        layout.addWidget(QtWidgets.QLabel('Start Year'))
-        self.year_start = QtWidgets.QLineEdit()
-        layout.addWidget(self.year_start)
-
-        layout.addWidget(QtWidgets.QLabel(parent.survey_id))
-        self.year_end = QtWidgets.QLineEdit()
-        layout.addWidget(self.year_end)
+        layout.addWidget(QtWidgets.QLabel('Longitude'))
+        self.long = QtWidgets.QLineEdit()
+        self.long.setText(str(long))
+        layout.addWidget(self.long)
 
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
@@ -118,39 +126,34 @@ class SiteFillPopup(QtWidgets.QDialog):
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)
         self.okButton = buttonBox.button(buttonBox.StandardButton.Ok)
-        self.okButton.setEnabled(False)
+        self.okButton.setEnabled(False) 
+        self.checkInput() # will enable ok button if in edit mode
 
         self.name.textChanged.connect(self.checkInput)
-        self.region.textChanged.connect(self.checkInput)
-        self.year_start.textChanged.connect(self.checkInput)
-        self.year_end.textChanged.connect(self.checkInput)
+        self.lat.textChanged.connect(self.checkInput)
+        self.long.textChanged.connect(self.checkInput)
 
         self.name.returnPressed.connect(lambda:
-                self.region.setFocus())
-        self.region.returnPressed.connect(lambda:
-                self.year_start.setFocus())
-        self.year_start.returnPressed.connect(lambda:
-                self.year_end.setFocus())
-        self.year_end.returnPressed.connect(self.accept_verify)
+                self.lat.setFocus())
+        self.lat.returnPressed.connect(lambda:
+                self.long.setFocus())
+        self.long.returnPressed.connect(self.accept_verify)
 
         self.name.setFocus()
 
     def checkInput(self):
         # year end not necessary
-        self.okButton.setEnabled(bool(self.get_name() and self.get_region() and self.get_year_start()))
+        self.okButton.setEnabled(bool(self.get_name() and self.get_lat() and self.get_long()))
 
     def get_name(self):
         return self.name.text()
 
-    def get_region(self):
-        return self.region.text()
+    def get_lat(self):
+        return self.lat.text()
     
-    def get_year_start(self):
-        return self.year_start.text()
-
-    def get_year_end(self):
-        return self.year_end.text()
+    def get_long(self):
+        return self.long.text()
 
     def accept_verify(self):
-        if self.get_name() and self.get_region() and self.get_year_start():
+        if self.get_name() and self.get_lat() and self.get_long():
             self.accept()
