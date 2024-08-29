@@ -54,6 +54,23 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
+    def edit_row(self, table, id, replace):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            replace_values = ",".join(f"{k}={v}" for k,v in replace.items())
+            command = f"UPDATE {table} SET {replace_values} WHERE id={id}"
+            print(command)
+            cursor.execute(command)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.Error as error:
+            print("Failed to update table", error)
+            if db:
+                db.close()
+            return False
+        
     def fetch_table(self, table):
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
@@ -74,7 +91,9 @@ class MatchyPatchyDB():
     def fetch_rows(self, table, row_cond, columns="*"):
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
-        cursor.execute(f'SELECT {columns} FROM {table} WHERE {row_cond};')
+        command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
+        print(command)
+        cursor.execute(command)
         rows = cursor.fetchall()  # returns in tuple
         db.close()
-        return [el[0] for el in rows]
+        return rows
