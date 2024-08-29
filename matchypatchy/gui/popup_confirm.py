@@ -4,12 +4,12 @@
 from PyQt6 import QtCore, QtWidgets
 
 class ConfirmPopup(QtWidgets.QDialog):
-    def __init__(self, prompt):
-        super().__init__()
+    def __init__(self, parent, prompt):
+        super().__init__(parent)
         
         self.prompt = prompt
         
-        self.setWindowTitle("Confirm")
+        self.setWindowTitle("Confirmation")
         fullLayout = QtWidgets.QVBoxLayout(self)
         self.container = QtWidgets.QWidget(objectName='container')
         fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
