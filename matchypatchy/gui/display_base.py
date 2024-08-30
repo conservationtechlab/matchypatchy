@@ -1,11 +1,14 @@
+"""
+Base Gui View
+"""
 import sys
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,
-                             QMenuBar, QVBoxLayout, QHBoxLayout, QComboBox,
-                             QLabel)
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtWidgets import (QApplication, QPushButton, QWidget,
+                             QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
+from PyQt6.QtCore import Qt
 
 from .popup_survey import SurveyPopup
 from .popup_site import SitePopup
+
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
@@ -17,22 +20,22 @@ class DisplayBase(QWidget):
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.label)
 
-        # list surveys
+        # Surveys
         survey_layout = QHBoxLayout()
         survey_label = QLabel("Survey:")
-        survey_layout.addWidget(survey_label,0)
+        survey_layout.addWidget(survey_label, 0)
         self.survey_select = QComboBox()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
-        survey_layout.addWidget(self.survey_select,2)
+        survey_layout.addWidget(self.survey_select, 2)
 
-        button_survey_new =  QPushButton("New Survey")
+        button_survey_new = QPushButton("New Survey")
         button_survey_new.clicked.connect(self.new_survey)
-        survey_layout.addWidget(button_survey_new,1)
+        survey_layout.addWidget(button_survey_new, 1)
 
         # Sites
-        self.button_site_manage =  QPushButton("Manage Sites")
+        self.button_site_manage = QPushButton("Manage Sites")
         self.button_site_manage.clicked.connect(self.new_site)
-        survey_layout.addWidget(self.button_site_manage,1)
+        survey_layout.addWidget(self.button_site_manage, 1)
         self.button_manage_site_flag = False
         self.button_site_manage.setEnabled(self.button_manage_site_flag)
 
@@ -63,8 +66,8 @@ class DisplayBase(QWidget):
     def new_survey(self):
         dialog = SurveyPopup(self)
         if dialog.exec():
-            confirm = self.mpDB.add_survey(dialog.get_name(),dialog.get_region(),
-                                           dialog.get_year_start(),dialog.get_year_start())
+            confirm = self.mpDB.add_survey(dialog.get_name(), dialog.get_region(),
+                                           dialog.get_year_start(), dialog.get_year_start())
             if confirm:
                 self.update_survey()
         del dialog
