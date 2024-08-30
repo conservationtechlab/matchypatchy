@@ -105,7 +105,7 @@ class SitePopup(QtWidgets.QDialog):
 
 
 class SiteFillPopup(QtWidgets.QDialog):
-    def __init__(self, parent, name=None, lat=None, long=None):
+    def __init__(self, parent, name="", lat="", long=""):
         super().__init__(parent)
         self.setWindowTitle("Edit Site")
         fullLayout = QtWidgets.QVBoxLayout(self)
