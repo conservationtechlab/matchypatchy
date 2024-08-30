@@ -77,7 +77,7 @@ class SitePopup(QtWidgets.QDialog):
             confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
                                          dialog.get_long(),self.survey_id[0])
         del dialog
-        self.sites = self.get_sites()
+        self.sites = self.update_sites()
 
     def edit_site(self):
         selected_site = self.site_select.currentRow()
@@ -105,7 +105,7 @@ class SitePopup(QtWidgets.QDialog):
 
 
 class SiteFillPopup(QtWidgets.QDialog):
-    def __init__(self, parent, name=None, lat=None, long=None):
+    def __init__(self, parent, name="", lat="", long=""):
         super().__init__(parent)
         self.setWindowTitle("Edit Site")
         fullLayout = QtWidgets.QVBoxLayout(self)

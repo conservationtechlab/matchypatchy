@@ -1,21 +1,25 @@
 import sys
+from pathlib import Path
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,
                              QMenuBar, QVBoxLayout, QHBoxLayout, QComboBox,
-                             QLabel,QSizePolicy)
+                             QLabel,QSizePolicy, QFileDialog)
 from PyQt6.QtCore import QSize, Qt
 from PyQt6.QtGui import QImage, QPixmap
 
 from .popup_survey import SurveyPopup
 from .popup_site import SitePopup
+from ..database import media
+
 
 class MainWindow(QMainWindow):
     def __init__(self, mpDB):
         super().__init__()
+        self.home = str(Path.home())
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
         self.setFixedSize(QSize(1200, 800))
         # Set the central widget of the Window.
-        main_widget = QWidget(self)
+        main_widget = QWidget()
         main_widget.setFocus()
         layout = QVBoxLayout()
 
@@ -63,9 +67,9 @@ class MainWindow(QMainWindow):
         button_load = QPushButton("Load Data")
         button_match = QPushButton("Match")
 
-        button_validate.clicked.connect(self.validate_db)
+        button_validate.clicked.connect(self.validate)
         button_load.clicked.connect(self.upload_media)
-        button_match.clicked.connect(self.match)
+        button_match.clicked.connect(self._display_single)
 
         # Add buttons to the layout
         bottom_layer.addWidget(button_validate)
@@ -78,9 +82,9 @@ class MainWindow(QMainWindow):
         self._createMenuBar()
         self.setCentralWidget(main_widget)
         
-    def validate_db(self):
+    def validate(self):
         tables = self.mpDB.validate()
-        self.label.setText(str(tables))
+        # set image view
 
     def _createMenuBar(self):
         menuBar = QMenuBar(self)
@@ -130,13 +134,39 @@ class MainWindow(QMainWindow):
         '''
         Add media from CSV (completed from animl)
         '''
-        return True
-               # fileName = QFileDialog.getOpenFileName(self,
-       # tr("Open Image"), "/home/jana", tr("Image Files (*.png *.jpg *.bmp)"))
+        self.select_survey()
+        sites = media.fetch_sites(self.mpDB, self.active_survey[0])
+        self.media_file = QFileDialog.getOpenFileName(self, "Import Image List", self.home, "CSV files (*.csv)")[0]
+        media.import_csv(self.mpDB, self.media_file, sites)
+
 
     def match(self):
         return True
-        
+    
+
+    def _display_single(self):
+        main_widget = QWidget()
+        main_widget.setFocus()
+        layout = QVBoxLayout()
+
+        self.label = QLabel("Image Viewer")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label,0)
+
+                #image screen
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_label.setScaledContents(True)
+        self.image_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        layout.addWidget(self.image_label,1)
+
+        self.image = QImage("C:/Users/Kyra/matchypatchy/IMAG0104.JPG")
+        pixmap = QPixmap(self.image)
+        self.image_label.setPixmap(pixmap)
+
+        main_widget.setLayout(layout)
+        self._createMenuBar()
+        self.setCentralWidget(main_widget)
 
 
 def main_display(mpDB):
@@ -147,11 +177,10 @@ def main_display(mpDB):
         mpDB: matchypatchy database object
     """
     app = QApplication(sys.argv)
-
     window = MainWindow(mpDB)
     window.show()
-
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main_display()
