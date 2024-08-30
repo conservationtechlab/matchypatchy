@@ -2,14 +2,13 @@
 Main Function
 
 '''
-
-from .gui import display_intro
+from .gui import main_gui
 from .database import mpdb
 
 
 def main(filepath='matchypatchy.db'):
     mpDB = mpdb.MatchyPatchyDB(filepath)
-    display_intro.main_display(mpDB)
+    main_gui.main_display(mpDB)
 
 
 if __name__ == "__main__":
