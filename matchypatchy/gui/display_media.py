@@ -1,124 +1,62 @@
-import sys
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,
-                             QMenuBar, QVBoxLayout, QHBoxLayout, QComboBox,
-                             QLabel)
-from PyQt6.QtCore import QSize, Qt
+"""
+GUI Window for viewing images
+"""
+from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
+                             QLabel, QSizePolicy)
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt
 
-from .popup_survey import SurveyPopup
-from .popup_site import SitePopup
 
 class DisplayMedia(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.mpDB = parent.mpDB
-        layout = QVBoxLayout(self)
+        container = QVBoxLayout(self)
 
         self.label = QLabel("Welcome to MatchyPatchy")
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(self.label)
+        container.addWidget(self.label,0)
+        
+        # Images
+        image_layout = QHBoxLayout()
 
-        # list surveys
-        survey_layout = QHBoxLayout()
-        survey_label = QLabel("Survey:")
-        survey_layout.addWidget(survey_label,0)
-        self.survey_select = QComboBox()
-        self.survey_select.currentIndexChanged.connect(self.select_survey)
-        survey_layout.addWidget(self.survey_select,2)
-
-        button_survey_new =  QPushButton("New Survey")
-        button_survey_new.clicked.connect(self.new_survey)
-        survey_layout.addWidget(button_survey_new,1)
-
-        # Sites
-        self.button_site_manage =  QPushButton("Manage Sites")
-        self.button_site_manage.clicked.connect(self.new_site)
-        survey_layout.addWidget(self.button_site_manage,1)
-        self.button_manage_site_flag = False
-        self.button_site_manage.setEnabled(self.button_manage_site_flag)
-
-        self.update_survey()
-        layout.addLayout(survey_layout)
-
-        # Bottom Layer
+        self.left_box = QLabel()
+        self.left_box.resize(400,300)
+        self.left_box.setScaledContents(True)
+        self.left_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        image_layout.addWidget(self.left_box,0)
+         
+        self.right_box = QLabel()
+        self.right_box.resize(400,300)
+        self.right_box.setScaledContents(True)
+        self.right_box.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        image_layout.addWidget(self.right_box,0)
+        container.addLayout(image_layout,0)
+        
+        
+        # Buttons
         bottom_layer = QHBoxLayout()
-        # Create three buttons
         button_validate = QPushButton("Validate DB")
         button_load = QPushButton("Load Data")
         button_match = QPushButton("Match")
-
-        button_validate.clicked.connect(self.validate_db)
-        button_load.clicked.connect(self.upload_media)
-        button_match.clicked.connect(self.match)
 
         # Add buttons to the layout
         bottom_layer.addWidget(button_validate)
         bottom_layer.addWidget(button_load)
         bottom_layer.addWidget(button_match)
-        layout.addLayout(bottom_layer)
-
-    def validate_db(self):
-        tables = self.mpDB.validate()
-        self.label.setText(str(tables))
-
-    def new_survey(self):
-        dialog = SurveyPopup(self)
-        if dialog.exec():
-            confirm = self.mpDB.add_survey(dialog.get_name(),dialog.get_region(),
-                                           dialog.get_year_start(),dialog.get_year_start())
-            if confirm:
-                self.update_survey()
-        del dialog
-
-    def update_survey(self):
-        self.survey_select.clear() 
-        survey_names = self.mpDB.fetch_columns(table='survey',columns='name')
-        self.survey_list = dict(survey_names)
-        self.survey_list_ordered = list(survey_names)
-        if self.survey_list_ordered:
-            self.survey_select.addItems([el[1] for el in survey_names])
-        self.button_manage_site_flag = self.select_survey()
-        self.button_site_manage.setEnabled(self.button_manage_site_flag)     
-
-    def select_survey(self):
-        try:
-            self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
-            return True
-        except IndexError:
-            return False
-
-    def new_site(self):
-        self.select_survey()
-        # create new from scratch, be able to import list from another survey
-        dialog = SitePopup(self)
-        if dialog.exec():
-            del dialog
-
-    def upload_media(self):
-        '''
-        Add media from CSV (completed from animl)
-        '''
-        return True
-               # fileName = QFileDialog.getOpenFileName(self,
-       # tr("Open Image"), "/home/jana", tr("Image Files (*.png *.jpg *.bmp)"))
-
-    def match(self):
-        return True
+        container.addLayout(bottom_layer)
+        
+        
+        self.load_image1('/home/kyra/animl-py/examples/Southwest/2021-06-30_SYFR0218.JPG')
+        self.load_image2('/home/kyra/animl-py/examples/Southwest/2021-08-08_RCNX0063.JPG')
+        
         
 
+    def load_image1(self, filepath):
+        self.image1 = QPixmap(filepath)
+        self.left_box.setPixmap(self.image1)
 
-def main_display(mpDB):
-    """
-    Launch GUI
-
-    Args:
-        mpDB: matchypatchy database object
-    """
-    app = QApplication(sys.argv)
-
-    window = MainWindow(mpDB)
-    window.show()
-
-    sys.exit(app.exec())
-
-if __name__ == "__main__":
-    main_display()
+        
+    def load_image2(self, filepath):
+        self.image2 = QPixmap(filepath)
+        self.right_box.setPixmap(self.image2)
