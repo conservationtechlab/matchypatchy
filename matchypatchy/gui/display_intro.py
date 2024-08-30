@@ -1,8 +1,9 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QWidget,
                              QMenuBar, QVBoxLayout, QHBoxLayout, QComboBox,
-                             QLabel)
+                             QLabel,QSizePolicy)
 from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QImage, QPixmap
 
 from .popup_survey import SurveyPopup
 from .popup_site import SitePopup
@@ -19,8 +20,19 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
 
         self.label = QLabel("Welcome to MatchyPatchy")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(self.label)
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label,0)
+
+        #image screen
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_label.setScaledContents(True)
+        self.image_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        layout.addWidget(self.image_label,1)
+
+        self.image = QImage("C:/Users/Kyra/matchypatchy/IMAG0104.JPG")
+        pixmap = QPixmap(self.image)
+        self.image_label.setPixmap(pixmap)
 
         # list surveys
         survey_layout = QHBoxLayout()
@@ -75,6 +87,7 @@ class MainWindow(QMainWindow):
         self.setMenuBar(menuBar)
         # FILE
         file = menuBar.addMenu("File")
+        Edit = menuBar.addMenu("Edit")
         view = menuBar.addMenu("View")
         Help = menuBar.addMenu("Help")
 

@@ -26,9 +26,8 @@ class SitePopup(QtWidgets.QDialog):
         # fetch from database 
         self.site_select = QtWidgets.QListWidget()
         layout.addWidget(self.site_select) 
-        self.sites = self.get_sites()
         self.site_select.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
-        self.site_select.itemSelectionChanged.connect(self.check_selection)
+        self.site_select.itemSelectionChanged.connect(self.set_editdel)
  
         # Buttons
         button_layout = QtWidgets.QHBoxLayout()
@@ -81,8 +80,8 @@ class SitePopup(QtWidgets.QDialog):
         self.sites = self.get_sites()
 
     def edit_site(self):
-        selected_site = self.site_select.selectedIndexes()
-        id = self.site_list_sequential[selected_site[0].row()][0]
+        selected_site = self.site_select.currentRow()
+        id = self.site_list_ordered[selected_site][0]
         cond = f'id={id}'
         id, name, lat, long = self.mpDB.fetch_rows('site',cond,columns='id, name, lat, long')[0]
         dialog = SiteFillPopup(self, name=name, lat=lat, long=long)
@@ -90,7 +89,7 @@ class SitePopup(QtWidgets.QDialog):
             replace_dict = {"name":f"'{dialog.get_name()}'", "lat":dialog.get_lat(), "long":dialog.get_long()}
             confirm = self.mpDB.edit_row("site",id,replace_dict)
         del dialog
-        self.sites = self.get_sites()
+        self.sites = self.update_sites()
     
     def delete_site(self):
         selected = self.site_select.currentItem().text()
