@@ -22,11 +22,11 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            insert_survey = """INSERT INTO survey
-                            (name, year_start, year_end, region) 
-                            VALUES (?, ?, ?, ?);"""
+            command = """INSERT INTO survey
+                        (name, year_start, year_end, region) 
+                        VALUES (?, ?, ?, ?);"""
             data_tuple = (name,  year_start, year_end, region)
-            cursor.execute(insert_survey, data_tuple)
+            cursor.execute(command, data_tuple)
             db.commit()
             db.close()
             return True
@@ -40,11 +40,11 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            insert_survey = """INSERT INTO site
-                            (name, lat, long, survey_id) 
-                            VALUES (?, ?, ?, ?);"""
-            data_tuple = (name,  lat, long, survey_id)
-            cursor.execute(insert_survey, data_tuple)
+            command = """INSERT INTO site
+                        (name, lat, long, survey_id) 
+                        VALUES (?, ?, ?, ?);"""
+            data_tuple = (name, lat, long, survey_id)
+            cursor.execute(command, data_tuple)
             db.commit()
             db.close()
             return True
@@ -58,11 +58,11 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            insert_survey = """INSERT INTO site
-                            (filepath, ext, datetime, comment, site_id) 
-                            VALUES (?, ?, ?, ?, ?);"""
+            command = """INSERT INTO media
+                        (filepath, ext, datetime, comment, site_id) 
+                        VALUES (?, ?, ?, ?, ?);"""
             data_tuple = (filepath, ext, datetime, comment, site_id)
-            cursor.execute(insert_survey, data_tuple)
+            cursor.execute(command, data_tuple)
             db.commit()
             db.close()
             return True
@@ -92,7 +92,8 @@ class MatchyPatchyDB():
     def fetch_table(self, table):
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
-        cursor.execute(f'SELECT * FROM {table};')
+        command = f'SELECT * FROM {table};'
+        cursor.execute(command)
         rows = cursor.fetchall()
         db.close()
         return rows
@@ -101,7 +102,8 @@ class MatchyPatchyDB():
         # check if columns is list, concat
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
-        cursor.execute(f'SELECT id, {columns} FROM {table};')
+        command = f'SELECT id, {columns} FROM {table};'
+        cursor.execute(command)
         rows = cursor.fetchall()  # returns in tuple
         db.close()
         return rows
@@ -109,7 +111,9 @@ class MatchyPatchyDB():
     def fetch_rows(self, table, row_cond, columns="*"):
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
-        cursor.execute(f'SELECT {columns} FROM {table} WHERE {row_cond};')
+        command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
+        print(command)
+        cursor.execute(command)
         rows = cursor.fetchall()  # returns in tuple
         db.close()
         return rows
