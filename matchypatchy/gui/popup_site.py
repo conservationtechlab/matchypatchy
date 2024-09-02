@@ -77,7 +77,7 @@ class SitePopup(QtWidgets.QDialog):
             confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
                                          dialog.get_long(),self.survey_id[0])
         del dialog
-        self.sites = self.get_sites()
+        self.sites = self.update_sites()
 
     def edit_site(self):
         selected_site = self.site_select.currentRow()
