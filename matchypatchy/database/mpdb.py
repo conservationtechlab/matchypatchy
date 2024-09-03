@@ -27,9 +27,10 @@ class MatchyPatchyDB():
                         VALUES (?, ?, ?, ?);"""
             data_tuple = (name,  year_start, year_end, region)
             cursor.execute(command, data_tuple)
+            id = cursor.lastrowid
             db.commit()
             db.close()
-            return True
+            return id
         except sqlite3.Error as error:
             print("Failed to add survey", error)
             if db:
@@ -45,9 +46,10 @@ class MatchyPatchyDB():
                         VALUES (?, ?, ?, ?);"""
             data_tuple = (name, lat, long, survey_id)
             cursor.execute(command, data_tuple)
+            id = cursor.lastrowid
             db.commit()
             db.close()
-            return True
+            return id
         except sqlite3.Error as error:
             print("Failed to add site", error)
             if db:
@@ -63,11 +65,31 @@ class MatchyPatchyDB():
                         VALUES (?, ?, ?, ?, ?);"""
             data_tuple = (filepath, ext, datetime, comment, site_id)
             cursor.execute(command, data_tuple)
+            id = cursor.lastrowid
             db.commit()
             db.close()
-            return True
+            return id
         except sqlite3.Error as error:
             print(f"Failed to add media: {filepath}.", error)
+            if db:
+                db.close()
+            return False
+        
+    def add_roi(self, filepath, ext, site_id, datetime=None, comment=None):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = """INSERT INTO media
+                        (filepath, ext, datetime, comment, site_id) 
+                        VALUES (?, ?, ?, ?, ?);"""
+            data_tuple = (filepath, ext, datetime, comment, site_id)
+            cursor.execute(command, data_tuple)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            print(f"Failed to add roi: {filepath}.", error)
             if db:
                 db.close()
             return False
@@ -117,6 +139,7 @@ class MatchyPatchyDB():
         rows = cursor.fetchall()  # returns in tuple
         db.close()
         return rows
+    
 
     def delete(self, table, cond):
         try:
