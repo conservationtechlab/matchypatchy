@@ -1,7 +1,7 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QMenuBar, QStackedLayout)
-from PyQt6.QtCore import QSize
+from PyQt6.QtCore import QSize, QObject, QEvent
 
 from .display_base import DisplayBase
 from .display_media import DisplayMedia
@@ -31,7 +31,10 @@ class MainWindow(QMainWindow):
         # Set the layout for the window
         container.setLayout(self.pages)
         self._set_base_view()
+
         self.setCentralWidget(container)
+
+        
 
     def _createMenuBar(self):
         menuBar = QMenuBar(self)
@@ -52,6 +55,12 @@ class MainWindow(QMainWindow):
 
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        key_text = event.text()
+        print(f"Key pressed: {key_text} (Qt key code: {key})")
+
 
 
 def main_display(mpDB):
