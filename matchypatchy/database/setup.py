@@ -63,7 +63,7 @@ def setup_database(filepath='matchypatchy.db'):
     
     # SPECIES
     cursor.execute('''CREATE TABLE IF NOT EXISTS species (
-                        species_id INTEGER PRIMARY KEY,
+                        id INTEGER PRIMARY KEY,
                         binomen TEXT NOT NULL,
                         common TEXT NOT NULL )''')
     
