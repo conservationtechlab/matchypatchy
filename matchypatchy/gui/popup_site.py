@@ -24,26 +24,26 @@ class SitePopup(QtWidgets.QDialog):
 
         # SITE LIST
         # fetch from database 
-        self.site_select = QtWidgets.QListWidget()
-        layout.addWidget(self.site_select) 
-        self.site_select.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
-        self.site_select.itemSelectionChanged.connect(self.set_editdel)
+        self.list = QtWidgets.QListWidget()
+        layout.addWidget(self.list) 
+        self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.list.itemSelectionChanged.connect(self.set_editdel)
  
         # Buttons
         button_layout = QtWidgets.QHBoxLayout()
-        button_survey_new =  QtWidgets.QPushButton("New")
-        button_survey_new.clicked.connect(self.add)
-        button_layout.addWidget(button_survey_new)
+        button_new =  QtWidgets.QPushButton("New")
+        button_new.clicked.connect(self.add)
+        button_layout.addWidget(button_new)
 
-        self.button_site_edit = QtWidgets.QPushButton("Edit")
-        self.button_site_edit.clicked.connect(self.edit)
-        self.button_site_edit.setEnabled(False)
-        button_layout.addWidget(self.button_site_edit)
+        self.button_edit = QtWidgets.QPushButton("Edit")
+        self.button_edit.clicked.connect(self.edit)
+        self.button_edit.setEnabled(False)
+        button_layout.addWidget(self.button_edit)
         
-        self.button_site_del = QtWidgets.QPushButton("Delete")
-        self.button_site_del.clicked.connect(self.delete)
-        self.button_site_del.setEnabled(False)
-        button_layout.addWidget(self.button_site_del)
+        self.button_del = QtWidgets.QPushButton("Delete")
+        self.button_del.clicked.connect(self.delete)
+        self.button_del.setEnabled(False)
+        button_layout.addWidget(self.button_del)
 
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
@@ -57,18 +57,17 @@ class SitePopup(QtWidgets.QDialog):
 
     def set_editdel(self):
         # currentRow() returns -1 if nothing selected
-        flag = bool(self.site_select.currentRow()+1) 
-        self.button_site_edit.setEnabled(flag)
-        self.button_site_del.setEnabled(flag)
+        flag = bool(self.list.currentRow()+1) 
+        self.button_edit.setEnabled(flag)
+        self.button_del.setEnabled(flag)
 
     def update(self):
-        self.site_select.clear()
+        self.list.clear()
         cond = f'survey_id={self.survey_id[0]}'
-        sites = self.mpDB.fetch_rows("site", cond, columns="id, name")
-        self.site_list = dict(sites)
-        self.site_list_ordered = sites
+        self.site_list_ordered = self.mpDB.fetch_rows("site", cond, columns="id, name")
+        self.site_list = dict(self.site_list_ordered)
         if self.site_list_ordered:
-            self.site_select.addItems([el[1] for el in sites])
+            self.list.addItems([el[1] for el in self.site_list_ordered])
         self.set_editdel()   
 
     def add(self):
@@ -80,7 +79,7 @@ class SitePopup(QtWidgets.QDialog):
         self.sites = self.update()
 
     def edit(self):
-        selected_site = self.site_select.currentRow()
+        selected_site = self.list.currentRow()
         id = self.site_list_ordered[selected_site][0]
         cond = f'id={id}'
         id, name, lat, long = self.mpDB.fetch_rows('site',cond,columns='id, name, lat, long')[0]
@@ -92,12 +91,12 @@ class SitePopup(QtWidgets.QDialog):
         self.sites = self.update()
     
     def delete(self):
-        selected = self.site_select.currentItem().text()
+        selected = self.list.currentItem().text()
         prompt = f'Are you sure you want to delete {selected}?'
         print(prompt)
         dialog = ConfirmPopup(self, prompt)
         if dialog.exec():
-            row = self.site_list_ordered[self.site_select.currentRow()][0]
+            row = self.site_list_ordered[self.list.currentRow()][0]
             cond = f'id={row}'
             self.mpDB.delete("site",cond)
         del dialog
