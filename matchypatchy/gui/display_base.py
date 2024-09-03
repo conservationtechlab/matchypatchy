@@ -11,7 +11,8 @@ from .popup_survey import SurveyPopup
 from .popup_site import SitePopup
 from .popup_alert import AlertPopup
 from .popup_species import SpeciesPopup
-from ..database.media import fetch_sites, import_csv
+from ..database.media import import_csv
+from ..database.sites import fetch_sites
 
 
 class DisplayBase(QWidget):

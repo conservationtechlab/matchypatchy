@@ -44,26 +44,28 @@ def import_csv(mpDB, manifest_filepath, valid_sites):
             return False
 
         media_id = mpDB.add_media(filepath, ext, site_id, datetime=datetime)
-        # TODO: add all ROIs within group
+        # TODO: add dtype checks
         for _, roi in group.iterrows():
-            print(roi)
+            
+            frame = roi["Frame Number"]
 
-    print(f"Added {len(unique_images)} files to Database")
+            bbox_x = roi['bbox1']
+            bbox_y = roi['bbox2']
+            bbox_w = roi['bbox3']
+            bbox_h = roi['bbox4']
 
-    
-def fetch_sites(mpDB, survey_id):
-    """
-    Fetches sites associated with given survey, checks that they have unique names,
+            species = roi['Species']
+            if isinstance(species, str):
+                species_id = mpDB.fetch_rows("species", f'common={species}', columns='id')
+                # look up species id
+            elif isinstance(species, int):
+                species_id = species 
+            else:
+                raise AssertionError('Species value not recognized.')
+            
+            print(species_id)
+            mpDB.add_roi(frame, bbox_x, bbox_y, bbox_w, bbox_h, 
+                         media_id, species_id, reviewed=False, iid=None, emb_id=None)
 
-    Args
-        - mpDB
-        - survey_id (int): requested survey id 
-    Returns
-        - an inverted dictionary in order to match manifest site names to table id
-    """
-    cond = f'survey_id={survey_id}'
-    sites = dict(mpDB.fetch_rows("site", cond, columns="id, name"))
-    if not len(sites.keys()) == len(set(sites.keys())):
-        AssertionError('Survey has duplicate site names, please fix before importing.')
-    sites = swap_keyvalue(sites)
-    return sites
+
+    print(f"Added {len(unique_images)} files and {len(manifest)} ROIs to Database")
