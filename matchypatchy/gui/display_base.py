@@ -113,8 +113,8 @@ class DisplayBase(QWidget):
             import_csv(self.mpDB, manifest, valid_sites)
         else:
             dialog = AlertPopup(self, "Please create a new survey before uploading.")
-        if dialog.exec():
-            del dialog
+            if dialog.exec():
+                del dialog
 
 
     # Match Button
