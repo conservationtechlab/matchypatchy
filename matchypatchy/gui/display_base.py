@@ -10,12 +10,14 @@ from PyQt6.QtCore import Qt
 from .popup_survey import SurveyPopup
 from .popup_site import SitePopup
 from .popup_alert import AlertPopup
+from .popup_species import SpeciesPopup
 from ..database.media import fetch_sites, import_csv
 
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
         super().__init__()
+        self.parent = parent
         self.mpDB = parent.mpDB
         layout = QVBoxLayout(self)
 
@@ -41,6 +43,10 @@ class DisplayBase(QWidget):
         survey_layout.addWidget(self.button_site_manage, 1)
         self.button_manage_site_flag = False
         self.button_site_manage.setEnabled(self.button_manage_site_flag)
+
+        self.button_species_manage = QPushButton("Manage Species")
+        self.button_species_manage.clicked.connect(self.manage_species)
+        survey_layout.addWidget(self.button_species_manage, 1)
 
         self.update_survey()
         layout.addLayout(survey_layout)
@@ -93,6 +99,11 @@ class DisplayBase(QWidget):
         self.select_survey()
         # create new from scratch, be able to import list from another survey
         dialog = SitePopup(self)
+        if dialog.exec():
+            del dialog
+
+    def manage_species(self):
+        dialog = SpeciesPopup(self)
         if dialog.exec():
             del dialog
 
