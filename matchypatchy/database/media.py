@@ -10,7 +10,7 @@ def is_unique(s):
     a = s.to_numpy() # s.values (pandas<0.24)
     return (a[0] == a).all()
 
-
+# TODO: Check to see if file already in database
 def import_csv(mpDB, manifest_filepath, valid_sites):
     """
     Media entry (id, filepath, ext, datetime, comment, site_id)
@@ -44,6 +44,9 @@ def import_csv(mpDB, manifest_filepath, valid_sites):
             return False
 
         mpDB.add_media(filepath, ext, site_id, datetime=datetime)
+
+        # TODO: add all ROIs within group
+        # for roi in group: 
 
     print("Added files to Database")
 
