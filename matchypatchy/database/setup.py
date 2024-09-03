@@ -39,6 +39,7 @@ def setup_database(filepath='matchypatchy.db'):
                         ext TEXT NOT NULL,
                         datetime TEXT,
                         comment TEXT,
+                        favorite INTEGER,
                         site_id INTEGER NOT NULL,
                         FOREIGN KEY (site_id) REFERENCES site (id) )''')
 
@@ -50,12 +51,12 @@ def setup_database(filepath='matchypatchy.db'):
                         bbox_y REAL NOT NULL,
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
-                        file_id INTEGER NOT NULL,
+                        media_id INTEGER NOT NULL,
                         species_id TEXT NOT NULL,
                         reviewed INTEGER NOT NULL,
                         iid INTEGER,
                         emb_id INTEGER,
-                        FOREIGN KEY(file_id) REFERENCES media (id)
+                        FOREIGN KEY(media_id) REFERENCES media (id)
                         FOREIGN KEY(species_id) REFERENCES species (id)
                         FOREIGN KEY(iid) REFERENCES individual (id)
                         FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) )''')

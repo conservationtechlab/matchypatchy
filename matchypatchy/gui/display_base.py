@@ -104,7 +104,7 @@ class DisplayBase(QWidget):
     # Upload Button
     def upload_media(self):
         '''
-        Add media from CSV (completed from animl)
+        Add media from CSV
         '''
         if self.select_survey():
             manifest = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
