@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt
 
 from .popup_survey import SurveyPopup
 from .popup_site import SitePopup
+from .popup_alert import AlertPopup
 from ..database.media import fetch_sites, import_csv
 
 
@@ -110,9 +111,17 @@ class DisplayBase(QWidget):
             print(manifest)
             valid_sites = fetch_sites(self.mpDB, self.active_survey[0])
             import_csv(self.mpDB, manifest, valid_sites)
+        else:
+            dialog = AlertPopup(self, "Please create a new survey before uploading.")
+        if dialog.exec():
+            del dialog
+
 
     # Match Button
     def match(self):
+        # run miewID 
+        # store embeddings in database
+        # 
         print('Test')
 
     # Keyboard Handler
