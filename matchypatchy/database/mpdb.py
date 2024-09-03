@@ -56,6 +56,25 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
+    def add_species(self, binomen, common):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = """INSERT INTO species
+                        (binomen, common) 
+                        VALUES (?, ?);"""
+            data_tuple = (binomen, common)
+            cursor.execute(command, data_tuple)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            print("Failed to add site", error)
+            if db:
+                db.close()
+            return False
+        
     def add_media(self, filepath, ext, site_id, datetime=None, comment=None):
         try:
             db = sqlite3.connect(self.filepath)
@@ -75,21 +94,24 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def add_roi(self, filepath, ext, site_id, datetime=None, comment=None):
+    def add_roi(self, frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
+                reviewed=False, iid=None, emb_id=None):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            command = """INSERT INTO media
-                        (filepath, ext, datetime, comment, site_id) 
-                        VALUES (?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, ext, datetime, comment, site_id)
+            command = """INSERT INTO roi
+                        (frame, bbox_x, bbox_y, bbox_w, bbox_h, 
+                        media_id, species_id, reviewed, iid, emb_id) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+            data_tuple = (frame, bbox_x, bbox_y, bbox_w, bbox_h, 
+                          media_id, species_id, reviewed, iid, emb_id)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
             db.close()
             return id
         except sqlite3.Error as error:
-            print(f"Failed to add roi: {filepath}.", error)
+            print(f"Failed to add roi for media: {media_id}.", error)
             if db:
                 db.close()
             return False
