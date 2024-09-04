@@ -31,10 +31,7 @@ class MainWindow(QMainWindow):
         # Set the layout for the window
         container.setLayout(self.pages)
         self._set_base_view()
-
-        self.setCentralWidget(container)
-
-        
+        self.setCentralWidget(container)        
 
     def _createMenuBar(self):
         menuBar = QMenuBar(self)
@@ -49,18 +46,15 @@ class MainWindow(QMainWindow):
 
     def _set_base_view(self):
         self.pages.setCurrentIndex(0)
+        self.Intro.setFocus()
 
     def _set_media_view(self):
         self.pages.setCurrentIndex(1)
+        self.Media.setFocus()
 
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)
-
-    def keyPressEvent(self, event):
-        key = event.key()
-        key_text = event.text()
-        print(f"Key pressed: {key_text} (Qt key code: {key})")
-
+        self.Compare.setFocus()
 
 
 def main_display(mpDB):
