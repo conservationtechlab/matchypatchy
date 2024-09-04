@@ -2,31 +2,34 @@
 
 '''
 from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtGui
 
 from ..database import mpdb
 from .popup_confirm import ConfirmPopup
 
-class SitePopup(QtWidgets.QDialog):
+class SpeciesPopup(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         #inherit survey information, db object
         self.mpDB = parent.mpDB
-        self.survey_id = parent.active_survey
 
         fullLayout = QtWidgets.QVBoxLayout(self)
-
         self.container = QtWidgets.QWidget(objectName='container')
         fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
         self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
                                      QtWidgets.QSizePolicy.Policy.Maximum)
         
         layout = QtWidgets.QVBoxLayout(self.container)
+        # SPECIES LIST
 
-        # SITE LIST
-        # fetch from database 
-        self.list = QtWidgets.QListWidget()
+        self.list = QtWidgets.QTableWidget()  
+        self.list.setColumnCount(2)
+        self.list.setHorizontalHeaderLabels(['Scientific Name', 'Common Name'])
+        self.list.setColumnWidth(0, 200)
+        self.list.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.list) 
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.list.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.list.itemSelectionChanged.connect(self.set_editdel)
  
         # Buttons
@@ -62,31 +65,35 @@ class SitePopup(QtWidgets.QDialog):
         self.button_del.setEnabled(flag)
 
     def update(self):
-        self.list.clear()
-        cond = f'survey_id={self.survey_id[0]}'
-        self.site_list_ordered = self.mpDB.fetch_rows("site", cond, columns="id, name")
-        self.site_list = dict(self.site_list_ordered)
-        if self.site_list_ordered:
-            self.list.addItems([el[1] for el in self.site_list_ordered])
+        #self.species_model.clear()
+        self.species_list_ordered = self.mpDB.fetch_table("species")
+        self.list.setRowCount(len(self.species_list_ordered))
+
+        # Add data to rows
+        for row in range(len(self.species_list_ordered)):
+            binomen = QtWidgets.QTableWidgetItem(self.species_list_ordered[row][1])
+            common = QtWidgets.QTableWidgetItem(self.species_list_ordered[row][2])
+            self.list.setItem(row, 0, binomen)
+            self.list.setItem(row, 1, common)
         self.set_editdel()   
 
     def add(self):
-        dialog = SiteFillPopup(self)
+        dialog = SpeciesFillPopup(self)
         if dialog.exec():
-            confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
-                                         dialog.get_long(),self.survey_id[0])
+            confirm = self.mpDB.add_species(dialog.get_binomen(),dialog.get_common())
         del dialog
         self.sites = self.update()
 
     def edit(self):
         selected_site = self.list.currentRow()
-        id = self.site_list_ordered[selected_site][0]
+        id = self.species_list_ordered[selected_site][0]
+
         cond = f'id={id}'
-        id, name, lat, long = self.mpDB.fetch_rows('site',cond,columns='id, name, lat, long')[0]
-        dialog = SiteFillPopup(self, name=name, lat=lat, long=long)
+        id, binomen, common = self.mpDB.fetch_rows('species', cond)[0]
+        dialog = SpeciesFillPopup(self, binomen=binomen, common=common)
         if dialog.exec():
-            replace_dict = {"name":dialog.get_name(), "lat":dialog.get_lat(), "long":dialog.get_long()}
-            confirm = self.mpDB.edit_row("site",id,replace_dict)
+            replace_dict = {"binomen":dialog.get_binomen(), "common":dialog.get_common()}
+            confirm = self.mpDB.edit_row("species",id,replace_dict)
         del dialog
         self.sites = self.update()
     
@@ -96,51 +103,36 @@ class SitePopup(QtWidgets.QDialog):
         print(prompt)
         dialog = ConfirmPopup(self, prompt)
         if dialog.exec():
-            row = self.site_list_ordered[self.list.currentRow()][0]
+            row = self.species_list_ordered[self.list.currentRow()][0]
             cond = f'id={row}'
-            self.mpDB.delete("site",cond)
+            self.mpDB.delete("species", cond)
         del dialog
         self.update()
 
 
-class SiteFillPopup(QtWidgets.QDialog):
-    def __init__(self, parent, name="", lat="", long=""):
+class SpeciesFillPopup(QtWidgets.QDialog):
+    def __init__(self, parent, binomen="", common=""):
         super().__init__(parent)
-        self.setWindowTitle("Edit Site")
+        self.setWindowTitle("Edit Species")
         fullLayout = QtWidgets.QVBoxLayout(self)
 
         self.container = QtWidgets.QWidget(objectName='container')
         fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
         self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
                                      QtWidgets.QSizePolicy.Policy.Maximum)
-
-        buttonSize = self.fontMetrics().height() 
-
         layout = QtWidgets.QVBoxLayout(self.container)
-        layout.setContentsMargins(buttonSize * 2, buttonSize, buttonSize * 2, buttonSize)
 
-        title = QtWidgets.QLabel(
-            f'Edit Site for {parent.survey_id[1]}', 
-            objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        # Scientific Name
+        layout.addWidget(QtWidgets.QLabel('Scientific Name'))
+        self.binomen = QtWidgets.QLineEdit()
+        self.binomen.setText(binomen)
+        layout.addWidget(self.binomen)
 
-        # name
-        layout.addWidget(QtWidgets.QLabel('Name'))
-        self.name = QtWidgets.QLineEdit()
-        self.name.setText(name)
-        layout.addWidget(self.name)
-
-        #region
-        layout.addWidget(QtWidgets.QLabel('Latitude'))
-        self.lat = QtWidgets.QLineEdit()
-        self.lat.setText(str(lat))
-        layout.addWidget(self.lat)
-
-        # start year
-        layout.addWidget(QtWidgets.QLabel('Longitude'))
-        self.long = QtWidgets.QLineEdit()
-        self.long.setText(str(long))
-        layout.addWidget(self.long)
+        # Common Name
+        layout.addWidget(QtWidgets.QLabel('Common Name'))
+        self.common = QtWidgets.QLineEdit()
+        self.common.setText(str(common))
+        layout.addWidget(self.common)
 
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
@@ -151,31 +143,23 @@ class SiteFillPopup(QtWidgets.QDialog):
         self.okButton.setEnabled(False) 
         self.checkInput() # will enable ok button if in edit mode
 
-        self.name.textChanged.connect(self.checkInput)
-        self.lat.textChanged.connect(self.checkInput)
-        self.long.textChanged.connect(self.checkInput)
+        self.binomen.textChanged.connect(self.checkInput)
+        self.common.textChanged.connect(self.checkInput)
 
-        self.name.returnPressed.connect(lambda:
-                self.lat.setFocus())
-        self.lat.returnPressed.connect(lambda:
-                self.long.setFocus())
-        self.long.returnPressed.connect(self.accept_verify)
+        self.binomen.returnPressed.connect(lambda: self.common.setFocus())
+        self.common.returnPressed.connect(self.accept_verify)
 
-        self.name.setFocus()
+        self.binomen.setFocus()
 
     def checkInput(self):
-        # year end not necessary
-        self.okButton.setEnabled(bool(self.get_name() and self.get_lat() and self.get_long()))
+        self.okButton.setEnabled(bool(self.get_binomen() and self.get_common()))
 
-    def get_name(self):
-        return self.name.text()
+    def get_binomen(self):
+        return self.binomen.text()
 
-    def get_lat(self):
-        return self.lat.text()
-    
-    def get_long(self):
-        return self.long.text()
+    def get_common(self):
+        return self.common.text()
 
     def accept_verify(self):
-        if self.get_name() and self.get_lat() and self.get_long():
+        if self.get_binomen() and self.get_common():
             self.accept()

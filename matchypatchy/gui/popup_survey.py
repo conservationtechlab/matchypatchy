@@ -69,6 +69,7 @@ class SurveyPopup(QtWidgets.QDialog):
         self.name.setFocus()
 
     def checkInput(self):
+        # TODO: add dtype validation
         # year end not necessary
         self.okButton.setEnabled(bool(self.get_name() and self.get_region() and self.get_year_start()))
 

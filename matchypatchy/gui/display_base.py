@@ -2,17 +2,23 @@
 Base Gui View
 """
 import sys
-from PyQt6.QtWidgets import (QApplication, QPushButton, QWidget,
+import os
+from PyQt6.QtWidgets import (QApplication, QPushButton, QWidget, QFileDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
 
 from .popup_survey import SurveyPopup
 from .popup_site import SitePopup
+from .popup_alert import AlertPopup
+from .popup_species import SpeciesPopup
+from ..database.media import import_csv
+from ..database.sites import fetch_sites
 
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
         super().__init__()
+        self.parent = parent
         self.mpDB = parent.mpDB
         layout = QVBoxLayout(self)
 
@@ -39,17 +45,21 @@ class DisplayBase(QWidget):
         self.button_manage_site_flag = False
         self.button_site_manage.setEnabled(self.button_manage_site_flag)
 
+        self.button_species_manage = QPushButton("Manage Species")
+        self.button_species_manage.clicked.connect(self.manage_species)
+        survey_layout.addWidget(self.button_species_manage, 1)
+
         self.update_survey()
         layout.addLayout(survey_layout)
 
         # Bottom Layer
         bottom_layer = QHBoxLayout()
         # Create three buttons
-        button_validate = QPushButton("Validate DB")
+        button_validate = QPushButton("Validate Images")
         button_load = QPushButton("Load Data")
         button_match = QPushButton("Match")
 
-        button_validate.clicked.connect(self.validate_db)
+        button_validate.clicked.connect(self.validate)
         button_load.clicked.connect(self.upload_media)
         button_match.clicked.connect(self.match)
 
@@ -57,11 +67,8 @@ class DisplayBase(QWidget):
         bottom_layer.addWidget(button_validate)
         bottom_layer.addWidget(button_load)
         bottom_layer.addWidget(button_match)
-        layout.addLayout(bottom_layer)
+        layout.addLayout(bottom_layer) 
 
-    def validate_db(self):
-        tables = self.mpDB.validate()
-        self.label.setText(str(tables))
 
     def new_survey(self):
         dialog = SurveyPopup(self)
@@ -96,16 +103,44 @@ class DisplayBase(QWidget):
         if dialog.exec():
             del dialog
 
+    def manage_species(self):
+        dialog = SpeciesPopup(self)
+        if dialog.exec():
+            del dialog
+
+    # Validate Button
+    def validate(self):
+        self.parent._set_media_view()
+        # return True
+
+    # Upload Button
     def upload_media(self):
         '''
-        Add media from CSV (completed from animl)
+        Add media from CSV
         '''
-        return True
-               # fileName = QFileDialog.getOpenFileName(self,
-       # tr("Open Image"), "/home/jana", tr("Image Files (*.png *.jpg *.bmp)"))
+        if self.select_survey():
+            manifest = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
+            print(manifest)
+            valid_sites = fetch_sites(self.mpDB, self.active_survey[0])
+            import_csv(self.mpDB, manifest, valid_sites)
+        else:
+            dialog = AlertPopup(self, "Please create a new survey before uploading.")
+            if dialog.exec():
+                del dialog
 
+
+    # Match Button
     def match(self):
-        return True
+        # run miewID 
+        # store embeddings in database
+        # 
+        print('Test')
+
+    # Keyboard Handler
+    def keyPressEvent(self, event):
+        key = event.key()
+        key_text = event.text()
+        print(f"Key pressed: {key_text} (Qt key code: {key})")
         
 
 

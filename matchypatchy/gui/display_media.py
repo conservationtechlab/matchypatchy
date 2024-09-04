@@ -2,10 +2,13 @@
 GUI Window for viewing images
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QSizePolicy)
-from PyQt6.QtGui import QPixmap
+                             QLabel, QSizePolicy, QPlainTextEdit)
+from PyQt6.QtGui import QPixmap, QKeyEvent
 from PyQt6.QtCore import Qt
 
+
+# TODO
+# add single/paired view toggle button
 
 class DisplayMedia(QWidget):
     def __init__(self, parent):
@@ -49,14 +52,21 @@ class DisplayMedia(QWidget):
         
         self.load_image1('/home/kyra/animl-py/examples/Southwest/2021-06-30_SYFR0218.JPG')
         self.load_image2('/home/kyra/animl-py/examples/Southwest/2021-08-08_RCNX0063.JPG')
-        
-        
+
 
     def load_image1(self, filepath):
         self.image1 = QPixmap(filepath)
         self.left_box.setPixmap(self.image1)
-
         
     def load_image2(self, filepath):
         self.image2 = QPixmap(filepath)
-        self.right_box.setPixmap(self.image2)
+    
+
+    # Keyboard Handler
+    def keyPressEvent(self, event):
+        key = event.key()
+        key_text = event.text()
+        print(f"Key pressed: {key_text} (Qt key code: {key})")
+
+
+
