@@ -3,11 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
-*.so
-
 # test databases
 *.db
+
+# miewid 
+miew_id/
 
 # Distribution / packaging
 .Python

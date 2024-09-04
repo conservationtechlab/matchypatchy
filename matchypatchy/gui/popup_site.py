@@ -9,6 +9,7 @@ from .popup_confirm import ConfirmPopup
 class SitePopup(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
+        self.setWindowTitle("Manage Sites")
         #inherit survey information, db object
         self.mpDB = parent.mpDB
         self.survey_id = parent.active_survey
