@@ -14,3 +14,10 @@ class DisplayCompare(QWidget):
         self.label = QLabel("Welcome to MatchyPatchy")
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.label)
+        
+        
+        # Keyboard Handler
+    def keyPressEvent(self, event):
+        key = event.key()
+        key_text = event.text()
+        print(f"Key pressed: {key_text} (Qt key code: {key})")

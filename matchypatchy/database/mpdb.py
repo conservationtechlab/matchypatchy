@@ -95,15 +95,15 @@ class MatchyPatchyDB():
             return False
         
     def add_roi(self, frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                reviewed=False, iid=None, emb_id=None):
+                viewpoint=None, reviewed=False, iid=None, emb_id=None):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO roi
-                        (frame, bbox_x, bbox_y, bbox_w, bbox_h, 
+                        (frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint,
                         media_id, species_id, reviewed, iid, emb_id) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (frame, bbox_x, bbox_y, bbox_w, bbox_h, 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+            data_tuple = (frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint,
                           media_id, species_id, reviewed, iid, emb_id)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid

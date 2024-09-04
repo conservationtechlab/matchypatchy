@@ -1,19 +1,16 @@
 import sqlite3
 from matchypatchy import sqlite_vec
-# fetch from master table
-#cursor.execute("SELECT name FROM sqlite_master")
 
 
 def setup_database(filepath='matchypatchy.db'):
     # Connect to SQLite database
     db = sqlite3.connect(filepath)
     cursor = db.cursor()
-    
     # EMBEDDING
-    #db.enable_load_extension(True)
-    #sqlite_vec.load(db)
-    #db.enable_load_extension(False)
-    #cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152])")
+    db.enable_load_extension(True)
+    sqlite_vec.load(db)
+    db.enable_load_extension(False)
+    cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152])")
     
     # SURVEY
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
@@ -51,6 +48,7 @@ def setup_database(filepath='matchypatchy.db'):
                         bbox_y REAL NOT NULL,
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
+                        viewpoint TEXT,
                         media_id INTEGER NOT NULL,
                         species_id TEXT NOT NULL,
                         reviewed INTEGER NOT NULL,

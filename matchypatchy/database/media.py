@@ -53,6 +53,9 @@ def import_csv(mpDB, manifest_filepath, valid_sites):
             bbox_y = roi['bbox2']
             bbox_w = roi['bbox3']
             bbox_h = roi['bbox4']
+            
+            # add viewpoint if exists
+            viewpoint = roi['Viewpoint'] if 'Viewpoint' in manifest.columns else None
 
             species = roi['Species']
             if isinstance(species, str):
