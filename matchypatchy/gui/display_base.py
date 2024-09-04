@@ -5,7 +5,6 @@ import os
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeyEvent
 
 from .popup_survey import SurveyPopup
 from .popup_site import SitePopup

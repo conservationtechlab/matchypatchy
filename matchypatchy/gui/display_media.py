@@ -2,11 +2,18 @@
 GUI Window for viewing images
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
+<<<<<<< HEAD
                              QLabel)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
 from .widget_image import ImageWidget
+=======
+                             QLabel, QSizePolicy, QPlainTextEdit)
+from PyQt6.QtGui import QPixmap, QKeyEvent
+from PyQt6.QtCore import Qt
+
+>>>>>>> main
 
 # TODO
 # add single/paired view toggle button
