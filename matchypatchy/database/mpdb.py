@@ -75,14 +75,26 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def add_media(self, filepath, ext, site_id, datetime=None, comment=None):
+    def add_media(self, filepath, ext, site_id, datetime=None, sequence_id=None, comment=None, favorite=0):
+        """
+        Media has 7 attributes not including id:
+            id INTEGER PRIMARY KEY
+            filepath TEXT NOT NULL: local filepath
+            ext TEXT NOT NULL: file extension
+            datetime TEXT: filemodifydate
+            sequence_id INTEGER: sequence id to link media
+            comment TEXT: any str value
+            favorite INTEGER: 0 default, 1 if favorited
+            site_id INTEGER NOT NULL: foreign key to site
+        """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO media
-                        (filepath, ext, datetime, comment, site_id) 
-                        VALUES (?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, ext, datetime, comment, site_id)
+                        (filepath, ext, datetime, sequence_id, 
+                        comment, favorite, site_id) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?);"""
+            data_tuple = (filepath, ext, datetime, sequence_id, comment, favorite, site_id)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()

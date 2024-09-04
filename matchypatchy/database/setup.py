@@ -35,6 +35,7 @@ def setup_database(filepath='matchypatchy.db'):
                         filepath TEXT NOT NULL,
                         ext TEXT NOT NULL,
                         datetime TEXT,
+                        sequence_id INTEER,
                         comment TEXT,
                         favorite INTEGER,
                         site_id INTEGER NOT NULL,
