@@ -10,6 +10,7 @@ from .popup_confirm import ConfirmPopup
 class SpeciesPopup(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
+        self.setWindowTitle("Manage Species")
         #inherit survey information, db object
         self.mpDB = parent.mpDB
 

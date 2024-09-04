@@ -55,18 +55,19 @@ class DisplayBase(QWidget):
         # Bottom Layer
         bottom_layer = QHBoxLayout()
         # Create three buttons
-        button_validate = QPushButton("Validate Images")
-        button_load = QPushButton("Load Data")
-        button_match = QPushButton("Match")
+        button_load = QPushButton("1. Load Data")
+        button_match = QPushButton("2. Match")
+        button_validate = QPushButton("3. Validate Images")
 
-        button_validate.clicked.connect(self.validate)
+        
         button_load.clicked.connect(self.upload_media)
         button_match.clicked.connect(self.match)
+        button_validate.clicked.connect(self.validate)
 
         # Add buttons to the layout
-        bottom_layer.addWidget(button_validate)
         bottom_layer.addWidget(button_load)
         bottom_layer.addWidget(button_match)
+        bottom_layer.addWidget(button_validate)
         layout.addLayout(bottom_layer) 
         
         self.setLayout(layout)
@@ -109,10 +110,7 @@ class DisplayBase(QWidget):
         if dialog.exec():
             del dialog
 
-    # Validate Button
-    def validate(self):
-        self.parent._set_media_view()
-        # return True
+
 
     # Upload Button
     def upload_media(self):
@@ -131,11 +129,19 @@ class DisplayBase(QWidget):
 
     # Match Button
     def match(self):
-        # run miewID 
-        # store embeddings in database
-        # 
-        print('Test')
+        # 1. fetch images
+        # 2. run viewpoint model
+        # 3. run miewid 
+        # 4. store embedding in table
+        
+        print(self.mpDB.validate())
+        
+    # Validate Button
+    def validate(self):
+        self.parent._set_media_view()
+        # return True
 
+    # Keyboard Handler
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()
