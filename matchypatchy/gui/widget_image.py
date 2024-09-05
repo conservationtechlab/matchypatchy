@@ -1,7 +1,8 @@
-from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QSizePolicy)
-from PyQt6.QtGui import QPixmap, QPainter, QKeyEvent
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QSizePolicy)
+from PyQt6.QtGui import QPixmap, QPainter
 from PyQt6.QtCore import Qt
+
+import os
 
 
 class ImageWidget(QWidget):
@@ -9,6 +10,7 @@ class ImageWidget(QWidget):
         super().__init__()
         self.box_width = width
         self.box_height = height
+        self.image_path = image_path
     
         self.setFixedSize(self.box_width, self.box_height)
         layout = QVBoxLayout()
@@ -18,8 +20,8 @@ class ImageWidget(QWidget):
         self.image_label.resize(self.box_width, self.box_height)
         self.image_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
 
-        if image_path:
-            self.display_image(image_path)
+        if self.image_path:
+            self.display_image(self.image_path)
 
         # Add the QLabel to the layout
         layout.addWidget(self.image_label)

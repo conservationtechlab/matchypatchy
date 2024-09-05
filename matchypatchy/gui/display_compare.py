@@ -61,8 +61,11 @@ class DisplayCompare(QWidget):
         bottom_layer.addWidget(button_match)
         container.addLayout(bottom_layer)
         
-        self.left_box.display_image_padded('/home/kyra/animl-py/examples/Southwest/2021-06-30_SYFR0218.JPG')
-        self.right_box.display_image_padded('/home/kyra/animl-py/examples/Southwest/2021-08-08_RCNX0063.JPG')
+        # self.left_box.display_image_padded('/home/kyra/animl-py/examples/Southwest/2021-06-30_SYFR0218.JPG')
+        # self.right_box.display_image_padded('/home/kyra/animl-py/examples/Southwest/2021-08-08_RCNX0063.JPG')
+
+        #self.left_box.display_image_padded("C:\Users\tswanson\animl-py\examples\Southwest\2021-06-30_SYFR0218.JPG")
+        self.right_box.display_image_padded('C:/Users/tswanson/animl-py/examples/Southwest/2021-08-08_RCNX0063.JPG')
 
         self.setLayout(container)
         
