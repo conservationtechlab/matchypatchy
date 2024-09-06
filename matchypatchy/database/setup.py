@@ -32,7 +32,7 @@ def setup_database(filepath='matchypatchy.db'):
     # MEDIA
     cursor.execute('''CREATE TABLE IF NOT EXISTS media (
                         id INTEGER PRIMARY KEY,
-                        filepath TEXT NOT NULL,
+                        filepath TEXT UNIQUE NOT NULL,
                         ext TEXT NOT NULL,
                         datetime TEXT,
                         sequence_id INTEER,
@@ -51,7 +51,7 @@ def setup_database(filepath='matchypatchy.db'):
                         bbox_h REAL NOT NULL,
                         viewpoint TEXT,
                         media_id INTEGER NOT NULL,
-                        species_id TEXT NOT NULL,
+                        species_id INTEGER NOT NULL,
                         reviewed INTEGER NOT NULL,
                         iid INTEGER,
                         emb_id INTEGER,

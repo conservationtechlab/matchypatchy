@@ -107,7 +107,7 @@ class MatchyPatchyDB():
             return False
         
     def add_roi(self, frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                viewpoint=None, reviewed=False, iid=None, emb_id=None):
+                viewpoint=None, reviewed=0, iid=None, emb_id=None):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -149,6 +149,7 @@ class MatchyPatchyDB():
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
         command = f'SELECT * FROM {table};'
+        print(command)
         cursor.execute(command)
         rows = cursor.fetchall()
         db.close()
@@ -168,7 +169,6 @@ class MatchyPatchyDB():
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
         command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
-        print(command)
         cursor.execute(command)
         rows = cursor.fetchall()  # returns in tuple
         db.close()
@@ -189,4 +189,19 @@ class MatchyPatchyDB():
             print("Failed to delete", error)
             if db:
                 db.close()
-            return False
+            return False 
+        
+    def clear(self, table):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = f'DELETE FROM {table};'
+            cursor.execute(command)
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.Error as error:
+            print(f"Failed to clear {table}", error)
+            if db:
+                db.close()
+            return False 
