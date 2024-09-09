@@ -16,12 +16,11 @@ def fetch_roi(mpDB):
         - an inverted dictionary in order to match manifest site names to table id
     """
     manifest = mpDB.fetch_table("roi")
-    print(manifest)
-
 
     if manifest:
-        manifest = pd.DataFrame(manifest, columns=["id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
+        rois = pd.DataFrame(manifest, columns=["id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
                                               "viewpoint", "media_id", "species_id", "reviewed", "iid", "emb_id"])
-    return manifest
+
+    return rois
 
 
