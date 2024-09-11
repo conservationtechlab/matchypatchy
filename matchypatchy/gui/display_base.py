@@ -13,10 +13,16 @@ from .popup_species import SpeciesPopup
 
 from ..database.media import import_csv
 from ..database.site import fetch_sites
-from ..database.roi import fetch_roi
+from ..database.roi import fetch_roi, update_roi_embedding
+import sqlite_vec
 
 from ..models.viewpoint import predict_viewpoint
-from ..models.miewid import load_miew, miew_dataloader, extract_roi_embedding
+from ..models.miewid import load_miew, miew_dataloader
+
+import torch
+from tqdm import tqdm
+
+
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
@@ -121,28 +127,67 @@ class DisplayBase(QWidget):
         '''
         Add media from CSV
         '''
+        # remove after finish testing
+        self.mpDB.clear('media')
+        self.mpDB.clear('roi')
+        self.mpDB.clear('roi_emb')
         if self.select_survey():
             manifest = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
             if manifest:
                 valid_sites = fetch_sites(self.mpDB, self.active_survey[0])
                 import_csv(self.mpDB, manifest, valid_sites)
+                #self.get_viewpoint()
+                self.get_embeddings()
         else:
             dialog = AlertPopup(self, "Please create a new survey before uploading.")
             if dialog.exec():
                 del dialog
+        
+        
+    def get_viewpoint(self):
+        # 1. fetch images
+        image_paths = dict(self.mpDB.fetch_columns("media", "filepath"))
+        rois = fetch_roi(self.mpDB)
+        roi_missing_viewpoint = rois[rois['Viewpoint'] is None]
+        #dataloader = viewpoint_dataloader(rois,image_paths)
+        # 2. run viewpoint model
+        #predict_viewpoint(manifest, None)
+        # 3. update rows 
+
+
 
     # Match Button
-    def match(self):
+    def get_embeddings(self):
         # 1. fetch images
-        manifest = fetch_roi(self.mpDB)
-        dataloader = miew_dataloader(manifest)
+        image_paths = dict(self.mpDB.fetch_columns("media", "filepath"))
+        rois = fetch_roi(self.mpDB)
+        rois = rois[rois['emb_id'] is None]
+        dataloader = miew_dataloader(rois,image_paths)
         # 2. run viewpoint model
-        predict_viewpoint(manifest, None)
+        #predict_viewpoint(manifest, None)
         # 3. run miewid 
         
-        model = load_miew("miew_id")
-        output = extract_roi_embedding(model, dataloader)
-        # 4. store embedding in table
+        model = load_miew('C:/Users/tswanson/matchypatchy/matchypatchy/models/miew_id')
+        
+        with torch.no_grad():
+            for _, batch in tqdm(enumerate(dataloader)):
+                img = batch[0]
+                roi_id = batch[1].numpy()[0]
+                print(roi_id)
+                output = model(img)
+                output = output.numpy().squeeze()
+                converted = sqlite_vec.serialize_float32(output)
+
+                # 4. store embedding in table
+                emb_id = self.mpDB.add_emb(converted)
+                update_roi_embedding(self.mpDB, roi_id, emb_id)
+
+
+    def match(self):
+        rois = fetch_roi(self.mpDB)
+        for roi in rois:
+            print(roi)
+        
 
         
     # Validate Button
