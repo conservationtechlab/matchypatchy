@@ -10,9 +10,13 @@ from .popup_survey import SurveyPopup
 from .popup_site import SitePopup
 from .popup_alert import AlertPopup
 from .popup_species import SpeciesPopup
-from ..database.media import import_csv
-from ..database.sites import fetch_sites
 
+from ..database.media import import_csv
+from ..database.site import fetch_sites
+from ..database.roi import fetch_roi
+
+from ..models.viewpoint import predict_viewpoint
+from ..models.miewid import load_miew, miew_dataloader, extract_roi_embedding
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
@@ -130,11 +134,16 @@ class DisplayBase(QWidget):
     # Match Button
     def match(self):
         # 1. fetch images
+        manifest = fetch_roi(self.mpDB)
+        dataloader = miew_dataloader(manifest)
         # 2. run viewpoint model
+        predict_viewpoint(manifest, None)
         # 3. run miewid 
-        # 4. store embedding in table
         
-        print(self.mpDB.validate())
+        model = load_miew("miew_id")
+        output = extract_roi_embedding(model, dataloader)
+        # 4. store embedding in table
+
         
     # Validate Button
     def validate(self):

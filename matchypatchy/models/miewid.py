@@ -2,7 +2,7 @@ from PIL import Image
 import torch
 import torchvision.transforms as transforms
 import numpy as np
-
+from transformers import AutoModel
 
 
 from PIL import Image,  ImageFile
@@ -12,11 +12,6 @@ import torchvision.transforms.functional as F
 from torchvision.transforms import (Compose, Resize, Normalize, ToTensor)
 
 
-
-preprocess = Compose([Resize((440, 440)),
-                      ToTensor(),
-                      Normalize(mean=[0.485, 0.456, 0.406],
-                                std=[0.229, 0.224, 0.225]),])
 
 
 class ImageGenerator(Dataset):
@@ -51,18 +46,17 @@ class ImageGenerator(Dataset):
 
         width, height = img.size
 
-        if self.crop:
-            bbox1 = self.x['bbox_x'].iloc[idx]
-            bbox2 = self.x['bbox_y'].iloc[idx]
-            bbox3 = self.x['bbox_w'].iloc[idx]
-            bbox4 = self.x['bbox_h'].iloc[idx]
+        bbox1 = self.x['bbox_x'].iloc[idx]
+        bbox2 = self.x['bbox_y'].iloc[idx]
+        bbox3 = self.x['bbox_w'].iloc[idx]
+        bbox4 = self.x['bbox_h'].iloc[idx]
 
-            left = width * bbox1
-            top = height * bbox2
-            right = width * (bbox1 + bbox3)
-            bottom = height * (bbox2 + bbox4)
+        left = width * bbox1
+        top = height * bbox2
+        right = width * (bbox1 + bbox3)
+        bottom = height * (bbox2 + bbox4)
 
-            img = img.crop((left, top, right, bottom))
+        img = img.crop((left, top, right, bottom))
 
         img_tensor = self.transform(img)
         img.close()
@@ -72,7 +66,7 @@ class ImageGenerator(Dataset):
     
 
 
-def dataloader(manifest, batch_size=1, workers=1, resize_height=440, resize_width=440):
+def miew_dataloader(manifest, batch_size=1, workers=1, resize_height=440, resize_width=440):
     '''
         Loads a dataset and wraps it in a PyTorch DataLoader object.
         Always dynamically crops
@@ -81,9 +75,6 @@ def dataloader(manifest, batch_size=1, workers=1, resize_height=440, resize_widt
             - manifest (DataFrame): data to be fed into the model
             - batch_size (int): size of each batch
             - workers (int): number of processes to handle the data
-            - file_col: column name containing full file paths
-            - crop (bool): if true, dynamically crop images
-            - normalize (bool): if true, normalize array to values [0,1]
             - resize_width (int): size in pixels for input width
             - resize_height (int): size in pixels for input height
 
@@ -102,7 +93,9 @@ def dataloader(manifest, batch_size=1, workers=1, resize_height=440, resize_widt
 
 
 def load_miew(file_path):
-    model = torch.load(file_path)
+    model = AutoModel.from_pretrained(file_path,trust_remote_code=True)
+    #model = torch.load(file_path)
+    print('Loaded MiewID')
     return model
 
 
@@ -113,7 +106,3 @@ def extract_roi_embedding(model, dataloader):
     print(output)
     print(output.shape)
     return output
-
-
-model = load_miew('/home/kyra/matchypatchy/matchypatchy/models/miew_id/miew_id_all.bin')
-extract_roi_embedding(model, dataloader)
