@@ -2,13 +2,14 @@
 Class Definition for MatchyPatchyDB
 '''
 import sqlite3
-
 from . import setup
+
 
 class MatchyPatchyDB():
     def __init__(self, filepath='matchypatchy.db'):
         self.filepath = filepath
         self.initiate = setup.setup_database(self.filepath)
+        print(self.validate())
     
     def validate(self):
         db = sqlite3.connect(self.filepath)
@@ -128,7 +129,36 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
+    def add_emb(self, embedding):
+        try:
+            db = sqlite3.connect(self.filepath)
+            db.enable_load_extension(True)
+            # db.load_extension("vec0")
+            db.load_extension("C:/Users/tswanson/matchypatchy/matchypatchy/sqlite_vec/vec0")
+            db.enable_load_extension(False)
+
+            cursor = db.cursor()
+            command = """INSERT INTO roi_emb (embedding)
+                        VALUES (?);"""
+            cursor.execute(command, [embedding])
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            print("Failed to add embedding.", error)
+            if db:
+                db.close()
+            return False
+        
     def edit_row(self, table, id, replace):
+        """
+        Args
+            - table (str):
+            - id (int):
+            - replace (dict): column:value pairs to update
+
+        """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -168,6 +198,7 @@ class MatchyPatchyDB():
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
         command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
+        print(command)
         cursor.execute(command)
         rows = cursor.fetchall()  # returns in tuple
         db.close()
