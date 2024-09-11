@@ -86,7 +86,7 @@ class SitePopup(QtWidgets.QDialog):
         id, name, lat, long = self.mpDB.fetch_rows('site',cond,columns='id, name, lat, long')[0]
         dialog = SiteFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
-            replace_dict = {"name":dialog.get_name(), "lat":dialog.get_lat(), "long":dialog.get_long()}
+            replace_dict = {"name":f"'{dialog.get_name()}'", "lat":dialog.get_lat(), "long":dialog.get_long()}
             confirm = self.mpDB.edit_row("site",id,replace_dict)
         del dialog
         self.sites = self.update()

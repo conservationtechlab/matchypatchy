@@ -6,7 +6,7 @@ from matchypatchy import utils
 
 from matchypatchy.database import (MatchyPatchyDB, fetch_sites, import_csv,
                                    is_unique, media, mpdb, setup,
-                                   setup_database, sites,)
+                                   setup_database, site,)
 from matchypatchy.gui import (AlertPopup, ConfirmPopup, DisplayBase,
                               DisplayCompare, DisplayMedia, DisplaySingle,
                               ImageWidget, MainWindow, SiteFillPopup,
@@ -29,5 +29,5 @@ __all__ = ['AlertPopup', 'ConfirmPopup', 'DisplayBase', 'DisplayCompare',
            'main_display', 'main_gui', 'media', 'mpdb', 'popup_alert',
            'popup_confirm', 'popup_site', 'popup_species', 'popup_survey',
            'register_numpy', 'serialize_float32', 'serialize_int8', 'setup',
-           'setup_database', 'sites', 'sqlite_vec', 'swap_keyvalue',
+           'setup_database', 'site', 'sqlite_vec', 'swap_keyvalue',
            'test_install', 'utils', 'widget_image']

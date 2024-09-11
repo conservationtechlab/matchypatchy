@@ -7,7 +7,8 @@ __version_info__ = tuple(__version__.split("."))
 def loadable_path():
   """ Returns the full path to the sqlite-vec loadable SQLite extension bundled with this package """
   loadable_path = os.path.join(os.path.dirname(__file__), "vec0")
-  return os.path.normpath(loadable_path)
+  #return os.path.normpath(loadable_path)
+  return os.path.normpath("vec0")
 
 def load(conn: sqlite3.Connection)  -> None:
   """ Load the sqlite-vec SQLite extension into the given database connection. """
