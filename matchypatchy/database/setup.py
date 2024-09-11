@@ -7,6 +7,7 @@ def setup_database(filepath='matchypatchy.db'):
     db = sqlite3.connect(filepath)
     cursor = db.cursor()
     # EMBEDDING
+    # TODO : FIX VEC LOAD
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
@@ -35,7 +36,7 @@ def setup_database(filepath='matchypatchy.db'):
                         filepath TEXT UNIQUE NOT NULL,
                         ext TEXT NOT NULL,
                         datetime TEXT,
-                        sequence_id INTEER,
+                        sequence_id INTEGER,
                         comment TEXT,
                         favorite INTEGER,
                         site_id INTEGER NOT NULL,
