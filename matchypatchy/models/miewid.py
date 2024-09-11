@@ -1,18 +1,7 @@
 from PIL import Image
-import torch
-import torchvision.transforms as transforms
-import numpy as np
 from transformers import AutoModel
-
-
-from PIL import Image,  ImageFile
-from numpy import max
 from torch.utils.data import Dataset, DataLoader
-import torchvision.transforms.functional as F
 from torchvision.transforms import (Compose, Resize, Normalize, ToTensor)
-
-
-
 
 class ImageGenerator(Dataset):
     '''
@@ -22,20 +11,24 @@ class ImageGenerator(Dataset):
     Options:
         - resize: dynamically resize images to target (square) [W,H]
     '''
-    def __init__(self, x, resize_height=440, resize_width=440):
+    def __init__(self, x, image_path_dict, resize_height=440, resize_width=440):
         self.x = x
+        self.image_path_dict = image_path_dict
         self.resize_height = int(resize_height)
         self.resize_width = int(resize_width)
-        self.transform = transforms.Compose([Resize((self.resize_height, self.resize_width)),
-                                             ToTensor(),
-                                             Normalize(mean=[0.485, 0.456, 0.406],
-                                                       std=[0.229, 0.224, 0.225]),])
+        self.transform = Compose([Resize((self.resize_height, self.resize_width)),
+                                  ToTensor(),
+                                  Normalize(mean=[0.485, 0.456, 0.406],
+                                            std=[0.229, 0.224, 0.225]),])
 
     def __len__(self):
         return len(self.x)
 
     def __getitem__(self, idx):
-        image_name = self.x.loc[idx, self.file_col]
+        id = self.x.loc[idx, 'id']
+        media_id = self.x.loc[idx, 'media_id']
+        image_name = self.image_path_dict[media_id]
+        print(image_name)
 
         try:
             img = Image.open(image_name).convert('RGB')
@@ -61,12 +54,10 @@ class ImageGenerator(Dataset):
         img_tensor = self.transform(img)
         img.close()
 
-        return img_tensor
-    
-    
+        return img_tensor, id
 
 
-def miew_dataloader(manifest, batch_size=1, workers=1, resize_height=440, resize_width=440):
+def miew_dataloader(rois, image_path_dict, batch_size=1, workers=1, resize_height=440, resize_width=440):
     '''
         Loads a dataset and wraps it in a PyTorch DataLoader object.
         Always dynamically crops
@@ -81,7 +72,7 @@ def miew_dataloader(manifest, batch_size=1, workers=1, resize_height=440, resize
         Returns:
             dataloader object
     '''
-    dataset_instance = ImageGenerator(manifest, resize_height=440, resize_width=440)
+    dataset_instance = ImageGenerator(rois, image_path_dict, resize_height=440, resize_width=440)
 
     dataLoader = DataLoader(
             dataset=dataset_instance,
@@ -97,12 +88,3 @@ def load_miew(file_path):
     #model = torch.load(file_path)
     print('Loaded MiewID')
     return model
-
-
-def extract_roi_embedding(model, dataloader):
-    with torch.no_grad():
-        output = model(dataloader)
-
-    print(output)
-    print(output.shape)
-    return output

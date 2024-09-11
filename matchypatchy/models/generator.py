@@ -7,10 +7,6 @@ from torchvision.transforms import (Compose, Resize, ToTensor)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-# MIEWID takes 480x480
-
-
-
 class SquarePad:
     def __call__(self, image):
         size = image.size()
@@ -30,7 +26,7 @@ class ImageGenerator(Dataset):
         - file_col: column name containing full file paths
         - resize: dynamically resize images to target (square) [W,H]
     '''
-    def __init__(self, x, file_col='file', resize_height=480, resize_width=480):
+    def __init__(self, x, file_col='file', resize_height=440, resize_width=440):
         self.x = x
         self.file_col = file_col
         self.resize_height = int(resize_height)

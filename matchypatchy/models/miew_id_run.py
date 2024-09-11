@@ -3,22 +3,15 @@ import torch
 import torchvision.transforms as transforms
 from transformers import AutoModel
 import numpy as np
-import json
-from miew_id.modeling_miewid import MiewIdNet 
-
-
-with open('C:/Users/Kyra/matchypatchy/matchypatchy/models/miew_id/config.json') as f:
-    config = json.load(f)
-print(config)
 
 
 #model = AutoModel.from_pretrained("C:/Users/Kyra/matchypatchy/matchypatchy/models/miew_id/",trust_remote_code=True)
 
-model = AutoModel.from_pretrained('C:/Users/Kyra/matchypatchy/matchypatchy/models/miewid_v2.bin',trust_remote_code=True)
-#print(model)
-torch.save(model.state_dict(), 'C:/Users/Kyra/matchypatchy/matchypatchy/models/miewid_v2.bin')
+model = AutoModel.from_pretrained('C:/Users/tswanson/matchypatchy/matchypatchy/models/miew_id',trust_remote_code=True)
+#print(model)pi
+#torch.save(model.state_dict(), 'C:/Users/tswanson/matchypatchy/matchypatchy/models/miewid_v2.bin')
 #load torch bin
-model = torch.load('C:/Users/Kyra/matchypatchy/matchypatchy/models/miewid_v2.bin')
+#model = torch.load('C:/Users/tswanson/matchypatchy/matchypatchy/models/miewid_v2.bin')
 
 
 def generate_random_image(height=440, width=440, channels=3):
