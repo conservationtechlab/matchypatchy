@@ -19,7 +19,9 @@ def fetch_roi(mpDB):
     if manifest:
         rois = pd.DataFrame(manifest, columns=["id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
                                               "viewpoint", "media_id", "species_id", "reviewed", "iid", "emb_id"])
-    return rois
+        return rois
+    else:
+        return False
 
 
 def update_roi_viewpoint(mpDB, roi_id, viewpoint):

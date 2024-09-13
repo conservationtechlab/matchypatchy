@@ -1,21 +1,11 @@
-from PIL import Image,  ImageFile
-from numpy import max
+"""
+Image Generators
+
+"""
+
+from PIL import Image
 from torch.utils.data import Dataset, DataLoader
-import torchvision.transforms.functional as F
-from torchvision.transforms import (Compose, Resize, ToTensor)
-
-ImageFile.LOAD_TRUNCATED_IMAGES = True
-
-
-class SquarePad:
-    def __call__(self, image):
-        size = image.size()
-        max_wh = max(size)
-        hp = int((max_wh - size[-1]) / 2)
-        vp = int((max_wh - size[-2]) / 2)
-        padding = (hp, vp, hp, vp)
-        return F.pad(image, padding, 0, 'constant')
-
+from torchvision.transforms import (Compose, Resize, Normalize, ToTensor)
 
 class ImageGenerator(Dataset):
     '''
@@ -23,26 +13,26 @@ class ImageGenerator(Dataset):
     ie from MegaDetector
 
     Options:
-        - file_col: column name containing full file paths
         - resize: dynamically resize images to target (square) [W,H]
     '''
-    def __init__(self, x, file_col='file', resize_height=440, resize_width=440):
+    def __init__(self, x, image_path_dict, resize_height=440, resize_width=440):
         self.x = x
-        self.file_col = file_col
+        self.image_path_dict = image_path_dict
         self.resize_height = int(resize_height)
         self.resize_width = int(resize_width)
-        self.transform = Compose([
-            SquarePad(),
-            # torch.resize order is H,W
-            Resize((self.resize_height, self.resize_width)),
-            ToTensor(),
-            ])
+        self.transform = Compose([Resize((self.resize_height, self.resize_width)),
+                                  ToTensor(),
+                                  Normalize(mean=[0.485, 0.456, 0.406],
+                                            std=[0.229, 0.224, 0.225]),])
 
     def __len__(self):
         return len(self.x)
 
     def __getitem__(self, idx):
-        image_name = self.x.loc[idx, self.file_col]
+        id = self.x.loc[idx, 'id']
+        media_id = self.x.loc[idx, 'media_id']
+        image_name = self.image_path_dict[media_id]
+        print(image_name)
 
         try:
             img = Image.open(image_name).convert('RGB')
@@ -53,35 +43,25 @@ class ImageGenerator(Dataset):
 
         width, height = img.size
 
-        if self.crop:
-            bbox1 = self.x['bbox1'].iloc[idx]
-            bbox2 = self.x['bbox2'].iloc[idx]
-            bbox3 = self.x['bbox3'].iloc[idx]
-            bbox4 = self.x['bbox4'].iloc[idx]
+        bbox1 = self.x['bbox_x'].iloc[idx]
+        bbox2 = self.x['bbox_y'].iloc[idx]
+        bbox3 = self.x['bbox_w'].iloc[idx]
+        bbox4 = self.x['bbox_h'].iloc[idx]
 
-            left = width * bbox1
-            top = height * bbox2
-            right = width * (bbox1 + bbox3)
-            bottom = height * (bbox2 + bbox4)
+        left = width * bbox1
+        top = height * bbox2
+        right = width * (bbox1 + bbox3)
+        bottom = height * (bbox2 + bbox4)
 
-            left = max(0, int(left) - self.buffer)
-            top = max(0, int(top) - self.buffer)
-            right = min(width, int(right) + self.buffer)
-            bottom = min(height, int(bottom) + self.buffer)
-            img = img.crop((left, top, right, bottom))
+        img = img.crop((left, top, right, bottom))
 
         img_tensor = self.transform(img)
         img.close()
 
-        if not self.normalize:  # un-normalize
-            img_tensor = img_tensor * 255
-
-        return img_tensor, image_name
-    
-    
+        return img_tensor, id
 
 
-def dataloader(manifest, batch_size=1, workers=1, file_col="file"):
+def dataloader(rois, image_path_dict, resize_height, resize_width, batch_size=1, workers=1):
     '''
         Loads a dataset and wraps it in a PyTorch DataLoader object.
         Always dynamically crops
@@ -90,18 +70,18 @@ def dataloader(manifest, batch_size=1, workers=1, file_col="file"):
             - manifest (DataFrame): data to be fed into the model
             - batch_size (int): size of each batch
             - workers (int): number of processes to handle the data
-            - file_col: column name containing full file paths
-            - crop (bool): if true, dynamically crop images
-            - normalize (bool): if true, normalize array to values [0,1]
             - resize_width (int): size in pixels for input width
             - resize_height (int): size in pixels for input height
 
         Returns:
             dataloader object
+
+
+        MIEWIDNET - 440, 440
     '''
-    
-    # default values file_col='file', resize=299
-    dataset_instance = ImageGenerator(manifest)
+    dataset_instance = ImageGenerator(rois, image_path_dict, 
+                                      resize_height=resize_height, 
+                                      resize_width=resize_width)
 
     dataLoader = DataLoader(
             dataset=dataset_instance,
