@@ -15,14 +15,21 @@ IMAGE_HEIGHT = 440
 IMAGE_WIDTH = 440
 
 
-def load_miew(file_path):
+def filter(rois):
+    return rois[rois['emb_id'] == 'None']
+
+
+def load(file_path, device):
     # TODO: check device
     weights = torch.load(file_path)
     miew = MiewIdNet()
-    # miew.to(device)
+    miew.to(device)
     miew.load_state_dict(weights, strict=False)
     miew.eval()
     return miew
+
+
+
 
 
 def weights_init_kaiming(m):

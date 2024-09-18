@@ -13,24 +13,26 @@ from .popup_species import SpeciesPopup
 
 from ..database.media import import_csv
 from ..database.site import fetch_sites
-from ..database.roi import fetch_roi, update_roi_embedding
+from ..database.roi import fetch_roi, update_roi_embedding, update_roi_viewpoint
 from .. import sqlite_vec
 
-from ..models.viewpoint import predict_viewpoint
-
+from ..models import viewpoint
 from ..models import miewid
+
 from ..models.generator import dataloader
 
 import torch
 from tqdm import tqdm
 
-
+## GET DEVICE
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.mpDB = parent.mpDB
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print('Using device:', self.device)
         
         layout = QVBoxLayout()
 
@@ -143,36 +145,53 @@ class DisplayBase(QWidget):
                 del dialog
         
     def match(self):
-        #self.get_viewpoint()
-        self.get_embeddings()
+        self.get_viewpoint()
+        #self.get_embeddings()
 
     def get_viewpoint(self):
+        # TODO: Utilize probability for pairs/sequences
+
         # 1. fetch images
         image_paths = dict(self.mpDB.fetch_columns("media", "filepath"))
         rois = fetch_roi(self.mpDB)
-        roi_missing_viewpoint = rois[rois['Viewpoint'] is None]
-        #dataloader = viewpoint_dataloader(rois,image_paths)
-        # 2. run viewpoint model
-        #predict_viewpoint(manifest, None)
-        # 3. update rows 
+        print(rois)
+        empty = viewpoint.filter(rois)
+        print(empty)
+        viewpoint_dl = dataloader(viewpoint.filter(rois), image_paths,
+                                viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
+        # 2. load viewpoint model
+        model = viewpoint.load('/home/kyra/matchypatchy/matchypatchy/models/viewpoint_jaguar.pt', self.device)
+        # 3. update rows
+        with torch.no_grad():
+            for _, batch in tqdm(enumerate(viewpoint_dl)):
+                img = batch[0]
+                roi_id = batch[1].numpy()[0]
+                output = model(img.to(self.device))
+
+                value = torch.argmax(output, dim=1).cpu().detach().numpy()
+                prob = torch.max(torch.nn.functional.softmax(output, dim=1), 1)[0]
+                print(roi_id, value, prob)
+                update_roi_viewpoint(self.mpDB, roi_id, value)
+                
+       
+
 
     # Match Button
     def get_embeddings(self):
         # 1. fetch images
         image_paths = dict(self.mpDB.fetch_columns("media", "filepath"))
         rois = fetch_roi(self.mpDB)
-        rois = rois[rois['emb_id'] == 'None']
-        dataloader = dataloader(rois, image_paths, miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
-        # 2. run miewid 
-        
-        model = miewid.load_miew('/models/miew_id_all.bin')
-        
+        miew_dl = dataloader(miewid.filter(rois), image_paths, 
+                                miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
+        # 2. load miewid 
+        model = miewid.load('/models/miew_id_all.bin', self.device)
+        # 3. update rows    
         with torch.no_grad():
-            for _, batch in tqdm(enumerate(dataloader)):
+            for _, batch in tqdm(enumerate(miew_dl)):
                 img = batch[0]
                 roi_id = batch[1].numpy()[0]
-                print(roi_id)
-                #output = model.extract_feat(img.to(device))
+                
+                output = model.extract_feat(img.to(self.device))
                 output = output.numpy().squeeze()
                 converted = sqlite_vec.serialize_float32(output)
 
