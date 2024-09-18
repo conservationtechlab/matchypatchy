@@ -145,8 +145,8 @@ class DisplayBase(QWidget):
                 del dialog
         
     def match(self):
-        self.get_viewpoint()
-        #self.get_embeddings()
+        #self.get_viewpoint()
+        self.get_embeddings()
 
     def get_viewpoint(self):
         # TODO: Utilize probability for pairs/sequences
@@ -154,9 +154,6 @@ class DisplayBase(QWidget):
         # 1. fetch images
         image_paths = dict(self.mpDB.fetch_columns("media", "filepath"))
         rois = fetch_roi(self.mpDB)
-        print(rois)
-        empty = viewpoint.filter(rois)
-        print(empty)
         viewpoint_dl = dataloader(viewpoint.filter(rois), image_paths,
                                 viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
         # 2. load viewpoint model
@@ -172,8 +169,6 @@ class DisplayBase(QWidget):
                 prob = torch.max(torch.nn.functional.softmax(output, dim=1), 1)[0]
                 print(roi_id, value, prob)
                 update_roi_viewpoint(self.mpDB, roi_id, value)
-                
-       
 
 
     # Match Button

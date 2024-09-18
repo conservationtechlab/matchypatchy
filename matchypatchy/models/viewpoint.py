@@ -14,7 +14,7 @@ IMAGE_WIDTH = 480
 
 def filter(manifest, value=None):
     if value is None:
-        filter = manifest[manifest["viewpoint"] == None]
+        filter = manifest[manifest["viewpoint"].isna()]
     else:
         filter = manifest[manifest["viewpoint"] == value]
     return filter

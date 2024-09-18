@@ -16,7 +16,7 @@ IMAGE_WIDTH = 440
 
 
 def filter(rois):
-    return rois[rois['emb_id'] == 'None']
+    return rois[rois['emb_id'].isna()]
 
 
 def load(file_path, device):
@@ -27,9 +27,6 @@ def load(file_path, device):
     miew.load_state_dict(weights, strict=False)
     miew.eval()
     return miew
-
-
-
 
 
 def weights_init_kaiming(m):
