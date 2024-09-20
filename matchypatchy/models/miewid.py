@@ -17,7 +17,7 @@ IMAGE_WIDTH = 440
 
 def loadable_path():
   """ Returns the full path to the sqlite-vec loadable SQLite extension bundled with this package """
-  loadable_path = os.path.join(os.getcwd(), "matchypatchy/models/miewid_v2.bin")
+  loadable_path = os.path.join(os.getcwd(), "matchypatchy/models/miewid.bin")
   return os.path.normpath(loadable_path)
 
 

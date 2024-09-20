@@ -37,10 +37,12 @@ def setup_database(filepath='matchypatchy.db'):
                         ext TEXT NOT NULL,
                         datetime TEXT,
                         sequence_id INTEGER,
+                        pair_id INTEGER,
                         comment TEXT,
                         favorite INTEGER,
                         site_id INTEGER NOT NULL,
-                        FOREIGN KEY (site_id) REFERENCES site (id) )''')
+                        FOREIGN KEY (site_id) REFERENCES site (id),
+                        FOREIGN KEY (pair_id) REFERENCES media (id) )''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (

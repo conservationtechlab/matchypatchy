@@ -2,6 +2,10 @@
 Base Gui View
 """
 import os
+import torch
+from tqdm import tqdm 
+import pandas as pd
+
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
@@ -21,8 +25,7 @@ from ..models import miewid
 
 from ..models.generator import dataloader
 
-import torch
-from tqdm import tqdm
+
 
 ## GET DEVICE
 
@@ -97,7 +100,7 @@ class DisplayBase(QWidget):
 
     def update_survey(self):
         self.survey_select.clear() 
-        survey_names = self.mpDB.fetch_columns(table='survey',columns='name')
+        survey_names = self.mpDB.select('survey',columns='id, name')
         self.survey_list = dict(survey_names)
         self.survey_list_ordered = list(survey_names)
         if self.survey_list_ordered:
@@ -145,36 +148,41 @@ class DisplayBase(QWidget):
                 del dialog
         
     def match(self):
-        #self.get_viewpoint()
+        self.get_viewpoint()
         self.get_embeddings()
 
     def get_viewpoint(self):
         # TODO: Utilize probability for pairs/sequences
 
         # 1. fetch images
-        image_paths = dict(self.mpDB.fetch_columns("media", "filepath"))
+        media = self.mpDB.select("media", columns="id, filepath, pair_id, sequence_id")
+        media = pd.DataFrame(media, columns=["id", "filepath", "pair_id", "sequence_id"])
+        image_paths = pd.Series(media["filepath"].values,index=media["id"]).to_dict() 
+
         rois = fetch_roi(self.mpDB)
-        viewpoint_dl = dataloader(viewpoint.filter(rois), image_paths,
-                                viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
-        # 2. load viewpoint model
-        model = viewpoint.load(self.device)
-        # 3. update rows
-        with torch.no_grad():
-            for _, batch in tqdm(enumerate(viewpoint_dl)):
-                img = batch[0]
-                roi_id = batch[1].numpy()[0]
-                output = model(img.to(self.device))
+        rois = viewpoint.filter(rois)
+        
+        if len(rois) > 0:
+            viewpoint_dl = dataloader(rois, image_paths, 
+                                      viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
+            # 2. load viewpoint model
+            model = viewpoint.load(self.device)
+            # 3. update rows
+            with torch.no_grad():
+                for _, batch in tqdm(enumerate(viewpoint_dl)):
+                    img = batch[0]
+                    roi_id = batch[1].numpy()[0]
+                    output = model(img.to(self.device))
+                    value = torch.argmax(output, dim=1).cpu().detach().numpy()[0]
+                    prob = torch.max(torch.nn.functional.softmax(output, dim=1), 1)[0]
+                    prob = prob.cpu().detach().numpy()[0]
+                    print(roi_id, value, prob)
+                    update_roi_viewpoint(self.mpDB, roi_id, value)
 
-                value = torch.argmax(output, dim=1).cpu().detach().numpy()
-                prob = torch.max(torch.nn.functional.softmax(output, dim=1), 1)[0]
-                print(roi_id, value, prob)
-                update_roi_viewpoint(self.mpDB, roi_id, value)
-
-
-    # Match Button
+        # Match Button
     def get_embeddings(self):
         # 1. fetch images
-        image_paths = dict(self.mpDB.fetch_columns("media", "filepath"))
+        image_paths = dict(self.mpDB.select("media", columns="id, filepath"))
         rois = fetch_roi(self.mpDB)
         miew_dl = dataloader(miewid.filter(rois), image_paths, 
                                 miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
@@ -187,7 +195,8 @@ class DisplayBase(QWidget):
                 roi_id = batch[1].numpy()[0]
                 
                 output = model.extract_feat(img.to(self.device))
-                output = output.numpy().squeeze()
+                output = output.cpu().detach().numpy()[0]
+                print(output)
                 converted = sqlite_vec.serialize_float32(output)
 
                 # 4. store embedding in table
