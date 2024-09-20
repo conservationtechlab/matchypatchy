@@ -69,11 +69,12 @@ def import_csv(mpDB, manifest_filepath, valid_sites):
             
             # add viewpoint if exists
             viewpoint = roi['Viewpoint'] if 'Viewpoint' in manifest.columns else None
+            individual = roi['Individual'] if 'Individual' in manifest.columns else None
 
             species = roi['Species']
             # look up species id
             if isinstance(species, str):
-                species_id = mpDB.fetch_rows("species", f'common="{species}"', columns='id')
+                species_id = mpDB.select("species", columns='id', row_cond=f'common="{species}"')
                 if species_id:
                     species_id = species_id[0][0]
 
@@ -85,7 +86,7 @@ def import_csv(mpDB, manifest_filepath, valid_sites):
                 continue
 
             roi_id = mpDB.add_roi(frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                         viewpoint=None, reviewed=0, iid=None, emb_id=None)
+                                  viewpoint=viewpoint, reviewed=0, individual_id=individual, emb_id=None)
 
 
     print(f"Added {len(unique_images)} files and {len(manifest)} ROIs to Database")
@@ -101,7 +102,7 @@ def fetch_media(mpDB):
     Returns
         - an inverted dictionary in order to match manifest site names to table id
     """
-    media = mpDB.fetch_table("media")
+    media = mpDB.select("media")
     
     if media:
         media = pd.DataFrame(media, columns=["id", "filepath", "ext", "datetime", 'sequence_id',

@@ -3,7 +3,7 @@ Functions for Manipulating and Processing ROIs
 """
 
 import pandas as pd
-from ..sqlite_vec import serialize_float32
+
 
 def fetch_roi(mpDB):
     """
@@ -15,10 +15,10 @@ def fetch_roi(mpDB):
     Returns
         - an inverted dictionary in order to match manifest site names to table id
     """
-    manifest = mpDB.fetch_table("roi")
+    manifest = mpDB.select("roi")
     if manifest:
         rois = pd.DataFrame(manifest, columns=["id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
-                                              "viewpoint", "media_id", "species_id", "reviewed", "iid", "emb_id"])
+                                              "viewpoint", "reviewed", "media_id", "species_id",  "individual_id", "emb_id"])
         return rois
     else:
         return False
@@ -56,25 +56,10 @@ def update_roi_iid(mpDB, roi_id, iid):
 
 
 def roi_knn(mpDB, roi_id, k=3):
-    roi_emb_ids = mpDB.fetch_rows("roi", f"id={roi_id}", columns = "id, emb_id")  
+    roi_emb_ids = mpDB.select("roi", f"id={roi_id}", columns="id, emb_id")  
 
     query = roi_emb_ids[0]
-
-    results = db.execute(
-        """
-        SELECT
-            roi_emb.id,
-            distance,
-            rio.id,
-            iid,
-        FROM roi_emb
-        LEFT JOIN roi ON roi.emb_id = roi_emb.id
-        WHERE embedding MATCH ?
-            AND k = 3
-        ORDER BY distance
-        """,
-        [serialize_float32(query)],
-    ).fetchall()
+    print(query)
 
     for row in results:
         print(row)

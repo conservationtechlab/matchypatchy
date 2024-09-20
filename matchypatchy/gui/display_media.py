@@ -88,7 +88,7 @@ class DisplayMedia(QWidget):
         self.parent._set_base_view()
 
     def update_survey(self):
-        survey_names = self.mpDB.fetch_columns(table='survey',columns='name')
+        survey_names = self.mpDB.select('survey',columns='id, name')
         self.survey_list_ordered = list(survey_names)
         if self.survey_list_ordered:
             self.survey_select.addItems([el[1] for el in survey_names])

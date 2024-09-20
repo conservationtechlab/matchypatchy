@@ -51,14 +51,14 @@ def setup_database(filepath='matchypatchy.db'):
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
                         viewpoint TEXT,
+                        reviewed INTEGER NOT NULL,
                         media_id INTEGER NOT NULL,
                         species_id INTEGER NOT NULL,
-                        reviewed INTEGER NOT NULL,
-                        iid INTEGER,
+                        individual_id INTEGER,
                         emb_id INTEGER,
                         FOREIGN KEY(media_id) REFERENCES media (id)
                         FOREIGN KEY(species_id) REFERENCES species (id)
-                        FOREIGN KEY(iid) REFERENCES individual (id)
+                        FOREIGN KEY(individual_id) REFERENCES individual (id)
                         FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) )''')
     
     # SPECIES

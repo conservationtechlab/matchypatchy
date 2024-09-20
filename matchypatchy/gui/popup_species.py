@@ -67,7 +67,7 @@ class SpeciesPopup(QtWidgets.QDialog):
 
     def update(self):
         #self.species_model.clear()
-        self.species_list_ordered = self.mpDB.fetch_table("species")
+        self.species_list_ordered = self.mpDB.select("species")
         self.list.setRowCount(len(self.species_list_ordered))
 
         # Add data to rows
@@ -90,7 +90,7 @@ class SpeciesPopup(QtWidgets.QDialog):
         id = self.species_list_ordered[selected_site][0]
 
         cond = f'id={id}'
-        id, binomen, common = self.mpDB.fetch_rows('species', cond)[0]
+        id, binomen, common = self.mpDB.select('species', row_cond=cond)[0]
         dialog = SpeciesFillPopup(self, binomen=binomen, common=common)
         if dialog.exec():
             replace_dict = {"binomen":f"'{dialog.get_binomen()}'", "common":f"'{dialog.get_common()}'"}

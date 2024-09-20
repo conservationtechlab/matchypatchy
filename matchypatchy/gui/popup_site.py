@@ -65,7 +65,7 @@ class SitePopup(QtWidgets.QDialog):
     def update(self):
         self.list.clear()
         cond = f'survey_id={self.survey_id[0]}'
-        self.site_list_ordered = self.mpDB.fetch_rows("site", cond, columns="id, name")
+        self.site_list_ordered = self.mpDB.select("site", columns="id, name", row_cond=cond)
         self.site_list = dict(self.site_list_ordered)
         if self.site_list_ordered:
             self.list.addItems([el[1] for el in self.site_list_ordered])
@@ -83,7 +83,7 @@ class SitePopup(QtWidgets.QDialog):
         selected_site = self.list.currentRow()
         id = self.site_list_ordered[selected_site][0]
         cond = f'id={id}'
-        id, name, lat, long = self.mpDB.fetch_rows('site',cond,columns='id, name, lat, long')[0]
+        id, name, lat, long = self.mpDB.select('site',columns='id, name, lat, long', row_cond=cond)[0]
         dialog = SiteFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
             replace_dict = {"name":f"'{dialog.get_name()}'", "lat":dialog.get_lat(), "long":dialog.get_long()}

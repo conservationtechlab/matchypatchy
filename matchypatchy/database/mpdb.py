@@ -3,6 +3,7 @@ Class Definition for MatchyPatchyDB
 '''
 import sqlite3
 from . import setup
+from ..sqlite_vec import serialize_float32
 
 
 class MatchyPatchyDB():
@@ -108,16 +109,17 @@ class MatchyPatchyDB():
             return False
         
     def add_roi(self, frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                viewpoint=None, reviewed=0, iid=None, emb_id=None):
+                viewpoint=None, reviewed=0, individual_id=None, emb_id=None):
+        # Note difference in variable order, foreign keys
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO roi
-                        (frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint,
-                        media_id, species_id, reviewed, iid, emb_id) 
+                        (frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
+                        media_id, species_id, individual_id, emb_id) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint,
-                          media_id, species_id, reviewed, iid, emb_id)
+            data_tuple = (frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
+                          media_id, species_id, individual_id, emb_id)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -174,36 +176,44 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
-        
-    def fetch_table(self, table):
-        db = sqlite3.connect(self.filepath)
-        cursor = db.cursor()
-        command = f'SELECT * FROM {table};'
-        cursor.execute(command)
-        rows = cursor.fetchall()
-        db.close()
-        return rows
     
-    def fetch_columns(self, table, columns):
-        # check if columns is list, concat
-        db = sqlite3.connect(self.filepath)
-        cursor = db.cursor()
-        command = f'SELECT id, {columns} FROM {table};'
-        cursor.execute(command)
-        rows = cursor.fetchall()  # returns in tuple
-        db.close()
-        return rows
+    def select(self, table, columns="*", row_cond=None):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            if row_cond:
+                command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
+            else:
+                command = f'SELECT {columns} FROM {table};'
+            print(command)
+            cursor.execute(command)
+            rows = cursor.fetchall()  # returns in tuple
+            db.close()
+            return rows
+        except sqlite3.Error as error:
+            print("Failed to fetch", error)
+            if db:
+                db.close()
+            return False
     
-    def fetch_rows(self, table, row_cond, columns="*"):
-        db = sqlite3.connect(self.filepath)
-        cursor = db.cursor()
-        command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
-        print(command)
-        cursor.execute(command)
-        rows = cursor.fetchall()  # returns in tuple
-        db.close()
-        return rows
-    
+    def select_join(self, table, join, columns="*", row_cond=None):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            if row_cond:
+                command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
+            else:
+                command = f'SELECT {columns} FROM {table};'
+            print(command)
+            cursor.execute(command)
+            rows = cursor.fetchall()  # returns in tuple
+            db.close()
+            return rows
+        except sqlite3.Error as error:
+            print("Failed to fetch", error)
+            if db:
+                db.close()
+            return False
 
     def delete(self, table, cond):
         try:
@@ -231,6 +241,32 @@ class MatchyPatchyDB():
             return True
         except sqlite3.Error as error:
             print(f"Failed to clear {table}", error)
+            if db:
+                db.close()
+            return False 
+        
+    def knn(self, query, k=3):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = """SELECT
+                            roi_emb.id,
+                            distance,
+                            rio.id,
+                            iid,
+                        FROM roi_emb
+                        LEFT JOIN roi ON roi.emb_id = roi_emb.id
+                        WHERE embedding MATCH ?
+                            AND k = ?
+                        ORDER BY distance
+                        """
+            data_tuple = (serialize_float32(query),k)
+            cursor.execute(command,data_tuple)
+            results = cursor.fetchall()
+            print(results)
+
+        except sqlite3.Error as error:
+            print(f"Failed to clear get knn for ROI", error)
             if db:
                 db.close()
             return False 

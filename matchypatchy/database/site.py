@@ -11,7 +11,7 @@ def fetch_sites(mpDB, survey_id):
         - an inverted dictionary in order to match manifest site names to table id
     """
     cond = f'survey_id={survey_id}'
-    sites = dict(mpDB.fetch_rows("site", cond, columns="id, name"))
+    sites = dict(mpDB.select("site", columns="id, name", row_cond=cond))
     if not len(sites.keys()) == len(set(sites.keys())):
         AssertionError('Survey has duplicate site names, please fix before importing.')
     sites = swap_keyvalue(sites)
