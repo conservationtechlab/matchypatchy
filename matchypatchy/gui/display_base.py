@@ -157,7 +157,7 @@ class DisplayBase(QWidget):
         viewpoint_dl = dataloader(viewpoint.filter(rois), image_paths,
                                 viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
         # 2. load viewpoint model
-        model = viewpoint.load('/home/kyra/matchypatchy/matchypatchy/models/viewpoint_jaguar.pt', self.device)
+        model = viewpoint.load(self.device)
         # 3. update rows
         with torch.no_grad():
             for _, batch in tqdm(enumerate(viewpoint_dl)):
@@ -179,7 +179,7 @@ class DisplayBase(QWidget):
         miew_dl = dataloader(miewid.filter(rois), image_paths, 
                                 miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
         # 2. load miewid 
-        model = miewid.load('/models/miew_id_all.bin', self.device)
+        model = miewid.load(self.device)
         # 3. update rows    
         with torch.no_grad():
             for _, batch in tqdm(enumerate(miew_dl)):

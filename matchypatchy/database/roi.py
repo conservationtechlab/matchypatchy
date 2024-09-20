@@ -3,7 +3,7 @@ Functions for Manipulating and Processing ROIs
 """
 
 import pandas as pd
-
+from ..sqlite_vec import serialize_float32
 
 def fetch_roi(mpDB):
     """
@@ -55,5 +55,26 @@ def update_roi_iid(mpDB, roi_id, iid):
     return mpDB.edit_row("roi", roi_id, {"iid":iid})
 
 
-def roi_knn(mpDB, roi_id, k):
-    emb_id = mpDB.fetch_rows("roi", f"id={roi_id}", columns = "id, emb_id")
+def roi_knn(mpDB, roi_id, k=3):
+    roi_emb_ids = mpDB.fetch_rows("roi", f"id={roi_id}", columns = "id, emb_id")  
+
+    query = roi_emb_ids[0]
+
+    results = db.execute(
+        """
+        SELECT
+            roi_emb.id,
+            distance,
+            rio.id,
+            iid,
+        FROM roi_emb
+        LEFT JOIN roi ON roi.emb_id = roi_emb.id
+        WHERE embedding MATCH ?
+            AND k = 3
+        ORDER BY distance
+        """,
+        [serialize_float32(query)],
+    ).fetchall()
+
+    for row in results:
+        print(row)

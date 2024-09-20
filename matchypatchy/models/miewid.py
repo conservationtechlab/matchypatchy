@@ -4,6 +4,7 @@ Code to run Miew_ID
 (source)
 
 """
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,14 +15,19 @@ from .heads import ElasticArcFace, ArcFaceSubCenterDynamic
 IMAGE_HEIGHT = 440
 IMAGE_WIDTH = 440
 
+def loadable_path():
+  """ Returns the full path to the sqlite-vec loadable SQLite extension bundled with this package """
+  loadable_path = os.path.join(os.getcwd(), "matchypatchy/models/miewid_v2.bin")
+  return os.path.normpath(loadable_path)
+
 
 def filter(rois):
     return rois[rois['emb_id'].isna()]
 
 
-def load(file_path, device):
+def load(device):
     # TODO: check device
-    weights = torch.load(file_path)
+    weights = torch.load(loadable_path())
     miew = MiewIdNet()
     miew.to(device)
     miew.load_state_dict(weights, strict=False)
