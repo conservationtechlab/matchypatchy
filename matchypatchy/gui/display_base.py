@@ -17,8 +17,9 @@ from .popup_species import SpeciesPopup
 
 from ..database.media import import_csv
 from ..database.site import fetch_sites
-from ..database.roi import fetch_roi, update_roi_embedding, update_roi_viewpoint
-from .. import sqlite_vec
+
+from ..database.roi import (fetch_roi, update_roi_embedding, 
+                            update_roi_viewpoint, roi_knn)
 
 from ..models import viewpoint
 from ..models import miewid
@@ -150,6 +151,8 @@ class DisplayBase(QWidget):
     def match(self):
         self.get_viewpoint()
         self.get_embeddings()
+        roi_knn(self.mpDB)
+
 
     def get_viewpoint(self):
         # TODO: Utilize probability for pairs/sequences
@@ -184,25 +187,24 @@ class DisplayBase(QWidget):
         # 1. fetch images
         image_paths = dict(self.mpDB.select("media", columns="id, filepath"))
         rois = fetch_roi(self.mpDB)
-        miew_dl = dataloader(miewid.filter(rois), image_paths, 
+        rois = miewid.filter(rois)
+        
+        if len(rois) > 0:
+            miew_dl = dataloader(miewid.filter(rois), image_paths, 
                                 miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
-        # 2. load miewid 
-        model = miewid.load(self.device)
-        # 3. update rows    
-        with torch.no_grad():
-            for _, batch in tqdm(enumerate(miew_dl)):
-                img = batch[0]
-                roi_id = batch[1].numpy()[0]
-                
-                output = model.extract_feat(img.to(self.device))
-                output = output.cpu().detach().numpy()[0]
-                print(output)
-                converted = sqlite_vec.serialize_float32(output)
-
-                # 4. store embedding in table
-                emb_id = self.mpDB.add_emb(converted)
-                update_roi_embedding(self.mpDB, roi_id, emb_id)
-
+            # 2. load miewid 
+            model = miewid.load(self.device)
+            # 3. get embedding
+            with torch.no_grad():
+                for _, batch in tqdm(enumerate(miew_dl)):
+                    img = batch[0]
+                    roi_id = batch[1].numpy()[0]
+                    # 
+                    output = model.extract_feat(img.to(self.device))
+                    output = output.cpu().detach().numpy()[0]
+                    # 4. store embedding in table
+                    emb_id = self.mpDB.add_emb(output)
+                    update_roi_embedding(self.mpDB, roi_id, emb_id)
         
     # Validate Button
     def validate(self):

@@ -3,7 +3,7 @@ Class Definition for MatchyPatchyDB
 '''
 import sqlite3
 from . import setup
-from ..sqlite_vec import serialize_float32
+from .. import sqlite_vec 
 
 
 class MatchyPatchyDB():
@@ -14,9 +14,15 @@ class MatchyPatchyDB():
     
     def validate(self):
         db = sqlite3.connect(self.filepath)
+        db.enable_load_extension(True)
+        sqlite_vec.load(db)
+        db.enable_load_extension(False)
         cursor = db.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
+        cursor.execute(f"PRAGMA table_info(roi_emb)")
+        columns = cursor.fetchall()
+        print(columns)
         db.close()
         return tables
     
@@ -109,7 +115,7 @@ class MatchyPatchyDB():
             return False
         
     def add_roi(self, frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                viewpoint=None, reviewed=0, individual_id=None, emb_id=None):
+                viewpoint=None, reviewed=0, individual_id=0, emb_id=0):
         # Note difference in variable order, foreign keys
         try:
             db = sqlite3.connect(self.filepath)
@@ -135,8 +141,7 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             db.enable_load_extension(True)
-            # db.load_extension("vec0")
-            db.load_extension("C:/Users/tswanson/matchypatchy/matchypatchy/sqlite_vec/vec0")
+            sqlite_vec.load(db)
             db.enable_load_extension(False)
 
             cursor = db.cursor()
@@ -180,6 +185,10 @@ class MatchyPatchyDB():
     def select(self, table, columns="*", row_cond=None):
         try:
             db = sqlite3.connect(self.filepath)
+            if table == "roi_emb":
+                db.enable_load_extension(True)
+                sqlite_vec.load(db)
+                db.enable_load_extension(False)
             cursor = db.cursor()
             if row_cond:
                 command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
@@ -196,14 +205,11 @@ class MatchyPatchyDB():
                 db.close()
             return False
     
-    def select_join(self, table, join, columns="*", row_cond=None):
+    def select_join(self, table, join_table, join_cond, columns="*"):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            if row_cond:
-                command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
-            else:
-                command = f'SELECT {columns} FROM {table};'
+            command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
             print(command)
             cursor.execute(command)
             rows = cursor.fetchall()  # returns in tuple
@@ -233,6 +239,11 @@ class MatchyPatchyDB():
     def clear(self, table):
         try:
             db = sqlite3.connect(self.filepath)
+            # enable clear vec database
+            if table == "roi_emb":
+                db.enable_load_extension(True)
+                sqlite_vec.load(db)
+                db.enable_load_extension(False)
             cursor = db.cursor()
             command = f'DELETE FROM {table};'
             cursor.execute(command)
@@ -248,25 +259,38 @@ class MatchyPatchyDB():
     def knn(self, query, k=3):
         try:
             db = sqlite3.connect(self.filepath)
+            db.enable_load_extension(True)
+            sqlite_vec.load(db)
+            db.enable_load_extension(False)
             cursor = db.cursor()
-            command = """SELECT
-                            roi_emb.id,
+            command = f"""SELECT
+                            rowid,
+                            distance
+                        FROM roi_emb
+                        WHERE embedding MATCH ?
+                        ORDER BY distance
+                        LIMIT ?
+                        """
+            data_tuple = (query,k)
+            cursor.execute(command,data_tuple)
+            results = cursor.fetchall()
+            return results
+
+        except sqlite3.Error as error:
+            print(f"Failed to get knn for ROI", error)
+            if db:
+                db.close()
+            return False 
+
+
+"""SELECT
+                            roi_emb.rowid,
                             distance,
-                            rio.id,
+                            roi.id,
                             iid,
                         FROM roi_emb
-                        LEFT JOIN roi ON roi.emb_id = roi_emb.id
+                        LEFT JOIN roi ON roi.emb_id = roi_emb.rowid
                         WHERE embedding MATCH ?
                             AND k = ?
                         ORDER BY distance
                         """
-            data_tuple = (serialize_float32(query),k)
-            cursor.execute(command,data_tuple)
-            results = cursor.fetchall()
-            print(results)
-
-        except sqlite3.Error as error:
-            print(f"Failed to clear get knn for ROI", error)
-            if db:
-                db.close()
-            return False 

@@ -22,7 +22,7 @@ def loadable_path():
 
 
 def filter(rois):
-    return rois[rois['emb_id'].isna()]
+    return rois[rois['emb_id'] == 0]
 
 
 def load(device):

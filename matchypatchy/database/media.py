@@ -85,8 +85,9 @@ def import_csv(mpDB, manifest_filepath, valid_sites):
                 print(f"Could not add detection for unknown species {species}")
                 continue
 
+            # do not add emb_id, to be determined later
             roi_id = mpDB.add_roi(frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                                  viewpoint=viewpoint, reviewed=0, individual_id=individual, emb_id=None)
+                                  viewpoint=viewpoint, reviewed=0, individual_id=individual)
 
 
     print(f"Added {len(unique_images)} files and {len(manifest)} ROIs to Database")

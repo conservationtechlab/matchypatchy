@@ -55,11 +55,12 @@ def update_roi_iid(mpDB, roi_id, iid):
     return mpDB.edit_row("roi", roi_id, {"iid":iid})
 
 
-def roi_knn(mpDB, roi_id, k=3):
-    roi_emb_ids = mpDB.select("roi", f"id={roi_id}", columns="id, emb_id")  
+def roi_knn(mpDB, k=3):
+    rois = fetch_roi(mpDB)
 
-    query = roi_emb_ids[0]
-    print(query)
 
-    for row in results:
-        print(row)
+    for _,roi in rois.iterrows():
+        print(roi, roi["emb_id"])
+        query = mpDB.select("roi_emb", columns="embedding", row_cond= f"rowid={roi["emb_id"]}")[0][0]
+        neighbors = mpDB.knn(query)
+        print(neighbors)
