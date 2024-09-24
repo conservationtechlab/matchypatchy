@@ -1,11 +1,13 @@
 import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget,
                              QMenuBar, QStackedLayout)
+from PyQt6.QtGui import QAction
 from PyQt6.QtCore import QSize, QObject, QEvent
 
 from .display_base import DisplayBase
 from .display_media import DisplayMedia
 from .display_compare import DisplayCompare
+from .popup_table import TableEditorPopup
 
 
 class MainWindow(QMainWindow):
@@ -44,10 +46,25 @@ class MainWindow(QMainWindow):
 
         file.addAction("New")
         
-        edit.addAction("Surveys")
-        edit.addAction("Sites")
-        edit.addAction("Species")
-        edit.addAction("Media")
+        edit_preferences = QAction("Preferences", self)
+        edit.addAction(edit_preferences)
+
+        edit_survey = QAction("Surveys", self)
+        edit_survey.triggered.connect(lambda: self.edit_popup('survey'))
+        edit.addAction(edit_survey)
+
+        edit_site = QAction("Sites", self)
+        edit_site.triggered.connect(lambda: self.edit_popup('site'))
+        edit.addAction(edit_site)
+
+        edit_species = QAction("Species", self)
+        edit_species.triggered.connect(lambda: self.edit_popup('site'))
+        edit.addAction(edit_species)
+
+        edit_media = QAction("Media", self)
+        edit_media.triggered.connect(lambda: self.edit_popup('site'))
+        edit.addAction(edit_media)
+
 
     def _set_base_view(self):
         self.pages.setCurrentIndex(0)
@@ -60,6 +77,11 @@ class MainWindow(QMainWindow):
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
+
+    def edit_popup(self, table):
+        dialog = TableEditorPopup(self, table)
+        if dialog.exec():
+            del dialog
 
 
 def main_display(mpDB):

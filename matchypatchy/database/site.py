@@ -1,6 +1,6 @@
-from ..utils import swap_keyvalue
+import pandas as pd
 
-def fetch_sites(mpDB, survey_id):
+def fetch_sites(mpDB, survey_id=None):
     """
     Fetches sites associated with given survey, checks that they have unique names,
 
@@ -10,9 +10,16 @@ def fetch_sites(mpDB, survey_id):
     Returns
         - an inverted dictionary in order to match manifest site names to table id
     """
-    cond = f'survey_id={survey_id}'
-    sites = dict(mpDB.select("site", columns="id, name", row_cond=cond))
-    if not len(sites.keys()) == len(set(sites.keys())):
-        AssertionError('Survey has duplicate site names, please fix before importing.')
-    sites = swap_keyvalue(sites)
-    return sites
+    if survey_id:
+        sites = mpDB.select("site", row_cond=f'survey_id={survey_id}')
+    else:
+        sites = mpDB.select("site")
+
+    if sites:
+        return pd.DataFrame(sites, columns=["id", "name", "lat", "long", "survey_id"])
+    else:  # return empty
+        return pd.DataFrame(columns=["id", "name", "lat", "long", "survey_id"])
+    
+
+def user_editable_rows():
+    return [1,2,3]

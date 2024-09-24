@@ -281,16 +281,3 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False 
-
-
-"""SELECT
-                            roi_emb.rowid,
-                            distance,
-                            roi.id,
-                            iid,
-                        FROM roi_emb
-                        LEFT JOIN roi ON roi.emb_id = roi_emb.rowid
-                        WHERE embedding MATCH ?
-                            AND k = ?
-                        ORDER BY distance
-                        """

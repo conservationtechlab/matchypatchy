@@ -15,7 +15,7 @@ from .popup_site import SitePopup
 from .popup_alert import AlertPopup
 from .popup_species import SpeciesPopup
 
-from ..database.media import import_csv
+from ..database.import_csv import import_csv
 from ..database.site import fetch_sites
 
 from ..database.roi import (fetch_roi, update_roi_embedding, 
