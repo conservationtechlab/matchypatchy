@@ -4,7 +4,9 @@
 from PyQt6 import QtCore, QtWidgets
 
 from .popup_confirm import ConfirmPopup
-from .popup_survey import SurveyPopup
+from .popup_survey import SurveyFillPopup
+from .popup_site import SiteFillPopup
+from .popup_species import SpeciesFillPopup
 
 from ..database import survey 
 from ..database import site  
@@ -24,25 +26,19 @@ class TableEditorPopup(QtWidgets.QDialog):
         print(self.data)
 
         self.setWindowTitle(f"Edit {self.table}")
-        fullLayout = QtWidgets.QVBoxLayout(self)
-        self.container = QtWidgets.QWidget(objectName='container')
-        fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
-                                     QtWidgets.QSizePolicy.Policy.Maximum)
-        
-        layout = QtWidgets.QVBoxLayout(self.container)
+        self.setFixedSize(600,425)
+        layout = QtWidgets.QVBoxLayout(self)
     
 
         self.list = QtWidgets.QTableWidget()  
-        self.list.setRowCount(self.data.shape[0])
         self.list.setColumnCount(self.data.shape[1])
         self.list.setHorizontalHeaderLabels(self.data.columns.tolist())
-        self.list.setColumnWidth(0, 200)
+        self.list.setColumnWidth(0,25)  # set id column to be small
         self.list.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.list) 
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.list.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.list.itemChanged.connect(self.edit)
+        layout.addWidget(self.list) 
  
         # Buttons
         button_layout = QtWidgets.QHBoxLayout()
@@ -50,10 +46,10 @@ class TableEditorPopup(QtWidgets.QDialog):
         button_new.clicked.connect(self.add)
         button_layout.addWidget(button_new)
 
-        self.button_edit = QtWidgets.QPushButton("Edit")
-        self.button_edit.clicked.connect(self.edit)
-        self.button_edit.setEnabled(False)
-        button_layout.addWidget(self.button_edit)
+        self.button_save = QtWidgets.QPushButton("Save")
+        self.button_save.clicked.connect(self.edit)
+        self.button_save.setEnabled(False)
+        button_layout.addWidget(self.button_save)
         
         self.button_del = QtWidgets.QPushButton("Delete")
         self.button_del.clicked.connect(self.delete)
@@ -70,6 +66,7 @@ class TableEditorPopup(QtWidgets.QDialog):
         self.update()
 
     def fetch(self):
+        # REFACTOR THIS?
         if self.table == "survey":
             self.data = survey.fetch_surveys(self.mpDB)
             self.editable_columns = survey.user_editable_rows()
@@ -91,7 +88,8 @@ class TableEditorPopup(QtWidgets.QDialog):
 
         TO DO: DO NOT ALLOW FOREIGN KEYS TO BE EDITED 
         '''
-        self.fetch()
+        self.list.setRowCount(self.data.shape[0])
+        self.list.setColumnCount(self.data.shape[1])
         for row in range(self.data.shape[0]):
             for column in range(self.data.shape[1]): # skip id column
                 item = QtWidgets.QTableWidgetItem(str(self.data.iat[row, column]))
@@ -101,41 +99,50 @@ class TableEditorPopup(QtWidgets.QDialog):
 
     def add(self):
         if self.table == "survey":
-            dialog = SurveyPopup(self)
-        elif self.table == "site":
-            dialog = AddSurvey(self.mpDB)
-        elif self.table == "species":
-            dialog = fetch_species(self.mpDB)
+            dialog = SurveyFillPopup(self)
             if dialog.exec():
-                dialog = self.mpDB.add_species(dialog.get_binomen(),dialog.get_common())
+                confirm = self.mpDB.add_survey(dialog.get_name(), dialog.get_region(),
+                                           dialog.get_year_start(), dialog.get_year_start())
+        elif self.table == "site":
+            dialog = SiteFillPopup(self.mpDB)
+            if dialog.exec():
+                confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
+                                             dialog.get_long(),self.survey_id[0])
+        elif self.table == "species":
+            dialog = SpeciesFillPopup(self.mpDB)
+            if dialog.exec():
+                confirm = self.mpDB.add_species(dialog.get_binomen(),dialog.get_common())
         elif self.table == "media":
-            dialog = fetch_media(self.mpDB)
+            dialog = None
 
         del dialog
 
+        self.fetch()
         self.update()
 
 
     def edit(self):
+        self.button_save.setEnabled(True)
+        # confirm changes button?
         selected_site = self.list.currentRow()
         id = self.data.iloc[selected_site]
+        print(id)
+        replace = dict()
 
-        dialog = AddPopup(self)
-        if dialog.exec():
-            replace_dict = {"binomen":f"'{dialog.get_binomen()}'", "common":f"'{dialog.get_common()}'"}
-            confirm = self.mpDB.edit_row("species",id,replace_dict)
-        del dialog
-        self.sites = self.update()
+        #self.mpDB.edit_row(self.table, id, replace)
+
+        #self.sites = self.update()
     
+
     def delete(self):
         selected = self.list.currentItem().text()
         prompt = f'Are you sure you want to delete {selected}?'
         print(prompt)
         dialog = ConfirmPopup(self, prompt)
         if dialog.exec():
-            row = self.species_list_ordered[self.list.currentRow()][0]
+            row = self.data.loc[self.list.currentRow(),'id']
             cond = f'id={row}'
-            self.mpDB.delete("species", cond)
+            self.mpDB.delete(self.table, cond)
         del dialog
         self.update()
 

@@ -3,7 +3,7 @@
 '''
 from PyQt6 import QtCore, QtWidgets
 
-class SurveyPopup(QtWidgets.QDialog):
+class SurveyFillPopup(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Survey")

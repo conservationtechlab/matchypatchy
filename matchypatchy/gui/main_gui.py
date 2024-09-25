@@ -58,11 +58,11 @@ class MainWindow(QMainWindow):
         edit.addAction(edit_site)
 
         edit_species = QAction("Species", self)
-        edit_species.triggered.connect(lambda: self.edit_popup('site'))
+        edit_species.triggered.connect(lambda: self.edit_popup('species'))
         edit.addAction(edit_species)
 
         edit_media = QAction("Media", self)
-        edit_media.triggered.connect(lambda: self.edit_popup('site'))
+        edit_media.triggered.connect(lambda: self.edit_popup('media'))
         edit.addAction(edit_media)
 
 
