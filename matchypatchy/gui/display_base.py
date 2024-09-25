@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
 
-from .popup_survey import SurveyPopup
+from .popup_survey import SurveyFillPopup
 from .popup_site import SitePopup
 from .popup_alert import AlertPopup
 from .popup_species import SpeciesPopup
@@ -19,13 +19,12 @@ from ..database.import_csv import import_csv
 from ..database.site import fetch_sites
 
 from ..database.roi import (fetch_roi, update_roi_embedding, 
-                            update_roi_viewpoint, roi_knn)
+                            update_roi_viewpoint, match)
 
 from ..models import viewpoint
 from ..models import miewid
 
 from ..models.generator import dataloader
-
 
 
 ## GET DEVICE
@@ -79,7 +78,7 @@ class DisplayBase(QWidget):
 
         
         button_load.clicked.connect(self.upload_media)
-        button_match.clicked.connect(self.match)
+        button_match.clicked.connect(self.process_roi)
         button_validate.clicked.connect(self.validate)
 
         # Add buttons to the layout
@@ -91,7 +90,7 @@ class DisplayBase(QWidget):
         self.setLayout(layout)
 
     def new_survey(self):
-        dialog = SurveyPopup(self)
+        dialog = SurveyFillPopup(self)
         if dialog.exec():
             confirm = self.mpDB.add_survey(dialog.get_name(), dialog.get_region(),
                                            dialog.get_year_start(), dialog.get_year_start())
@@ -148,11 +147,10 @@ class DisplayBase(QWidget):
             if dialog.exec():
                 del dialog
         
-    def match(self):
+    def process_roi(self):
         self.get_viewpoint()
         self.get_embeddings()
-        roi_knn(self.mpDB)
-
+        match(self.mpDB)
 
     def get_viewpoint(self):
         # TODO: Utilize probability for pairs/sequences
