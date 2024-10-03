@@ -83,26 +83,27 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def add_media(self, filepath, ext, site_id, datetime=None, sequence_id=None, comment=None, favorite=0):
+    def add_media(self, filepath, ext, site_id, datetime=None, sequence_id=None, pair_id=None, comment=None, favorite=0):
         """
-        Media has 7 attributes not including id:
-            id INTEGER PRIMARY KEY
-            filepath TEXT NOT NULL: local filepath
-            ext TEXT NOT NULL: file extension
-            datetime TEXT: filemodifydate
-            sequence_id INTEGER: sequence id to link media
-            comment TEXT: any str value
-            favorite INTEGER: 0 default, 1 if favorited
-            site_id INTEGER NOT NULL: foreign key to site
+        Media has 9 attributes not including id:
+            id INTEGER PRIMARY KEY,
+            filepath TEXT UNIQUE NOT NULL,
+            ext TEXT NOT NULL,
+            datetime TEXT,
+            site_id INTEGER NOT NULL,
+            sequence_id INTEGER,
+            pair_id INTEGER,
+            comment TEXT,
+            favorite INTEGER,
         """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO media
-                        (filepath, ext, datetime, sequence_id, 
-                        comment, favorite, site_id) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, ext, datetime, sequence_id, comment, favorite, site_id)
+                        (filepath, ext, datetime, site_id,
+                        sequence_id, pair_id, comment, favorite) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
+            data_tuple = (filepath, ext, datetime, site_id, sequence_id, pair_id, comment, favorite)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -212,9 +213,10 @@ class MatchyPatchyDB():
             command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
             print(command)
             cursor.execute(command)
+            column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
             db.close()
-            return rows
+            return rows, column_names
         except sqlite3.Error as error:
             print("Failed to fetch", error)
             if db:

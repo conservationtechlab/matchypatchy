@@ -36,11 +36,11 @@ def setup_database(filepath='matchypatchy.db'):
                         filepath TEXT UNIQUE NOT NULL,
                         ext TEXT NOT NULL,
                         datetime TEXT,
+                        site_id INTEGER NOT NULL,
                         sequence_id INTEGER,
                         pair_id INTEGER,
                         comment TEXT,
                         favorite INTEGER,
-                        site_id INTEGER NOT NULL,
                         FOREIGN KEY (site_id) REFERENCES site (id),
                         FOREIGN KEY (pair_id) REFERENCES media (id) )''')
 

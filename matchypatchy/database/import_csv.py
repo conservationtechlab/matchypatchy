@@ -50,6 +50,7 @@ def import_csv(mpDB, manifest_filepath, valid_sites):
 
         try:
             site_id = valid_sites.loc[valid_sites["name"]==site,"id"].values[0]
+            site_id = int(site_id)
         except KeyError:
             print('Site referenced but not added to Database')
             return False
