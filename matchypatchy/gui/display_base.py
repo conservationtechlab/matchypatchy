@@ -21,10 +21,10 @@ from ..database.site import fetch_sites
 from ..database.roi import (fetch_roi, update_roi_embedding, 
                             update_roi_viewpoint, match)
 
-from ..models import viewpoint
-from ..models import miewid
+from animl.reid import viewpoint
+from animl.reid import miewid
 
-from ..models.generator import dataloader
+from animl.generator import reid_dataloader
 
 
 ## GET DEVICE
@@ -164,7 +164,7 @@ class DisplayBase(QWidget):
         rois = viewpoint.filter(rois)
         
         if len(rois) > 0:
-            viewpoint_dl = dataloader(rois, image_paths, 
+            viewpoint_dl = reid_dataloader(rois, image_paths, 
                                       viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
             # 2. load viewpoint model
             model = viewpoint.load(self.device)
@@ -188,7 +188,7 @@ class DisplayBase(QWidget):
         rois = miewid.filter(rois)
         
         if len(rois) > 0:
-            miew_dl = dataloader(miewid.filter(rois), image_paths, 
+            miew_dl = reid_dataloader(miewid.filter(rois), image_paths, 
                                 miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
             # 2. load miewid 
             model = miewid.load(self.device)
