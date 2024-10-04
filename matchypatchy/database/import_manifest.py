@@ -8,7 +8,7 @@ from ..utils import is_unique
 
 
 # TODO: Check for duplicates
-def import_csv(mpDB, manifest_filepath, valid_sites):
+def import_manifest(mpDB, manifest_filepath, valid_sites):
     """
     Media entry (id, filepath, ext, datetime, comment, site_id)
     """

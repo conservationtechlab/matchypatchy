@@ -23,3 +23,20 @@ def fetch_sites(mpDB, survey_id=None):
 
 def user_editable_rows():
     return [1,2,3]
+
+
+def import_csv(mpDB, file_path, survey_id):
+    """
+    Site entry (id, name, lat, long)
+    """
+    # TODO: TEST NOT NULL
+    site_list = pd.read_csv(file_path)
+
+    assert "Name" in site_list.columns
+    assert "Latitude" in site_list.columns
+    assert "Longitude" in site_list.columns
+
+    for _, site in site_list.iterrows():
+        site_id = mpDB.add_site(site['Name'], site['Latitude'], site['Longitude'], survey_id)
+
+    print(f"Added {len(site_list)} sites to Database")
