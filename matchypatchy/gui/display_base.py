@@ -15,7 +15,7 @@ from .popup_site import SitePopup
 from .popup_alert import AlertPopup
 from .popup_species import SpeciesPopup
 
-from ..database.import_csv import import_csv
+from ..database.import_manifest import import_manifest
 from ..database.site import fetch_sites
 
 from ..database.roi import (fetch_roi, update_roi_embedding, 
@@ -140,7 +140,7 @@ class DisplayBase(QWidget):
             manifest = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
             if manifest:
                 valid_sites = fetch_sites(self.mpDB, self.active_survey[0])
-                import_csv(self.mpDB, manifest, valid_sites)
+                import_manifest(self.mpDB, manifest, valid_sites)
                 
         else:
             dialog = AlertPopup(self, "Please create a new survey before uploading.")
@@ -167,7 +167,7 @@ class DisplayBase(QWidget):
             viewpoint_dl = reid_dataloader(rois, image_paths, 
                                       viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
             # 2. load viewpoint model
-            model = viewpoint.load(self.device)
+            model = viewpoint.load(os.path.join(os.getcwd(), "viewpoint_jaguar.pt"), device=self.device)
             # 3. update rows
             with torch.no_grad():
                 for _, batch in tqdm(enumerate(viewpoint_dl)):
@@ -191,7 +191,7 @@ class DisplayBase(QWidget):
             miew_dl = reid_dataloader(miewid.filter(rois), image_paths, 
                                 miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
             # 2. load miewid 
-            model = miewid.load(self.device)
+            model = miewid.load(os.path.join(os.getcwd(), "miewid_9cats.bin"), device=self.device)
             # 3. get embedding
             with torch.no_grad():
                 for _, batch in tqdm(enumerate(miew_dl)):

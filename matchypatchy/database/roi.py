@@ -62,14 +62,38 @@ def roi_knn(mpDB, emb_id, k=3):
 
 
 def match(mpDB): 
+    # 1. Get KNN for each ROI
+    # 2. filter out matches from same sequence, pair
+    # 3. rank ROIs by match scores 
+
     info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, datetime, site_id, sequence_id, pair_id"
     # need sequence and pair ids from media to restrict comparisons shown to 
     rois, columns = mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
     rois = pd.DataFrame(rois,columns=columns)
-    print(rois)
 
     for _,roi in rois.iterrows():
-        print(roi, roi["emb_id"])
         neighbors = roi_knn(mpDB, roi["emb_id"]) 
-        print(neighbors)
+        filtered_neighbors = filter(rois, roi['id'], neighbors)
+        print(roi['id'], filtered_neighbors)
 
+
+def filter(rois, roi_id, neighbors, threshold = 100):
+    filtered = []
+    query = rois[rois['id'] == roi_id]
+    #print("query", query)
+
+    for i in range(1,len(neighbors)):  # skip first one, self match
+        match = rois[rois['emb_id'] == neighbors[i][0]]
+        
+        #print("match", match)
+        # if not same individual or unlabeled individual:
+        if (query['individual_id'].item() is None) or (match['individual_id'].item() != query['individual_id'].item()):
+            # if not in same sequence
+            if (query['sequence_id'].item() is None) or (match['sequence_id'].item() != query['sequence_id'].item()):
+                # if not in same pair (should be redundent to sequence)
+                if (query['pair_id'].item() is None) or (match['pair_id'].item() != query['pair_id'].item()):
+                    # distance check (do first or last?)
+                    if neighbors[i][1] < threshold:
+                        filtered.append(neighbors[i])
+
+    return sorted(filtered, key=lambda x: x[1])

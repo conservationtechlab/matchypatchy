@@ -5,7 +5,7 @@ from matchypatchy import test_install
 from matchypatchy import utils
 
 from matchypatchy.database import (MatchyPatchyDB, fetch_media, fetch_roi,
-                                   fetch_sites, fetch_surveys, import_csv,
+                                   fetch_sites, fetch_surveys, import_manifest,
                                    media, mpdb, roi, roi_knn, setup,
                                    setup_database, site, survey,
                                    update_roi_embedding, update_roi_iid,
@@ -29,7 +29,7 @@ __all__ = ['AlertPopup', 'ConfirmPopup', 'DisplayBase', 'DisplayCompare',
            'MatchyPatchyDB', 'SiteFillPopup', 'SitePopup', 'SpeciesFillPopup',
            'SpeciesPopup', 'SurveyPopup', 'database', 'display_base',
            'display_compare', 'display_media', 'display_single', 'fetch_media',
-           'fetch_roi', 'fetch_sites', 'fetch_surveys', 'gui', 'import_csv',
+           'fetch_roi', 'fetch_sites', 'fetch_surveys', 'gui', 'import_manifest',
            'is_unique', 'load', 'loadable_path', 'main', 'main_display',
            'main_gui', 'media', 'mpdb', 'popup_alert', 'popup_confirm',
            'popup_site', 'popup_species', 'popup_survey', 'register_numpy',
