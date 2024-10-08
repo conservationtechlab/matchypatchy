@@ -2,7 +2,7 @@
 GUI Window for viewing images
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox)
+                             QLabel, QComboBox, QSpacerItem, QSizePolicy)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
@@ -19,23 +19,31 @@ class DisplayMedia(QWidget):
         self.mpDB = parent.mpDB
         
         layout = QVBoxLayout()
-
-        self.label = QLabel("Media")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setFixedHeight(20)
-        layout.addWidget(self.label)
         
         first_layer = QHBoxLayout()
         survey_label = QLabel("Survey:")
-        first_layer.addWidget(survey_label, 0)
+        survey_label.setFixedWidth(50)
+        first_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.survey_select = QComboBox()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
-        first_layer.addWidget(self.survey_select, 2)
-        self.update_survey()
+        self.survey_select.setFixedWidth(200)
+        first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        return_button = QPushButton("Home")
+        return_button.clicked.connect(self.home)
+        return_button.setFixedWidth(100)
+        first_layer.addWidget(return_button, 0,  alignment=Qt.AlignmentFlag.AlignLeft)
+
+        first_layer.addStretch()
         layout.addLayout(first_layer)
 
+        # MEDIA TABLE
+        self.media_table = MediaTable(self)
+        layout.addWidget(self.media_table, stretch=1)
 
         self.setLayout(layout)
+
+        self.update_survey()
         
     def home(self):
         self.parent._set_base_view()
@@ -48,6 +56,9 @@ class DisplayMedia(QWidget):
 
     def select_survey(self):
         self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
+
+    def update(self):
+        self.media_table.update()
 
     # Keyboard Handler
     def keyPressEvent(self, event):

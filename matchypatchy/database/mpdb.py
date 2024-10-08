@@ -223,6 +223,28 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
+    def all_media(self):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed, 
+                         roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, datetime, 
+                         site_id, sequence_id, pair_id, comment, favorite, binomen, common, name, sex"""
+            command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
+                                           LEFT JOIN species ON roi.species_id = species.id
+                                           LEFT JOIN individual ON roi.individual_id = individual.id;"""
+            cursor.execute(command)
+            column_names = [description[0] for description in cursor.description]
+            rows = cursor.fetchall()  # returns in tuple
+            db.close()
+            return rows, column_names
+        except sqlite3.Error as error:
+            print("Failed to fetch", error)
+            if db:
+                db.close()
+            return False
+
+
     def delete(self, table, cond):
         try:
             db = sqlite3.connect(self.filepath)

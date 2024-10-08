@@ -96,6 +96,7 @@ class MainWindow(QMainWindow):
 
     def _set_media_view(self):
         self.pages.setCurrentIndex(1)
+        self.Media.update()
         self.Media.setFocus()
 
     def _set_compare_view(self):
