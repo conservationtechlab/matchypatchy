@@ -70,11 +70,18 @@ def match(mpDB):
     # need sequence and pair ids from media to restrict comparisons shown to 
     rois, columns = mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
     rois = pd.DataFrame(rois,columns=columns)
+    neighbor_dict = dict()
+    nearest_dict = dict()
 
     for _,roi in rois.iterrows():
         neighbors = roi_knn(mpDB, roi["emb_id"]) 
         filtered_neighbors = filter(rois, roi['id'], neighbors)
-        print(roi['id'], filtered_neighbors)
+        #print(roi['id'], filtered_neighbors)
+        neighbor_dict[roi['id']] = filtered_neighbors
+        nearest_dict[roi['id']] = filtered_neighbors[0][1]
+
+    print(neighbor_dict)
+    print(nearest_dict)
 
 
 def filter(rois, roi_id, neighbors, threshold = 100):
@@ -97,3 +104,7 @@ def filter(rois, roi_id, neighbors, threshold = 100):
                         filtered.append(neighbors[i])
 
     return sorted(filtered, key=lambda x: x[1])
+
+
+def rank(neighbor_dict):
+    sorted(neighbor_dict, key=lambda x: x.value())
