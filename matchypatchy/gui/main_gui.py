@@ -96,8 +96,11 @@ class MainWindow(QMainWindow):
 
     def _set_media_view(self):
         self.pages.setCurrentIndex(1)
-        self.Media.update()
         self.Media.setFocus()
+        self.Media.refresh_filters() 
+        self.Media.connect()
+        self.Media.update_table()
+        
 
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)

@@ -49,7 +49,7 @@ class DisplayBase(QWidget):
         first_layer.addWidget(survey_label, 0)
         self.survey_select = QComboBox()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
-        first_layer.addWidget(self.survey_select, 2)
+        first_layer.addWidget(self.survey_select, 1)
 
         button_survey_new = QPushButton("New Survey")
         button_survey_new.clicked.connect(self.new_survey)
@@ -65,6 +65,10 @@ class DisplayBase(QWidget):
         self.button_species_manage = QPushButton("Manage Species")
         self.button_species_manage.clicked.connect(self.manage_species)
         first_layer.addWidget(self.button_species_manage, 1)
+
+        self.button_media_manage = QPushButton("Manage Media")
+        self.button_media_manage.clicked.connect(self.manage_media)
+        first_layer.addWidget(self.button_media_manage, 1)
 
         self.update_survey()
         layout.addLayout(first_layer)
@@ -127,6 +131,10 @@ class DisplayBase(QWidget):
         if dialog.exec():
             del dialog
 
+    # Manage Media Button
+    def manage_media(self):
+        self.parent._set_media_view()
+
     # Upload Button
     def upload_media(self):
         '''
@@ -167,7 +175,7 @@ class DisplayBase(QWidget):
             viewpoint_dl = reid_dataloader(rois, image_paths, 
                                       viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
             # 2. load viewpoint model
-            model = viewpoint.load(os.path.join(os.getcwd(), "viewpoint_jaguar.pt"), device=self.device)
+            model = viewpoint.load(os.path.join(os.getcwd(), "matchypatchy\\models\\viewpoint_jaguar.pt"), device=self.device)
             # 3. update rows
             with torch.no_grad():
                 for _, batch in tqdm(enumerate(viewpoint_dl)):
@@ -191,7 +199,7 @@ class DisplayBase(QWidget):
             miew_dl = reid_dataloader(miewid.filter(rois), image_paths, 
                                 miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
             # 2. load miewid 
-            model = miewid.load(os.path.join(os.getcwd(), "miewid_9cats.bin"), device=self.device)
+            model = miewid.load(os.path.join(os.getcwd(), "matchypatchy\\models\\miewid.bin"), device=self.device)
             # 3. get embedding
             with torch.no_grad():
                 for _, batch in tqdm(enumerate(miew_dl)):
@@ -206,7 +214,7 @@ class DisplayBase(QWidget):
         
     # Validate Button
     def validate(self):
-        self.parent._set_media_view()
+        self.parent._set_compare_view()
         # return True
 
     # Keyboard Handler

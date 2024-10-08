@@ -5,64 +5,44 @@ import time
 
 
 
-class WorkerThread(QThread):
-    progress = pyqtSignal(int)
-    finished = pyqtSignal()
-
-    def run(self):
-        for i in range(101):
-            time.sleep(0.1)  # Simulate a long-running task
-            self.progress.emit(i)
-        self.finished.emit()
 
 class ProgressPopup(QDialog):
-    def __init__(self, prompt):
-        super().__init__()
+    def __init__(self, parent, prompt):
+        super().__init__(parent)
         self.setWindowTitle("Progress")
-        self.setGeometry(100, 100, 300, 100)
         self.layout = QVBoxLayout()
 
+        self.counter = 0
+        self.max = 100
+        
         self.label = QLabel(prompt)
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setRange(self.counter, self.max)
 
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.progress_bar)
 
         self.setLayout(self.layout)
 
-        self.worker_thread = WorkerThread()
-        self.worker_thread.progress.connect(self.update_progress)
-        self.worker_thread.finished.connect(self.close)
-        self.worker_thread.start()
 
-    def update_progress(self, value):
-        self.progress_bar.setValue(value)
+    def update_progress(self):
+        """Update the progress bar based on the counter value."""
+        self.counter += 1
+        print(self.counter)
+        self.progress_bar.setValue(self.counter)  # Update progress bar value
 
+        if self.counter >= self.max:  # Stop the timer when progress reaches 100
+            self.close()
 
-class ProgressBar(QWidget):
-    """
-    Progress bar widget in place on window
-    """
-    def __init__(self, parent):
-        super().__init__()
-        self.setWindowTitle("Progress")
-        self.setGeometry(100, 100, 300, 100)
-        self.layout = QVBoxLayout()
+    def set_max(self, max):
+        """Update the progress bar maximum value"""
+        print(max)
+        self.max = max
 
-        self.label = QLabel(prompt)
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-
-        self.layout.addWidget(self.label)
-        self.layout.addWidget(self.progress_bar)
-
-        self.setLayout(self.layout)
-
-        self.worker_thread = WorkerThread()
-        self.worker_thread.progress.connect(self.update_progress)
-        self.worker_thread.finished.connect(self.close)
-        self.worker_thread.start()
-
-    def update_progress(self, value):
-        self.progress_bar.setValue(value)
+    def set_counter(self, counter):
+        """Update the progress bar to specific"""
+        if counter < self.max:
+            self.counter = counter
+            self.progress_bar.setValue(self.counter)
+        else:
+            self.close()
