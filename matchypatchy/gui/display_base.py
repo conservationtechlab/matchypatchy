@@ -2,13 +2,11 @@
 Base Gui View
 """
 import os
-import torch
-from tqdm import tqdm 
 import pandas as pd
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QThread, pyqtSignal, Qt
 
 from .popup_survey import SurveyFillPopup
 from .popup_site import SitePopup
@@ -24,18 +22,12 @@ from ..database.roi import (fetch_roi, update_roi_embedding,
 from animl.reid import viewpoint
 from animl.reid import miewid
 
-from animl.generator import reid_dataloader
-
-
-## GET DEVICE
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.mpDB = parent.mpDB
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print('Using device:', self.device)
         
         layout = QVBoxLayout()
 
@@ -82,7 +74,7 @@ class DisplayBase(QWidget):
 
         
         button_load.clicked.connect(self.upload_media)
-        button_match.clicked.connect(self.process_roi)
+        button_match.clicked.connect(self.process_images)
         button_validate.clicked.connect(self.validate)
 
         # Add buttons to the layout
@@ -155,62 +147,18 @@ class DisplayBase(QWidget):
             if dialog.exec():
                 del dialog
         
-    def process_roi(self):
-        self.get_viewpoint()
-        self.get_embeddings()
-        match(self.mpDB)
+    def process_images(self):
+        # Figure out how to add loading bar
+        dialog = AlertPopup(self, "Processing Images", title="Processing Images")
+        dialog.show()
+        self.animl_thread = AnimlThread(self.mpDB)
 
-    def get_viewpoint(self):
-        # TODO: Utilize probability for pairs/sequences
-
-        # 1. fetch images
-        media = self.mpDB.select("media", columns="id, filepath, pair_id, sequence_id")
-        media = pd.DataFrame(media, columns=["id", "filepath", "pair_id", "sequence_id"])
-        image_paths = pd.Series(media["filepath"].values,index=media["id"]).to_dict() 
-
-        rois = fetch_roi(self.mpDB)
-        rois = viewpoint.filter(rois)
+        # Connect signals from the thread to the main thread
+        self.animl_thread.progress_update.connect(dialog.update)
+        self.animl_thread.start()
         
-        if len(rois) > 0:
-            viewpoint_dl = reid_dataloader(rois, image_paths, 
-                                      viewpoint.IMAGE_HEIGHT, viewpoint.IMAGE_WIDTH)
-            # 2. load viewpoint model
-            model = viewpoint.load(os.path.join(os.getcwd(), "matchypatchy\\models\\viewpoint_jaguar.pt"), device=self.device)
-            # 3. update rows
-            with torch.no_grad():
-                for _, batch in tqdm(enumerate(viewpoint_dl)):
-                    img = batch[0]
-                    roi_id = batch[1].numpy()[0]
-                    output = model(img.to(self.device))
-                    value = torch.argmax(output, dim=1).cpu().detach().numpy()[0]
-                    prob = torch.max(torch.nn.functional.softmax(output, dim=1), 1)[0]
-                    prob = prob.cpu().detach().numpy()[0]
-                    print(roi_id, value, prob)
-                    update_roi_viewpoint(self.mpDB, roi_id, value)
-
-        # Match Button
-    def get_embeddings(self):
-        # 1. fetch images
-        image_paths = dict(self.mpDB.select("media", columns="id, filepath"))
-        rois = fetch_roi(self.mpDB)
-        rois = miewid.filter(rois)
-        
-        if len(rois) > 0:
-            miew_dl = reid_dataloader(miewid.filter(rois), image_paths, 
-                                miewid.IMAGE_HEIGHT, miewid.IMAGE_WIDTH)
-            # 2. load miewid 
-            model = miewid.load(os.path.join(os.getcwd(), "matchypatchy\\models\\miewid.bin"), device=self.device)
-            # 3. get embedding
-            with torch.no_grad():
-                for _, batch in tqdm(enumerate(miew_dl)):
-                    img = batch[0]
-                    roi_id = batch[1].numpy()[0]
-                    # 
-                    output = model.extract_feat(img.to(self.device))
-                    output = output.cpu().detach().numpy()[0]
-                    # 4. store embedding in table
-                    emb_id = self.mpDB.add_emb(output)
-                    update_roi_embedding(self.mpDB, roi_id, emb_id)
+        if dialog.exec():
+            del dialog
         
     # Validate Button
     def validate(self):
@@ -222,3 +170,56 @@ class DisplayBase(QWidget):
         key = event.key()
         key_text = event.text()
         print(f"Key pressed: {key_text} (Qt key code: {key})")
+
+
+class AnimlThread(QThread):
+    progress_update = pyqtSignal(str)  # Signal to update the progress bar
+
+    def __init__(self, mpDB):
+        super().__init__()
+        self.mpDB = mpDB
+        media = self.mpDB.select("media", columns="id, filepath, pair_id, sequence_id")
+        self.media = pd.DataFrame(media, columns=["id", "filepath", "pair_id", "sequence_id"])
+        self.image_paths = pd.Series(self.media["filepath"].values,index=self.media["id"]).to_dict() 
+
+        self.viewpoint_filepath = os.path.join(os.getcwd(), "viewpoint_jaguar.pt")
+        self.miew_filepath = os.path.join(os.getcwd(), "miewid.bin")
+        
+    
+    def run(self):
+        self.progress_update.emit("Calculating bounding box...")
+        self.get_bbox()
+        self.progress_update.emit("Calculating viewpoint...")
+        self.get_viewpoint()
+        self.progress_update.emit("Calculating embeddings...")
+        self.get_embeddings()
+        self.progress_update.emit("Matching images...")
+        match(self.mpDB)
+        self.progress_update.emit("Processing complete!")
+
+    def get_bbox(self):
+        # TODO: add MD step, assumes no rois yet
+        pass
+
+    def get_viewpoint(self):
+        # TODO: Utilize probability for pairs/sequences
+        self.rois = fetch_roi(self.mpDB)
+        viewpoints = viewpoint.matchypatchy(self.rois, self.image_paths, self.viewpoint_filepath)
+    
+        for v in viewpoints:
+            roi_id = v[0]
+            value = v[1]
+            prob = v[2] 
+            print(roi_id, value, prob)
+            self.mpDB.edit_row("roi", roi_id, {"viewpoint":value})
+
+        # Match Button
+    def get_embeddings(self):
+        # 1. fetch images
+        self.rois = fetch_roi(self.mpDB)
+        embs = miewid.matchypatchy(self.rois, self.image_paths, self.miew_filepath)
+        for e in embs:
+            roi_id = e[0]
+            emb = e[1]
+            emb_id = self.mpDB.add_emb(emb)
+            self.mpDB.edit_row("roi", roi_id, {"emb_id":emb_id})
