@@ -1,9 +1,9 @@
 import sys
 import os
+
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction
-from PyQt6.QtCore import QSize, QObject, QEvent
 
 from .display_base import DisplayBase
 from .display_media import DisplayMedia
@@ -22,7 +22,10 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
-        self.setFixedSize(QSize(1200, 800))
+        self.setMinimumSize(1200, 800)
+        self.resize(1200,800)
+
+        # Create Menu Bar
         self._createMenuBar()
         # Create container
         container = QWidget(self)
@@ -71,7 +74,6 @@ class MainWindow(QMainWindow):
         file_import_media.triggered.connect(lambda: self.import_popup('media'))
         file_import.addAction(file_import_media)
         
-
         # EDIT 
         edit_preferences = QAction("Preferences", self)
         edit.addAction(edit_preferences)

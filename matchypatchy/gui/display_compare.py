@@ -5,7 +5,7 @@ GUI Window for Match Comparisons
 
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox)
+                             QLabel, QComboBox, QLineEdit, QSizePolicy)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
@@ -60,72 +60,117 @@ class DisplayCompare(QWidget):
         layer_two.addWidget(QLabel("Label 2"))
         control_panel.addLayout(layer_one)
         layout.addLayout(control_panel)
-        
-        # IMAGES
+
+        # Image Comparison
         image_layout = QHBoxLayout()
         
-        left_side = QVBoxLayout()
-        left_label = QLabel("Query")
-        left_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        left_side.addWidget(left_label,0)
-        self.left_box = ImageWidget()
-        left_side.addWidget(self.left_box)
-        image_layout.addLayout(left_side)
-        
-        right_side = QVBoxLayout()
-        right_label = QLabel("Match")
-        right_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        right_side.addWidget(right_label,0)
-        self.right_box = ImageWidget()
-        right_side.addWidget(self.right_box)
-        image_layout.addLayout(right_side)
-        
-        layout.addLayout(image_layout)
-
-        # Image Options
-        image_options = QHBoxLayout()
-        
+        # QUERY
+        query_layout = QVBoxLayout()
+        query_label = QLabel("Query")
+        query_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        query_layout.addWidget(query_label)
+        # Options
         query_options = QHBoxLayout()
-        query_label = QLabel("Query:")
-        query_options.addWidget(query_label, 1)
+        # # Query Number
+        query_image_label = QLabel("Query Image:")
+        query_options.addWidget(query_image_label,1)
         self.button_previous_query = QPushButton("<<")
-        query_options.addWidget(self.button_previous_query, 0)
+        self.button_previous_query.setMaximumWidth(40)
+        query_options.addWidget(self.button_previous_query)
+        self.query_number = QLineEdit()
+        query_options.addWidget(self.query_number)
+        query_n = QLabel("/9")
+        query_options.addWidget(query_n)
         self.query_number = QLabel()
-        query_options.addWidget(self.query_number, 0)
+        query_options.addWidget(self.query_number)
         self.button_next_query = QPushButton(">>")
-        query_options.addWidget(self.button_next_query, 0)
+        query_options.addWidget(self.button_next_query)
+        self.button_next_query.setMaximumWidth(40)
+        # # Sequence Number
         sequence_label = QLabel("Sequence:")
-        query_options.addWidget(sequence_label, 1)
+        query_options.addWidget(sequence_label)
         self.button_previous_sequence = QPushButton("<<")
+        self.button_previous_sequence.setMaximumWidth(40)
         query_options.addWidget(self.button_previous_sequence, 0)
+        self.sequence_number = QLineEdit()
+        query_options.addWidget(self.sequence_number, 0)
+        query_sequence_n = QLabel("/3")
+        query_options.addWidget(query_sequence_n, 0)
         self.sequence_number = QLabel()
         query_options.addWidget(self.sequence_number, 0)
         self.button_next_sequence = QPushButton(">>")
-        query_options.addWidget(self.button_next_sequence, 0)
+        self.button_next_sequence.setMaximumWidth(40)
+        query_options.addWidget(self.button_next_sequence)
+        # # Viewpoint Toggle
+        self.button_viewpoint = QPushButton("Left/Right")
+        query_options.addWidget(self.button_viewpoint)
+        query_layout.addLayout(query_options)
+        # Image
+        self.query_image = ImageWidget("IMAG0104.JPG")
+        self.query_image.setAlignment(Qt.AlignmentFlag.AlignTop)
+        query_layout.addWidget(self.query_image,1)
+        # MetaData
+        self.query_info = QLabel("Image Metadata")
+        self.query_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.query_info.setMaximumHeight(200)
+        query_layout.addWidget(self.query_info,1)
+        image_layout.addLayout(query_layout)
+        image_layout.addSpacing(50)
 
-        image_options.addLayout(query_options)
-        
-        # MATCH OPTIONS
+         # match
+        match_layout = QVBoxLayout()
+        match_label = QLabel("Match")
+        match_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        match_layout.addWidget(match_label)
+        # Options
         match_options = QHBoxLayout()
-        match_label = QLabel("Match:")
-        match_options.addWidget(match_label, 1)
+        # # match Number
+        match_image_label = QLabel("Match Image:")
+        match_options.addWidget(match_image_label,1)
         self.button_previous_match = QPushButton("<<")
-        match_options.addWidget(self.button_previous_match, 0)
+        self.button_previous_match.setMaximumWidth(40)
+        match_options.addWidget(self.button_previous_match)
+        self.match_number = QLineEdit()
+        match_options.addWidget(self.match_number)
+        match_n = QLabel("/9")
+        match_options.addWidget(match_n)
         self.match_number = QLabel()
-        match_options.addWidget(self.match_number, 0)
+        match_options.addWidget(self.match_number)
         self.button_next_match = QPushButton(">>")
-        match_options.addWidget(self.button_next_match, 0)
+        match_options.addWidget(self.button_next_match)
+        self.button_next_match.setMaximumWidth(40)
+        # # Sequence Number
         sequence_label = QLabel("Sequence:")
-        match_options.addWidget(sequence_label, 1)
+        match_options.addWidget(sequence_label)
         self.button_previous_sequence = QPushButton("<<")
+        self.button_previous_sequence.setMaximumWidth(40)
         match_options.addWidget(self.button_previous_sequence, 0)
+        self.sequence_number = QLineEdit()
+        match_options.addWidget(self.sequence_number, 0)
+        match_sequence_n = QLabel("/3")
+        match_options.addWidget(match_sequence_n, 0)
         self.sequence_number = QLabel()
         match_options.addWidget(self.sequence_number, 0)
         self.button_next_sequence = QPushButton(">>")
+        self.button_next_sequence.setMaximumWidth(40)
         match_options.addWidget(self.button_next_sequence, 0)
+        # # Viewpoint Toggle
+        self.button_viewpoint = QPushButton("Left/Right")
+        match_options.addWidget(self.button_viewpoint, 0)
+        match_layout.addLayout(match_options)
+        # Image
+        self.match_image = ImageWidget("IMAG0104.JPG")
+        self.match_image.setAlignment(Qt.AlignmentFlag.AlignTop)
+        match_layout.addWidget(self.match_image,1)
+        # MetaData
+        self.match_info = QLabel("Image Metadata")
+        self.match_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.match_info.setMaximumHeight(200)
+        match_layout.addWidget(self.match_info,1)
 
-        image_options.addLayout(match_options)
-        layout.addLayout(image_options)
+        image_layout.addLayout(match_layout)
+        # Add image block to layout
+        layout.addLayout(image_layout)
 
         # Buttons
         bottom_layer = QHBoxLayout()
@@ -140,12 +185,6 @@ class DisplayCompare(QWidget):
         bottom_layer.addWidget(button_match)
         layout.addLayout(bottom_layer)
         
-        # self.left_box.display_image_padded('/home/kyra/animl-py/examples/Southwest/2021-06-30_SYFR0218.JPG')
-        # self.right_box.display_image_padded('/home/kyra/animl-py/examples/Southwest/2021-08-08_RCNX0063.JPG')
-
-        self.left_box.display_image_padded("C:/Users/tswanson/animl-py/examples/Southwest/2021-06-30_SYFR0218.JPG")
-        self.right_box.display_image_padded('C:/Users/tswanson/animl-py/examples/Southwest/2021-08-08_RCNX0063.JPG')
-
         self.setLayout(layout)
         
     def home(self):
