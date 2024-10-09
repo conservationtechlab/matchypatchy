@@ -1,31 +1,25 @@
 '''
-
+Alert Popup displaying simple text and OK button
 '''
-from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtWidgets import QVBoxLayout, QDialogButtonBox, QLabel, QDialog
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-class AlertPopup(QtWidgets.QDialog):
-    def __init__(self, parent, prompt):
+class AlertPopup(QDialog):
+    def __init__(self, parent, prompt, title="Alert"):
         super().__init__(parent)
         
-        self.prompt = prompt
+        self.setWindowTitle(title)
+        layout = QVBoxLayout(self)
         
-        self.setWindowTitle("Alert")
-        fullLayout = QtWidgets.QVBoxLayout(self)
-        self.container = QtWidgets.QWidget(objectName='container')
-        fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
-                                     QtWidgets.QSizePolicy.Policy.Maximum)
-        layout = QtWidgets.QVBoxLayout(self.container)
-        
-        
-        title = QtWidgets.QLabel(self.prompt, 
-            objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        self.prompt = QLabel(prompt, objectName='title', 
+                            alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.prompt)
  
         # buttons
-        button_layout = QtWidgets.QHBoxLayout()
-        
-        buttonBox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok)
-        button_layout.addWidget(buttonBox, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         buttonBox.accepted.connect(self.accept)
-        layout.addLayout(button_layout)
+
+
+    def update(self, prompt):
+        self.prompt.setText(prompt)
