@@ -9,21 +9,23 @@ from PyQt6.QtGui import QImage, QPixmap
 
 
 class DisplaySingle(QWidget):
-    def __init__(self, mainwindow):
+    def __init__(self, parent):
         super().__init__()
-        # Title
-        print(mainwindow.active_survey)
+        self.parent = parent
+        self.mpDB = parent.mpDB
+        
         layout = QVBoxLayout()
-        mainwindow.label = QLabel("Image Viewer")
-        mainwindow.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(mainwindow.label,0)
+
+        self.label = QLabel("Image Viewer")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label,0)
 
         # Iimage screen
-        mainwindow.image_label = QLabel()
-        mainwindow.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        mainwindow.image_label.setScaledContents(True)
-        mainwindow.image_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
-        layout.addWidget(mainwindow.image_label,1)
+        self.image_label = QLabel()
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_label.setScaledContents(True)
+        self.image_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        layout.addWidget(self.image_label,1)
 
         #self.image = QImage()
         #pixmap = QPixmap(self.image)

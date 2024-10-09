@@ -8,6 +8,7 @@ from PyQt6.QtCore import QSize, QObject, QEvent
 from .display_base import DisplayBase
 from .display_media import DisplayMedia
 from .display_compare import DisplayCompare
+from .display_single import DisplaySingle
 from .popup_table import TableEditorPopup
 from .popup_dropdown import DropdownPopup
 
@@ -31,10 +32,12 @@ class MainWindow(QMainWindow):
         self.Intro = DisplayBase(self)
         self.Media = DisplayMedia(self)
         self.Compare = DisplayCompare(self)
+        self.Single = DisplaySingle(self)
         self.pages = QStackedLayout()
         self.pages.addWidget(self.Intro)
         self.pages.addWidget(self.Media)
         self.pages.addWidget(self.Compare)
+        self.pages.addWidget(self.Single)
 
         # Set the layout for the window
         container.setLayout(self.pages)
@@ -100,10 +103,13 @@ class MainWindow(QMainWindow):
         self.Media.refresh_filters() 
         self.Media.connect()
         self.Media.update_table()
-        
 
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)
+        self.Compare.setFocus()
+
+    def _set_single_view(self):
+        self.pages.setCurrentIndex(3)
         self.Compare.setFocus()
 
     def edit_popup(self, table):

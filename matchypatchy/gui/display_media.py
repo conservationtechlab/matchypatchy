@@ -2,16 +2,15 @@
 GUI Window for viewing images
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QSpacerItem, QSizePolicy)
+                             QLabel, QComboBox)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
-from .widget_image import ImageWidget
 from .media_table import MediaTable
 from .widget_progressbar import ProgressPopup
 
-# TODO
-# add single/paired view toggle button
+# TODO:
+# MAKE MEDIA EDITABLE
 
 class DisplayMedia(QWidget):
     def __init__(self, parent):

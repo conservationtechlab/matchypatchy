@@ -2,17 +2,20 @@
 Class Definition for MatchyPatchyDB
 '''
 import sqlite3
-from . import setup
+from .setup import setup_database
 from .. import sqlite_vec 
 
 
 class MatchyPatchyDB():
     def __init__(self, filepath='matchypatchy.db'):
         self.filepath = filepath
-        self.initiate = setup.setup_database(self.filepath)
-        print(self.validate())
+        self.initiate = setup_database(self.filepath)
+        #self.validate()
     
     def validate(self):
+        """
+        Validate All Tables Are Present
+        """
         db = sqlite3.connect(self.filepath)
         db.enable_load_extension(True)
         sqlite_vec.load(db)
@@ -20,13 +23,16 @@ class MatchyPatchyDB():
         cursor = db.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
+        print(tables)
         cursor.execute(f"PRAGMA table_info(roi_emb)")
         columns = cursor.fetchall()
         print(columns)
         db.close()
-        return tables
     
     def add_survey(self, name, year_start, year_end, region):
+        """
+        
+        """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
