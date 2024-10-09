@@ -4,7 +4,6 @@
 from PyQt6 import QtCore, QtWidgets
 from PyQt6 import QtGui
 
-from ..database import mpdb
 from .popup_confirm import ConfirmPopup
 
 class SpeciesPopup(QtWidgets.QDialog):

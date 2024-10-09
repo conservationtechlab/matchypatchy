@@ -1,9 +1,7 @@
-'''
+"""
 
-'''
+"""
 from PyQt6 import QtCore, QtWidgets
-
-from ..database import mpdb
 from .popup_confirm import ConfirmPopup
 
 class SitePopup(QtWidgets.QDialog):
