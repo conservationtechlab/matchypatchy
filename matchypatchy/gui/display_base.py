@@ -29,6 +29,7 @@ class DisplayBase(QWidget):
         self.label = QLabel("Welcome to MatchyPatchy")
         self.label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.label)
+        layout.addStretch()
 
         # Surveys
         first_layer = QHBoxLayout()
@@ -59,27 +60,47 @@ class DisplayBase(QWidget):
 
         self.update_survey()
         layout.addLayout(first_layer)
+        layout.addSpacing(50)
+
+
+        option1 = QLabel("Option 1:")
+        option1.setMaximumHeight(20)
+        layout.addWidget(option1)
 
         # Bottom Layer
-        bottom_layer = QHBoxLayout()
+        csv_layer = QHBoxLayout()
         # Create three buttons
-        button_load_csv = QPushButton("Import from CSV")
-        button_load_folder = QPushButton("Import from Folder")
-        button_match = QPushButton("Process")
-        button_validate = QPushButton("Validate")
+        button_csv_load = QPushButton("1. Import from CSV")
+        button_csv_process = QPushButton("2. Process")
+        button_csv_match = QPushButton("3. Match")
 
         
-        button_load_csv.clicked.connect(self.upload_csv)
-        button_load_folder.clicked.connect(self.upload_folder)
-        button_match.clicked.connect(self.process_images)
-        button_validate.clicked.connect(self.validate)
+        button_csv_load.clicked.connect(self.upload_csv)
+        button_csv_process.clicked.connect(self.process_images)
+        button_csv_match.clicked.connect(self.validate)
 
         # Add buttons to the layout
-        bottom_layer.addWidget(button_load_csv)
-        bottom_layer.addWidget(button_load_folder)
-        bottom_layer.addWidget(button_match)
-        bottom_layer.addWidget(button_validate)
-        layout.addLayout(bottom_layer) 
+        csv_layer.addWidget(button_csv_load)
+        csv_layer.addWidget(button_csv_process)
+        csv_layer.addWidget(button_csv_match)
+        layout.addLayout(csv_layer) 
+
+        option2 = QLabel("Option 2:")
+        option1.setMaximumHeight(20)
+        layout.addWidget(option2)
+
+        folder_layer = QHBoxLayout()
+
+        button_folder_load = QPushButton("1. Import from Folder")
+        button_folder_process = QPushButton("2. Process")
+        button_folder_validate = QPushButton("3. Validate")
+        button_folder_match = QPushButton("4. Match")
+
+        folder_layer.addWidget(button_folder_load)
+        folder_layer.addWidget(button_folder_process)
+        folder_layer.addWidget(button_folder_validate)
+        folder_layer.addWidget(button_folder_match)
+        layout.addLayout(folder_layer) 
         
         self.setLayout(layout)
 
@@ -170,11 +191,4 @@ class DisplayBase(QWidget):
     def validate(self):
         self.parent._set_compare_view()
         # return True
-
-    # Keyboard Handler
-    def keyPressEvent(self, event):
-        key = event.key()
-        key_text = event.text()
-        print(f"Key pressed: {key_text} (Qt key code: {key})")
-
 

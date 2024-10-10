@@ -5,11 +5,11 @@ GUI Window for Match Comparisons
 
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QLineEdit, QSizePolicy)
+                             QLabel, QComboBox, QLineEdit)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
-
+from ..database.roi import fetch_roi_compare, match, rank, get_bbox
 from .widget_image import ImageWidget
 
 class DisplayCompare(QWidget):
@@ -17,6 +17,11 @@ class DisplayCompare(QWidget):
         super().__init__()
         self.parent = parent
         self.mpDB = parent.mpDB
+
+        self.current_query = 0
+        self.current_match = 0
+        self.current_query_seq = 0
+        self.current_match_seq = 0
         
         layout = QVBoxLayout()
 
@@ -61,6 +66,8 @@ class DisplayCompare(QWidget):
         control_panel.addLayout(layer_one)
         layout.addLayout(control_panel)
 
+        layout.addSpacing(20)
+
         # Image Comparison
         image_layout = QHBoxLayout()
         
@@ -71,51 +78,76 @@ class DisplayCompare(QWidget):
         query_layout.addWidget(query_label)
         # Options
         query_options = QHBoxLayout()
+        query_options.addStretch()
         # # Query Number
         query_image_label = QLabel("Query Image:")
-        query_options.addWidget(query_image_label,1)
+        query_options.addWidget(query_image_label)
         self.button_previous_query = QPushButton("<<")
         self.button_previous_query.setMaximumWidth(40)
+        self.button_previous_query.clicked.connect(lambda: self.set_query(self.current_query-1))
         query_options.addWidget(self.button_previous_query)
-        self.query_number = QLineEdit()
+        self.query_number = QLineEdit(str(self.current_query + 1))
+        self.query_number.setMaximumWidth(100)
         query_options.addWidget(self.query_number)
-        query_n = QLabel("/9")
-        query_options.addWidget(query_n)
-        self.query_number = QLabel()
-        query_options.addWidget(self.query_number)
+        self.query_n = QLabel("/9")
+        query_options.addWidget(self.query_n)
         self.button_next_query = QPushButton(">>")
-        query_options.addWidget(self.button_next_query)
         self.button_next_query.setMaximumWidth(40)
+        self.button_previous_query.clicked.connect(lambda: self.set_query(self.current_query + 1))
+        query_options.addWidget(self.button_next_query)
+        query_options.addStretch()  # stretch the gap
         # # Sequence Number
         sequence_label = QLabel("Sequence:")
         query_options.addWidget(sequence_label)
-        self.button_previous_sequence = QPushButton("<<")
-        self.button_previous_sequence.setMaximumWidth(40)
-        query_options.addWidget(self.button_previous_sequence, 0)
-        self.sequence_number = QLineEdit()
-        query_options.addWidget(self.sequence_number, 0)
-        query_sequence_n = QLabel("/3")
-        query_options.addWidget(query_sequence_n, 0)
-        self.sequence_number = QLabel()
-        query_options.addWidget(self.sequence_number, 0)
-        self.button_next_sequence = QPushButton(">>")
-        self.button_next_sequence.setMaximumWidth(40)
-        query_options.addWidget(self.button_next_sequence)
-        # # Viewpoint Toggle
-        self.button_viewpoint = QPushButton("Left/Right")
-        query_options.addWidget(self.button_viewpoint)
+        self.button_previous_query_seq = QPushButton("<<")
+        self.button_previous_query_seq.setMaximumWidth(40)
+        self.button_previous_query_seq.clicked.connect(lambda: self.set_query_sequence(self.current_query_seq - 1))
+        query_options.addWidget(self.button_previous_query_seq)
+        self.query_seq_number = QLineEdit(str(self.current_query_seq + 1))
+        self.query_seq_number.setMaximumWidth(100)
+        query_options.addWidget(self.query_seq_number)
+        self.query_sequence_n = QLabel("/3")
+        query_options.addWidget(self.query_sequence_n)
+        self.button_next_query_seq = QPushButton(">>")
+        self.button_next_query_seq.setMaximumWidth(40)
+        self.button_next_query_seq.clicked.connect(lambda: self.set_query_sequence(self.current_query_seq + 1))
+        query_options.addWidget(self.button_next_query_seq)
+        query_options.addStretch()
         query_layout.addLayout(query_options)
+
         # Image
-        self.query_image = ImageWidget("IMAG0104.JPG")
+        self.query_image = ImageWidget()
         self.query_image.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.query_image.setAlignment(Qt.AlignmentFlag.AlignRight)
         query_layout.addWidget(self.query_image,1)
+        # Image Tools
+
         # MetaData
         self.query_info = QLabel("Image Metadata")
         self.query_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.query_info.setMaximumHeight(200)
+        self.query_info.setStyleSheet("border: 1px solid black;")
         query_layout.addWidget(self.query_info,1)
         image_layout.addLayout(query_layout)
-        image_layout.addSpacing(50)
+
+
+        # MIDDLE COLUMN
+        middle_column = QVBoxLayout()
+        # Viewpoint Toggle In Middle
+        self.button_viewpoint = QPushButton("L/R")
+        self.button_viewpoint.clicked.connect(self.toggle_viewpoint)
+        self.button_viewpoint.setMaximumWidth(50)
+        middle_column.addWidget(self.button_viewpoint, alignment=Qt.AlignmentFlag.AlignTop)
+        middle_column.addSpacing(200)
+
+
+        self.button_match = QPushButton("Match")
+        self.button_match.setCheckable(True)
+        self.button_match.clicked.connect(self.toggle_match)
+        self.button_match.setMaximumWidth(50)
+        middle_column.addWidget(self.button_match, alignment=Qt.AlignmentFlag.AlignTop)
+        middle_column.addStretch()
+        image_layout.addLayout(middle_column)
 
          # match
         match_layout = QVBoxLayout()
@@ -124,50 +156,57 @@ class DisplayCompare(QWidget):
         match_layout.addWidget(match_label)
         # Options
         match_options = QHBoxLayout()
-        # # match Number
+        # # Match Number
+        match_options.addStretch()
         match_image_label = QLabel("Match Image:")
-        match_options.addWidget(match_image_label,1)
+        match_options.addWidget(match_image_label)
         self.button_previous_match = QPushButton("<<")
         self.button_previous_match.setMaximumWidth(40)
+        self.button_previous_match.clicked.connect(lambda: self.set_match(self.current_match - 1))
         match_options.addWidget(self.button_previous_match)
-        self.match_number = QLineEdit()
+        self.match_number = QLineEdit(str(self.current_match + 1))
+        self.match_number.setMaximumWidth(100)
         match_options.addWidget(self.match_number)
-        match_n = QLabel("/9")
-        match_options.addWidget(match_n)
-        self.match_number = QLabel()
-        match_options.addWidget(self.match_number)
+        self.match_n = QLabel("/9")
+        match_options.addWidget(self.match_n)
         self.button_next_match = QPushButton(">>")
-        match_options.addWidget(self.button_next_match)
         self.button_next_match.setMaximumWidth(40)
+        self.button_previous_match.clicked.connect(lambda: self.set_match(self.current_match + 1))
+        match_options.addWidget(self.button_next_match)
+        match_options.addStretch()  # stretch the gap
         # # Sequence Number
         sequence_label = QLabel("Sequence:")
         match_options.addWidget(sequence_label)
-        self.button_previous_sequence = QPushButton("<<")
-        self.button_previous_sequence.setMaximumWidth(40)
-        match_options.addWidget(self.button_previous_sequence, 0)
-        self.sequence_number = QLineEdit()
-        match_options.addWidget(self.sequence_number, 0)
-        match_sequence_n = QLabel("/3")
-        match_options.addWidget(match_sequence_n, 0)
-        self.sequence_number = QLabel()
-        match_options.addWidget(self.sequence_number, 0)
+        self.button_previous_match_seq = QPushButton("<<")
+        self.button_previous_match_seq.setMaximumWidth(40)
+        self.button_previous_match_seq.clicked.connect(lambda: self.set_match_sequence(self.current_match_seq - 1))
+        match_options.addWidget(self.button_previous_match_seq)
+        self.match_seq_number = QLineEdit(str(self.current_match_seq + 1))
+        self.match_seq_number.setMaximumWidth(100)
+        match_options.addWidget(self.match_seq_number)
+        self.match_sequence_n = QLabel("/3")
+        match_options.addWidget(self.match_sequence_n)
         self.button_next_sequence = QPushButton(">>")
         self.button_next_sequence.setMaximumWidth(40)
-        match_options.addWidget(self.button_next_sequence, 0)
-        # # Viewpoint Toggle
-        self.button_viewpoint = QPushButton("Left/Right")
-        match_options.addWidget(self.button_viewpoint, 0)
+        self.button_previous_match_seq.clicked.connect(lambda: self.set_match_sequence(self.current_match_seq + 1))
+        match_options.addWidget(self.button_next_sequence)
+        match_options.addStretch()
         match_layout.addLayout(match_options)
+
         # Image
-        self.match_image = ImageWidget("IMAG0104.JPG")
+        self.match_image = ImageWidget()
         self.match_image.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.match_image.setAlignment(Qt.AlignmentFlag.AlignLeft)
         match_layout.addWidget(self.match_image,1)
+        # Image Tools
+
         # MetaData
         self.match_info = QLabel("Image Metadata")
         self.match_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.match_info.setMaximumHeight(200)
-        match_layout.addWidget(self.match_info,1)
+        self.match_info.setStyleSheet("border: 1px solid black;")
 
+        match_layout.addWidget(self.match_info,1)
         image_layout.addLayout(match_layout)
         # Add image block to layout
         layout.addLayout(image_layout)
@@ -177,12 +216,10 @@ class DisplayCompare(QWidget):
         button_home = QPushButton("Home")
         button_home.clicked.connect(self.home)
         button_load = QPushButton("Load Data")
-        button_match = QPushButton("Match")
-
+        
         # Add buttons to the layout
         bottom_layer.addWidget(button_home)
         bottom_layer.addWidget(button_load)
-        bottom_layer.addWidget(button_match)
         layout.addLayout(bottom_layer)
         
         self.setLayout(layout)
@@ -190,8 +227,67 @@ class DisplayCompare(QWidget):
     def home(self):
         self.parent._set_base_view()
 
+    def update(self):
+        # run on entry
+        # get roi / media, pivot 
+        self.rois = fetch_roi_compare(self.mpDB)
+        print(self.rois)
+        # set top rank
+        self.current_query = self.nearest_dict_sorted[0][0]
+        self.current_query_matches = self.neighbor_dict[self.current_query]
+        self.current_match = self.current_query_matches[0][0]
+                
+        self.load_images()
+
+    def set_query(self, n):
+        # check if less than max or min
+        pass
+    
+    def set_match(self, n):
+        pass
+
+    def set_query_sequence(self, n):
+        pass
+    
+    def set_match_sequence(self, n):
+        pass
+
+    def toggle_viewpoint(self):
+        pass
+
+    def toggle_match(self):
+        # Check if the button is checked (pushed in)
+        if self.button_match.isChecked():
+            self.button_match.setStyleSheet("""
+            QPushButton {
+                background-color: #2e7031;  /* Green background */
+                color: white;              /* White text */
+            }
+        """)
+            print("Button is pressed in.")
+        else:
+            self.button_match.setStyleSheet("")
+            print("Button is released.")
+
+    def load_images(self):
+        self.query_image.display_image(self.rois.loc[self.current_query, "filepath"],
+                                       bbox=get_bbox(self.rois.iloc[self.current_query]))
+        self.match_image.display_image(self.rois.loc[self.current_match, "filepath"],
+                                        bbox=get_bbox(self.rois.iloc[self.current_match]))
+
+    def load_data(self):
+        pass
+
+    def calculate_neighbors(self):
+        # run on entry
+        self.neighbor_dict, self.nearest_dict = match(self.mpDB)
+        self.nearest_dict_sorted = rank(self.nearest_dict)
+        
+
     # Keyboard Handler
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()
         print(f"Key pressed: {key_text} (Qt key code: {key})")
+
+

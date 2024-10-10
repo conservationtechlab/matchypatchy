@@ -7,7 +7,7 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ..database.roi import (fetch_roi, match)
+from ..database.roi import (fetch_roi)
 
 from animl.reid import viewpoint
 from animl.reid import miewid
@@ -27,14 +27,10 @@ class MiewThread(QThread):
         
     
     def run(self):
-        self.progress_update.emit("Calculating bounding box...")
-        self.get_bbox()
         self.progress_update.emit("Calculating viewpoint...")
         self.get_viewpoint()
         self.progress_update.emit("Calculating embeddings...")
         self.get_embeddings()
-        self.progress_update.emit("Matching images...")
-        match(self.mpDB)
         self.progress_update.emit("Processing complete!")
 
     def get_bbox(self):

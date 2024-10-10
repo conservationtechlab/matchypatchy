@@ -109,6 +109,9 @@ class MainWindow(QMainWindow):
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
+        self.Compare.calculate_neighbors()
+        self.Compare.update()
+        
 
     def _set_single_view(self):
         self.pages.setCurrentIndex(3)

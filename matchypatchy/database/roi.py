@@ -24,35 +24,26 @@ def fetch_roi(mpDB):
         return False
 
 
-def update_roi_viewpoint(mpDB, roi_id, viewpoint):
-    """Add embedding id once calculated
-    Args:
-        - mpDB: database object
-        - roi_id (int): roi id to update
-        - viewpoint (str): emb_id foreign key to add
+def fetch_roi_compare(mpDB):
     """
-    return mpDB.edit_row("roi", roi_id, {"viewpoint":viewpoint})
+    Fetches sites associated with given survey, checks that they have unique names,
 
-
-def update_roi_embedding(mpDB, roi_id, emb_id):
-    """Add embedding id once calculated
-    Args:
-        - mpDB: database object
-        - roi_id (int): roi id to update
-        - emb_id (int): emb_id foreign key to add
+    Args
+        - mpDB
+        - survey_id (int): requested survey id 
+    Returns
+        - an inverted dictionary in order to match manifest site names to table id
     """
-    return mpDB.edit_row("roi", roi_id, {"emb_id":emb_id})
-
-
-def update_roi_iid(mpDB, roi_id, iid):
-    """Add individual id once confirmed
-    
-    Args:
-        - mpDB: database object
-        - roi_id (int): roi id to update
-        - iid (int): iid foreign key to add
-    """
-    return mpDB.edit_row("roi", roi_id, {"iid":iid})
+    manifest, _ = mpDB.select_join("roi", "media", "roi.media_id = media.id")
+    if manifest:
+        rois = pd.DataFrame(manifest, columns=["roi_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
+                                              "viewpoint", "reviewed", "media_id", "species_id", "individual_id", "emb_id",
+                                              "media_id2", "filepath", "ext", "datetime", 'site_id', 'sequence_id', "pair_id", 'comment', 'favorite'])
+        rois = rois.drop(columns=["media_id2"])
+        rois.set_index("emb_id")
+        return rois
+    else:
+        return False
 
 
 def roi_knn(mpDB, emb_id, k=3):
@@ -80,8 +71,7 @@ def match(mpDB):
         neighbor_dict[roi['id']] = filtered_neighbors
         nearest_dict[roi['id']] = filtered_neighbors[0][1]
 
-    print(neighbor_dict)
-    print(nearest_dict)
+    return neighbor_dict, nearest_dict
 
 
 def filter(rois, roi_id, neighbors, threshold = 100):
@@ -106,5 +96,9 @@ def filter(rois, roi_id, neighbors, threshold = 100):
     return sorted(filtered, key=lambda x: x[1])
 
 
-def rank(neighbor_dict):
-    sorted(neighbor_dict, key=lambda x: x.value())
+def rank(nearest_dict):
+    return sorted(nearest_dict.items(), key=lambda x: x[1])
+
+
+def get_bbox(roi):
+    return roi[['bbox_x','bbox_y','bbox_w','bbox_h']]

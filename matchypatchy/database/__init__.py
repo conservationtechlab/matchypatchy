@@ -9,9 +9,7 @@ from matchypatchy.database import survey
 from matchypatchy.database.import_manifest import (import_manifest,)
 from matchypatchy.database.media import (fetch_media,)
 from matchypatchy.database.mpdb import (MatchyPatchyDB,)
-from matchypatchy.database.roi import (fetch_roi, roi_knn,
-                                       update_roi_embedding, update_roi_iid,
-                                       update_roi_viewpoint,)
+from matchypatchy.database.roi import (fetch_roi, roi_knn)
 from matchypatchy.database.setup import (setup_database,)
 from matchypatchy.database.site import (fetch_sites,)
 from matchypatchy.database.survey import (fetch_surveys,)
