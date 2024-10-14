@@ -5,12 +5,10 @@ Widget for displaying list of Media
 'site_id', 'sequence_id', 'pair_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 import pandas as pd
-from PIL import Image
-from PIL.ImageQt import ImageQt
 
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel
-from PyQt6.QtGui import QPixmap, QPainter
-from PyQt6.QtCore import QThread, pyqtSignal, Qt
+from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
 
 class MediaTable(QWidget):
@@ -139,30 +137,24 @@ class LoadThumbnailThread(QThread):
     def run(self):
         for i, roi in self.data_filtered.iterrows():
 
-            pil_image = Image.open(roi['filepath'])
-            img_width, img_height = pil_image.size 
+            self.original = QImage(roi['filepath'])
 
             if self.crop:
-                left = img_width * roi['bbox_x']
-                top = img_height * roi['bbox_y']
-                right = img_width * (roi['bbox_x'] + roi['bbox_w'])
-                bottom = img_height * (roi['bbox_y'] + roi['bbox_h'])
-                pil_image = pil_image.crop((left, top, right, bottom))
+                left = self.original.width() * roi['bbox_x']
+                top = self.original.height() * roi['bbox_y']
+                right = self.original.width() * roi['bbox_w']
+                bottom = self.original.height() * roi['bbox_h']
+                crop_rect = QRect(int(left), int(top), int(right), int(bottom))
+                self.image = self.original.copy(crop_rect)
 
-            qimage = ImageQt(pil_image)
-            pixmap = QPixmap.fromImage(qimage)
-            scaled_pixmap = pixmap.scaled(self.size, self.size, Qt.AspectRatioMode.KeepAspectRatio, 
-                                          Qt.TransformationMode.SmoothTransformation)
-            
-            # padded_image = QPixmap(self.size, self.size)
-            # padded_image.fill(Qt.GlobalColor.black) 
-            
-            # painter = QPainter(padded_image)
-            # # Calculate position to center the scaled image
-            # x = (self.size - scaled_pixmap.width()) // 2
-            # y = (self.size - scaled_pixmap.height()) // 2
-            # painter.drawPixmap(x, y, scaled_pixmap)
-            # painter.end()
+            else:
+                self.image = self.original.copy()
+
+            scaled_image = self.image.scaled(self.size, self.size,
+                                             Qt.AspectRatioMode.KeepAspectRatio, 
+                                             Qt.TransformationMode.SmoothTransformation)
+            pixmap = QPixmap.fromImage(scaled_image)
+
         
-            self.image_loaded.emit(i, scaled_pixmap)
+            self.image_loaded.emit(i, pixmap)
             self.progress_update.emit(int((i + 1) / len(self.data_filtered) * 100))

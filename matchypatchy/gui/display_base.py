@@ -77,7 +77,7 @@ class DisplayBase(QWidget):
         
         button_csv_load.clicked.connect(self.upload_csv)
         button_csv_process.clicked.connect(self.process_images)
-        button_csv_match.clicked.connect(self.validate)
+        button_csv_match.clicked.connect(self.match)
 
         # Add buttons to the layout
         csv_layer.addWidget(button_csv_load)
@@ -95,6 +95,10 @@ class DisplayBase(QWidget):
         button_folder_process = QPushButton("2. Process")
         button_folder_validate = QPushButton("3. Validate")
         button_folder_match = QPushButton("4. Match")
+
+
+        button_folder_validate.clicked.connect(self.validate)
+        button_folder_match.clicked.connect(self.match)
 
         folder_layer.addWidget(button_folder_load)
         folder_layer.addWidget(button_folder_process)
@@ -189,6 +193,9 @@ class DisplayBase(QWidget):
         
     # Validate Button
     def validate(self):
-        self.parent._set_compare_view()
+        self.parent._set_media_view()
         # return True
 
+    # Validate Button
+    def match(self):
+        self.parent._set_compare_view()
