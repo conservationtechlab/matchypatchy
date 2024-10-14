@@ -7,9 +7,7 @@ from matchypatchy import utils
 from matchypatchy.database import (MatchyPatchyDB, fetch_media, fetch_roi,
                                    fetch_sites, fetch_surveys, import_manifest,
                                    media, mpdb, roi, roi_knn, setup,
-                                   setup_database, site, survey,
-                                   update_roi_embedding, update_roi_iid,
-                                   update_roi_viewpoint,)
+                                   setup_database, site, survey)
 from matchypatchy.gui import (AlertPopup, ConfirmPopup, DisplayBase,
                               DisplayCompare, DisplayMedia, DisplaySingle,
                               ImageWidget, MainWindow, SiteFillPopup,

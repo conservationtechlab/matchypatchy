@@ -22,7 +22,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
-        self.setMinimumSize(1200, 800)
+        self.setMinimumSize(1280, 800)
         self.resize(1200,800)
 
         # Create Menu Bar
@@ -110,8 +110,6 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
         self.Compare.calculate_neighbors()
-        self.Compare.update()
-        
 
     def _set_single_view(self):
         self.pages.setCurrentIndex(3)

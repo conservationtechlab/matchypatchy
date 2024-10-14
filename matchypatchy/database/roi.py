@@ -40,7 +40,7 @@ def fetch_roi_compare(mpDB):
                                               "viewpoint", "reviewed", "media_id", "species_id", "individual_id", "emb_id",
                                               "media_id2", "filepath", "ext", "datetime", 'site_id', 'sequence_id', "pair_id", 'comment', 'favorite'])
         rois = rois.drop(columns=["media_id2"])
-        rois.set_index("emb_id")
+        rois = rois.set_index("roi_id")
         return rois
     else:
         return False
@@ -67,7 +67,6 @@ def match(mpDB):
     for _,roi in rois.iterrows():
         neighbors = roi_knn(mpDB, roi["emb_id"]) 
         filtered_neighbors = filter(rois, roi['id'], neighbors)
-        #print(roi['id'], filtered_neighbors)
         neighbor_dict[roi['id']] = filtered_neighbors
         nearest_dict[roi['id']] = filtered_neighbors[0][1]
 
@@ -75,14 +74,14 @@ def match(mpDB):
 
 
 def filter(rois, roi_id, neighbors, threshold = 100):
+    """
+    Returns list of valid neighbors by roi_emb.id
+    """
     filtered = []
     query = rois[rois['id'] == roi_id]
-    #print("query", query)
 
-    for i in range(1,len(neighbors)):  # skip first one, self match
+    for i in range(len(neighbors)):  # skip first one, self match
         match = rois[rois['emb_id'] == neighbors[i][0]]
-        
-        #print("match", match)
         # if not same individual or unlabeled individual:
         if (query['individual_id'].item() is None) or (match['individual_id'].item() != query['individual_id'].item()):
             # if not in same sequence
@@ -90,7 +89,7 @@ def filter(rois, roi_id, neighbors, threshold = 100):
                 # if not in same pair (should be redundent to sequence)
                 if (query['pair_id'].item() is None) or (match['pair_id'].item() != query['pair_id'].item()):
                     # distance check (do first or last?)
-                    if neighbors[i][1] < threshold:
+                    if neighbors[i][1] < threshold and neighbors[i][1] > 0:
                         filtered.append(neighbors[i])
 
     return sorted(filtered, key=lambda x: x[1])
@@ -102,3 +101,24 @@ def rank(nearest_dict):
 
 def get_bbox(roi):
     return roi[['bbox_x','bbox_y','bbox_w','bbox_h']]
+
+
+def get_info(roi, spacing=1.5):
+    
+    columns = ['roi_id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+       'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
+       'filepath', 'ext', 'datetime', 'site_id', 'sequence_id', 'pair_id',
+       'comment', 'favorite']
+    
+    info_dict = roi[['filepath','datetime','comment']].to_dict()
+
+    info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
+
+    html_text = f"""
+        <div style="line-height: {spacing};">
+            {info_label}
+        </div>
+        """
+
+    return html_text
+
