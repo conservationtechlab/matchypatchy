@@ -3,7 +3,7 @@
 '''
 from PyQt6 import QtCore, QtWidgets
 
-from .popup_confirm import ConfirmPopup
+from .popup_alert import AlertPopup
 from .popup_survey import SurveyFillPopup
 from .popup_site import SiteFillPopup
 from .popup_species import SpeciesFillPopup
@@ -138,7 +138,7 @@ class TableEditorPopup(QtWidgets.QDialog):
         selected = self.list.currentItem().text()
         prompt = f'Are you sure you want to delete {selected}?'
         print(prompt)
-        dialog = ConfirmPopup(self, prompt)
+        dialog = AlertPopup(self, prompt)
         if dialog.exec():
             row = self.data.loc[self.list.currentRow(),'id']
             cond = f'id={row}'

@@ -2,7 +2,7 @@
 
 """
 from PyQt6 import QtCore, QtWidgets
-from .popup_confirm import ConfirmPopup
+from .popup_alert import AlertPopup
 
 class SitePopup(QtWidgets.QDialog):
     def __init__(self, parent):
@@ -93,7 +93,7 @@ class SitePopup(QtWidgets.QDialog):
         selected = self.list.currentItem().text()
         prompt = f'Are you sure you want to delete {selected}?'
         print(prompt)
-        dialog = ConfirmPopup(self, prompt)
+        dialog = AlertPopup(self, prompt)
         if dialog.exec():
             row = self.site_list_ordered[self.list.currentRow()][0]
             cond = f'id={row}'

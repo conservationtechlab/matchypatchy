@@ -2,9 +2,8 @@
 
 '''
 from PyQt6 import QtCore, QtWidgets
-from PyQt6 import QtGui
 
-from .popup_confirm import ConfirmPopup
+from .popup_alert import AlertPopup
 
 class SpeciesPopup(QtWidgets.QDialog):
     def __init__(self, parent):
@@ -101,7 +100,7 @@ class SpeciesPopup(QtWidgets.QDialog):
         selected = self.list.currentItem().text()
         prompt = f'Are you sure you want to delete {selected}?'
         print(prompt)
-        dialog = ConfirmPopup(self, prompt)
+        dialog = AlertPopup(self, prompt)
         if dialog.exec():
             row = self.species_list_ordered[self.list.currentRow()][0]
             cond = f'id={row}'
