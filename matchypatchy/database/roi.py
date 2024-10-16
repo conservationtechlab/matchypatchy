@@ -23,27 +23,16 @@ def fetch_roi(mpDB):
     else:
         return False
 
-
-def fetch_roi_compare(mpDB):
-    """
-    Fetches sites associated with given survey, checks that they have unique names,
-
-    Args
-        - mpDB
-        - survey_id (int): requested survey id 
-    Returns
-        - an inverted dictionary in order to match manifest site names to table id
-    """
-    manifest, _ = mpDB.select_join("roi", "media", "roi.media_id = media.id")
-    if manifest:
-        rois = pd.DataFrame(manifest, columns=["roi_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
-                                              "viewpoint", "reviewed", "media_id", "species_id", "individual_id", "emb_id",
-                                              "media_id2", "filepath", "ext", "datetime", 'site_id', 'sequence_id', "pair_id", 'comment', 'favorite'])
-        rois = rois.drop(columns=["media_id2"])
-        rois = rois.set_index("roi_id")
+    
+def fetch_roi_media(mpDB):
+        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 
+                   'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id', 
+                   'filepath', 'ext', 'datetime', 'site_id', 'sequence_id', 'pair_id',
+                    'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+        media, column_names = mpDB.all_media()
+        rois = pd.DataFrame(media, columns=column_names)
+        rois = rois.set_index("id")
         return rois
-    else:
-        return False
 
 
 def roi_knn(mpDB, emb_id, k=3):
@@ -104,13 +93,10 @@ def get_bbox(roi):
 
 
 def get_info(roi, spacing=1.5):
+    roi = roi.rename(index={"name": "Name", "filepath": "File Path",
+                            "comment":"Comment","datetime": "Timestamp"})
     
-    columns = ['roi_id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-       'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
-       'filepath', 'ext', 'datetime', 'site_id', 'sequence_id', 'pair_id',
-       'comment', 'favorite']
-    
-    info_dict = roi[['filepath','datetime','comment']].to_dict()
+    info_dict = roi[['Name','File Path','Timestamp','Comment']].to_dict()
 
     info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
 

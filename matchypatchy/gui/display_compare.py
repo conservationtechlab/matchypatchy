@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
-from ..database.roi import fetch_roi_compare, match, rank, get_bbox, get_info
+from ..database.roi import fetch_roi_media, match, rank, get_bbox, get_info
 from .widget_image import ImageWidget
 
 class DisplayCompare(QWidget):
@@ -242,7 +242,7 @@ class DisplayCompare(QWidget):
     def set_query(self, n):
         # wrap around
         if n < 0: n = self.n_queries - 1
-        if n >= self.n_queries: n = 0
+        if n > self.n_queries - 1: n = 0
 
         # set current query
         self.current_query = n
@@ -279,7 +279,7 @@ class DisplayCompare(QWidget):
         Set the curent match index and id 
         """
         if n < 0: n = len(self.current_query_matches) - 1
-        if n >= len(self.current_query_matches): n = 0
+        if n > len(self.current_query_matches) - 1: n = 0
 
         self.current_match = n
         self.current_match_id = self.current_query_matches[self.current_match][0]
@@ -336,7 +336,7 @@ class DisplayCompare(QWidget):
         """
         Calculates knn for all unvalidated images, ranks by smallest distance to nn
         """
-        self.rois = fetch_roi_compare(self.mpDB)
+        self.rois = fetch_roi_media(self.mpDB)
 
         self.neighbor_dict, self.nearest_dict = match(self.mpDB)
         self.ranked_queries = rank(self.nearest_dict)
@@ -344,6 +344,7 @@ class DisplayCompare(QWidget):
         # set number of queries to validate
         self.n_queries = len(self.neighbor_dict)
         self.query_n.setText("/" + str(self.n_queries))
+
         # set first query to highest rank 
         self.set_query(0)
         
