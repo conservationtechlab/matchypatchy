@@ -25,8 +25,8 @@ def setup_database(filepath='matchypatchy.db'):
     cursor.execute('''CREATE TABLE IF NOT EXISTS site (
                         id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
-                        lat REAL NOT NULL,
-                        long REAL NOT NULL,
+                        lat REAL,
+                        long REAL,
                         survey_id INTEGER NOT NULL,
                         FOREIGN KEY (survey_id) REFERENCES survey (id) )''')
 

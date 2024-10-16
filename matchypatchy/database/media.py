@@ -20,9 +20,10 @@ def fetch_media(mpDB):
     media = mpDB.select("media")
     
     if media:
-        media = pd.DataFrame(media, columns=["id", "filepath", "ext", "datetime", 'site_id',
+        media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", 'site_id',
                                              'sequence_id', "pair_id", 'comment', 'favorite'])
     return media 
+
 
 
 def user_editable_rows():
