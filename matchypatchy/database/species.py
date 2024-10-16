@@ -25,7 +25,7 @@ def user_editable_rows():
 
 def import_csv(mpDB, file_path):
     """
-    Media entry (id, filepath, ext, datetime, comment, site_id)
+    Media entry (id, filepath, ext, timestamp, comment, site_id)
     """
     # TODO: Check not none
     species_list = pd.read_csv(file_path)

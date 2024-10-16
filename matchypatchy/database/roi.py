@@ -27,7 +27,7 @@ def fetch_roi(mpDB):
 def fetch_roi_media(mpDB):
         columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 
                    'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id', 
-                   'filepath', 'ext', 'datetime', 'site_id', 'sequence_id', 'pair_id',
+                   'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'pair_id',
                     'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
         media, column_names = mpDB.all_media()
         rois = pd.DataFrame(media, columns=column_names)
@@ -46,7 +46,7 @@ def match(mpDB):
     # 2. filter out matches from same sequence, pair
     # 3. rank ROIs by match scores 
 
-    info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, datetime, site_id, sequence_id, pair_id"
+    info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id, pair_id"
     # need sequence and pair ids from media to restrict comparisons shown to 
     rois, columns = mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
     rois = pd.DataFrame(rois,columns=columns)
@@ -94,7 +94,7 @@ def get_bbox(roi):
 
 def get_info(roi, spacing=1.5):
     roi = roi.rename(index={"name": "Name", "filepath": "File Path",
-                            "comment":"Comment","datetime": "Timestamp"})
+                            "comment":"Comment","timestamp": "Timestamp"})
     
     info_dict = roi[['Name','File Path','Timestamp','Comment']].to_dict()
 

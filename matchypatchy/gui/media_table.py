@@ -1,7 +1,7 @@
 """
 Widget for displaying list of Media
 ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 'reviewed', 
-'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'datetime', 
+'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'timestamp', 
 'site_id', 'sequence_id', 'pair_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 import pandas as pd
@@ -23,7 +23,7 @@ class MediaTable(QWidget):
         # Create QTableWidget
         self.table = QTableWidget()
         self.table.setColumnCount(12)  # Columns: Thumbnail, Name, and Description
-        self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Date Time", "Species", "Common", "Individual", "Sex", "Site", "Sequence ID", "Favorite", "Comment"])
+        self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", "Species", "Common", "Individual", "Sex", "Site", "Sequence ID", "Favorite", "Comment"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setColumnWidth(0, 60) 
         self.table.setColumnWidth(10, 60) 
@@ -106,7 +106,7 @@ class MediaTable(QWidget):
         
         # Data
         self.table.setItem(i, 2, QTableWidgetItem(roi["filepath"]))  # File Path column
-        self.table.setItem(i, 3, QTableWidgetItem(roi["datetime"]))  # Date Time column
+        self.table.setItem(i, 3, QTableWidgetItem(roi["timestamp"]))  # Date Time column
         self.table.setItem(i, 4, QTableWidgetItem(roi["binomen"]))   # File Path column
         self.table.setItem(i, 5, QTableWidgetItem(roi["common"]))  # Date Time column
         self.table.setItem(i, 6, QTableWidgetItem(roi["name"]))  # Individual column

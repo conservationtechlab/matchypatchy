@@ -89,13 +89,14 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def add_media(self, filepath, ext, site_id, datetime=None, sequence_id=None, pair_id=None, comment=None, favorite=0):
+    def add_media(self, filepath, ext, timestamp, site_id, 
+                  sequence_id=None, pair_id=None, comment=None, favorite=0):
         """
         Media has 9 attributes not including id:
             id INTEGER PRIMARY KEY,
             filepath TEXT UNIQUE NOT NULL,
             ext TEXT NOT NULL,
-            datetime TEXT,
+            timestamp TEXT NOT NULL,
             site_id INTEGER NOT NULL,
             sequence_id INTEGER,
             pair_id INTEGER,
@@ -106,10 +107,11 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO media
-                        (filepath, ext, datetime, site_id,
+                        (filepath, ext, timestamp, site_id,
                         sequence_id, pair_id, comment, favorite) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, ext, datetime, site_id, sequence_id, pair_id, comment, favorite)
+            data_tuple = (filepath, ext, timestamp, site_id, 
+                          sequence_id, pair_id, comment, favorite)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -234,7 +236,7 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed, 
-                         roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, datetime, 
+                         roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp, 
                          site_id, sequence_id, pair_id, comment, favorite, binomen, common, name, sex"""
             command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
                                            LEFT JOIN species ON roi.species_id = species.id
