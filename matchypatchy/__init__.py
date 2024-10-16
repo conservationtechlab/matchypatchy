@@ -5,16 +5,16 @@ from matchypatchy import test_install
 from matchypatchy import utils
 
 from matchypatchy.database import (MatchyPatchyDB, fetch_media, fetch_roi,
-                                   fetch_sites, fetch_surveys, import_manifest,
+                                   fetch_sites, fetch_surveys,
                                    media, mpdb, roi, roi_knn, setup,
                                    setup_database, site, survey)
-from matchypatchy.gui import (AlertPopup, ConfirmPopup, DisplayBase,
+from matchypatchy.gui import (AlertPopup, AlertPopup, DisplayBase,
                               DisplayCompare, DisplayMedia, DisplaySingle,
                               ImageWidget, MainWindow, SiteFillPopup,
                               SitePopup, SpeciesFillPopup, SpeciesPopup,
                               SurveyFillPopup, display_base, display_compare,
                               display_media, display_single, main_display,
-                              main_gui, popup_alert, popup_confirm, popup_site,
+                              main_gui, popup_alert, popup_site,
                               popup_species, popup_survey, widget_image,)
 from matchypatchy.sqlite_vec import (load, loadable_path, register_numpy,
                                      serialize_float32, serialize_int8,)
@@ -22,12 +22,12 @@ from matchypatchy.test_install import (main,)
 from matchypatchy.utils import (is_unique, swap_keyvalue,)
 
 
-__all__ = ['AlertPopup', 'ConfirmPopup', 'DisplayBase', 'DisplayCompare',
+__all__ = ['AlertPopup', 'AlertPopup', 'DisplayBase', 'DisplayCompare',
            'DisplayMedia', 'DisplaySingle', 'ImageWidget', 'MainWindow',
            'MatchyPatchyDB', 'SiteFillPopup', 'SitePopup', 'SpeciesFillPopup',
            'SpeciesPopup', 'SurveyPopup', 'database', 'display_base',
            'display_compare', 'display_media', 'display_single', 'fetch_media',
-           'fetch_roi', 'fetch_sites', 'fetch_surveys', 'gui', 'import_manifest',
+           'fetch_roi', 'fetch_sites', 'fetch_surveys', 'gui',
            'is_unique', 'load', 'loadable_path', 'main', 'main_display',
            'main_gui', 'media', 'mpdb', 'popup_alert', 'popup_confirm',
            'popup_site', 'popup_species', 'popup_survey', 'register_numpy',
