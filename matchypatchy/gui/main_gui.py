@@ -14,7 +14,6 @@ from .popup_dropdown import DropdownPopup
 
 from ..database import site
 from ..database import species
-from ..database.import_manifest import import_manifest
 
 
 class MainWindow(QMainWindow):
@@ -142,10 +141,6 @@ class MainWindow(QMainWindow):
             if table == "site":
                 site.import_csv(self.mpDB, file_path, survey_id=survey_id)
 
-            # MEDIA
-            elif table == "media":
-                valid_sites = site.fetch_sites(self.mpDB, survey_id)
-                import_manifest(self.mpDB, file_path, valid_sites)
 
 
 def main_display(mpDB):

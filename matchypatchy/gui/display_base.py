@@ -11,8 +11,8 @@ from .popup_survey import SurveyFillPopup
 from .popup_site import SitePopup
 from .popup_alert import AlertPopup
 from .popup_species import SpeciesPopup
+from .popup_import import ImportCSVPopup
 
-from ..database.import_manifest import import_manifest
 from ..database.import_directory import import_directory
 from ..database.site import fetch_sites
 
@@ -162,9 +162,9 @@ class DisplayBase(QWidget):
         if self.select_survey():
             manifest = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
             if manifest:
-                valid_sites = fetch_sites(self.mpDB, self.active_survey[0])
-                import_manifest(self.mpDB, manifest, valid_sites)
-                
+                dialog = ImportCSVPopup(self, manifest)
+                if dialog.exec():
+                    del dialog                
         else:
             dialog = AlertPopup(self, "Please create a new survey before uploading.")
             if dialog.exec():
