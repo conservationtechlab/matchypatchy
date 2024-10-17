@@ -15,8 +15,12 @@ from .popup_import import ImportCSVPopup
 
 from ..database.import_directory import import_directory
 
-
+from ..ml.sequence_thread import SequenceThread
+from ..ml.animl_thread import AnimlThread
 from ..ml.miew_thread import MiewThread
+
+
+# TODO: add download models button/popup
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
@@ -73,7 +77,6 @@ class DisplayBase(QWidget):
         button_csv_load = QPushButton("1. Import from CSV")
         button_csv_process = QPushButton("2. Process")
         button_csv_match = QPushButton("3. Match")
-
         
         button_csv_load.clicked.connect(self.upload_csv)
         button_csv_process.clicked.connect(self.process_images)
@@ -96,7 +99,7 @@ class DisplayBase(QWidget):
         button_folder_validate = QPushButton("3. Validate")
         button_folder_match = QPushButton("4. Match")
 
-
+        button_folder_process.clicked.connect(self.process_images)
         button_folder_validate.clicked.connect(self.validate)
         button_folder_match.clicked.connect(self.match)
 
@@ -180,16 +183,20 @@ class DisplayBase(QWidget):
         
     def process_images(self):
         # Figure out how to add loading bar
-        dialog = AlertPopup(self, "Processing Images", title="Processing Images")
+        dialog = AlertPopup(self, "Processing Images", title="Processing images...")
         dialog.show()
 
         # 1. SEQUENCE 
+        self.sequence_thread = SequenceThread(self.mpDB)
+        self.sequence_thread.progress_update.connect(dialog.update)
+        self.sequence_thread.start()
 
         # 2. ANIML (BBOX + SPECIES)
+        #self.animl_thread = AnimlThread(self.mpDB)
+        #self.animl_thread.progress_update.connect(dialog.update)
+        #self.animl_thread.start()
 
         self.miew_thread = MiewThread(self.mpDB)
-
-        # Connect signals from the thread to the main thread
         self.miew_thread.progress_update.connect(dialog.update)
         self.miew_thread.start()
         
