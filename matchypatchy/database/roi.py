@@ -5,6 +5,9 @@ Functions for Manipulating and Processing ROIs
 import pandas as pd
 
 
+VIEWPOINT = ["Right", "Left"]
+
+
 def fetch_roi(mpDB):
     """
     Fetches sites associated with given survey, checks that they have unique names,
@@ -35,9 +38,9 @@ def fetch_roi_media(mpDB):
         return rois
 
 
-def roi_knn(mpDB, emb_id, k=3):
+def roi_knn(mpDB, emb_id, k=5):
     query = mpDB.select("roi_emb", columns="embedding", row_cond= f'rowid={emb_id}')[0][0]
-    neighbors = mpDB.knn(query)
+    neighbors = mpDB.knn(query, k=k)
     return neighbors
 
 
@@ -53,11 +56,13 @@ def match(mpDB):
     neighbor_dict = dict()
     nearest_dict = dict()
 
+    # WHAT TO DO IF NO NEIGHBORS?
     for _,roi in rois.iterrows():
         neighbors = roi_knn(mpDB, roi["emb_id"]) 
         filtered_neighbors = filter(rois, roi['id'], neighbors)
-        neighbor_dict[roi['id']] = filtered_neighbors
-        nearest_dict[roi['id']] = filtered_neighbors[0][1]
+        if filtered_neighbors:
+            neighbor_dict[roi['id']] = filtered_neighbors
+            nearest_dict[roi['id']] = filtered_neighbors[0][1]
 
     return neighbor_dict, nearest_dict
 
@@ -71,6 +76,7 @@ def filter(rois, roi_id, neighbors, threshold = 100):
 
     for i in range(len(neighbors)):  # skip first one, self match
         match = rois[rois['emb_id'] == neighbors[i][0]]
+
         # if not same individual or unlabeled individual:
         if (query['individual_id'].item() is None) or (match['individual_id'].item() != query['individual_id'].item()):
             # if not in same sequence
@@ -93,10 +99,19 @@ def get_bbox(roi):
 
 
 def get_info(roi, spacing=1.5):
-    roi = roi.rename(index={"name": "Name", "filepath": "File Path",
-                            "comment":"Comment","timestamp": "Timestamp"})
-    
-    info_dict = roi[['Name','File Path','Timestamp','Comment']].to_dict()
+    # get relevant data
+    roi = roi.rename(index={"name": "Name", 
+                            "filepath": "File Path",
+                            "comment":"Comment",
+                            "timestamp": "Timestamp",
+                            "site_id": "Site",
+                            "sequence_id": "Sequence ID",
+                            "viewpoint": "Viewpoint"})
+
+    info_dict = roi[['Name','File Path','Timestamp','Site','Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+
+    # convert viewpoint to human-readable
+    info_dict['Viewpoint'] = VIEWPOINT[int(info_dict['Viewpoint'])]
 
     info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
 

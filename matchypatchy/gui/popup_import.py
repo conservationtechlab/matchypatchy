@@ -34,8 +34,6 @@ class ImportCSVPopup(QDialog):
         self.selected_comment = 0
 
         self.setWindowTitle('Import from CSV')
-
-        # Create layout
         layout = QVBoxLayout()
 
         # Create a label
@@ -43,7 +41,7 @@ class ImportCSVPopup(QDialog):
         layout.addWidget(self.label)
         layout.addSpacing(5)
 
-        # filepath
+        # Filepath
         filepath_layout = QHBoxLayout()
         filepath_layout.addWidget(QLabel("Filepath:"))
         asterisk = QLabel("*")
@@ -53,11 +51,10 @@ class ImportCSVPopup(QDialog):
         self.filepath.addItems(self.columns)
         self.filepath.currentTextChanged.connect(self.select_filepath)
         filepath_layout.addWidget(self.filepath)
-
         layout.addLayout(filepath_layout)
         layout.addSpacing(5)
 
-        # timestamp
+        # Timestamp
         timestamp_layout = QHBoxLayout()
         timestamp_layout.addWidget(QLabel("Timestamp:"))
         asterisk = QLabel("*")
@@ -70,7 +67,7 @@ class ImportCSVPopup(QDialog):
         layout.addLayout(timestamp_layout)
         layout.addSpacing(5)
 
-        # site
+        # Site
         site_layout = QHBoxLayout()
         site_layout.addWidget(QLabel("Site:"))
         asterisk = QLabel("*")
@@ -142,7 +139,7 @@ class ImportCSVPopup(QDialog):
         comment_layout.addWidget(self.comment)
         layout.addLayout(comment_layout)
 
-        # Create OK button
+        # Ok/Cancel
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         buttonBox.accepted.connect(self.import_manifest)  
@@ -150,18 +147,16 @@ class ImportCSVPopup(QDialog):
         self.okButton = buttonBox.button(buttonBox.StandardButton.Ok)
         self.okButton.setEnabled(False)
 
-
-        print(self.data.shape)
+        # Progress Bar (hidden at start)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, self.data.shape[0])
         self.progress_bar.setTextVisible(False)
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
-
         self.setLayout(layout)
 
-
+    # would this be better as a switch statement? probably
     def select_filepath(self):
         try:
             self.selected_filepath = self.columns[self.filepath.currentIndex()]
@@ -228,7 +223,6 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
 
-
     def check_ok_button(self):
         """
         Determine if sufficient information for import
@@ -237,7 +231,6 @@ class ImportCSVPopup(QDialog):
         """
         if (self.selected_filepath != 0) and (self.selected_timestamp != 0) and (self.select_site != 0):
             self.okButton.setEnabled(True)
-
 
     def collate_selections(self):
         return {"filepath": self.selected_filepath,
@@ -250,7 +243,6 @@ class ImportCSVPopup(QDialog):
                 "individual": self.selected_individual,
                 "comment": self.selected_comment}
 
-
     # TODO: Check for duplicates
     def import_manifest(self):
         """
@@ -259,20 +251,18 @@ class ImportCSVPopup(QDialog):
         # assert bbox in manifest.columns
         self.progress_bar.show()
         selected_columns = self.collate_selections()
-        print(selected_columns)
 
         self.data.sort_values(by=["FilePath"])
 
         unique_images = self.data.groupby(selected_columns['filepath'])
+
+        print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
 
         self.import_thread = ImportThread(self.mpDB, self.active_survey, 
                                           unique_images, selected_columns)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.close)
         self.import_thread.start()
-
-        print(f"Added {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
-
 
 
 class ImportThread(QThread):
@@ -289,6 +279,11 @@ class ImportThread(QThread):
         roi_counter = 0  # progressbar counter
         for filepath, group in self.unique_images:
 
+            # check to see if file exists 
+            if not os.path.exists(filepath):
+                print(f"Warning, file {filepath} does not exist")
+                continue
+
             # get file extension
             _, ext = os.path.splitext(os.path.basename(filepath))
             
@@ -303,9 +298,11 @@ class ImportThread(QThread):
                 site_id = self.mpDB.add_site(str(site_name), None, None, int(self.active_survey[0]))
 
             # Optional data
-            sequence_id = exemplar[self.selected_columns['sequence_id']].item() if self.selected_columns['sequence_id'] != 0 else None
-            pair_id = exemplar[self.selected_columns['pair_id']].item() if self.selected_columns['pair_id'] != 0 else None
+            sequence_id = int(exemplar[self.selected_columns['sequence_id']].item()) if self.selected_columns['sequence_id'] != 0 else None
+            pair_id = int(exemplar[self.selected_columns['pair_id']].item()) if self.selected_columns['pair_id'] != 0 else None
             comment = exemplar[self.selected_columns['comment']].item() if self.selected_columns['comment'] != 0 else None
+
+            #print(filepath, ext, timestamp, site_id, sequence_id, pair_id, comment)
 
             media_id = self.mpDB.add_media(filepath, ext, timestamp, site_id,
                                            sequence_id=sequence_id, 
@@ -355,10 +352,10 @@ class ImportThread(QThread):
                         individual_id = self.mpDB.add_individual(species_id, str(individual))
                     
                 else: # no individual id, need review
-                    individual_id = 0
+                    individual_id = None
                     
                 # set reviewed to 1 for named images
-                reviewed = 1 if individual_id > 0 else 0
+                reviewed = 1 if individual_id is not None else 0
 
                 # do not add emb_id, to be determined later
                 roi_id = self.mpDB.add_roi(frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
