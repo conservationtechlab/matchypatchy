@@ -84,11 +84,30 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print("Failed to add site", error)
+            print("Failed to add species", error)
             if db:
                 db.close()
             return False
         
+    def add_individual(self, species_id, name, sex=None):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = """INSERT INTO individual
+                        (species_id, name, sex) 
+                        VALUES (?, ?, ?);"""
+            data_tuple = (species_id, name, sex)
+            cursor.execute(command, data_tuple)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            print("Failed to add individual", error)
+            if db:
+                db.close()
+            return False
+
     def add_media(self, filepath, ext, timestamp, site_id, 
                   sequence_id=None, pair_id=None, comment=None, favorite=0):
         """
@@ -191,7 +210,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
     
-    def select(self, table, columns="*", row_cond=None):
+    def select(self, table, columns="*", row_cond=None, quiet=True):
         try:
             db = sqlite3.connect(self.filepath)
             if table == "roi_emb":
@@ -203,7 +222,7 @@ class MatchyPatchyDB():
                 command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
             else:
                 command = f'SELECT {columns} FROM {table};'
-            print(command)
+            if not quiet: print(command)
             cursor.execute(command)
             rows = cursor.fetchall()  # returns in tuple
             db.close()
@@ -214,12 +233,12 @@ class MatchyPatchyDB():
                 db.close()
             return False
     
-    def select_join(self, table, join_table, join_cond, columns="*"):
+    def select_join(self, table, join_table, join_cond, columns="*", quiet=True):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
-            print(command)
+            if not quiet: print(command)
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple

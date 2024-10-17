@@ -8,16 +8,18 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
                              QComboBox, QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
+from ..database.site import fetch_sites
 from ..utils import is_unique
 
 
 columns=["filepath", "timestamp", 'site_id', 'sequence_id', "pair_id", 'comment',
-         "viewpoint", "species_id",  "individual_id"]
+         "viewpoint", "species_id", "individual_id"]
 
 class ImportCSVPopup(QDialog):
     def __init__(self, parent, manifest):
         super().__init__(parent)
         self.mpDB = parent.mpDB
+        self.active_survey = parent.active_survey
         self.data = pd.read_csv(manifest)
         self.columns = ["None"] + list(self.data.columns)
         
@@ -27,6 +29,9 @@ class ImportCSVPopup(QDialog):
         self.selected_sequence_id = 0
         self.selected_pair_id = 0
         self.selected_viewpoint = 0
+        self.selected_species = 0
+        self.selected_individual = 0
+        self.selected_comment = 0
 
         self.setWindowTitle('Import from CSV')
 
@@ -41,16 +46,23 @@ class ImportCSVPopup(QDialog):
         # filepath
         filepath_layout = QHBoxLayout()
         filepath_layout.addWidget(QLabel("Filepath:"))
+        asterisk = QLabel("*")
+        asterisk.setStyleSheet("QLabel { color : red; }")
+        filepath_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
         self.filepath = QComboBox()
         self.filepath.addItems(self.columns)
         self.filepath.currentTextChanged.connect(self.select_filepath)
         filepath_layout.addWidget(self.filepath)
+
         layout.addLayout(filepath_layout)
         layout.addSpacing(5)
 
         # timestamp
         timestamp_layout = QHBoxLayout()
         timestamp_layout.addWidget(QLabel("Timestamp:"))
+        asterisk = QLabel("*")
+        asterisk.setStyleSheet("QLabel { color : red; }")
+        timestamp_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
         self.timestamp = QComboBox()
         self.timestamp.addItems(self.columns)
         self.timestamp.currentTextChanged.connect(self.select_timestamp)
@@ -61,6 +73,9 @@ class ImportCSVPopup(QDialog):
         # site
         site_layout = QHBoxLayout()
         site_layout.addWidget(QLabel("Site:"))
+        asterisk = QLabel("*")
+        asterisk.setStyleSheet("QLabel { color : red; }")
+        site_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
         self.site = QComboBox()
         self.site.addItems(self.columns)
         self.site.currentTextChanged.connect(self.select_site)
@@ -79,15 +94,44 @@ class ImportCSVPopup(QDialog):
         layout.addSpacing(5)
 
         # Pair
-        sequence_layout = QHBoxLayout()
-        sequence_layout.addWidget(QLabel("Pair ID:"))
-        self.sequence_id = QComboBox()
-        self.sequence_id.addItems(self.columns)
-        self.sequence_id.currentTextChanged.connect(self.select_sequence)
-        sequence_layout.addWidget(self.sequence_id)
-        layout.addLayout(sequence_layout)
+        pair_layout = QHBoxLayout()
+        pair_layout.addWidget(QLabel("Pair ID:"))
+        self.pair_id = QComboBox()
+        self.pair_id.addItems(self.columns)
+        self.pair_id.currentTextChanged.connect(self.select_pair)
+        pair_layout.addWidget(self.pair_id)
+        layout.addLayout(pair_layout)
         layout.addSpacing(5)
 
+        # Viewpoint
+        viewpoint_layout = QHBoxLayout()
+        viewpoint_layout.addWidget(QLabel("Viewpoint:"))
+        self.viewpoint = QComboBox()
+        self.viewpoint.addItems(self.columns)
+        self.viewpoint.currentTextChanged.connect(self.select_viewpoint)
+        viewpoint_layout.addWidget(self.viewpoint)
+        layout.addLayout(viewpoint_layout)
+        layout.addSpacing(5)
+
+        # Species
+        species_layout = QHBoxLayout()
+        species_layout.addWidget(QLabel("Species:"))
+        self.species = QComboBox()
+        self.species.addItems(self.columns)
+        self.species.currentTextChanged.connect(self.select_species)
+        species_layout.addWidget(self.species)
+        layout.addLayout(species_layout)
+        layout.addSpacing(5)
+
+        # Individual
+        individual_layout = QHBoxLayout()
+        individual_layout.addWidget(QLabel("Individual:"))
+        self.individual = QComboBox()
+        self.individual.addItems(self.columns)
+        self.individual.currentTextChanged.connect(self.select_individual)
+        individual_layout.addWidget(self.individual)
+        layout.addLayout(individual_layout)
+        layout.addSpacing(5)
 
         # Comment
         comment_layout = QHBoxLayout()
@@ -107,14 +151,13 @@ class ImportCSVPopup(QDialog):
         self.okButton.setEnabled(False)
 
 
-
+        print(self.data.shape)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, self.data.shape[0])
         self.progress_bar.setTextVisible(False)
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
-        
 
         self.setLayout(layout)
 
@@ -122,6 +165,7 @@ class ImportCSVPopup(QDialog):
     def select_filepath(self):
         try:
             self.selected_filepath = self.columns[self.filepath.currentIndex()]
+            self.check_ok_button()
             return True
         except IndexError:
             return False
@@ -129,6 +173,7 @@ class ImportCSVPopup(QDialog):
     def select_timestamp(self):
         try:
             self.selected_timestamp = self.columns[self.timestamp.currentIndex()]
+            self.check_ok_button()
             return True
         except IndexError:
             return False
@@ -136,6 +181,7 @@ class ImportCSVPopup(QDialog):
     def select_site(self):
         try:
             self.selected_site = self.columns[self.site.currentIndex()]
+            self.check_ok_button()
             return True
         except IndexError:
             return False
@@ -147,6 +193,41 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
         
+    def select_pair(self):
+        try:
+            self.selected_pair_id = self.columns[self.pair_id.currentIndex()]
+            return True
+        except IndexError:
+            return False
+        
+    def select_viewpoint(self):
+        try:
+            self.selected_viewpoint = self.columns[self.viewpoint.currentIndex()]
+            return True
+        except IndexError:
+            return False
+        
+    def select_species(self):
+        try:
+            self.selected_species = self.columns[self.species.currentIndex()]
+            return True
+        except IndexError:
+            return False
+        
+    def select_individual(self):
+        try:
+            self.selected_individual = self.columns[self.individual.currentIndex()]
+            return True
+        except IndexError:
+            return False
+        
+    def select_comment(self):
+        try:
+            self.selected_comment = self.columns[self.comment.currentIndex()]
+            return True
+        except IndexError:
+            return False
+
 
     def check_ok_button(self):
         """
@@ -154,11 +235,7 @@ class ImportCSVPopup(QDialog):
 
         Must include filepath, timestamp, site
         """
-        # 
-        # must have 
-        
-
-        if self.selected_filepath != 0 :
+        if (self.selected_filepath != 0) and (self.selected_timestamp != 0) and (self.select_site != 0):
             self.okButton.setEnabled(True)
 
 
@@ -166,7 +243,12 @@ class ImportCSVPopup(QDialog):
         return {"filepath": self.selected_filepath,
                 "timestamp": self.selected_timestamp,
                 "site": self.selected_site,
-                "sequence_id": self.selected_sequence_id}
+                "sequence_id": self.selected_sequence_id,
+                "pair_id": self.selected_pair_id,
+                "viewpoint": self.selected_viewpoint,
+                "species": self.selected_species,
+                "individual": self.selected_individual,
+                "comment": self.selected_comment}
 
 
     # TODO: Check for duplicates
@@ -175,16 +257,19 @@ class ImportCSVPopup(QDialog):
         Media entry (id, filepath, ext, timestamp, comment, site_id)
         """
         # assert bbox in manifest.columns
+        self.progress_bar.show()
         selected_columns = self.collate_selections()
+        print(selected_columns)
 
         self.data.sort_values(by=["FilePath"])
 
         unique_images = self.data.groupby(selected_columns['filepath'])
 
-        self.import_thread = ImportThread(unique_images, selected_columns)
+        self.import_thread = ImportThread(self.mpDB, self.active_survey, 
+                                          unique_images, selected_columns)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
+        self.import_thread.finished.connect(self.close)
         self.import_thread.start()
-
 
         print(f"Added {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
 
@@ -193,83 +278,94 @@ class ImportCSVPopup(QDialog):
 class ImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, unique_images, selected_columns):
+    def __init__(self, mpDB, active_survey, unique_images, selected_columns):
         super().__init__()
+        self.mpDB = mpDB
+        self.active_survey = active_survey
         self.unique_images = unique_images
         self.selected_columns = selected_columns
     
     def run(self):
-        i = 0  # progressbar counter
+        roi_counter = 0  # progressbar counter
         for filepath, group in self.unique_images:
-            print(group)
 
-            # create site
-            if is_unique(group[self.selected_columns['site']]):
-                site = group.loc[0, self.selected_columns['site']] # get first one
-            else:
-                AssertionError(f"File {filepath} has ROI references to multiple sites, should be one.") 
+            # get file extension
+            _, ext = os.path.splitext(os.path.basename(filepath))
+            
+            # get remaining information
+            exemplar = group.head(1)
 
-            # check all datetimes are the same
-            if is_unique(group[self.selected_columns['timestamp']]):
-                timestamp = group.loc[0, self.selected_columns['site']]
-            else:
-                AssertionError(f"File {filepath} has ROI references to multiple datetimes, should be one.") 
-
-"""
-            # check all sequence_id are the same
-            if "sequence_id" in manifest.columns:
-                sequence_id = group["sequence_id"].iloc[0] if is_unique(group["sequence_id"]) else None
-            else:
-                sequence_id = None
-                
-            filename = os.path.basename(filepath)
-            _, ext = os.path.splitext(filename)
-
+            timestamp = exemplar[self.selected_columns['timestamp']].item()
+            site_name = exemplar[self.selected_columns['site']].item()  
             try:
-                site_id = valid_sites.loc[valid_sites["name"]==site,"id"].values[0]
-                site_id = int(site_id)
-            except KeyError:
-                print('Site referenced but not added to Database')
-                return False
+                site_id = self.mpDB.select("site", columns='id', row_cond=f'name="{site_name}"')[0][0]
+            except IndexError:
+                site_id = self.mpDB.add_site(str(site_name), None, None, int(self.active_survey[0]))
 
-            media_id = mpDB.add_media(filepath, ext, site_id, datetime=datetime, sequence_id=sequence_id)
+            # Optional data
+            sequence_id = exemplar[self.selected_columns['sequence_id']].item() if self.selected_columns['sequence_id'] != 0 else None
+            pair_id = exemplar[self.selected_columns['pair_id']].item() if self.selected_columns['pair_id'] != 0 else None
+            comment = exemplar[self.selected_columns['comment']].item() if self.selected_columns['comment'] != 0 else None
 
-
-            # "bbox_x", "bbox_y", "bbox_w", "bbox_h"
-
+            media_id = self.mpDB.add_media(filepath, ext, timestamp, site_id,
+                                           sequence_id=sequence_id, 
+                                           pair_id=pair_id,
+                                           comment=comment)
             # TODO: add dtype checks
-            for _, roi in group.iterrows():
+            for i, roi in group.iterrows():
                 # Frame number for videos, else 1 if image 
                 # WARNING! WILL HAVE TO DYNAMICALLY PULL FRAME WHEN RUNNING miewid
-                frame = roi['frame_number'] if 'frame_number' in manifest.columns else 1
+                frame = roi['frame_number'] if 'frame_number' in group.columns else 1
+ 
+                if 'bbox1' in roi:
+                    bbox_x = roi['bbox1']
+                    bbox_y = roi['bbox2']
+                    bbox_w = roi['bbox3']
+                    bbox_h = roi['bbox4']
+                elif 'bbox_x' in roi:
+                    bbox_x = roi['bbox_x']
+                    bbox_y = roi['bbox_y']
+                    bbox_w = roi['bbox_w']
+                    bbox_h = roi['bbox_h']
+                else: # add filterable empties 
+                    bbox_x = -1 
+                    bbox_y = -1
+                    bbox_w = -1
+                    bbox_h = -1
 
-                bbox_x = roi['bbox1']
-                bbox_y = roi['bbox2']
-                bbox_w = roi['bbox3']
-                bbox_h = roi['bbox4']
-                
-                # add viewpoint if exists
-                viewpoint = roi['Viewpoint'] if 'Viewpoint' in manifest.columns else None
-                individual = roi['Individual'] if 'Individual' in manifest.columns else None
+                # add species
+                if self.selected_columns['species'] != 0:
+                    species_name = roi[self.selected_columns['species']]
+                    try:
+                        species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{species_name}"')[0][0]
+                    except IndexError:
+                        species_id = self.mpDB.add_species("Taxon not specified", str(species_name))
+                else: # no species
+                    species_id = -1
 
-                species = roi['Species']
-                # look up species id
-                if isinstance(species, str):
-                    species_id = mpDB.select("species", columns='id', row_cond=f'common="{species}"')
-                    if species_id:
-                        species_id = species_id[0][0]
+                # viewpoint
+                viewpoint = roi[self.selected_columns['viewpoint']] if self.selected_columns['viewpoint'] != 0 else None
 
-                # already references table id
-                elif isinstance(species, int):
-                    species_id = species 
-                else:
-                    print(f"Could not add detection for unknown species {species}")
-                    continue
+                # individual
+                if self.selected_columns['individual'] != 0: 
+                    individual = roi[self.selected_columns['individual']]
+                    try:
+                        individual_id = self.mpDB.select("individual", columns='id', row_cond=f'name="{individual}"')[0][0]
+                    except IndexError:
+                        individual_id = self.mpDB.add_individual(species_id, str(individual))
+                    
+                else: # no individual id, need review
+                    individual_id = 0
+                    
+                # set reviewed to 1 for named images
+                reviewed = 1 if individual_id > 0 else 0
 
                 # do not add emb_id, to be determined later
-                roi_id = mpDB.add_roi(frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                                    viewpoint=viewpoint, reviewed=0, individual_id=individual)
-        
+                roi_id = self.mpDB.add_roi(frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
+                                  viewpoint=viewpoint, reviewed=reviewed, 
+                                  individual_id=individual_id, emb_id=0)
+                roi_counter += 1
+                self.progress_update.emit(roi_counter)
 
-                self.progress_update.emit(int((i + 1) / len(self.data.shape[0])))
-"""
+        # finished adding media
+        self.finished.emit()
