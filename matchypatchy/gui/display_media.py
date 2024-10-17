@@ -32,6 +32,10 @@ class DisplayMedia(QWidget):
         survey_label.setFixedWidth(50)
         first_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        unidentified = QPushButton("Unidentified Only")
+        unidentified.clicked.connect(self.select_unidentified)
+        first_layer.addWidget(unidentified, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         # SURVEY 
         self.survey_select = QComboBox()
         self.survey_select.setFixedWidth(200)
@@ -95,10 +99,13 @@ class DisplayMedia(QWidget):
         self.species_select.currentIndexChanged.connect(self.select_species)
 
     def update_table(self):
+        # TODO: load images only once, store in temp
         self.loading_bar = ProgressPopup(self, "Loading images...")
         self.loading_bar.show()
         self.media_table.update()
 
+    def select_unidentified():
+        pass
 
     def select_survey(self):
         print('survey changed')

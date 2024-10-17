@@ -4,6 +4,12 @@ Widget for displaying list of Media
 'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'timestamp', 
 'site_id', 'sequence_id', 'pair_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
+
+# TODO: MAKE TABLE SORTABLE
+# TODO: MAKE TABLE EDITABLE
+# TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
+
+
 import pandas as pd
 
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel
