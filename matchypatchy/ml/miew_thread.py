@@ -21,10 +21,10 @@ class MiewThread(QThread):
         media = self.mpDB.select("media", columns="id, filepath, pair_id, sequence_id")
         self.media = pd.DataFrame(media, columns=["id", "filepath", "pair_id", "sequence_id"])
         self.image_paths = pd.Series(self.media["filepath"].values,index=self.media["id"]).to_dict() 
+        self.rois = fetch_roi(self.mpDB)
 
         self.viewpoint_filepath = os.path.join(os.getcwd(), "viewpoint_jaguar.pt")
         self.miew_filepath = os.path.join(os.getcwd(), "miewid.bin")
-        
     
     def run(self):
         self.progress_update.emit("Calculating viewpoint...")
@@ -33,13 +33,8 @@ class MiewThread(QThread):
         self.get_embeddings()
         self.progress_update.emit("Processing complete!")
 
-    def get_bbox(self):
-        # TODO: add MD step, assumes no rois yet
-        pass
-
     def get_viewpoint(self):
         # TODO: Utilize probability for pairs/sequences
-        self.rois = fetch_roi(self.mpDB)
         viewpoints = viewpoint.matchypatchy(self.rois, self.image_paths, self.viewpoint_filepath)
     
         for v in viewpoints:
@@ -51,8 +46,6 @@ class MiewThread(QThread):
 
         # Match Button
     def get_embeddings(self):
-        # 1. fetch images
-        self.rois = fetch_roi(self.mpDB)
         embs = miewid.matchypatchy(self.rois, self.image_paths, self.miew_filepath)
         for e in embs:
             roi_id = e[0]
