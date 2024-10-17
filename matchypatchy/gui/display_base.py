@@ -14,7 +14,7 @@ from .popup_species import SpeciesPopup
 from .popup_import import ImportCSVPopup
 
 from ..database.import_directory import import_directory
-from ..database.site import fetch_sites
+
 
 from ..ml.miew_thread import MiewThread
 
@@ -119,7 +119,7 @@ class DisplayBase(QWidget):
 
     def update_survey(self):
         self.survey_select.clear() 
-        survey_names = self.mpDB.select('survey',columns='id, name')
+        survey_names = self.mpDB.select('survey', columns='id, name')
         self.survey_list = dict(survey_names)
         self.survey_list_ordered = list(survey_names)
         if self.survey_list_ordered:
@@ -182,6 +182,11 @@ class DisplayBase(QWidget):
         # Figure out how to add loading bar
         dialog = AlertPopup(self, "Processing Images", title="Processing Images")
         dialog.show()
+
+        # 1. SEQUENCE 
+
+        # 2. ANIML (BBOX + SPECIES)
+
         self.miew_thread = MiewThread(self.mpDB)
 
         # Connect signals from the thread to the main thread
