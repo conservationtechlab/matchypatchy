@@ -203,7 +203,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def edit_row(self, table, id, replace):
+    def edit_row(self, table, id, replace, quiet=True):
         """
         Args
             - table (str):
@@ -216,7 +216,7 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             replace_values = ",".join(f"{k}={v}" for k,v in replace.items())
             command = f"UPDATE {table} SET {replace_values} WHERE id={id}"
-            print(command)
+            if not quiet: print(command)
             cursor.execute(command)
             db.commit()
             db.close()
