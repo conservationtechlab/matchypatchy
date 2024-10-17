@@ -77,7 +77,11 @@ def setup_database(filepath='matchypatchy.db'):
                         sex TEXT,
                         FOREIGN KEY(species_id) REFERENCES species (id)
                     )''')
-
+    
+    # SEQUENCE
+    cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
+                        id INTEGER PRIMARY KEY
+                    )''')
 
     # Commit changes and close connection
     db.commit()

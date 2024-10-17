@@ -185,6 +185,23 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
+
+    def add_sequence(self):
+        # Note difference in variable order, foreign keys
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = """INSERT INTO sequence DEFAULT VALUES;"""
+            cursor.execute(command)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            print(f"Failed to add sequence.", error)
+            if db:
+                db.close()
+            return False
         
     def edit_row(self, table, id, replace):
         """
