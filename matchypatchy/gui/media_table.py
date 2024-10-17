@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
+THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
 
 class MediaTable(QWidget):
 
@@ -112,7 +113,7 @@ class MediaTable(QWidget):
         self.table.setItem(i, 6, QTableWidgetItem(roi["name"]))  # Individual column
         self.table.setItem(i, 7, QTableWidgetItem(roi["sex"]))  # Sex column
         self.table.setItem(i, 8, QTableWidgetItem(roi["site"]))   # Site column
-        self.table.setItem(i, 9, QTableWidgetItem(roi["sequence_id"]))  # Sequence ID column
+        self.table.setItem(i, 9, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
         
         # Favorite Checkbox
         favorite = QTableWidgetItem()
@@ -136,25 +137,29 @@ class LoadThumbnailThread(QThread):
     
     def run(self):
         for i, roi in self.data_filtered.iterrows():
-
+            # load image
             self.original = QImage(roi['filepath'])
 
-            if self.crop:
-                left = self.original.width() * roi['bbox_x']
-                top = self.original.height() * roi['bbox_y']
-                right = self.original.width() * roi['bbox_w']
-                bottom = self.original.height() * roi['bbox_h']
-                crop_rect = QRect(int(left), int(top), int(right), int(bottom))
-                self.image = self.original.copy(crop_rect)
+            # image not found
+            if self.original.isNull():
+                self.image = QImage(THUMBNAIL_NOTFOUND)
 
             else:
-                self.image = self.original.copy()
+                if self.crop:
+                    left = self.original.width() * roi['bbox_x']
+                    top = self.original.height() * roi['bbox_y']
+                    right = self.original.width() * roi['bbox_w']
+                    bottom = self.original.height() * roi['bbox_h']
+                    crop_rect = QRect(int(left), int(top), int(right), int(bottom))
+                    self.image = self.original.copy(crop_rect)
+
+                else:
+                    self.image = self.original.copy()
 
             scaled_image = self.image.scaled(self.size, self.size,
-                                             Qt.AspectRatioMode.KeepAspectRatio, 
-                                             Qt.TransformationMode.SmoothTransformation)
+                                            Qt.AspectRatioMode.KeepAspectRatio, 
+                                            Qt.TransformationMode.SmoothTransformation)
             pixmap = QPixmap.fromImage(scaled_image)
 
-        
             self.image_loaded.emit(i, pixmap)
             self.progress_update.emit(int((i + 1) / len(self.data_filtered) * 100))
