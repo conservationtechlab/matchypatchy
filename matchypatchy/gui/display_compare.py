@@ -11,6 +11,7 @@ from PyQt6.QtGui import QKeyEvent
 
 from ..database.roi import fetch_roi_media, match, rank, get_bbox, get_info
 from .widget_image import ImageWidget
+from .popup_alert import AlertPopup
 
 class DisplayCompare(QWidget):
     def __init__(self, parent):
@@ -292,7 +293,6 @@ class DisplayCompare(QWidget):
         self.load_data(match_only=True)
 
 
-    
     def set_match_sequence(self, n):
         pass
 
@@ -338,19 +338,25 @@ class DisplayCompare(QWidget):
         """
         self.rois = fetch_roi_media(self.mpDB)
 
-        self.neighbor_dict, self.nearest_dict = match(self.mpDB)
-        self.ranked_queries = rank(self.nearest_dict)
+        # must have embeddings to continue
+        if not (self.rois["emb_id"] == 0).all():
+            self.neighbor_dict, self.nearest_dict = match(self.mpDB)
+            self.ranked_queries = rank(self.nearest_dict)
 
-        # set number of queries to validate
-        self.n_queries = len(self.neighbor_dict)
-        self.query_n.setText("/" + str(self.n_queries))
+            # set number of queries to validate
+            self.n_queries = len(self.neighbor_dict)
+            self.query_n.setText("/" + str(self.n_queries))
 
-        # set first query to highest rank 
-        self.set_query(0)
+            # set first query to highest rank 
+            self.set_query(0)
+        else:
+            dialog = AlertPopup(self, prompt="No data to match, process images first.")
+            if dialog.exec():
+                del dialog
+            self.parent._set_base_view()
         
-    
 
-    # Keyboard Handler
+        # Keyboard Handler
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()
