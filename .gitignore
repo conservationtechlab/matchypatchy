@@ -6,8 +6,8 @@ __pycache__/
 # test databases
 *.db
 
-# miewid 
-miew_id/
+Jaguar/
+examples/
 
 # Distribution / packaging
 .Python
