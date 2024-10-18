@@ -4,6 +4,7 @@ Thread Class for Processing BBox and Species Classification
 """
 import os
 import pandas as pd
+import animl
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -41,3 +42,11 @@ class AnimlThread(QThread):
     def get_species(self):
         # TODO: Utilize probability for pairs/sequences
         self.rois = fetch_roi(self.mpDB)
+
+
+
+class ManifestThread(QThread):
+    progress_update = pyqtSignal(str)  # Signal to update the progress bar
+
+    def __init__(self, directory):
+        super().__init__()

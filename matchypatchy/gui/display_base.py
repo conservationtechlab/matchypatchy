@@ -11,9 +11,8 @@ from .popup_survey import SurveyFillPopup
 from .popup_site import SitePopup
 from .popup_alert import AlertPopup
 from .popup_species import SpeciesPopup
-from .popup_import import ImportCSVPopup
-
-from ..database.import_directory import import_directory
+from .popup_import_csv import ImportCSVPopup
+from .popup_import_folder import ImportFolderPopup
 
 from ..ml.sequence_thread import SequenceThread
 from ..ml.animl_thread import AnimlThread
@@ -177,8 +176,16 @@ class DisplayBase(QWidget):
         self.mpDB.clear('media')
         self.mpDB.clear('roi')
         self.mpDB.clear('roi_emb')
-        directory = QFileDialog.getExistingDirectory(self, "Open File", os.path.expanduser('~'), QFileDialog.Option.ShowDirsOnly)
-        import_directory(self.mpDB, directory)
+        if self.select_survey():
+            directory = QFileDialog.getExistingDirectory(self, "Open File", os.path.expanduser('~'), QFileDialog.Option.ShowDirsOnly)
+            if directory:
+                dialog = ImportFolderPopup(self, directory)
+                if dialog.exec():
+                    del dialog                
+        else:
+            dialog = AlertPopup(self, "Please create a new survey before uploading.")
+            if dialog.exec():
+                del dialog
 
         
     def process_images(self):
