@@ -14,6 +14,8 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from ..database.media import fetch_media
 
 
+# TODO: what to do if sequence_id already exists? 
+
 class SequenceThread(QThread):
 
     progress_update = pyqtSignal(str)  # Signal to update the progress bar
