@@ -10,6 +10,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
 from ..database.roi import fetch_roi_media, match, rank, get_bbox, get_info
+from ..database.individual import merge
+
 from .widget_image import ImageWidget
 from .popup_alert import AlertPopup
 
@@ -116,13 +118,12 @@ class DisplayCompare(QWidget):
         query_options.addStretch()
         query_layout.addLayout(query_options)
 
-        # Image
+        # Query Image
         self.query_image = ImageWidget()
         self.query_image.setStyleSheet("border: 1px solid black;")
         self.query_image.setAlignment(Qt.AlignmentFlag.AlignTop)
         query_layout.addWidget(self.query_image,1)
-        # Image Tools
-
+        # Query Image Tools
         image_buttons = QHBoxLayout()
         placeholder = QLabel("Brightness, Contrast, zoom? ")
         image_buttons.addWidget(placeholder)
@@ -156,7 +157,7 @@ class DisplayCompare(QWidget):
         middle_column.addStretch()
         image_layout.addLayout(middle_column)
 
-         # match
+         # Match
         match_layout = QVBoxLayout()
         match_label = QLabel("Match")
         match_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -197,13 +198,13 @@ class DisplayCompare(QWidget):
         match_options.addStretch()
         match_layout.addLayout(match_options)
 
-        # Image
+        # Match Image
         self.match_image = ImageWidget()
         self.match_image.setStyleSheet("border: 1px solid black;")
         self.match_image.setAlignment(Qt.AlignmentFlag.AlignTop)
         match_layout.addWidget(self.match_image,1)
-        # Image Tools
 
+        # Match Image Tools
         image_buttons = QHBoxLayout()
         placeholder = QLabel("Brightness, Contrast, zoom? ")
         image_buttons.addWidget(placeholder)
@@ -306,12 +307,21 @@ class DisplayCompare(QWidget):
             QPushButton {
                 background-color: #2e7031;  /* Green background */
                 color: white;              /* White text */
-            }
-        """)
-            print("Button is pressed in.")
+            }""")
+
+            print("Match")
+            # MATCH
+            if self.rois.loc[self.current_query_id, "individual_id"] == self.rois.loc[self.current_match_id, "individual_id"] and \
+               self.rois.loc[self.current_query_id, "individual_id"] == None:
+                #  make new individual
+                pass
+            else:
+                merge(self.mpDB, self.rois.loc[self.current_query_id], self.rois.loc[self.current_match_id])
+
         else:
             self.button_match.setStyleSheet("")
-            print("Button is released.")
+            
+            # UNMATCH
 
     def load_images(self, match_only=False):
        """
@@ -334,14 +344,14 @@ class DisplayCompare(QWidget):
     # run on entry
     def calculate_neighbors(self):
         """
-        Calculates knn for all unvalidated images, ranks by smallest distance to nn
+        Calculates knn for all unvalidated images, ranks by smallest distance to NN
         """
         self.rois = fetch_roi_media(self.mpDB)
 
         # must have embeddings to continue
         if not (self.rois["emb_id"] == 0).all():
-            self.neighbor_dict, self.nearest_dict = match(self.mpDB)
-            self.ranked_queries = rank(self.nearest_dict)
+            self.neighbor_dict, nearest_dict = match(self.mpDB)
+            self.ranked_queries = rank(nearest_dict)
 
             # set number of queries to validate
             self.n_queries = len(self.neighbor_dict)
@@ -373,6 +383,10 @@ class DisplayCompare(QWidget):
         # Down Arrow
         elif key == 16777237:
             self.set_match(self.current_match + 1)
+
+        # M - Match
+        elif key == 'm':
+            self.toggle_match()
 
         else:
             print(f"Key pressed: {key_text} (Qt key code: {key})")

@@ -36,12 +36,10 @@ class MiewThread(QThread):
     def get_viewpoint(self):
         # TODO: Utilize probability for pairs/sequences
         viewpoints = viewpoint.matchypatchy(self.rois, self.image_paths, self.viewpoint_filepath)
-    
         for v in viewpoints:
             roi_id = v[0]
             value = v[1]
             prob = v[2] 
-            print(roi_id, value, prob)
             self.mpDB.edit_row("roi", roi_id, {"viewpoint":value})
 
         # Match Button
