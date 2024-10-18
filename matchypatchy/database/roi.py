@@ -85,7 +85,9 @@ def filter(rois, roi_id, neighbors, threshold = 100):
                 if (query['pair_id'].item() is None) or (match['pair_id'].item() != query['pair_id'].item()):
                     # distance check (do first or last?)
                     if neighbors[i][1] < threshold and neighbors[i][1] > 0:
-                        filtered.append(neighbors[i])
+                        # replace emb_id with roi_id
+                        match_roi_id = match['id'].item()
+                        filtered.append((match_roi_id, neighbors[i][1]))
 
     return sorted(filtered, key=lambda x: x[1])
 
