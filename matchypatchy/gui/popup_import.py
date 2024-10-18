@@ -23,15 +23,15 @@ class ImportCSVPopup(QDialog):
         self.data = pd.read_csv(manifest)
         self.columns = ["None"] + list(self.data.columns)
         
-        self.selected_filepath = 0
-        self.selected_timestamp = 0
-        self.selected_site = 0
-        self.selected_sequence_id = 0
-        self.selected_pair_id = 0
-        self.selected_viewpoint = 0
-        self.selected_species = 0
-        self.selected_individual = 0
-        self.selected_comment = 0
+        self.selected_filepath = self.columns[0]
+        self.selected_timestamp = self.columns[0]
+        self.selected_site = self.columns[0]
+        self.selected_sequence_id = self.columns[0]
+        self.selected_pair_id = self.columns[0]
+        self.selected_viewpoint = self.columns[0]
+        self.selected_species = self.columns[0]
+        self.selected_individual = self.columns[0]
+        self.selected_comment = self.columns[0]
 
         self.setWindowTitle('Import from CSV')
         layout = QVBoxLayout()
@@ -251,6 +251,7 @@ class ImportCSVPopup(QDialog):
         # assert bbox in manifest.columns
         self.progress_bar.show()
         selected_columns = self.collate_selections()
+        print(selected_columns)
 
         self.data.sort_values(by=["FilePath"])
 
@@ -298,9 +299,9 @@ class ImportThread(QThread):
                 site_id = self.mpDB.add_site(str(site_name), None, None, int(self.active_survey[0]))
 
             # Optional data
-            sequence_id = int(exemplar[self.selected_columns['sequence_id']].item()) if self.selected_columns['sequence_id'] != 0 else None
-            pair_id = int(exemplar[self.selected_columns['pair_id']].item()) if self.selected_columns['pair_id'] != 0 else None
-            comment = exemplar[self.selected_columns['comment']].item() if self.selected_columns['comment'] != 0 else None
+            sequence_id = int(exemplar[self.selected_columns['sequence_id']].item()) if self.selected_columns['sequence_id'] != 'None' else None
+            pair_id = int(exemplar[self.selected_columns['pair_id']].item()) if self.selected_columns['pair_id'] != 'None' else None
+            comment = exemplar[self.selected_columns['comment']].item() if self.selected_columns['comment'] != 'None' else None
 
             #print(filepath, ext, timestamp, site_id, sequence_id, pair_id, comment)
 
@@ -331,7 +332,7 @@ class ImportThread(QThread):
                     bbox_h = -1
 
                 # add species
-                if self.selected_columns['species'] != 0:
+                if self.selected_columns['species'] != 'None':
                     species_name = roi[self.selected_columns['species']]
                     try:
                         species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{species_name}"')[0][0]
@@ -341,10 +342,10 @@ class ImportThread(QThread):
                     species_id = -1
 
                 # viewpoint
-                viewpoint = roi[self.selected_columns['viewpoint']] if self.selected_columns['viewpoint'] != 0 else None
+                viewpoint = roi[self.selected_columns['viewpoint']] if self.selected_columns['viewpoint'] != 'None' else None
 
                 # individual
-                if self.selected_columns['individual'] != 0: 
+                if self.selected_columns['individual'] != 'None': 
                     individual = roi[self.selected_columns['individual']]
                     try:
                         individual_id = self.mpDB.select("individual", columns='id', row_cond=f'name="{individual}"')[0][0]
