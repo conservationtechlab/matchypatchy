@@ -18,6 +18,7 @@ from ..ml.sequence_thread import SequenceThread
 from ..ml.animl_thread import AnimlThread
 from ..ml.miew_thread import MiewThread
 
+from animl.file_management import build_file_manifest
 
 # TODO: add download models button/popup
 
@@ -179,7 +180,9 @@ class DisplayBase(QWidget):
         if self.select_survey():
             directory = QFileDialog.getExistingDirectory(self, "Open File", os.path.expanduser('~'), QFileDialog.Option.ShowDirsOnly)
             if directory:
-                dialog = ImportFolderPopup(self, directory)
+                files = build_file_manifest(directory)
+                print(files)
+                dialog = ImportFolderPopup(self, files)
                 if dialog.exec():
                     del dialog                
         else:

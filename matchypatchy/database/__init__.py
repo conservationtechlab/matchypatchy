@@ -1,4 +1,3 @@
-from matchypatchy.database import import_directory
 from matchypatchy.database import media
 from matchypatchy.database import mpdb
 from matchypatchy.database import roi
@@ -7,7 +6,6 @@ from matchypatchy.database import site
 from matchypatchy.database import species
 from matchypatchy.database import survey
 
-from matchypatchy.database.import_directory import (import_directory,)
 from matchypatchy.database.media import (fetch_media, get_sequence_id,
                                          user_editable_rows,)
 from matchypatchy.database.mpdb import (MatchyPatchyDB,)

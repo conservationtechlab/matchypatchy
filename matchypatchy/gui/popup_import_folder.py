@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 
+
 columns=["filepath", "timestamp", 'site_id', 'sequence_id', "pair_id", 'comment',
          "viewpoint", "species_id", "individual_id"]
 
@@ -17,51 +18,14 @@ class ImportFolderPopup(QDialog):
         super().__init__(parent)
         self.mpDB = parent.mpDB
         self.active_survey = parent.active_survey
-        self.data = pd.read_csv(manifest)
-        self.columns = ["None"] + list(self.data.columns)
-        
-        self.selected_filepath = self.columns[0]
-        self.selected_timestamp = self.columns[0]
-        self.selected_site = self.columns[0]
-        self.selected_sequence_id = self.columns[0]
-        self.selected_pair_id = self.columns[0]
-        self.selected_viewpoint = self.columns[0]
-        self.selected_species = self.columns[0]
-        self.selected_individual = self.columns[0]
-        self.selected_comment = self.columns[0]
+        self.data = manifest
 
-        self.setWindowTitle('Import from CSV')
+        self.setWindowTitle('Import from Folder')
         layout = QVBoxLayout()
 
         # Create a label
         self.label = QLabel("Select Columns to Import Data")
         layout.addWidget(self.label)
-        layout.addSpacing(5)
-
-        # Filepath
-        filepath_layout = QHBoxLayout()
-        filepath_layout.addWidget(QLabel("Filepath:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        filepath_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.filepath = QComboBox()
-        self.filepath.addItems(self.columns)
-        self.filepath.currentTextChanged.connect(self.select_filepath)
-        filepath_layout.addWidget(self.filepath)
-        layout.addLayout(filepath_layout)
-        layout.addSpacing(5)
-
-        # Timestamp
-        timestamp_layout = QHBoxLayout()
-        timestamp_layout.addWidget(QLabel("Timestamp:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        timestamp_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.timestamp = QComboBox()
-        self.timestamp.addItems(self.columns)
-        self.timestamp.currentTextChanged.connect(self.select_timestamp)
-        timestamp_layout.addWidget(self.timestamp)
-        layout.addLayout(timestamp_layout)
         layout.addSpacing(5)
 
         # Site
@@ -126,15 +90,6 @@ class ImportFolderPopup(QDialog):
         individual_layout.addWidget(self.individual)
         layout.addLayout(individual_layout)
         layout.addSpacing(5)
-
-        # Comment
-        comment_layout = QHBoxLayout()
-        comment_layout.addWidget(QLabel("Comment:"))
-        self.comment = QComboBox()
-        self.comment.addItems(self.columns)
-        self.comment.currentTextChanged.connect(self.select_sequence)
-        comment_layout.addWidget(self.comment)
-        layout.addLayout(comment_layout)
 
         # Ok/Cancel
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
@@ -364,3 +319,4 @@ class CSVImportThread(QThread):
 
         # finished adding media
         self.finished.emit()
+

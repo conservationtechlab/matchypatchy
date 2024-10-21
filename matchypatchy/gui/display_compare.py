@@ -249,6 +249,7 @@ class DisplayCompare(QWidget):
         # set current query
         self.current_query = n
         self.current_query_id = self.ranked_queries[self.current_query][0]
+        self.current_query_pair_id = self.rois.loc[self.current_query_id, 'pair_id']
         self.query_number.setText(str(self.current_query + 1))
 
         # get query sequences
@@ -285,6 +286,7 @@ class DisplayCompare(QWidget):
 
         self.current_match = n
         self.current_match_id = self.current_query_matches[self.current_match][0]
+        self.current_match_pair_id = self.rois.loc[self.current_match_id, 'pair_id']
         self.match_number.setText(str(self.current_match + 1))
 
         # get match sequences
@@ -341,7 +343,7 @@ class DisplayCompare(QWidget):
             self.query_info.setText(get_info(self.rois.loc[self.current_query_id]))
         self.match_info.setText(get_info(self.rois.loc[self.current_match_id]))
 
-    # run on entry
+    #  RUN ON ENTRY
     def calculate_neighbors(self):
         """
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
