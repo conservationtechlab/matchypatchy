@@ -109,7 +109,7 @@ class MatchyPatchyDB():
             return False
 
     def add_media(self, filepath, ext, timestamp, site_id, 
-                  sequence_id=None, pair_id=None, comment=None, favorite=0):
+                  sequence_id=None, capture_id=None, comment=None, favorite=0):
         """
         Media has 9 attributes not including id:
             id INTEGER PRIMARY KEY,
@@ -118,7 +118,7 @@ class MatchyPatchyDB():
             timestamp TEXT NOT NULL,
             site_id INTEGER NOT NULL,
             sequence_id INTEGER,
-            pair_id INTEGER,
+            capture_id INTEGER,
             comment TEXT,
             favorite INTEGER,
         """
@@ -127,10 +127,10 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO media
                         (filepath, ext, timestamp, site_id,
-                        sequence_id, pair_id, comment, favorite) 
+                        sequence_id, capture_id, comment, favorite) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (filepath, ext, timestamp, site_id, 
-                          sequence_id, pair_id, comment, favorite)
+                          sequence_id, capture_id, comment, favorite)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -203,12 +203,29 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
+    def add_capture(self):
+        # Note difference in variable order, foreign keys
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = """INSERT INTO capture DEFAULT VALUES;"""
+            cursor.execute(command)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            print(f"Failed to add capture.", error)
+            if db:
+                db.close()
+            return False
+        
     def edit_row(self, table, id, replace, quiet=True):
         """
         Args
             - table (str):
             - id (int):
-            - replace (dict): column:value pairs to update
+            - replace (dict): column:value captures to update
 
         """
         try:
@@ -273,7 +290,7 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed, 
                          roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp, 
-                         site_id, sequence_id, pair_id, comment, favorite, binomen, common, name, sex"""
+                         site_id, sequence_id, capture_id, comment, favorite, binomen, common, name, sex"""
             command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
                                            LEFT JOIN species ON roi.species_id = species.id
                                            LEFT JOIN individual ON roi.individual_id = individual.id;"""

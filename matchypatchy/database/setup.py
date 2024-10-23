@@ -38,11 +38,12 @@ def setup_database(filepath='matchypatchy.db'):
                         timestamp TEXT NOT NULL,
                         site_id INTEGER NOT NULL,
                         sequence_id INTEGER,
-                        pair_id INTEGER,
+                        capture_id INTEGER,
                         comment TEXT,
                         favorite INTEGER,
                         FOREIGN KEY (site_id) REFERENCES site (id),
-                        FOREIGN KEY (pair_id) REFERENCES media (id) )''')
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id),
+                        FOREIGN KEY (capture_id) REFERENCES capture (id) )''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
@@ -83,6 +84,10 @@ def setup_database(filepath='matchypatchy.db'):
                         id INTEGER PRIMARY KEY
                     )''')
 
+    # CAPTURE
+    cursor.execute('''CREATE TABLE IF NOT EXISTS capture (
+                        id INTEGER PRIMARY KEY
+                    )''')
     # Commit changes and close connection
     db.commit()
     print('Database initiated.')
