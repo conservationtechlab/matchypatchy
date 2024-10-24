@@ -5,16 +5,16 @@ Pair_ID should be given in advance since there is likely
 some mismatch between camera timestamps and they won't be exactly the same
 
 """
-import os
 import pandas as pd
 from datetime import datetime, timedelta
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ..database.media import fetch_media
+from ..database.media import fetch_media, IMAGE_EXT
 
 
 # TODO: what to do if sequence_id already exists? 
+# TODO: sequence ids for individual videos should be one number, validate
 
 class SequenceThread(QThread):
 
@@ -35,26 +35,66 @@ class SequenceThread(QThread):
 
         sequences = []
         current_sequence = []
+        seen_pairs = {}
         for i, image in self.media.iterrows():
             if current_sequence:
+                # site is the same, timestamp under threshold, n under threshold
                 if (image['site_id'] == current_sequence[0]['site_id']) and \
                     (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
                     (len(current_sequence) < self.max_n):
                     current_sequence.append(image)
                 else:
+                    # bank the current sequence and start a new group
                     sequences.append(current_sequence)
-                    current_sequence = [image]  # Start a new group
+                    current_sequence = [image]  
             else:
                 current_sequence = [image]
+
+            # get pair id, make note to group
+            capture_id = image['capture_id']
+            g = len(sequences)
+            if capture_id in seen_pairs: 
+                if g not in seen_pairs[capture_id]:
+                    seen_pairs[capture_id].extend([g])  # Merge the current list with the existing one
+            else:
+                seen_pairs[capture_id] = [g]
 
         # Append the last group
         if current_sequence:
             sequences.append(current_sequence)
 
+        # merge pairs into the same sequence
+        print("Sequences:",len(sequences))
+        paired_sequences = [value for value in seen_pairs.values() if len(value) > 1]
+        print(paired_sequences)
+        sequences = self.merge_paired_sequences(sequences, paired_sequences)
+
         # update media entries
         for _, group in enumerate(sequences):
+            # create a sequence id
             sequence_id = self.mpDB.add_sequence()
             for image in group:
                 self.mpDB.edit_row('media', image['id'], {"sequence_id":sequence_id})
-                
 
+
+    def merge_paired_sequences(self, sequences, pairs):
+        to_remove = []
+
+        for pair in pairs:
+            concatenated_list = []
+            min_i = min(pair)
+            print('first sequence',len(sequences[min_i]))
+            remainder = [p for p in pair if p != min_i]
+            print(min_i, remainder)
+            if 0 <= min_i < len(sequences):
+                for index in remainder:
+                    print('second sequence',len(sequences[index]))
+                    sequences[min_i] += sequences[index]  # Concatenate the list at the given index
+                to_remove.extend(remainder)
+            print(len(sequences[min_i]))
+    
+        # remove duplicate sequences
+        for index in to_remove.sort(reverse=True):
+            sequences.pop(index)
+
+        return sequences

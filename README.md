@@ -8,5 +8,5 @@ TODO
  - save thumbnails to photo dir - save as full but smaller size
  - download models, add button to home
  - update media_table to be sortable, etc
- - utilize pair/sequence for viewpoint
- - adjust query to incorporate pair
+ - utilize capture/sequence for viewpoint
+ - adjust query to incorporate capture

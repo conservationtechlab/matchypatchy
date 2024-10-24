@@ -30,7 +30,7 @@ def fetch_roi(mpDB):
 def fetch_roi_media(mpDB):
         columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 
                    'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id', 
-                   'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'pair_id',
+                   'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'capture_id',
                     'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
         media, column_names = mpDB.all_media()
         rois = pd.DataFrame(media, columns=column_names)
@@ -46,11 +46,11 @@ def roi_knn(mpDB, emb_id, k=5):
 
 def match(mpDB): 
     # 1. Get KNN for each ROI
-    # 2. filter out matches from same sequence, pair
+    # 2. filter out matches from same sequence, capture
     # 3. rank ROIs by match scores 
 
-    info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id, pair_id"
-    # need sequence and pair ids from media to restrict comparisons shown to 
+    info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id, capture_id"
+    # need sequence and capture ids from media to restrict comparisons shown to 
     rois, columns = mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
     rois = pd.DataFrame(rois,columns=columns)
     neighbor_dict = dict()
@@ -81,8 +81,8 @@ def filter(rois, roi_id, neighbors, threshold = 100):
         if (query['individual_id'].item() is None) or (match['individual_id'].item() != query['individual_id'].item()):
             # if not in same sequence
             if (query['sequence_id'].item() is None) or (match['sequence_id'].item() != query['sequence_id'].item()):
-                # if not in same pair (should be redundent to sequence)
-                if (query['pair_id'].item() is None) or (match['pair_id'].item() != query['pair_id'].item()):
+                # if not in same capture (should be redundent to sequence)
+                if (query['capture_id'].item() is None) or (match['capture_id'].item() != query['capture_id'].item()):
                     # distance check (do first or last?)
                     if neighbors[i][1] < threshold and neighbors[i][1] > 0:
                         # replace emb_id with roi_id
@@ -95,13 +95,10 @@ def filter(rois, roi_id, neighbors, threshold = 100):
 def rank(nearest_dict):
     return sorted(nearest_dict.items(), key=lambda x: x[1])
 
-
-def get_bbox(roi):
-    return roi[['bbox_x','bbox_y','bbox_w','bbox_h']]
-
-
-def get_info(roi, spacing=1.5):
-    # get relevant data
+def roi_metadata(roi, spacing=1.5):
+    """
+    Display relevant metadata in comparison label box
+    """
     roi = roi.rename(index={"name": "Name", 
                             "filepath": "File Path",
                             "comment":"Comment",
@@ -124,4 +121,23 @@ def get_info(roi, spacing=1.5):
         """
 
     return html_text
+
+
+def get_bbox(roi): 
+    """
+    Return the bbox coordinates for a given roi row
+    """
+    return roi[['bbox_x','bbox_y','bbox_w','bbox_h']]
+
+
+def get_sequence(id, roi_media):
+    """
+    Return two lists of roi.ids
+
+    Group by capture, order by frame number
+    """
+    sequence_id = roi_media.loc[id, "sequence_id"]
+    sequence = roi_media[roi_media['sequence_id'] == sequence_id]
+    #print(sequence.sort_values(by=['capture_id']))
+
 

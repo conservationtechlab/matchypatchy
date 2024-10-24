@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
-from ..database.roi import fetch_roi_media, match, rank, get_bbox, get_info
+from ..database.roi import (fetch_roi_media, match, rank, get_bbox, roi_metadata, get_sequence)
 from ..database.individual import merge
 
 from .widget_image import ImageWidget
@@ -252,6 +252,7 @@ class DisplayCompare(QWidget):
         self.query_number.setText(str(self.current_query + 1))
 
         # get query sequences
+        get_sequence(self.current_query_id, self.data)
 
         # update matches
         self.update_matches()
@@ -288,6 +289,7 @@ class DisplayCompare(QWidget):
         self.match_number.setText(str(self.current_match + 1))
 
         # get match sequences
+        get_sequence(self.current_match_id, self.data)
 
         # load new images
         self.load_images(match_only=True)
@@ -311,12 +313,12 @@ class DisplayCompare(QWidget):
 
             print("Match")
             # MATCH
-            if self.rois.loc[self.current_query_id, "individual_id"] == self.rois.loc[self.current_match_id, "individual_id"] and \
-               self.rois.loc[self.current_query_id, "individual_id"] == None:
+            if self.data.loc[self.current_query_id, "individual_id"] == self.data.loc[self.current_match_id, "individual_id"] and \
+               self.data.loc[self.current_query_id, "individual_id"] == None:
                 #  make new individual
                 pass
             else:
-                merge(self.mpDB, self.rois.loc[self.current_query_id], self.rois.loc[self.current_match_id])
+                merge(self.mpDB, self.data.loc[self.current_query_id], self.data.loc[self.current_match_id])
 
         else:
             self.button_match.setStyleSheet("")
@@ -328,28 +330,28 @@ class DisplayCompare(QWidget):
        Load Images for Current Query and Match
        """
        if not match_only: # dont update query if only updating match
-           self.query_image.display_image(self.rois.loc[self.current_query_id,"filepath"],
-                                        bbox=get_bbox(self.rois.loc[self.current_query_id]))
-       self.match_image.display_image(self.rois.loc[self.current_match_id,"filepath"],
-                                      bbox=get_bbox(self.rois.loc[self.current_match_id]))
+           self.query_image.display_image(self.data.loc[self.current_query_id,"filepath"],
+                                        bbox=get_bbox(self.data.loc[self.current_query_id]))
+       self.match_image.display_image(self.data.loc[self.current_match_id,"filepath"],
+                                      bbox=get_bbox(self.data.loc[self.current_match_id]))
 
     def load_data(self, match_only=False):
         """
         Load MetaData for Current Query and Match
         """
         if not match_only: # dont update query if only updating match
-            self.query_info.setText(get_info(self.rois.loc[self.current_query_id]))
-        self.match_info.setText(get_info(self.rois.loc[self.current_match_id]))
+            self.query_info.setText(roi_metadata(self.data.loc[self.current_query_id]))
+        self.match_info.setText(roi_metadata(self.data.loc[self.current_match_id]))
 
-    # run on entry
+    # RUN ON ENTRY
     def calculate_neighbors(self):
         """
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
         """
-        self.rois = fetch_roi_media(self.mpDB)
+        self.data = fetch_roi_media(self.mpDB)
 
         # must have embeddings to continue
-        if not (self.rois["emb_id"] == 0).all():
+        if not (self.data["emb_id"] == 0).all():
             self.neighbor_dict, nearest_dict = match(self.mpDB)
             self.ranked_queries = rank(nearest_dict)
 

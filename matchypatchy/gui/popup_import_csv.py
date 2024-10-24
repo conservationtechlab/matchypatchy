@@ -298,6 +298,7 @@ class CSVImportThread(QThread):
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns['sequence_id']].item()) if self.selected_columns['sequence_id'] != 'None' else None
+
             # get capture_id and convert or create new one
             if self.selected_columns['capture_id'] != 'None':
                 temp_id = int(exemplar[self.selected_columns['capture_id']].item())
@@ -305,13 +306,11 @@ class CSVImportThread(QThread):
                     capture_id = capture_dict[temp_id]
                 except KeyError:
                     capture_id = self.mpDB.add_capture()
-                    capture_dict[temp_id] = capture_dict
+                    capture_dict[temp_id] = capture_id
             else:
                 capture_id = self.mpDB.add_capture()
 
             comment = exemplar[self.selected_columns['comment']].item() if self.selected_columns['comment'] != 'None' else None
-
-            #print(filepath, ext, timestamp, site_id, sequence_id, capture_id, comment)
 
             media_id = self.mpDB.add_media(filepath, ext, timestamp, site_id,
                                            sequence_id=sequence_id, 
