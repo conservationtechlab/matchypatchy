@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 
-columns=["filepath", "timestamp", 'site_id', 'sequence_id', "pair_id", 'comment',
+columns=["filepath", "timestamp", 'site_id', 'sequence_id', "capture_id", 'comment',
          "viewpoint", "species_id", "individual_id"]
 
 class ImportCSVPopup(QDialog):
@@ -24,7 +24,7 @@ class ImportCSVPopup(QDialog):
         self.selected_timestamp = self.columns[0]
         self.selected_site = self.columns[0]
         self.selected_sequence_id = self.columns[0]
-        self.selected_pair_id = self.columns[0]
+        self.selected_capture_id = self.columns[0]
         self.selected_viewpoint = self.columns[0]
         self.selected_species = self.columns[0]
         self.selected_individual = self.columns[0]
@@ -87,14 +87,14 @@ class ImportCSVPopup(QDialog):
         layout.addLayout(sequence_layout)
         layout.addSpacing(5)
 
-        # Pair
-        pair_layout = QHBoxLayout()
-        pair_layout.addWidget(QLabel("Pair ID:"))
-        self.pair_id = QComboBox()
-        self.pair_id.addItems(self.columns)
-        self.pair_id.currentTextChanged.connect(self.select_pair)
-        pair_layout.addWidget(self.pair_id)
-        layout.addLayout(pair_layout)
+        # capture
+        capture_layout = QHBoxLayout()
+        capture_layout.addWidget(QLabel("Capture ID:"))
+        self.capture_id = QComboBox()
+        self.capture_id.addItems(self.columns)
+        self.capture_id.currentTextChanged.connect(self.select_capture)
+        capture_layout.addWidget(self.capture_id)
+        layout.addLayout(capture_layout)
         layout.addSpacing(5)
 
         # Viewpoint
@@ -185,9 +185,9 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
         
-    def select_pair(self):
+    def select_capture(self):
         try:
-            self.selected_pair_id = self.columns[self.pair_id.currentIndex()]
+            self.selected_capture_id = self.columns[self.capture_id.currentIndex()]
             return True
         except IndexError:
             return False
@@ -234,7 +234,7 @@ class ImportCSVPopup(QDialog):
                 "timestamp": self.selected_timestamp,
                 "site": self.selected_site,
                 "sequence_id": self.selected_sequence_id,
-                "pair_id": self.selected_pair_id,
+                "capture_id": self.selected_capture_id,
                 "viewpoint": self.selected_viewpoint,
                 "species": self.selected_species,
                 "individual": self.selected_individual,
@@ -275,6 +275,7 @@ class CSVImportThread(QThread):
     
     def run(self):
         roi_counter = 0  # progressbar counter
+        capture_dict = {}
         for filepath, group in self.unique_images:
 
             # check to see if file exists 
@@ -297,14 +298,23 @@ class CSVImportThread(QThread):
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns['sequence_id']].item()) if self.selected_columns['sequence_id'] != 'None' else None
-            pair_id = int(exemplar[self.selected_columns['pair_id']].item()) if self.selected_columns['pair_id'] != 'None' else None
-            comment = exemplar[self.selected_columns['comment']].item() if self.selected_columns['comment'] != 'None' else None
 
-            #print(filepath, ext, timestamp, site_id, sequence_id, pair_id, comment)
+            # get capture_id and convert or create new one
+            if self.selected_columns['capture_id'] != 'None':
+                temp_id = int(exemplar[self.selected_columns['capture_id']].item())
+                try:
+                    capture_id = capture_dict[temp_id]
+                except KeyError:
+                    capture_id = self.mpDB.add_capture()
+                    capture_dict[temp_id] = capture_id
+            else:
+                capture_id = self.mpDB.add_capture()
+
+            comment = exemplar[self.selected_columns['comment']].item() if self.selected_columns['comment'] != 'None' else None
 
             media_id = self.mpDB.add_media(filepath, ext, timestamp, site_id,
                                            sequence_id=sequence_id, 
-                                           pair_id=pair_id,
+                                           capture_id=capture_id,
                                            comment=comment)
             # TODO: add dtype checks
             for i, roi in group.iterrows():

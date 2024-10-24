@@ -2,7 +2,7 @@
 Widget for displaying list of Media
 ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 'reviewed', 
 'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'timestamp', 
-'site_id', 'sequence_id', 'pair_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+'site_id', 'sequence_id', 'capture_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 
 # TODO: MAKE TABLE SORTABLE
@@ -29,8 +29,10 @@ class MediaTable(QWidget):
 
         # Create QTableWidget
         self.table = QTableWidget()
-        self.table.setColumnCount(12)  # Columns: Thumbnail, Name, and Description
-        self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", "Species", "Common", "Individual", "Sex", "Site", "Sequence ID", "Favorite", "Comment"])
+        self.table.setColumnCount(13)  # Columns: Thumbnail, Name, and Description
+        self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", 
+                                              "Species", "Common", "Individual", "Sex", 
+                                              "Site", "Sequence ID", "Capture ID", "Favorite", "Comment"])
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setColumnWidth(0, 60) 
         self.table.setColumnWidth(10, 60) 
@@ -120,14 +122,16 @@ class MediaTable(QWidget):
         self.table.setItem(i, 7, QTableWidgetItem(roi["sex"]))  # Sex column
         self.table.setItem(i, 8, QTableWidgetItem(roi["site"]))   # Site column
         self.table.setItem(i, 9, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
+        self.table.setItem(i, 10, QTableWidgetItem(str(roi["capture_id"])))  # Sequence ID column
+        
         
         # Favorite Checkbox
         favorite = QTableWidgetItem()
         favorite.setCheckState(self.check_state(roi["favorite"]))
-        self.table.setItem(i, 10, favorite)   # Comment column
+        self.table.setItem(i, 11, favorite)   # Comment column
 
         # Comment
-        self.table.setItem(i, 11, QTableWidgetItem(roi["comment"]))  # Favorite column
+        self.table.setItem(i, 12, QTableWidgetItem(roi["comment"]))  # Favorite column
         
 
 

@@ -18,8 +18,8 @@ class AnimlThread(QThread):
     def __init__(self, mpDB):
         super().__init__()
         self.mpDB = mpDB
-        media = self.mpDB.select("media", columns="id, filepath, pair_id, sequence_id")
-        self.media = pd.DataFrame(media, columns=["id", "filepath", "pair_id", "sequence_id"])
+        media = self.mpDB.select("media", columns="id, filepath, capture_id, sequence_id")
+        self.media = pd.DataFrame(media, columns=["id", "filepath", "capture_id", "sequence_id"])
         self.image_paths = pd.Series(self.media["filepath"].values,index=self.media["id"]).to_dict() 
 
         self.md_filepath = os.path.join(os.getcwd(), "viewpoint_jaguar.pt")
@@ -40,7 +40,7 @@ class AnimlThread(QThread):
         pass
 
     def get_species(self):
-        # TODO: Utilize probability for pairs/sequences
+        # TODO: Utilize probability for captures/sequences
         self.rois = fetch_roi(self.mpDB)
 
 
