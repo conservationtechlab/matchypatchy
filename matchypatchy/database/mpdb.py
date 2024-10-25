@@ -1,6 +1,7 @@
 '''
 Class Definition for MatchyPatchyDB
 '''
+from typing import Optional
 import sqlite3
 from .setup import setup_database
 from .. import sqlite_vec 
@@ -53,7 +54,7 @@ class MatchyPatchyDB():
             return False
 
     
-    def add_survey(self, name, year_start, year_end, region):
+    def add_survey(self, name: str, year_start: int, year_end: int, region: str):
         """
         
         """
@@ -75,7 +76,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def add_site(self, name, lat, long, survey_id):
+    def add_site(self, name: str, lat: float, long: float, survey_id: int):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -94,7 +95,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def add_species(self, binomen, common):
+    def add_species(self, binomen: str, common: str):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -113,7 +114,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def add_individual(self, species_id, name, sex=None):
+    def add_individual(self, species_id: int, name:str, sex: Optional[str]=None):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -132,8 +133,9 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def add_media(self, filepath, ext, timestamp, site_id, 
-                  sequence_id=None, capture_id=None, comment=None, favorite=0):
+    def add_media(self, filepath: str, ext: str, timestamp: str, site_id: int, 
+                  sequence_id: Optional[int]=None, capture_id: Optional[int]=None, 
+                  comment: Optional[str]=None, favorite: int=0):
         """
         Media has 9 attributes not including id:
             id INTEGER PRIMARY KEY,
@@ -166,8 +168,9 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def add_roi(self, frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                viewpoint=None, reviewed=0, individual_id=0, emb_id=0):
+    def add_roi(self, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float, 
+                media_id: int, species_id: int, viewpoint: Optional[int]=None, reviewed: int=0, 
+                individual_id: int=0, emb_id: int=0):
         # Note difference in variable order, foreign keys
         try:
             db = sqlite3.connect(self.filepath)
@@ -244,7 +247,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def edit_row(self, table, id, replace, quiet=True):
+    def edit_row(self, table: str, id: int, replace: dict, quiet=True):
         """
         Args
             - table (str):
@@ -268,7 +271,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
     
-    def select(self, table, columns="*", row_cond=None, quiet=True):
+    def select(self, table: str, columns: str="*", row_cond: Optional[str]=None, quiet=True):
         try:
             db = sqlite3.connect(self.filepath)
             if table == "roi_emb":
@@ -329,7 +332,6 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-
     def delete(self, table, cond):
         try:
             db = sqlite3.connect(self.filepath)
@@ -366,6 +368,9 @@ class MatchyPatchyDB():
             return False 
         
     def knn(self, query, k=3):
+        """
+        Return the knn for a query embedding
+        """
         try:
             db = sqlite3.connect(self.filepath)
             db.enable_load_extension(True)
