@@ -28,6 +28,30 @@ class MatchyPatchyDB():
         columns = cursor.fetchall()
         print(columns)
         db.close()
+
+
+    def _fetch(self, command):
+        """
+        Execute a specific sql query to fetch data
+        Meant for one-time use 
+        """
+        try:
+            db = sqlite3.connect(self.filepath)
+            db.enable_load_extension(True)
+            sqlite_vec.load(db)
+            db.enable_load_extension(False)
+            cursor = db.cursor()
+            cursor.execute(command)
+            rows = cursor.fetchall()
+            db.commit()
+            db.close()
+            return rows
+        except sqlite3.Error as error:
+            print("Failed to execute fetch.", error)
+            if db:
+                db.close()
+            return False
+
     
     def add_survey(self, name, year_start, year_end, region):
         """

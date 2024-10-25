@@ -36,7 +36,7 @@ class SequenceThread(QThread):
         sequences = []
         current_sequence = []
         seen_pairs = {}
-        for i, image in self.media.iterrows():
+        for _, image in self.media.iterrows():
             if current_sequence:
                 # site is the same, timestamp under threshold, n under threshold
                 if (image['site_id'] == current_sequence[0]['site_id']) and \
@@ -64,9 +64,7 @@ class SequenceThread(QThread):
             sequences.append(current_sequence)
 
         # merge pairs into the same sequence
-        print("Sequences:",len(sequences))
         paired_sequences = [value for value in seen_pairs.values() if len(value) > 1]
-        print(paired_sequences)
         sequences = self.merge_paired_sequences(sequences, paired_sequences)
 
         # update media entries
@@ -76,25 +74,20 @@ class SequenceThread(QThread):
             for image in group:
                 self.mpDB.edit_row('media', image['id'], {"sequence_id":sequence_id})
 
-
     def merge_paired_sequences(self, sequences, pairs):
+        # save index of other element to remove later
         to_remove = []
-
         for pair in pairs:
-            concatenated_list = []
             min_i = min(pair)
-            print('first sequence',len(sequences[min_i]))
             remainder = [p for p in pair if p != min_i]
-            print(min_i, remainder)
             if 0 <= min_i < len(sequences):
                 for index in remainder:
-                    print('second sequence',len(sequences[index]))
                     sequences[min_i] += sequences[index]  # Concatenate the list at the given index
                 to_remove.extend(remainder)
-            print(len(sequences[min_i]))
     
         # remove duplicate sequences
-        for index in to_remove.sort(reverse=True):
+        to_remove.sort(reverse=True)
+        for index in to_remove:
             sequences.pop(index)
 
         return sequences

@@ -1,9 +1,13 @@
 """
 Base Gui View
+
+Note:
+    Because Displays are never deleted, all dialogs must be explicitly deleted
+
 """
 import os
 
-from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog,
+from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
 
@@ -18,7 +22,7 @@ from ..ml.sequence_thread import SequenceThread
 from ..ml.animl_thread import AnimlThread
 from ..ml.miew_thread import MiewThread
 
-from animl.file_management import build_file_manifest
+
 
 # TODO: add download models button/popup
 
@@ -78,7 +82,7 @@ class DisplayBase(QWidget):
         button_csv_process = QPushButton("2. Process")
         button_csv_match = QPushButton("3. Match")
         
-        button_csv_load.clicked.connect(self.upload_csv)
+        button_csv_load.clicked.connect(self.import_csv)
         button_csv_process.clicked.connect(self.process_images)
         button_csv_match.clicked.connect(self.match)
 
@@ -99,6 +103,7 @@ class DisplayBase(QWidget):
         button_folder_validate = QPushButton("3. Validate")
         button_folder_match = QPushButton("4. Match")
 
+        button_folder_load.clicked.connect(self.import_folder)
         button_folder_process.clicked.connect(self.process_images)
         button_folder_validate.clicked.connect(self.validate)
         button_folder_match.clicked.connect(self.match)
@@ -154,7 +159,7 @@ class DisplayBase(QWidget):
         self.parent._set_media_view()
 
     # Upload Button
-    def upload_csv(self):
+    def import_csv(self):
         '''
         Add media from CSV
         '''
@@ -165,6 +170,7 @@ class DisplayBase(QWidget):
         if self.select_survey():
             manifest = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
             if manifest:
+                
                 dialog = ImportCSVPopup(self, manifest)
                 if dialog.exec():
                     del dialog                
@@ -173,18 +179,20 @@ class DisplayBase(QWidget):
             if dialog.exec():
                 del dialog
             
-    def upload_folder(self):
+    def import_folder(self):
         self.mpDB.clear('media')
         self.mpDB.clear('roi')
         self.mpDB.clear('roi_emb')
         if self.select_survey():
             directory = QFileDialog.getExistingDirectory(self, "Open File", os.path.expanduser('~'), QFileDialog.Option.ShowDirsOnly)
+            print(directory)
             if directory:
-                files = build_file_manifest(directory)
-                print(files)
-                dialog = ImportFolderPopup(self, files)
-                if dialog.exec():
-                    del dialog                
+                dialog = ImportFolderPopup(self, directory)
+                if dialog.exec() == QDialog.DialogCode.Rejected:
+                   del dialog
+                   self.import_folder()
+                else:
+                    del dialog 
         else:
             dialog = AlertPopup(self, "Please create a new survey before uploading.")
             if dialog.exec():
@@ -202,13 +210,13 @@ class DisplayBase(QWidget):
         self.sequence_thread.start()
 
         # 2. ANIML (BBOX + SPECIES)
-        #self.animl_thread = AnimlThread(self.mpDB)
-        #self.animl_thread.progress_update.connect(dialog.update)
-        #self.animl_thread.start()
+        self.animl_thread = AnimlThread(self.mpDB)
+        self.animl_thread.progress_update.connect(dialog.update)
+        self.animl_thread.start()
 
-        self.miew_thread = MiewThread(self.mpDB)
-        self.miew_thread.progress_update.connect(dialog.update)
-        self.miew_thread.start()
+        #self.miew_thread = MiewThread(self.mpDB)
+        #self.miew_thread.progress_update.connect(dialog.update)
+        #self.miew_thread.start()
         
         if dialog.exec():
             del dialog
