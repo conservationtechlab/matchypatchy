@@ -2,8 +2,15 @@
 Main Function
 
 '''
-from .gui import main_gui
-from .database import mpdb
+# GET CWD 
+import sys, os
+import logging
+if getattr(sys, 'frozen', False):
+    application_path = os.path.dirname(sys.executable)
+    os.chdir(application_path)
+
+logging.debug('CWD: ' + os.getcwd())
+
 
 # DISABLE HUGGINGFACE
 import requests
@@ -19,7 +26,13 @@ def backend_factory() -> requests.Session:
 configure_http_backend(backend_factory=backend_factory)
 
 
-def main(filepath='matchypatchy.db'):
+# START GUI
+from .gui import main_gui
+from .database import mpdb
+
+def main():
+    filepath = os.path.join(os.getcwd(), 'matchypatchy.db')
+    print(filepath)
     mpDB = mpdb.MatchyPatchyDB(filepath)
     main_gui.main_display(mpDB)
 
