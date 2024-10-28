@@ -168,7 +168,8 @@ class DisplayBase(QWidget):
         self.mpDB.clear('roi')
         self.mpDB.clear('roi_emb')
         if self.select_survey():
-            manifest = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
+            manifest = QFileDialog.getOpenFileName(self, "Open File", 
+                                                   os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
             if manifest:
                 
                 dialog = ImportCSVPopup(self, manifest)
@@ -184,8 +185,9 @@ class DisplayBase(QWidget):
         self.mpDB.clear('roi')
         self.mpDB.clear('roi_emb')
         if self.select_survey():
-            directory = QFileDialog.getExistingDirectory(self, "Open File", os.path.expanduser('~'), QFileDialog.Option.ShowDirsOnly)
-            print(directory)
+            directory = QFileDialog.getExistingDirectory(self, "Open File", 
+                                                         os.path.expanduser('~'), 
+                                                         QFileDialog.Option.ShowDirsOnly)
             if directory:
                 dialog = ImportFolderPopup(self, directory)
                 if dialog.exec() == QDialog.DialogCode.Rejected:
@@ -201,7 +203,7 @@ class DisplayBase(QWidget):
         
     def process_images(self):
         # Figure out how to add loading bar
-        dialog = AlertPopup(self, "Processing Images", title="Processing images...")
+        dialog = AlertPopup(self, "Processing Images", title="Processing images...", progressbar=True)
         dialog.show()
 
         # 1. SEQUENCE 
