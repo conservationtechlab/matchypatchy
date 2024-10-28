@@ -21,71 +21,73 @@ class ImportFolderPopup(QDialog):
         self.mpDB = parent.mpDB
         self.active_survey = parent.active_survey
         self.directory = os.path.normpath(directory)
-
-        self.file_tree = ['None'] + self.directory.split(os.sep)
+        self.data = pd.DataFrame()
 
         self.setWindowTitle('Import from Folder')
         layout = QVBoxLayout()
 
         # Create a label
-        self.label = QLabel("If available, select the directory level associated with Site:")
+        self.label = QLabel("Searching directory...")
         layout.addWidget(self.label)
         layout.addSpacing(5)
 
         # Site
         site_layout = QHBoxLayout()
         self.site = QComboBox()
-        self.site.addItems(self.file_tree)
-        self.site.currentTextChanged.connect(self.select_site)
+        self.site.hide()
         site_layout.addWidget(self.site)
         layout.addLayout(site_layout)
         layout.addSpacing(5)
 
         # Ok/Cancel
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
-        layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
-        buttonBox.accepted.connect(self.build_manifest)  
-        buttonBox.rejected.connect(self.reject)
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.buttonBox.accepted.connect(self.import_manifest)  
+        self.buttonBox.rejected.connect(self.reject)
+        self.buttonBox.hide()
 
         # Progress Bar (hidden at start)
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
         self.setLayout(layout)
 
-
-    def select_site(self):
-        try:
-            self.site_level = self.site.currentIndex()
-            return True
-        except IndexError:
-            return False
-        
-
+        # build manifest
+        self.build_manifest()
+    
+    # 1. Run Thread on entry
     def build_manifest(self):
         # show progress bar
         self.progress_bar.setRange(0, 0)
-        self.progress_bar.show()
-
         self.build_thread = BuildManifestThread(self.directory)
         self.build_thread.manifest.connect(self.get_manifest)
         self.build_thread.start()
 
+    # 2. Receive data from thread, check if valid
     def get_manifest(self, manifest):
-        print(manifest)
         self.progress_bar.hide()
         self.data = manifest
 
         if not self.data.empty:
-            self.import_manifest()
+            self.get_site_level()
         else:
-            dialog = AlertPopup(self, "No images found! Please try another folder.", title="Alert")
+            dialog = AlertPopup(self, "No images found! Choose another directory.", title="Alert")
             if dialog.exec():
                 self.reject()
-        
 
+    # 3. Offer
+    def get_site_level(self):
+        self.label.setText("Select a level in the directory hierarchy that corresponds to site, if available:")
+        self.site.show()
+        self.buttonBox.show()
+
+        example = self.data.loc[0,'FilePath']
+        # get potential site 
+        file_tree = ['None'] + example.split(os.sep)
+        self.site.addItems(file_tree)
+
+    #. 4. Import manifest into media table
     def import_manifest(self):
         """
         Media entry (id, filepath, ext, timestamp, comment, site_id)
@@ -94,14 +96,16 @@ class ImportFolderPopup(QDialog):
         self.progress_bar.setRange(0, len(self.data))
         self.progress_bar.show()
 
-        site_level = 1
+        site_level = self.site.currentIndex()
+        site_level = site_level + 1 if site_level==0 else site_level
 
         print(f"Adding {len(self.data)} files to Database")
 
-        self.import_thread = FolderImportThread(self.mpDB, self.active_survey, self.data, self.site_level)
+        self.import_thread = FolderImportThread(self.mpDB, self.active_survey, self.data, site_level)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
-        self.import_thread.finished.connect(self.close)
+        self.import_thread.finished.connect(self.accept)
         self.import_thread.start()
+
 
 
 
@@ -128,10 +132,9 @@ class FolderImportThread(QThread):
         super().__init__()
         self.mpDB = mpDB
         self.active_survey = active_survey
-
         self.data = data
         self.site_level = site_level
-
+        self.default_site = None
         self.animl_conversion = {"filepath": "FilePath",
                                 "timestamp": "DateTime"}    
         
@@ -139,8 +142,8 @@ class FolderImportThread(QThread):
     def run(self):
         for i, file in self.data.iterrows():
 
-            filepath = file[self.animl_conversion['filepath']].item()
-            timestamp = file[self.animl_conversion['timestamp']].item()
+            filepath = file[self.animl_conversion['filepath']]
+            timestamp = file[self.animl_conversion['timestamp']]
 
             # check to see if file exists 
             if not os.path.exists(filepath):
@@ -152,8 +155,7 @@ class FolderImportThread(QThread):
             
             # get remaining information
             if self.site_level > 0:
-                site_name = os.path.normpath(filepath).split(os.sep)[self.site_level + 1]
-                print(site_name)
+                site_name = os.path.normpath(filepath).split(os.sep)[self.site_level]
                 try:
                     site_id = self.mpDB.select("site", columns='id', row_cond=f'name="{site_name}"')[0][0]
                 except IndexError:
@@ -163,7 +165,10 @@ class FolderImportThread(QThread):
                     self.default_site = self.mpDB.add_site("None", None, None, int(self.active_survey[0]))
                 site_id = self.default_site
 
-            media_id = self.mpDB.add_media(filepath, ext, timestamp, site_id,
+            # insert into table, force type
+            media_id = self.mpDB.add_media(filepath, ext, 
+                                           str(timestamp), 
+                                           int(site_id),
                                            sequence_id=None, 
                                            capture_id=None,
                                            comment=None)
@@ -172,4 +177,3 @@ class FolderImportThread(QThread):
 
         # finished adding media
         self.finished.emit()
-
