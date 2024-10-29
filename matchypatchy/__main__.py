@@ -9,7 +9,11 @@ if getattr(sys, 'frozen', False):
     application_path = os.path.dirname(sys.executable)
     os.chdir(application_path)
 
-logging.debug('CWD: ' + os.getcwd())
+
+# SET UP LOGGING
+LOGFILE = os.path.join(os.getcwd(),'matchpatchy.log')
+logging.basicConfig(filename=LOGFILE, encoding='utf-8', level=logging.DEBUG, force=True) 
+logging.info('CWD: ' + os.getcwd())
 
 
 # DISABLE HUGGINGFACE
@@ -32,7 +36,7 @@ from .database import mpdb
 
 def main():
     filepath = os.path.join(os.getcwd(), 'matchypatchy.db')
-    print(filepath)
+    logging.info('mpDB: ' + filepath)
     mpDB = mpdb.MatchyPatchyDB(filepath)
     main_gui.main_display(mpDB)
 
