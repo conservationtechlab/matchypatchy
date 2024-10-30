@@ -206,11 +206,11 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO roi
-                        (frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                        media_id, species_id, individual_id, emb_id) 
+                        (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
+                         species_id, viewpoint, reviewed, individual_id, emb_id) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                          media_id, species_id, individual_id, emb_id)
+            data_tuple = (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
+                         species_id, viewpoint, reviewed, individual_id, emb_id)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
