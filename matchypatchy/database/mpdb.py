@@ -2,6 +2,7 @@
 Class Definition for MatchyPatchyDB
 '''
 from typing import Optional
+import logging
 import sqlite3
 from .setup import setup_database
 from .. import sqlite_vec 
@@ -49,6 +50,7 @@ class MatchyPatchyDB():
             return rows
         except sqlite3.Error as error:
             print("Failed to execute fetch.", error)
+            logging.error("Failed to execute fetch." + error)
             if db:
                 db.close()
             return False
@@ -56,7 +58,11 @@ class MatchyPatchyDB():
     
     def add_survey(self, name: str, year_start: int, year_end: int, region: str):
         """
-        
+        Add a survey with
+            - name (str) Not Null
+            - year_start (int) Not Null
+            - year_end (int)
+            - region (str)
         """
         try:
             db = sqlite3.connect(self.filepath)
@@ -72,11 +78,19 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add survey", error)
+            logging.error("Failed to add survey: " + error)
             if db:
                 db.close()
             return False
         
     def add_site(self, name: str, lat: float, long: float, survey_id: int):
+        """
+        Add a site with
+            - name
+            - lat
+            - long
+            - survey_id
+        """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -91,11 +105,17 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add site", error)
+            logging.error("Failed to add site: " + error)
             if db:
                 db.close()
             return False
         
     def add_species(self, binomen: str, common: str):
+        """
+        Add species with
+            - binomen (str): Scientific name
+            - common (str): common name 
+        """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -110,11 +130,18 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add species", error)
+            logging.error("Failed to add species: " + error)
             if db:
                 db.close()
             return False
         
     def add_individual(self, species_id: int, name:str, sex: Optional[str]=None):
+        """
+        Add an individual with
+            - species_id
+            - name
+            - sex
+        """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -129,6 +156,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add individual", error)
+            logging.error("Failed to add individual: " + error)
             if db:
                 db.close()
             return False
@@ -164,14 +192,16 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print(f"Failed to add media: {filepath}.", error)
+            logging.error("Failed to add media: " + error)
             if db:
                 db.close()
             return False
         
-    def add_roi(self, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float, 
-                media_id: int, species_id: int, viewpoint: Optional[int]=None, reviewed: int=0, 
-                individual_id: int=0, emb_id: int=0):
+    def add_roi(self, media_id: int, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
+                species_id:  Optional[int]=None, viewpoint: Optional[str]=None, reviewed: int=0, 
+                individual_id: Optional[int]=None, emb_id: int=0):
         # Note difference in variable order, foreign keys
+
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -188,6 +218,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print(f"Failed to add roi for media: {media_id}.", error)
+            logging.error("Failed to add roi: " + error)
             if db:
                 db.close()
             return False
@@ -209,6 +240,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add embedding.", error)
+            logging.error("Failed to add embedding: " + error)
             if db:
                 db.close()
             return False
@@ -226,6 +258,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print(f"Failed to add sequence.", error)
+            logging.error("Failed to add sequence: " + error)
             if db:
                 db.close()
             return False
@@ -243,6 +276,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print(f"Failed to add capture.", error)
+            logging.error("Failed to add capture: " + error)
             if db:
                 db.close()
             return False
@@ -267,6 +301,7 @@ class MatchyPatchyDB():
             return True
         except sqlite3.Error as error:
             print("Failed to update table", error)
+            logging.error("Failed to update table: " + error)
             if db:
                 db.close()
             return False
@@ -290,6 +325,7 @@ class MatchyPatchyDB():
             return rows
         except sqlite3.Error as error:
             print("Failed to fetch", error)
+            logging.error("Failed fetch: " + error)
             if db:
                 db.close()
             return False
@@ -307,6 +343,7 @@ class MatchyPatchyDB():
             return rows, column_names
         except sqlite3.Error as error:
             print("Failed to fetch", error)
+            logging.error("Failed fetch: " + error)
             if db:
                 db.close()
             return False
@@ -328,6 +365,7 @@ class MatchyPatchyDB():
             return rows, column_names
         except sqlite3.Error as error:
             print("Failed to fetch", error)
+            logging.error("Failed all_media fetch:" + error)
             if db:
                 db.close()
             return False
@@ -343,6 +381,7 @@ class MatchyPatchyDB():
             return True
         except sqlite3.Error as error:
             print("Failed to delete", error)
+            logging.error("Failed delete: " + error)
             if db:
                 db.close()
             return False 
@@ -363,6 +402,25 @@ class MatchyPatchyDB():
             return True
         except sqlite3.Error as error:
             print(f"Failed to clear {table}", error)
+            logging.error(f"Failed to clear {table}: " + error)
+            if db:
+                db.close()
+            return False 
+        
+    def count(self, table):
+        """
+        Return the number of entries in a given table
+        """
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            row_count = cursor.fetchone()[0]
+            db.close()
+            return row_count
+        except sqlite3.Error as error:
+            print(f"Failed to count for {table}", error)
+            logging.error(f"Failed to count for {table}:" + error)
             if db:
                 db.close()
             return False 
@@ -388,10 +446,12 @@ class MatchyPatchyDB():
             data_tuple = (query,k)
             cursor.execute(command,data_tuple)
             results = cursor.fetchall()
+            db.close()
             return results
 
         except sqlite3.Error as error:
-            print(f"Failed to get knn for ROI", error)
+            print("Failed to get knn for ROI", error)
+            logging.error("Failed to get knn for ROI" + error)
             if db:
                 db.close()
             return False 

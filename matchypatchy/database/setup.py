@@ -48,15 +48,15 @@ def setup_database(filepath='matchypatchy.db'):
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
                         id INTEGER PRIMARY KEY,
+                        media_id INTEGER NOT NULL,
                         frame INTEGER NOT NULL,
                         bbox_x REAL NOT NULL,
                         bbox_y REAL NOT NULL,
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
+                        species_id INTEGER,
                         viewpoint TEXT,
                         reviewed INTEGER NOT NULL,
-                        media_id INTEGER NOT NULL,
-                        species_id INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb_id INTEGER,
                         FOREIGN KEY(media_id) REFERENCES media (id)

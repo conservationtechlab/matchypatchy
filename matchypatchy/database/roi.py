@@ -20,11 +20,12 @@ def fetch_roi(mpDB):
     """
     manifest = mpDB.select("roi")
     if manifest:
-        rois = pd.DataFrame(manifest, columns=["id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
-                                              "viewpoint", "reviewed", "media_id", "species_id",  "individual_id", "emb_id"])
+        rois = pd.DataFrame(manifest, columns=["id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
+                                               "species_id", "viewpoint", "reviewed", "individual_id", "emb_id"])
         return rois
     else:
         return False
+
 
     
 def fetch_roi_media(mpDB):
