@@ -91,7 +91,7 @@ class MediaTable(QWidget):
         self.fetch()  
         
         self.parent.loading_bar.show()
-
+        self.table.clearContents() 
         self.table.setRowCount(len(self.data))  
         # load images
         self.image_loader_thread = LoadThumbnailThread(self.data, self.crop)

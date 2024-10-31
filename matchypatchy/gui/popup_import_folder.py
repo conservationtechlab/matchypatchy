@@ -98,7 +98,7 @@ class ImportFolderPopup(QDialog):
         self.progress_bar.show()
 
         site_level = self.site.currentIndex()
-        site_level = site_level + 1 if site_level==0 else site_level
+        site_level = site_level if site_level==0 else site_level - 1 
 
         print(f"Adding {len(self.data)} files to Database")
 
