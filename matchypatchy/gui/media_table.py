@@ -5,18 +5,25 @@ Widget for displaying list of Media
 'site_id', 'sequence_id', 'capture_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 
-# TODO: MAKE TABLE SORTABLE
 # TODO: MAKE TABLE EDITABLE
 # TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
+# TODO: MAKE THUMBNAIL LOAD FASTER
 
-
+import tempfile
 import pandas as pd
+from PIL import Image
 
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
+from ..config import TEMPDIR
+from .popup_alert import AlertPopup
+from ..database.media import fetch_media
+
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
+
+
 
 class MediaTable(QWidget):
 
@@ -24,6 +31,13 @@ class MediaTable(QWidget):
         super().__init__(parent)
         self.mpDB = parent.mpDB
         self.parent = parent
+        self.data = pd.DataFrame()
+        self.thumbnails = dict()
+        self.crop = True
+        self.edits = list()
+        self.columns = ["reviewed","thumbnail", "filepath", "timestamp", 
+                        "binomen", "common", "individual_id", "sex", 
+                        "site", "sequence_id", "capture_id", "favorite", "comment"]
         # Set up layout
         layout = QVBoxLayout()
 
@@ -36,21 +50,65 @@ class MediaTable(QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.setColumnWidth(0, 60) 
         self.table.setColumnWidth(10, 60) 
+        self.table.setSortingEnabled(True)
+        self.table.itemChanged.connect(self.update_entry)  # allow user editing
+
         # Add table to the layout
         layout.addWidget(self.table)
         self.setLayout(layout)
+
 
     def fetch(self):
         """
         Select all media, store in dataframe
         """
-        media, column_names = self.mpDB.all_media()
-        self.data = pd.DataFrame(media, columns=column_names)
+        roi_n = self.mpDB.count('roi')        
+        if roi_n > 0:
+            media, column_names = self.mpDB.all_media()
+            self.data = pd.DataFrame(media, columns=column_names)  
+        # no rois processed, default to full image
+        else:
+            self.data = fetch_media(self.mpDB)
+            self.crop = False  # display full image
+            if not self.data.empty:
+                # fill in missing columns
+                self.data =self.data.assign(reviewed=0, binomen=None, common=None, 
+                                            name=None, sex=None, individual_id=0)
+            else: 
+                # no media, give warning, go home
+                self.parent.loading_bar.close()
+                dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
+                if dialog.exec():
+                    self.parent.home()
+                    del dialog
+
+        # set df index to table index
+        #self.data = self.data.set_index("id")
+
+    # RUN ON ENTRY
+    def load(self):
+        """
+        Fetch table, load images and save as thumbnails to tempdir
+        """
+        self.fetch()  
+        
+        self.parent.loading_bar.show()
+
+        self.table.setRowCount(len(self.data))  
+        # load images
+        self.image_loader_thread = LoadThumbnailThread(self.data, self.crop)
+        self.image_loader_thread.progress_update.connect(self.parent.loading_bar.set_counter)
+        self.image_loader_thread.loaded_image.connect(self.add_thumbnail_path)
+        self.image_loader_thread.finished.connect(self.filter)
+        self.image_loader_thread.start()
+
 
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
+        Always run before updating table
         """
+        # create new copy of full dataset
         self.data_filtered = self.data
         # Survey Filter
         if self.parent.valid_sites:
@@ -66,51 +124,78 @@ class MediaTable(QWidget):
         # Species Filter
         if self.parent.active_species[0] > 0:
             self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == self.parent.active_species[0]]
-        
-    def update(self):
+
+        # Unidentified Filter
+        if self.parent.unidentified_only:
+            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == 0]
+
+        if self.parent.favorites_only:
+            self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
+
+        # refresh table
+        self.refresh_table()
+
+    def refresh_table(self):
         """
-        Fetch and Filter data, Update table
+        Add rows to table
         """
-        self.fetch()
-        self.filter()
+        # clear old contents and prep for filtered data
+        self.table.clearContents() 
+        # disconnect edit function while refreshing to prevent needless calls
+        self.table.blockSignals(True)  
+        self.table.setRowCount(self.data_filtered.shape[0])
+        for i in range(self.data_filtered.shape[0]):
+            self.add_row(i)
+        self.table.blockSignals(False)  # reconnect editing
+        print(self.data_filtered)
+       
+    # TODO: UPDATE ENTRIES
+    def update_entry(self, item): 
+        """
+        Allows user to edit entry in table 
 
-        self.table.setRowCount(len(self.data_filtered))  
-        self.image_loader_thread = LoadThumbnailThread(self.data_filtered)
+        Save edits in queue, allow undo 
+        prompt user to save edits 
+        """
+        entry = item.row()
+        reference = self.columns[item.column()]
+        print(entry,reference)
+        # if checkbox
+        if item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
+            print(item.checkState() == Qt.CheckState.Checked)
+        # else is text
+        else:
+            print(self.data_filtered.at[entry, reference])
+            # convert row and column to 
+            print(item.text())  
 
-        # Connect signals from the thread to the main thread
-        self.image_loader_thread.progress_update.connect(self.parent.loading_bar.set_counter)
-        self.image_loader_thread.image_loaded.connect(self.add_row)
-        self.image_loader_thread.start()
-
-        # enable checkboxes
-        #self.table.itemChanged.connect(self.on_checkbox_change)
+        # add to queue
     
-    def check_state(self, item):
+    def set_check_state(self, item):
         """
         Set the checkbox of reviewed and favorite columns
+        when adding rows
         """
         if item:
             return Qt.CheckState.Checked
         else:
             return Qt.CheckState.Unchecked
 
-
-    def on_checkbox_change(self, item): 
-        #print(item.row(),item.column())
-        pass
-        # update database  
-
-    def add_row(self, i, thumbnail):
+    def add_row(self, i):
         roi = self.data_filtered.iloc[i]
         self.table.setRowHeight(i, 100)
         # Reviewed Checkbox
         reviewed = QTableWidgetItem()
-        reviewed.setCheckState(self.check_state(roi["reviewed"]))
+        reviewed.setFlags(reviewed.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+        reviewed.setCheckState(self.set_check_state(roi["reviewed"]))
+
         self.table.setItem(i, 0, reviewed)  # Thumbnail column
 
         # Thumbnail
+        thumbnail = QImage(roi['thumbnail_path'])
+        pixmap = QPixmap.fromImage(thumbnail)
         label = QLabel()
-        label.setPixmap(thumbnail)
+        label.setPixmap(pixmap)
         self.table.setCellWidget(i, 1, label)
         
         # Data
@@ -124,37 +209,39 @@ class MediaTable(QWidget):
         self.table.setItem(i, 9, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
         self.table.setItem(i, 10, QTableWidgetItem(str(roi["capture_id"])))  # Sequence ID column
         
-        
         # Favorite Checkbox
         favorite = QTableWidgetItem()
-        favorite.setCheckState(self.check_state(roi["favorite"]))
+        favorite.setFlags(favorite.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+        favorite.setCheckState(self.set_check_state(roi["favorite"]))
         self.table.setItem(i, 11, favorite)   # Comment column
 
         # Comment
         self.table.setItem(i, 12, QTableWidgetItem(roi["comment"]))  # Favorite column
-        
+
+    # adds emitted temp thumbnail path to data 
+    def add_thumbnail_path(self, i, thumbnail_path):
+        self.data.loc[i,'thumbnail_path'] = thumbnail_path
 
 
 class LoadThumbnailThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
-    image_loaded = pyqtSignal(int, QPixmap)
+    loaded_image = pyqtSignal(int, str)
 
-    def __init__(self, data_filtered, crop=True):
+    def __init__(self, data, crop=True):
         super().__init__()
-        self.data_filtered = data_filtered
+        self.data = data
         self.crop = crop
         self.size = 99
     
     def run(self):
-        for i, roi in self.data_filtered.iterrows():
+        for i, roi in self.data.iterrows():
             # load image
             self.original = QImage(roi['filepath'])
-
-            # image not found
+            # image not found, use placeholder
             if self.original.isNull():
                 self.image = QImage(THUMBNAIL_NOTFOUND)
-
             else:
+                # crop for rois
                 if self.crop:
                     left = self.original.width() * roi['bbox_x']
                     top = self.original.height() * roi['bbox_y']
@@ -162,14 +249,19 @@ class LoadThumbnailThread(QThread):
                     bottom = self.original.height() * roi['bbox_h']
                     crop_rect = QRect(int(left), int(top), int(right), int(bottom))
                     self.image = self.original.copy(crop_rect)
-
+                # no crop for media
                 else:
                     self.image = self.original.copy()
-
+            # scale it to 99x99
             scaled_image = self.image.scaled(self.size, self.size,
                                             Qt.AspectRatioMode.KeepAspectRatio, 
                                             Qt.TransformationMode.SmoothTransformation)
-            pixmap = QPixmap.fromImage(scaled_image)
-
-            self.image_loaded.emit(i, pixmap)
-            self.progress_update.emit(int((i + 1) / len(self.data_filtered) * 100))
+            
+            # create a temporary file to hold thumbnail
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
+                temp_file_path = temp_file.name 
+            # save the image
+            scaled_image.save(temp_file_path, format="JPG")
+            # emit thumbnail_path and progress update
+            self.loaded_image.emit(i, temp_file_path)
+            self.progress_update.emit(int((i + 1) / len(self.data) * 100))
