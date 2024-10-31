@@ -23,7 +23,6 @@ from ..ml.animl_thread import AnimlThread
 from ..ml.miew_thread import MiewThread
 
 
-
 # TODO: add download models button/popup
 
 class DisplayBase(QWidget):
@@ -158,7 +157,6 @@ class DisplayBase(QWidget):
     def manage_media(self):
         self.parent._set_media_view()
 
-    # Upload Button
     def import_csv(self):
         '''
         Add media from CSV
@@ -181,6 +179,9 @@ class DisplayBase(QWidget):
                 del dialog
             
     def import_folder(self):
+        """
+        Add media from a folder
+        """
         self.mpDB.clear('media')
         self.mpDB.clear('roi')
         self.mpDB.clear('roi_emb')
@@ -202,7 +203,10 @@ class DisplayBase(QWidget):
 
         
     def process_images(self):
-        # Figure out how to add loading bar
+        """
+        Processes Sequence, MD, Animl, Viewpoint, Miew
+        For any image/roi that doesn't have values for those already
+        """
         dialog = AlertPopup(self, "Processing Images", title="Processing images...", progressbar=True)
         dialog.show()
 
