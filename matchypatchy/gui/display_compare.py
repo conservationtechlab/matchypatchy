@@ -9,11 +9,11 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 
-from ..database.roi import (fetch_roi_media, match, rank, get_bbox, roi_metadata, get_sequence)
-from ..database.individual import merge
+from matchypatchy.database.roi import (fetch_roi_media, match, rank, get_bbox, roi_metadata, get_sequence)
+from matchypatchy.database.individual import merge
 
-from .widget_image import ImageWidget
-from .popup_alert import AlertPopup
+from matchypatchy.gui.widget_image import ImageWidget
+from matchypatchy.gui.popup_alert import AlertPopup
 
 class DisplayCompare(QWidget):
     def __init__(self, parent):

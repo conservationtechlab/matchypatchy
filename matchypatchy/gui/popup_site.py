@@ -2,7 +2,7 @@
 
 """
 from PyQt6 import QtCore, QtWidgets
-from .popup_alert import AlertPopup
+from matchypatchy.gui.popup_alert import AlertPopup
 
 class SitePopup(QtWidgets.QDialog):
     def __init__(self, parent):

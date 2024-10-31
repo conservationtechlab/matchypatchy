@@ -1,3 +1,14 @@
+"""
+MAIN GUI
+
+Functions for MenuBar
+
+Display Pages:
+    1. DisplayBase
+    2. DisplayMedia
+    3. DisplayCompare
+    4. DisplaySingle
+"""
 import sys
 import os
 
@@ -5,15 +16,15 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction
 
-from .display_base import DisplayBase
-from .display_media import DisplayMedia
-from .display_compare import DisplayCompare
-from .display_single import DisplaySingle
-from .popup_table import TableEditorPopup
-from .popup_dropdown import DropdownPopup
+from matchypatchy.gui.display_base import DisplayBase
+from matchypatchy.gui.display_media import DisplayMedia
+from matchypatchy.gui.display_compare import DisplayCompare
+from matchypatchy.gui.display_single import DisplaySingle
+from matchypatchy.gui.popup_table import TableEditorPopup
+from matchypatchy.gui.popup_dropdown import DropdownPopup
 
-from ..database import site
-from ..database import species
+from matchypatchy.database import site
+from matchypatchy.database import species
 
 
 class MainWindow(QMainWindow):
@@ -102,8 +113,8 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
         self.Media.refresh_filters() 
-        self.Media.connect()
-        self.Media.update_table()
+        self.Media.connect_filters()
+        self.Media.load_table()
 
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)

@@ -3,15 +3,15 @@
 '''
 from PyQt6 import QtCore, QtWidgets
 
-from .popup_alert import AlertPopup
-from .popup_survey import SurveyFillPopup
-from .popup_site import SiteFillPopup
-from .popup_species import SpeciesFillPopup
+from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.popup_survey import SurveyFillPopup
+from matchypatchy.gui.popup_site import SiteFillPopup
+from matchypatchy.gui.popup_species import SpeciesFillPopup
 
-from ..database import survey 
-from ..database import site  
-from ..database import species 
-from ..database import media 
+from matchypatchy.database import survey 
+from matchypatchy.database import site  
+from matchypatchy.database import species 
+from matchypatchy.database import media 
 
 
 class TableEditorPopup(QtWidgets.QDialog):

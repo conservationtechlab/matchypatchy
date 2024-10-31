@@ -1,5 +1,6 @@
-from PIL import Image
-from PIL.ImageQt import ImageQt
+"""
+Custom Widget for Displaying an Image
+"""
 
 from PyQt6.QtWidgets import QLabel
 from PyQt6.QtGui import QPixmap, QPainter, QImage
@@ -58,3 +59,7 @@ class ImageWidget(QLabel):
     
     def resizeEvent(self, event):
         super().resizeEvent(event)
+
+    # TODO:
+    # def zoom(self):
+    # def adjust_contrast(self):

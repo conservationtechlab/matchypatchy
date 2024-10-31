@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
                              QComboBox, QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-from .popup_alert import AlertPopup
+from matchypatchy.gui.popup_alert import AlertPopup
 
 from animl.file_management import build_file_manifest
 
@@ -126,7 +126,6 @@ class BuildManifestThread(QThread):
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     
-
     def __init__(self, mpDB, active_survey, data, site_level):
         super().__init__()
         self.mpDB = mpDB

@@ -11,22 +11,20 @@ Widget for displaying list of Media
 
 import tempfile
 import pandas as pd
-from PIL import Image
 
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
-from ..config import TEMPDIR
-from .popup_alert import AlertPopup
-from ..database.media import fetch_media
+from matchypatchy.config import TEMPDIR
+from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.database.media import fetch_media
 
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
 
 
 
 class MediaTable(QWidget):
-
     def __init__(self, parent):
         super().__init__(parent)
         self.mpDB = parent.mpDB

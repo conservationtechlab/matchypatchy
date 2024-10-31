@@ -37,14 +37,12 @@ class DropdownPopup(QDialog):
 
         self.get_options()
 
-
     def select(self):
         try:
             self.selected_option = self.list[self.combo.currentIndex()]
             return True
         except IndexError:
             return False
-
 
     def get_options(self):
         options = self.parent.mpDB.select(self.table, columns = f"id, {self.column}")

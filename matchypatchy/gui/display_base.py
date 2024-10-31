@@ -11,16 +11,16 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
 
-from .popup_survey import SurveyFillPopup
-from .popup_site import SitePopup
-from .popup_alert import AlertPopup
-from .popup_species import SpeciesPopup
-from .popup_import_csv import ImportCSVPopup
-from .popup_import_folder import ImportFolderPopup
+from matchypatchy.gui.popup_survey import SurveyFillPopup
+from matchypatchy.gui.popup_site import SitePopup
+from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.popup_species import SpeciesPopup
+from matchypatchy.gui.popup_import_csv import ImportCSVPopup
+from matchypatchy.gui.popup_import_folder import ImportFolderPopup
 
-from ..ml.sequence_thread import SequenceThread
-from ..ml.animl_thread import AnimlThread
-from ..ml.miew_thread import MiewThread
+from matchypatchy.ml.sequence_thread import SequenceThread
+from matchypatchy.ml.animl_thread import AnimlThread
+from matchypatchy.ml.miew_thread import MiewThread
 
 
 # TODO: add download models button/popup

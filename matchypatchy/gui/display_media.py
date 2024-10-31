@@ -5,8 +5,8 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox)
 from PyQt6.QtCore import Qt
 
-from .media_table import MediaTable
-from .widget_progressbar import ProgressPopup
+from matchypatchy.gui.media_table import MediaTable
+from matchypatchy.gui.popup_alert import ProgressPopup
 
 
 class DisplayMedia(QWidget):
@@ -115,14 +115,15 @@ class DisplayMedia(QWidget):
         self.active_individual = self.individual_list_ordered[self.individual_select.currentIndex()]
 
     # 2. RUN ON ENTRY
-    def connect(self):
+    def connect_filters(self):
+        # connect combobox selection AFTER they've been populated
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         self.site_select.currentIndexChanged.connect(self.select_site)
         self.species_select.currentIndexChanged.connect(self.select_species)
         self.individual_select.currentIndexChanged.connect(self.select_individual)
 
     # 3. RUN ON ENTRY
-    def update_table(self):
+    def load_table(self):
         self.loading_bar = ProgressPopup(self, "Loading images...")
         self.media_table.load()
 
