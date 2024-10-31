@@ -40,7 +40,7 @@ def setup_database(filepath='matchypatchy.db'):
                         sequence_id INTEGER,
                         capture_id INTEGER,
                         comment TEXT,
-                        favorite INTEGER,
+                        favorite INTEGER NOT NULL,
                         FOREIGN KEY (site_id) REFERENCES site (id),
                         FOREIGN KEY (sequence_id) REFERENCES sequence (id),
                         FOREIGN KEY (capture_id) REFERENCES capture (id) )''')
