@@ -64,14 +64,14 @@ class AnimlThread(QThread):
             bbox_h = roi['bbox4']
 
             # species, viewpoint, individual TBD
-            species_id = -1
+            species_id = None
             viewpoint = None
             individual_id = None
 
                 # do not add emb_id, to be determined later
-            self.mpDB.add_roi(frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                              media_id, species_id, viewpoint=viewpoint,
-                              reviewed=0, individual_id=individual_id, emb_id=0)
+            self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
+                              species_id, viewpoint=viewpoint, reviewed=0, 
+                              individual_id=individual_id, emb_id=0)
     
     def get_species(self):
         # TODO: Utilize probability for captures/sequences

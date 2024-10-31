@@ -12,6 +12,7 @@ from .popup_alert import AlertPopup
 
 from animl.file_management import build_file_manifest
 
+
 columns=["filepath", "timestamp", 'site_id', 'sequence_id', "capture_id", 'comment',
          "viewpoint", "species_id", "individual_id"]
 
@@ -107,8 +108,6 @@ class ImportFolderPopup(QDialog):
         self.import_thread.start()
 
 
-
-
 class BuildManifestThread(QThread):
     """
     Thread for launching 
@@ -137,7 +136,6 @@ class FolderImportThread(QThread):
         self.default_site = None
         self.animl_conversion = {"filepath": "FilePath",
                                 "timestamp": "DateTime"}    
-        
 
     def run(self):
         for i, file in self.data.iterrows():
@@ -172,7 +170,7 @@ class FolderImportThread(QThread):
                                            sequence_id=None, 
                                            capture_id=None,
                                            comment=None)
-            
+
             self.progress_update.emit(i)
 
         # finished adding media

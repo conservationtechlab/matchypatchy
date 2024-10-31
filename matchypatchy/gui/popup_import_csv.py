@@ -346,7 +346,7 @@ class CSVImportThread(QThread):
                     except IndexError:
                         species_id = self.mpDB.add_species("Taxon not specified", str(species_name))
                 else: # no species
-                    species_id = -1
+                    species_id = None
 
                 # viewpoint
                 viewpoint = roi[self.selected_columns['viewpoint']] if self.selected_columns['viewpoint'] != 'None' else None
@@ -366,9 +366,9 @@ class CSVImportThread(QThread):
                 reviewed = 1 if individual_id is not None else 0
 
                 # do not add emb_id, to be determined later
-                roi_id = self.mpDB.add_roi(frame, bbox_x, bbox_y, bbox_w, bbox_h, media_id, species_id,
-                                  viewpoint=viewpoint, reviewed=reviewed, 
-                                  individual_id=individual_id, emb_id=0)
+                roi_id = self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,  
+                                           species_id, viewpoint=viewpoint, reviewed=reviewed, 
+                                           individual_id=individual_id, emb_id=0)
                 roi_counter += 1
                 self.progress_update.emit(roi_counter)
 
