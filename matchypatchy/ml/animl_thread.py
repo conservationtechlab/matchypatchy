@@ -5,11 +5,11 @@ Thread Class for Processing BBox and Species Classification
 import os
 import pandas as pd
 import logging
-from animl import matchypatchy as animl_mp
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ..database.roi import (fetch_roi, match)
+from matchypatchy.database.roi import (fetch_roi, match)
+from animl import matchypatchy as animl_mp
 
 FRAME_DIR = os.path.join(os.getcwd(), "Frames")
 logging.debug('FRAME_DIR: ' + FRAME_DIR)

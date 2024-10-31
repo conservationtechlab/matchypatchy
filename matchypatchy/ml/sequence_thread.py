@@ -6,11 +6,11 @@ some mismatch between camera timestamps and they won't be exactly the same
 
 """
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from ..database.media import fetch_media, IMAGE_EXT
+from matchypatchy.database.media import fetch_media, IMAGE_EXT
 
 
 # TODO: what to do if sequence_id already exists? 
