@@ -1,11 +1,12 @@
 '''
 Class Definition for MatchyPatchyDB
 '''
-from typing import Optional
 import logging
+from typing import Optional
 import sqlite3
-from .setup import setup_database
-from .. import sqlite_vec 
+
+from matchypatchy.database.setup import setup_database
+from matchypatchy import sqlite_vec 
 
 
 class MatchyPatchyDB():
@@ -371,6 +372,9 @@ class MatchyPatchyDB():
             return False
 
     def delete(self, table, cond):
+        """
+        Delete Entries From table Given condition
+        """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -387,6 +391,9 @@ class MatchyPatchyDB():
             return False 
         
     def clear(self, table):
+        """
+        Clear a table without dropping it
+        """
         try:
             db = sqlite3.connect(self.filepath)
             # enable clear vec database

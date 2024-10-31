@@ -1,14 +1,16 @@
+"""
+Functions for Managing Species Table
+"""
 import pandas as pd
 
 def fetch_species(mpDB):
     """
-    Fetches sites associated with given survey, checks that they have unique names,
+    Fetches species Table, Converts to DataFrame
 
     Args
         - mpDB
-        - survey_id (int): requested survey id 
     Returns
-        - an inverted dictionary in order to match manifest site names to table id
+        - dataframe of species table
     """
 
     species = mpDB.select("species")
@@ -17,15 +19,15 @@ def fetch_species(mpDB):
         return pd.DataFrame(species, columns=["id", "binomen", "common"])
     else:  # return empty
         return pd.DataFrame(columns=["id", "binomen", "common"])
-    
-
-def user_editable_rows():
-    return [1,2]
 
 
 def import_csv(mpDB, file_path):
     """
-    Media entry (id, filepath, ext, timestamp, comment, site_id)
+    Species CSV entry (id, binomen, common)
+
+    Args
+        - mpDB
+        - file_path (str): path to csv of species 
     """
     # TODO: Check not none
     species_list = pd.read_csv(file_path)

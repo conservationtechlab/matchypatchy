@@ -1,8 +1,12 @@
+"""
+Functions for Managing Site Table
+"""
 import pandas as pd
+
 
 def fetch_sites(mpDB, survey_id=None):
     """
-    Fetches sites associated with given survey, checks that they have unique names,
+    Fetches sites associated with given survey, Converts to DataFrame
 
     Args
         - mpDB
@@ -19,10 +23,6 @@ def fetch_sites(mpDB, survey_id=None):
         return pd.DataFrame(sites, columns=["id", "name", "lat", "long", "survey_id"])
     else:  # return empty
         return pd.DataFrame(columns=["id", "name", "lat", "long", "survey_id"])
-    
-
-def user_editable_rows():
-    return [1,2,3]
 
 
 def import_csv(mpDB, file_path, survey_id):

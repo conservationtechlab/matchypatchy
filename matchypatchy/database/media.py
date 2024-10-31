@@ -1,13 +1,12 @@
 """
 Functions for Importing and Manipulating Media
 """
-
 import pandas as pd
-from datetime import datetime, timedelta
 
 
 IMAGE_EXT = ['.jpg','.jpeg','.png','.bmp','.tif', '.tiff']
 VIDEO_EXT = ['.avi','.mp4','.wmv','.mov']
+
 
 def fetch_media(mpDB):
     """
@@ -26,8 +25,3 @@ def fetch_media(mpDB):
         media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", 'site_id',
                                              'sequence_id', "capture_id", 'comment', 'favorite'])
     return media 
-
-
-
-def user_editable_rows():
-    return [1,2,3,4,5,6]

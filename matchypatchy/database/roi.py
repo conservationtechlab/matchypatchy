@@ -1,7 +1,6 @@
 """
 Functions for Manipulating and Processing ROIs
 """
-
 import pandas as pd
 
 
@@ -26,17 +25,19 @@ def fetch_roi(mpDB):
     else:
         return False
 
-
     
 def fetch_roi_media(mpDB):
-        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 
-                   'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id', 
-                   'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'capture_id',
-                    'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
-        media, column_names = mpDB.all_media()
-        rois = pd.DataFrame(media, columns=column_names)
-        rois = rois.set_index("id")
-        return rois
+    """
+    Fetch Info for Media Table 
+    """
+    columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 
+                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id', 
+                'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'capture_id',
+                'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+    media, column_names = mpDB.all_media()
+    rois = pd.DataFrame(media, columns=column_names)
+    rois = rois.set_index("id")
+    return rois
 
 
 def roi_knn(mpDB, emb_id, k=5):
@@ -96,6 +97,7 @@ def filter(rois, roi_id, neighbors, threshold = 100):
 
 def rank(nearest_dict):
     return sorted(nearest_dict.items(), key=lambda x: x[1])
+
 
 def roi_metadata(roi, spacing=1.5):
     """

@@ -1,3 +1,7 @@
+"""
+Set Up matchypatchy Database
+"""
+import logging
 import sqlite3
 from matchypatchy import sqlite_vec
 
@@ -6,8 +10,6 @@ def setup_database(filepath='matchypatchy.db'):
     # Connect to SQLite database
     db = sqlite3.connect(filepath)
     cursor = db.cursor()
-    # EMBEDDING
-    # TODO : FIX VEC LOAD
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
@@ -88,9 +90,10 @@ def setup_database(filepath='matchypatchy.db'):
     cursor.execute('''CREATE TABLE IF NOT EXISTS capture (
                         id INTEGER PRIMARY KEY
                     )''')
+
     # Commit changes and close connection
     db.commit()
-    print('Database initiated.')
+    logging.info('Database initiated.')
     db.close()
     return True
 
