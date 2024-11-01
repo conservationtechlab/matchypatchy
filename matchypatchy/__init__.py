@@ -3,7 +3,7 @@ from matchypatchy import database
 from matchypatchy import gui
 from matchypatchy import ml
 from matchypatchy import sqlite_vec
-from matchypatchy import test_install
+from matchypatchy import MatchyPatchy
 from matchypatchy import utils
 
 from matchypatchy.config import (DB_PATH, LOGFILE, TEMPDIR,)
@@ -36,7 +36,7 @@ from matchypatchy.ml import (AnimlThread, FRAME_DIR, MiewThread,
                              sequence_thread,)
 from matchypatchy.sqlite_vec import (load, loadable_path, register_numpy,
                                      serialize_float32, serialize_int8,)
-from matchypatchy.test_install import (backend_factory, main,)
+from matchypatchy.MatchyPatchy import (backend_factory, main,)
 from matchypatchy.utils import (is_unique, swap_keyvalue,)
 
 __all__ = ['AlertPopup', 'AnimlThread', 'BuildManifestThread',
@@ -61,4 +61,4 @@ __all__ = ['AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'rank', 'register_numpy', 'roi', 'roi_knn', 'roi_metadata',
            'sequence_thread', 'serialize_float32', 'serialize_int8', 'setup',
            'setup_database', 'site', 'species', 'sqlite_vec', 'survey',
-           'swap_keyvalue', 'test_install', 'utils', 'widget_image']
+           'swap_keyvalue', 'MatchyPatchy', 'utils', 'widget_image']
