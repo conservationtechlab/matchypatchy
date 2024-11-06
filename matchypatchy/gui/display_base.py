@@ -17,9 +17,10 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_species import SpeciesPopup
 from matchypatchy.gui.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.popup_import_folder import ImportFolderPopup
+from matchypatchy.gui.popup_downloadml import MLDownloadPopup
 
 from matchypatchy.ml.sequence_thread import SequenceThread
-from matchypatchy.ml.animl_thread import AnimlThread
+from matchypatchy.ml.animl_thread import AnimlThread, AnimlOptionsPopup
 from matchypatchy.ml.miew_thread import MiewThread
 
 
@@ -37,15 +38,19 @@ class DisplayBase(QWidget):
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFixedHeight(20)
         layout.addWidget(self.label)
-        layout.addSpacing(300)
+        layout.addSpacing(400)
 
         column_layout = QHBoxLayout()
         column_layout.addSpacing(100) # add spacing to left side
 
         # DB MANAGEMENT
+        border_db = QWidget()
+        border_db.setObjectName("borderWidget")
+        border_db.setStyleSheet("#borderWidget { border: 1px solid gray; }")
         db_layer = QVBoxLayout()
-        db_layer.addWidget(QLabel("Database Management"),
-                           alignment=Qt.AlignmentFlag.AlignCenter)
+        db_label = QLabel("Database Management")
+        db_label.setObjectName("QLabel_Base")
+        db_layer.addWidget(db_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         #Survey
         survey_layout = QHBoxLayout()
@@ -59,44 +64,51 @@ class DisplayBase(QWidget):
         survey_layout.addWidget(button_survey_new,0)
         db_layer.addLayout(survey_layout,0)
         
-        # Sites
         self.button_site_manage = QPushButton("Manage Sites")
+        self.button_species_manage = QPushButton("Manage Species")
+        self.button_media_manage = QPushButton("Manage Media")
+        self.button_individual_manage = QPushButton("Manage Individuals")
+
         self.button_site_manage.clicked.connect(self.new_site)
+        self.button_species_manage.clicked.connect(self.manage_species)
+        self.button_media_manage.clicked.connect(self.validate)
+        self.button_individual_manage.clicked.connect(self.manage_individual)
+
         db_layer.addWidget(self.button_site_manage)
         self.button_manage_site_flag = False
         self.button_site_manage.setEnabled(self.button_manage_site_flag)
-
-        self.button_species_manage = QPushButton("Manage Species")
-        self.button_species_manage.clicked.connect(self.manage_species)
         db_layer.addWidget(self.button_species_manage)
-
-        self.button_media_manage = QPushButton("Manage Media")
-        self.button_media_manage.clicked.connect(self.manage_media)
         db_layer.addWidget(self.button_media_manage)
+        db_layer.addWidget(self.button_individual_manage)
 
         db_layer.addStretch()
-        column_layout.addLayout(db_layer,1)
+        border_db.setLayout(db_layer)
+        column_layout.addWidget(border_db,1)
         column_layout.addSpacing(20)
 
         # IMPORT
+        border_import = QWidget()
+        border_import.setObjectName("borderWidget")
+        border_import.setStyleSheet("#borderWidget { border: 1px solid gray; }")
         import_layer = QVBoxLayout()
-        import_layer.addWidget(QLabel("Import and Process Data"),
-                               alignment=Qt.AlignmentFlag.AlignCenter)
+        import_label = QLabel("Import and Process Data")
+        import_label.setObjectName("QLabel_Base")
+        import_layer.addWidget(import_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        
         button_load_csv = QPushButton("1. Import from CSV")
         button_load_folder = QPushButton("1. Import from Folder")
         button_process = QPushButton("2. Process")
         button_validate = QPushButton("3. Validate")
         button_match = QPushButton("4. Match")
+        button_export = QPushButton("5.Export")
         
         button_load_csv.clicked.connect(self.import_csv)
         button_load_folder.clicked.connect(self.import_folder)
         button_process.clicked.connect(self.process_images)
         button_validate.clicked.connect(self.validate)
         button_match.clicked.connect(self.match)
+        button_export.clicked.connect(self.export)
 
-        # Add buttons to the layout
         load_layout = QHBoxLayout()
         load_layout.addWidget(button_load_csv)
         load_layout.addWidget(button_load_folder)
@@ -104,24 +116,44 @@ class DisplayBase(QWidget):
         import_layer.addWidget(button_process)
         import_layer.addWidget(button_validate)
         import_layer.addWidget(button_match)
+        import_layer.addWidget(button_export)
 
         import_layer.addStretch()
-        column_layout.addLayout(import_layer,1) 
+        border_import.setLayout(import_layer)
+        column_layout.addWidget(border_import,1)
         column_layout.addSpacing(20)
         
         # OTHER
+        border_other = QWidget()
+        border_other.setObjectName("borderWidget")
+        border_other.setStyleSheet("#borderWidget { border: 1px solid gray; }")
         other_layer = QVBoxLayout()
-        other_layer.addWidget(QLabel("Other Options"),
-                              alignment=Qt.AlignmentFlag.AlignCenter)
+        other_label = QLabel("Other Options")
+        other_label.setObjectName("QLabel_Base")
+        other_layer.addWidget(other_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        # ML models
+        button_configuration = QPushButton("Configuration")
         button_download_ml = QPushButton("Download Models")
+
+        other_layer.addWidget(button_configuration)
         other_layer.addWidget(button_download_ml)
 
+        button_configuration.clicked.connect(self.edit_config)
+        button_download_ml.clicked.connect(self.download_ml)
+
+
         other_layer.addStretch()
-        column_layout.addLayout(other_layer,1) 
+        border_other.setLayout(other_layer)
+        column_layout.addWidget(border_other,1)
         column_layout.addSpacing(100) # add spacing to right side
 
+        
         layout.addLayout(column_layout)
+        layout.addSpacing(100)
+
+        self.setStyleSheet("QPushButton, QComboBox { height: 30px; }"
+                           "#QLabel_Base { font-size: 16px; }")
         self.setLayout(layout)
 
         self.update_survey()
@@ -164,9 +196,8 @@ class DisplayBase(QWidget):
         if dialog.exec():
             del dialog
 
-    # Manage Media Button
-    def manage_media(self):
-        self.parent._set_media_view()
+    def manage_individual(self):
+        pass
 
     def import_csv(self):
         '''
@@ -226,8 +257,13 @@ class DisplayBase(QWidget):
         self.sequence_thread.progress_update.connect(dialog.update)
         self.sequence_thread.start()
 
+        animl_options = AnimlOptionsPopup(self)
+        if animl_options.exec():
+            detector_key = animl_options.select_detector()
+            classifier_key = animl_options.select_classifier()
+
         # 2. ANIML (BBOX + SPECIES)
-        self.animl_thread = AnimlThread(self.mpDB)
+        self.animl_thread = AnimlThread(self.mpDB, detector_key, classifier_key)
         self.animl_thread.progress_update.connect(dialog.update)
         self.animl_thread.start()
 
@@ -237,12 +273,25 @@ class DisplayBase(QWidget):
         
         if dialog.exec():
             del dialog
+
+    
+    def edit_config(self):
+        pass
         
-    # Validate Button
+    def download_ml(self):
+        dialog = MLDownloadPopup(self)
+        if dialog.exec():
+            del dialog       
+        
+    # Validate/Manage Media Button
     def validate(self):
         self.parent._set_media_view()
         # return True
 
-    # Validate Button
+    # Match Button
     def match(self):
         self.parent._set_compare_view()
+
+    # Export Button
+    def export(self):
+        pass

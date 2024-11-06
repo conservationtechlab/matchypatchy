@@ -29,15 +29,15 @@ class MiewThread(QThread):
         self.progress_update.emit("Calculating viewpoint...")
         self.get_viewpoint()
         self.progress_update.emit("Calculating embeddings...")
-        #self.get_embeddings()
+        self.get_embeddings()
         self.progress_update.emit("Processing complete!")
 
     def get_viewpoint(self):
         # TODO: Utilize probability for captures/sequences
-        print(self.media)
-        print(self.rois)
 
-        viewpoints = animl_mp.viewpoint_estimator(self.rois, self.image_paths, self.viewpoint_filepath)
+        filtered_rois = self.rois[self.rois['viewpoint'] == None]
+
+        viewpoints = animl_mp.viewpoint_estimator(filtered_rois, self.image_paths, self.viewpoint_filepath)
         viewpoints = viewpoints.set_index("id")
         
         for roi_id, v in viewpoints.iterrows():
@@ -49,7 +49,10 @@ class MiewThread(QThread):
 
         # Match Button
     def get_embeddings(self):
-        embs = animl_mp.miew_embedding(self.rois, self.image_paths, self.miew_filepath)
+
+        filtered_rois = self.rois[self.rois['emb_id'] == 0]
+
+        embs = animl_mp.miew_embedding(filtered_rois, self.image_paths, self.miew_filepath)
         for e in embs:
             roi_id = e[0]
             emb = e[1]

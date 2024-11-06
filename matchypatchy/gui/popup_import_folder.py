@@ -2,9 +2,10 @@
 Popup for Importing a Manifest
 """
 import os
+from pathlib import Path
 import pandas as pd
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QProgressBar,
                              QComboBox, QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
@@ -21,7 +22,7 @@ class ImportFolderPopup(QDialog):
         super().__init__(parent)
         self.mpDB = parent.mpDB
         self.active_survey = parent.active_survey
-        self.directory = os.path.normpath(directory)
+        self.directory = Path(directory)
         self.data = pd.DataFrame()
 
         self.setWindowTitle('Import from Folder')
@@ -33,12 +34,9 @@ class ImportFolderPopup(QDialog):
         layout.addSpacing(5)
 
         # Site
-        site_layout = QHBoxLayout()
         self.site = QComboBox()
         self.site.hide()
-        site_layout.addWidget(self.site)
-        layout.addLayout(site_layout)
-        layout.addSpacing(5)
+        layout.addWidget(self.site)
 
         # Ok/Cancel
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
@@ -71,21 +69,21 @@ class ImportFolderPopup(QDialog):
         self.data = manifest
 
         if not self.data.empty:
-            self.get_site_level()
+            self.get_options()
         else:
             dialog = AlertPopup(self, "No images found! Choose another directory.", title="Alert")
             if dialog.exec():
                 self.reject()
 
     # 3. Offer
-    def get_site_level(self):
+    def get_options(self):
         self.label.setText("Select a level in the directory hierarchy that corresponds to site, if available:")
         self.site.show()
         self.buttonBox.show()
 
         example = self.data.loc[0,'FilePath']
         # get potential site 
-        file_tree = ['None'] + example.split(os.sep)
+        file_tree = ['None'] + list(filter(None,example.split(os.sep)))
         self.site.addItems(file_tree)
 
     #. 4. Import manifest into media table
@@ -98,7 +96,6 @@ class ImportFolderPopup(QDialog):
         self.progress_bar.show()
 
         site_level = self.site.currentIndex()
-        site_level = site_level if site_level==0 else site_level - 1 
 
         print(f"Adding {len(self.data)} files to Database")
 
