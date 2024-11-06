@@ -6,7 +6,7 @@ from matchypatchy import sqlite_vec
 from matchypatchy import MatchyPatchy
 from matchypatchy import utils
 
-from matchypatchy.config import (DB_PATH, LOGFILE, TEMPDIR,)
+from matchypatchy.config import (DB_PATH, LOGFILE, TEMP_DIR,)
 from matchypatchy.database import (IMAGE_EXT, MatchyPatchyDB, VIDEO_EXT,
                                    VIEWPOINT, fetch_media, fetch_roi,
                                    fetch_roi_media, fetch_sites, fetch_species,
@@ -31,7 +31,7 @@ from matchypatchy.gui import (AlertPopup, BuildManifestThread, CSVImportThread,
                               popup_import_folder, popup_individual,
                               popup_site, popup_species, popup_survey,
                               popup_table, widget_image,)
-from matchypatchy.ml import (AnimlThread, FRAME_DIR, MiewThread,
+from matchypatchy.ml import (AnimlThread, MiewThread,
                              SequenceThread, animl_thread, miew_thread,
                              sequence_thread,)
 from matchypatchy.sqlite_vec import (load, loadable_path, register_numpy,
@@ -47,7 +47,7 @@ __all__ = ['AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'LoadThumbnailThread', 'MainWindow', 'MatchyPatchyDB', 'MediaTable',
            'MiewThread', 'ProgressPopup', 'SequenceThread', 'SiteFillPopup',
            'SitePopup', 'SpeciesFillPopup', 'SpeciesPopup', 'SurveyFillPopup',
-           'TEMPDIR', 'THUMBNAIL_NOTFOUND', 'TableEditorPopup', 'VIDEO_EXT',
+           'TEMP_DIR', 'THUMBNAIL_NOTFOUND', 'TableEditorPopup', 'VIDEO_EXT',
            'VIEWPOINT', 'animl_thread', 'backend_factory', 'columns', 'config',
            'database', 'display_base', 'display_compare', 'display_media',
            'display_single', 'fetch_media', 'fetch_roi', 'fetch_roi_media',

@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
-from matchypatchy.config import TEMPDIR
+from matchypatchy.config import TEMP_DIR
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.database.media import fetch_media
 
@@ -86,7 +86,7 @@ class MediaTable(QWidget):
     # RUN ON ENTRY
     def load(self):
         """
-        Fetch table, load images and save as thumbnails to tempdir
+        Fetch table, load images and save as thumbnails to TEMP_DIR
         """
         self.fetch()  
         
