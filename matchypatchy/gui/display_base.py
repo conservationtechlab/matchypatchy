@@ -21,8 +21,7 @@ from matchypatchy.gui.popup_downloadml import MLDownloadPopup
 
 from matchypatchy.ml.sequence_thread import SequenceThread
 from matchypatchy.ml.animl_thread import AnimlThread, AnimlOptionsPopup
-from matchypatchy.ml.miew_thread import MiewThread
-
+from matchypatchy.ml.reid_thread import ReIDThread, ReIDOptionsPopup
 
 # TODO: add download models button/popup
 
@@ -258,24 +257,34 @@ class DisplayBase(QWidget):
         self.sequence_thread.start()
 
         animl_options = AnimlOptionsPopup(self)
-        if animl_options.exec():
+        result = animl_options.exec()
+        if result == QDialog.DialogCode.Accepted:
             detector_key = animl_options.select_detector()
             classifier_key = animl_options.select_classifier()
 
-        # 2. ANIML (BBOX + SPECIES)
-        self.animl_thread = AnimlThread(self.mpDB, detector_key, classifier_key)
-        self.animl_thread.progress_update.connect(dialog.update)
-        self.animl_thread.start()
+            # 2. ANIML (BBOX + SPECIES)
+            self.animl_thread = AnimlThread(self.mpDB, detector_key, classifier_key)
+            self.animl_thread.progress_update.connect(dialog.update)
+            self.animl_thread.start()
+        else:
+            del animl_options
 
-        #self.miew_thread = MiewThread(self.mpDB)
-        #self.miew_thread.progress_update.connect(dialog.update)
-        #self.miew_thread.start()
-        
-        if dialog.exec():
-            del dialog
+        reid_options = ReIDOptionsPopup(self)
+        result = reid_options.exec()
+        if result == QDialog.DialogCode.Accepted:
+            reid_key = reid_options.select_reid()
+            viewpoint_key = reid_options.select_viewpoint()
 
-    
+            self.miew_thread = ReIDThread(self.mpDB, reid_key, viewpoint_key)
+            self.miew_thread.progress_update.connect(dialog.update)
+            self.miew_thread.start()
+
+        # close alert popup
+        dialog.accept()
+        del dialog
+
     def edit_config(self):
+        # TODO 
         pass
         
     def download_ml(self):
@@ -286,7 +295,6 @@ class DisplayBase(QWidget):
     # Validate/Manage Media Button
     def validate(self):
         self.parent._set_media_view()
-        # return True
 
     # Match Button
     def match(self):
@@ -294,4 +302,5 @@ class DisplayBase(QWidget):
 
     # Export Button
     def export(self):
+        # TODO
         pass

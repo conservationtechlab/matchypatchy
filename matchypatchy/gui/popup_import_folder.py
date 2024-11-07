@@ -83,7 +83,7 @@ class ImportFolderPopup(QDialog):
 
         example = self.data.loc[0,'FilePath']
         # get potential site 
-        file_tree = ['None'] + list(filter(None,example.split(os.sep)))
+        file_tree = ['None'] + example.split(os.sep)
         self.site.addItems(file_tree)
 
     #. 4. Import manifest into media table
@@ -95,7 +95,7 @@ class ImportFolderPopup(QDialog):
         self.progress_bar.setRange(0, len(self.data))
         self.progress_bar.show()
 
-        site_level = self.site.currentIndex()
+        site_level = 0 if self.site.currentIndex()==0 else self.site.currentIndex() - 1
 
         print(f"Adding {len(self.data)} files to Database")
 

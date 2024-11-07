@@ -49,7 +49,7 @@ class MLDownloadPopup(QDialog):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
-        self.available_models = models.import_models()
+        self.available_models = models.available_models()
         self.set_checkboxes()
         
 
