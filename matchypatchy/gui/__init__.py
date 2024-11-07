@@ -5,7 +5,7 @@ from matchypatchy.gui import display_single
 from matchypatchy.gui import main_gui
 from matchypatchy.gui import media_table
 from matchypatchy.gui import popup_alert
-from matchypatchy.gui import popup_downloadml
+from matchypatchy.gui import popup_ml
 from matchypatchy.gui import popup_dropdown
 from matchypatchy.gui import popup_import_csv
 from matchypatchy.gui import popup_import_folder
@@ -46,7 +46,7 @@ __all__ = ['AlertPopup', 'BuildManifestThread', 'CSVImportThread',
            'SurveyFillPopup', 'THUMBNAIL_NOTFOUND', 'TableEditorPopup',
            'columns', 'display_base', 'display_compare', 'display_media',
            'display_single', 'main_display', 'main_gui', 'media_table',
-           'popup_alert', 'popup_downloadml', 'popup_dropdown',
+           'popup_alert', 'popup_ml', 'popup_dropdown',
            'popup_import_csv', 'popup_import_folder', 'popup_individual',
            'popup_site', 'popup_species', 'popup_survey', 'popup_table',
            'widget_image']
