@@ -51,7 +51,7 @@ class MatchyPatchyDB():
             return rows
         except sqlite3.Error as error:
             print("Failed to execute fetch.", error)
-            logging.error("Failed to execute fetch." + error)
+            logging.error("Failed to execute fetch.", error)
             if db:
                 db.close()
             return False
@@ -79,7 +79,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add survey", error)
-            logging.error("Failed to add survey: " + error)
+            logging.error("Failed to add survey: ", error)
             if db:
                 db.close()
             return False
@@ -106,7 +106,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add site", error)
-            logging.error("Failed to add site: " + error)
+            logging.error("Failed to add site: ", error)
             if db:
                 db.close()
             return False
@@ -131,7 +131,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add species", error)
-            logging.error("Failed to add species: " + error)
+            logging.error("Failed to add species: ", error)
             if db:
                 db.close()
             return False
@@ -157,7 +157,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add individual", error)
-            logging.error("Failed to add individual: " + error)
+            logging.error("Failed to add individual: ", error)
             if db:
                 db.close()
             return False
@@ -193,7 +193,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print(f"Failed to add media: {filepath}.", error)
-            logging.error("Failed to add media: " + error)
+            logging.error("Failed to add media: ", error)
             if db:
                 db.close()
             return False
@@ -219,7 +219,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print(f"Failed to add roi for media: {media_id}.", error)
-            logging.error("Failed to add roi: " + error)
+            logging.error("Failed to add roi: ", error)
             if db:
                 db.close()
             return False
