@@ -32,8 +32,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
-        self.setMinimumSize(1280, 800)
-        self.resize(1200,800)
+        self.setMinimumSize(1600, 900)
+        self.resize(1600, 900)
 
         # Create Menu Bar
         self._createMenuBar()
