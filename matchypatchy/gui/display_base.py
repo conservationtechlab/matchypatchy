@@ -17,11 +17,11 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_species import SpeciesPopup
 from matchypatchy.gui.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.popup_import_folder import ImportFolderPopup
-from matchypatchy.gui.popup_downloadml import MLDownloadPopup
+from matchypatchy.gui.popup_ml import MLDownloadPopup, MLOptionsPopup
 
 from matchypatchy.ml.sequence_thread import SequenceThread
-from matchypatchy.ml.animl_thread import AnimlThread, AnimlOptionsPopup
-from matchypatchy.ml.reid_thread import ReIDThread, ReIDOptionsPopup
+from matchypatchy.ml.animl_thread import AnimlThread
+from matchypatchy.ml.reid_thread import ReIDThread
 
 # TODO: add download models button/popup
 
@@ -85,7 +85,7 @@ class DisplayBase(QWidget):
         column_layout.addWidget(border_db,1)
         column_layout.addSpacing(20)
 
-        # IMPORT
+        # MAIN PROCESS
         border_import = QWidget()
         border_import.setObjectName("borderWidget")
         border_import.setStyleSheet("#borderWidget { border: 1px solid gray; }")
@@ -198,6 +198,9 @@ class DisplayBase(QWidget):
     def manage_individual(self):
         pass
 
+    # MAIN PROCESS --------------------------------------------------------------
+
+    # STEP 1: Import from CSV
     def import_csv(self):
         '''
         Add media from CSV
@@ -219,6 +222,7 @@ class DisplayBase(QWidget):
             if dialog.exec():
                 del dialog
             
+    # STEP 1: Import from FOLDER
     def import_folder(self):
         """
         Add media from a folder
@@ -242,7 +246,7 @@ class DisplayBase(QWidget):
             if dialog.exec():
                 del dialog
 
-        
+    # STEP 2: Process Button
     def process_images(self):
         """
         Processes Sequence, MD, Animl, Viewpoint, Miew
@@ -256,51 +260,54 @@ class DisplayBase(QWidget):
         self.sequence_thread.progress_update.connect(dialog.update)
         self.sequence_thread.start()
 
-        animl_options = AnimlOptionsPopup(self)
+        animl_options = MLOptionsPopup(self)
         result = animl_options.exec()
         if result == QDialog.DialogCode.Accepted:
             detector_key = animl_options.select_detector()
             classifier_key = animl_options.select_classifier()
+            reid_key = animl_options.select_reid()
+            viewpoint_key = animl_options.select_viewpoint()
 
             # 2. ANIML (BBOX + SPECIES)
             self.animl_thread = AnimlThread(self.mpDB, detector_key, classifier_key)
             self.animl_thread.progress_update.connect(dialog.update)
-            self.animl_thread.start()
-        else:
-            del animl_options
 
-        reid_options = ReIDOptionsPopup(self)
-        result = reid_options.exec()
-        if result == QDialog.DialogCode.Accepted:
-            reid_key = reid_options.select_reid()
-            viewpoint_key = reid_options.select_viewpoint()
-
+            # 3. REID AND VIEWPOINT
             self.miew_thread = ReIDThread(self.mpDB, reid_key, viewpoint_key)
             self.miew_thread.progress_update.connect(dialog.update)
-            self.miew_thread.start()
 
-        # close alert popup
-        dialog.accept()
-        del dialog
+            # chain threads
+            self.animl_thread.finished.connect(self.miew_thread.start)
+            self.miew_thread.finished.connect(dialog.accept)
+            self.animl_thread.start()
+
+        # processing canceled
+        else:
+            del animl_options
+            dialog.reject()
+            del dialog
+
+    # STEP 3: Validate/Manage Media Button
+    def validate(self):
+        self.parent._set_media_view()
+
+    # STEP 4: Match Button
+    def match(self):
+        self.parent._set_compare_view()
+
+    # STEP 5: Export Button
+    def export(self):
+        # TODO
+        pass
+
+    # OTHER OPTIONS ------------------------------------------------------------------
 
     def edit_config(self):
         # TODO 
         pass
-        
+
     def download_ml(self):
         dialog = MLDownloadPopup(self)
         if dialog.exec():
-            del dialog       
-        
-    # Validate/Manage Media Button
-    def validate(self):
-        self.parent._set_media_view()
-
-    # Match Button
-    def match(self):
-        self.parent._set_compare_view()
-
-    # Export Button
-    def export(self):
-        # TODO
-        pass
+            del dialog  
+    
