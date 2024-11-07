@@ -21,7 +21,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.database.media import fetch_media
 
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
-VIEWPOINT = ["Left", "Right"]
+VIEWPOINT = {None: "None", 0:"Left", 1:"Right"}
 
 
 class MediaTable(QWidget):

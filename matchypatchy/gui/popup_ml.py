@@ -5,7 +5,7 @@ Popup for Selection within a list, ie Survey selection
 
 """
 import wget
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar, 
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QProgressBar, 
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
@@ -34,6 +34,7 @@ class MLDownloadPopup(QDialog):
             self.checkbox_layout.addWidget(checkbox, i, 0)
 
         # Add OK and Cancel buttons
+        layout.addSpacing(20)
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         self.buttonBox.accepted.connect(self.accept)  
@@ -90,6 +91,13 @@ class MLOptionsPopup(QDialog):
 
         self.setWindowTitle('Model Options')
         layout = QVBoxLayout()
+        layout.addSpacing(10)
+
+        # Sequence 
+        self.sequence = QCheckBox("Calculate Sequence")
+        self.sequence.setStyleSheet("""QCheckBox {padding: 5px;}
+                                       QCheckBox::indicator {width: 25px; height: 25px;}""")
+        layout.addWidget(self.sequence)
 
         # Detector
         self.detector_label = QLabel("Select Detector Model:")
@@ -129,6 +137,7 @@ class MLOptionsPopup(QDialog):
         self.viewpoint.addItems(self.viewpoint_list)
 
         # Ok/Cancel
+        layout.addSpacing(20)
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         self.buttonBox.accepted.connect(self.accept)  
@@ -136,6 +145,9 @@ class MLOptionsPopup(QDialog):
 
         self.setLayout(layout)
 
+
+    def select_sequence(self):
+        return self.sequence.isChecked()
 
     def select_detector(self): 
         self.selected_detector_key = self.available_detectors[self.detector.currentIndex()]

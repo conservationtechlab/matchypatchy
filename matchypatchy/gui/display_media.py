@@ -19,6 +19,7 @@ class DisplayMedia(QWidget):
         
         first_layer = QHBoxLayout()
         # Home Button
+        first_layer.addSpacing(10)
         return_button = QPushButton("Home")
         return_button.clicked.connect(self.home)
         return_button.setFixedWidth(100)

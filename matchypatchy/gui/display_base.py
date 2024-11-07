@@ -255,18 +255,21 @@ class DisplayBase(QWidget):
         dialog = AlertPopup(self, "Processing Images", title="Processing images...", progressbar=True)
         dialog.show()
 
-        # 1. SEQUENCE 
-        self.sequence_thread = SequenceThread(self.mpDB)
-        self.sequence_thread.progress_update.connect(dialog.update)
-        self.sequence_thread.start()
-
         animl_options = MLOptionsPopup(self)
         result = animl_options.exec()
         if result == QDialog.DialogCode.Accepted:
+
+            sequence_checked = animl_options.select_sequence()
             detector_key = animl_options.select_detector()
             classifier_key = animl_options.select_classifier()
             reid_key = animl_options.select_reid()
             viewpoint_key = animl_options.select_viewpoint()
+
+            # 1. SEQUENCE 
+            if sequence_checked:
+                self.sequence_thread = SequenceThread(self.mpDB)
+                self.sequence_thread.progress_update.connect(dialog.update)
+                self.sequence_thread.start()
 
             # 2. ANIML (BBOX + SPECIES)
             self.animl_thread = AnimlThread(self.mpDB, detector_key, classifier_key)
