@@ -3,9 +3,7 @@ Functions for Manipulating and Processing ROIs
 """
 import pandas as pd
 
-
-VIEWPOINT = ["Right", "Left"]
-
+from matchypatchy.config import VIEWPOINT
 
 def fetch_roi(mpDB):
     """
@@ -58,14 +56,13 @@ def match(mpDB):
     neighbor_dict = dict()
     nearest_dict = dict()
 
-    # WHAT TO DO IF NO NEIGHBORS?
+    # TODO: WHAT TO DO IF NO NEIGHBORS?
     for _,roi in rois.iterrows():
         neighbors = roi_knn(mpDB, roi["emb_id"]) 
         filtered_neighbors = filter(rois, roi['id'], neighbors)
         if filtered_neighbors:
             neighbor_dict[roi['id']] = filtered_neighbors
             nearest_dict[roi['id']] = filtered_neighbors[0][1]
-
 
     return neighbor_dict, nearest_dict
 
@@ -114,7 +111,7 @@ def roi_metadata(roi, spacing=1.5):
     info_dict = roi[['Name','File Path','Timestamp','Site','Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
     # convert viewpoint to human-readable
-    info_dict['Viewpoint'] = VIEWPOINT[int(info_dict['Viewpoint'])]
+    info_dict['Viewpoint'] = VIEWPOINT[info_dict['Viewpoint']]
 
     info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
 

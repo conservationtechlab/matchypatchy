@@ -25,3 +25,7 @@ logging.debug('FRAME_DIR: ' + str(FRAME_DIR))
 
 # CREATE MODEL FOLDER
 ML_DIR.mkdir(exist_ok=True)
+
+
+# GLOBALS
+VIEWPOINT = {None: "None", 0:"Left", 1:"Right"}

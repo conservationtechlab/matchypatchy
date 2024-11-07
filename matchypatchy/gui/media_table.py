@@ -16,13 +16,11 @@ from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
-from matchypatchy.config import TEMP_DIR
+from matchypatchy.config import TEMP_DIR, VIEWPOINT
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.database.media import fetch_media
 
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
-VIEWPOINT = {None: "None", 0:"Left", 1:"Right"}
-
 
 class MediaTable(QWidget):
     def __init__(self, parent):
