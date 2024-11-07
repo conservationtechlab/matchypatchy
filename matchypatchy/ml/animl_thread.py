@@ -4,8 +4,7 @@ Thread Class for Processing BBox and Species Classification
 """
 import pandas as pd
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QComboBox, QDialogButtonBox, QLabel)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.ml import models
 from matchypatchy import config
@@ -13,51 +12,6 @@ from matchypatchy import config
 from animl import matchypatchy as animl_mp
 
 # TODO: HANDLE VIDEOS
-
-class AnimlOptionsPopup(QDialog):
-    def __init__(self, parent):
-        super().__init__(parent)
-
-        self.setWindowTitle('Animl Options')
-        layout = QVBoxLayout()
-
-        # Detector
-        self.detector_label = QLabel("Select Detector Model:")
-        self.detector = QComboBox()
-        layout.addWidget(self.detector_label)
-        layout.addWidget(self.detector)
-
-        self.available_detectors = list(models.available_models(models.DETECTORS))
-        self.detector_list = [models.MODELS[m][0] for m in self.available_detectors]
-        self.detector.addItems(self.detector_list)
-
-        # Classifier
-        self.classifier_label = QLabel("Select Classifier Model:")
-        self.classifier = QComboBox()
-        layout.addWidget(self.classifier_label)
-        layout.addWidget(self.classifier)
-
-        self.available_classifiers = list(models.available_models(models.CLASSIFIERS))
-        self.classifier_list = [models.MODELS[m][0] for m in self.available_classifiers]
-        self.classifier.addItems(self.classifier_list)
-
-        # Ok/Cancel
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
-        layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.buttonBox.accepted.connect(self.accept)  
-        self.buttonBox.rejected.connect(self.reject)
-
-        self.setLayout(layout)
-
-
-    def select_detector(self): 
-        self.selected_detector_key = self.available_detectors[self.detector.currentIndex()]
-        return self.selected_detector_key
-
-    def select_classifier(self):
-        self.selected_classifier_key = self.available_classifiers[self.classifier.currentIndex()]
-        return self.selected_classifier_key
-
 
 class AnimlThread(QThread):
     progress_update = pyqtSignal(str)  # Signal to update the progress bar
@@ -93,7 +47,6 @@ class AnimlThread(QThread):
 
     def get_bbox(self):
         # 1 RUN MED 
-        print(self.md_filepath)
         detections = animl_mp.detect(self.md_filepath, self.media)
         # 2 GET BOXES
         for i, roi in detections.iterrows():
@@ -139,5 +92,3 @@ class AnimlThread(QThread):
                     species_id = self.mpDB.add_species(binomen, prediction)
                 # update species_id        
                 self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})
-
-

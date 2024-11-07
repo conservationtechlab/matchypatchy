@@ -12,7 +12,7 @@ Widget for displaying list of Media
 import tempfile
 import pandas as pd
 
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel
+from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel, QHeaderView
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
@@ -21,7 +21,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.database.media import fetch_media
 
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
-
+VIEWPOINT = ["Left", "Right"]
 
 
 class MediaTable(QWidget):
@@ -34,20 +34,20 @@ class MediaTable(QWidget):
         self.crop = True
         self.edits = list()
         self.columns = ["reviewed","thumbnail", "filepath", "timestamp", 
-                        "binomen", "common", "individual_id", "sex", 
+                        "viewpoint", "binomen", "common", "individual_id", "sex", 
                         "site", "sequence_id", "capture_id", "favorite", "comment"]
         # Set up layout
         layout = QVBoxLayout()
 
         # Create QTableWidget
         self.table = QTableWidget()
-        self.table.setColumnCount(13)  # Columns: Thumbnail, Name, and Description
+        self.table.setColumnCount(14)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", 
-                                              "Species", "Common", "Individual", "Sex", 
+                                              "Viewpoint", "Species", "Common", "Individual", "Sex", 
                                               "Site", "Sequence ID", "Capture ID", "Favorite", "Comment"])
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.setColumnWidth(0, 60) 
-        self.table.setColumnWidth(10, 60) 
+        self.table.resizeColumnsToContents()
+        self.table.setColumnWidth(1, 100)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.table.setSortingEnabled(True)
         self.table.itemChanged.connect(self.update_entry)  # allow user editing
 
@@ -145,7 +145,6 @@ class MediaTable(QWidget):
         for i in range(self.data_filtered.shape[0]):
             self.add_row(i)
         self.table.blockSignals(False)  # reconnect editing
-        print(self.data_filtered)
        
     # TODO: UPDATE ENTRIES
     def update_entry(self, item): 
@@ -199,22 +198,23 @@ class MediaTable(QWidget):
         # Data
         self.table.setItem(i, 2, QTableWidgetItem(roi["filepath"]))  # File Path column
         self.table.setItem(i, 3, QTableWidgetItem(roi["timestamp"]))  # Date Time column
-        self.table.setItem(i, 4, QTableWidgetItem(roi["binomen"]))   # File Path column
-        self.table.setItem(i, 5, QTableWidgetItem(roi["common"]))  # Date Time column
-        self.table.setItem(i, 6, QTableWidgetItem(roi["name"]))  # Individual column
-        self.table.setItem(i, 7, QTableWidgetItem(roi["sex"]))  # Sex column
-        self.table.setItem(i, 8, QTableWidgetItem(roi["site"]))   # Site column
-        self.table.setItem(i, 9, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
-        self.table.setItem(i, 10, QTableWidgetItem(str(roi["capture_id"])))  # Sequence ID column
+        self.table.setItem(i, 4, QTableWidgetItem(VIEWPOINT[roi["viewpoint"]]))  # Viewpoint column
+        self.table.setItem(i, 5, QTableWidgetItem(roi["binomen"]))   # File Path column
+        self.table.setItem(i, 6, QTableWidgetItem(roi["common"]))  # Date Time column
+        self.table.setItem(i, 7, QTableWidgetItem(roi["name"]))  # Individual column
+        self.table.setItem(i, 8, QTableWidgetItem(roi["sex"]))  # Sex column
+        self.table.setItem(i, 9, QTableWidgetItem(roi["site"]))   # Site column
+        self.table.setItem(i, 10, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
+        self.table.setItem(i, 11, QTableWidgetItem(str(roi["capture_id"])))  # Sequence ID column
         
         # Favorite Checkbox
         favorite = QTableWidgetItem()
         favorite.setFlags(favorite.flags() | Qt.ItemFlag.ItemIsUserCheckable)
         favorite.setCheckState(self.set_check_state(roi["favorite"]))
-        self.table.setItem(i, 11, favorite)   # Comment column
+        self.table.setItem(i, 12, favorite)   # Comment column
 
         # Comment
-        self.table.setItem(i, 12, QTableWidgetItem(roi["comment"]))  # Favorite column
+        self.table.setItem(i, 13, QTableWidgetItem(roi["comment"]))  # Favorite column
 
     # adds emitted temp thumbnail path to data 
     def add_thumbnail_path(self, i, thumbnail_path):

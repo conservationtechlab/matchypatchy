@@ -57,7 +57,7 @@ def setup_database(filepath='matchypatchy.db'):
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
                         species_id INTEGER,
-                        viewpoint TEXT,
+                        viewpoint INTEGER,
                         reviewed INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb_id INTEGER,

@@ -241,7 +241,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print("Failed to add embedding.", error)
-            logging.error("Failed to add embedding: " + error)
+            logging.error("Failed to add embedding: ", error)
             if db:
                 db.close()
             return False
@@ -259,7 +259,7 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             print(f"Failed to add sequence.", error)
-            logging.error("Failed to add sequence: " + error)
+            logging.error("Failed to add sequence: ", error)
             if db:
                 db.close()
             return False
@@ -302,7 +302,7 @@ class MatchyPatchyDB():
             return True
         except sqlite3.Error as error:
             print("Failed to update table", error)
-            logging.error("Failed to update table: " + error)
+            logging.error("Failed to update table: ", error)
             if db:
                 db.close()
             return False
@@ -326,7 +326,7 @@ class MatchyPatchyDB():
             return rows
         except sqlite3.Error as error:
             print("Failed to fetch", error)
-            logging.error("Failed fetch: " + error)
+            logging.error("Failed fetch: ", error)
             if db:
                 db.close()
             return False
@@ -344,7 +344,7 @@ class MatchyPatchyDB():
             return rows, column_names
         except sqlite3.Error as error:
             print("Failed to fetch", error)
-            logging.error("Failed fetch: " + error)
+            logging.error("Failed fetch: ", error)
             if db:
                 db.close()
             return False
@@ -366,7 +366,7 @@ class MatchyPatchyDB():
             return rows, column_names
         except sqlite3.Error as error:
             print("Failed to fetch", error)
-            logging.error("Failed all_media fetch:" + error)
+            logging.error("Failed all_media fetch:", error)
             if db:
                 db.close()
             return False
@@ -385,7 +385,7 @@ class MatchyPatchyDB():
             return True
         except sqlite3.Error as error:
             print("Failed to delete", error)
-            logging.error("Failed delete: " + error)
+            logging.error("Failed delete: ", error)
             if db:
                 db.close()
             return False 
@@ -409,7 +409,7 @@ class MatchyPatchyDB():
             return True
         except sqlite3.Error as error:
             print(f"Failed to clear {table}", error)
-            logging.error(f"Failed to clear {table}: " + error)
+            logging.error(f"Failed to clear {table}: ", error)
             if db:
                 db.close()
             return False 
@@ -427,7 +427,7 @@ class MatchyPatchyDB():
             return row_count
         except sqlite3.Error as error:
             print(f"Failed to count for {table}", error)
-            logging.error(f"Failed to count for {table}:" + error)
+            logging.error(f"Failed to count for {table}:", error)
             if db:
                 db.close()
             return False 
@@ -458,7 +458,7 @@ class MatchyPatchyDB():
 
         except sqlite3.Error as error:
             print("Failed to get knn for ROI", error)
-            logging.error("Failed to get knn for ROI" + error)
+            logging.error("Failed to get knn for ROI", error)
             if db:
                 db.close()
             return False 
