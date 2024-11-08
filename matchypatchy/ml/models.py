@@ -29,7 +29,7 @@ MIEW_DEFAULT = [7]
 
 DETECTORS = ["MegaDetector v5a", "MegaDetector v5b"]
 CLASSIFIERS = ["Andes","Amazon Rainforest", "Savanna", "SE Asian Rainforest", "Southwest USA"]
-REIDS = ["MiewID v2", "MiewID v3"]
+REIDS = ["MiewID v3", "MiewID v2"]
 VIEWPOINTS = ["Jaguar Viewpoint"]
 
 def available_models(keys=MODELS.keys()):

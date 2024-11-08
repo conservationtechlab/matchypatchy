@@ -8,6 +8,7 @@ Widget for displaying list of Media
 # TODO: MAKE TABLE EDITABLE
 # TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
 # TODO: MAKE THUMBNAIL LOAD FASTER
+# NOTE: INDIVIDUAL TABLE REFERENCES SPECIES
 
 import tempfile
 import pandas as pd
@@ -68,7 +69,7 @@ class MediaTable(QWidget):
             self.crop = False  # display full image
             if not self.data.empty:
                 # fill in missing columns
-                self.data =self.data.assign(reviewed=0, binomen=None, common=None, 
+                self.data =self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
                                             name=None, sex=None, individual_id=0)
             else: 
                 # no media, give warning, go home
