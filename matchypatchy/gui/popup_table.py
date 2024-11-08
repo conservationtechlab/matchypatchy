@@ -1,6 +1,9 @@
 '''
 
 '''
+
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
+                             QTableWidgetItem, QPushButton, QDialogButtonBox)
 from PyQt6 import QtCore, QtWidgets
 
 from matchypatchy.gui.popup_alert import AlertPopup
@@ -14,7 +17,7 @@ from matchypatchy.database import species
 from matchypatchy.database import media 
 
 
-class TableEditorPopup(QtWidgets.QDialog):
+class TableEditorPopup(QDialog):
     def __init__(self, parent, table):
         super().__init__(parent)
         # get database object
@@ -27,10 +30,9 @@ class TableEditorPopup(QtWidgets.QDialog):
 
         self.setWindowTitle(f"Edit {self.table}")
         self.setFixedSize(600,425)
-        layout = QtWidgets.QVBoxLayout(self)
-    
+        layout = QVBoxLayout()
 
-        self.list = QtWidgets.QTableWidget()  
+        self.list = QTableWidget()  
         self.list.setColumnCount(self.data.shape[1])
         self.list.setHorizontalHeaderLabels(self.data.columns.tolist())
         self.list.setColumnWidth(0,25)  # set id column to be small
@@ -41,29 +43,31 @@ class TableEditorPopup(QtWidgets.QDialog):
         layout.addWidget(self.list) 
  
         # Buttons
-        button_layout = QtWidgets.QHBoxLayout()
-        button_new =  QtWidgets.QPushButton("New")
+        button_layout = QHBoxLayout()
+        button_new = QPushButton("New")
         button_new.clicked.connect(self.add)
         button_layout.addWidget(button_new)
 
-        self.button_save = QtWidgets.QPushButton("Save")
+        self.button_save = QPushButton("Save")
         self.button_save.clicked.connect(self.edit)
         self.button_save.setEnabled(False)
         button_layout.addWidget(self.button_save)
         
-        self.button_del = QtWidgets.QPushButton("Delete")
+        self.button_del = QPushButton("Delete")
         self.button_del.clicked.connect(self.delete)
         self.button_del.setEnabled(False)
         button_layout.addWidget(self.button_del)
 
-        buttonBox = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        # Ok/Cancel Buttons
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
         
+        self.setLayout(layout)
         self.update()
+       
 
     def fetch(self):
         # REFACTOR THIS?
@@ -92,7 +96,7 @@ class TableEditorPopup(QtWidgets.QDialog):
         self.list.setColumnCount(self.data.shape[1])
         for row in range(self.data.shape[0]):
             for column in range(self.data.shape[1]): # skip id column
-                item = QtWidgets.QTableWidgetItem(str(self.data.iat[row, column]))
+                item = QTableWidgetItem(str(self.data.iat[row, column]))
                 if column in self.editable_columns:
                     item.setFlags(item.flags() | QtCore.Qt.ItemFlag.ItemIsEditable) 
                 self.list.setItem(row, column, item)
@@ -122,6 +126,7 @@ class TableEditorPopup(QtWidgets.QDialog):
 
 
     def edit(self):
+        # TODO
         self.button_save.setEnabled(True)
         # confirm changes button?
         selected_site = self.list.currentRow()
@@ -132,7 +137,6 @@ class TableEditorPopup(QtWidgets.QDialog):
         #self.mpDB.edit_row(self.table, id, replace)
 
         #self.sites = self.update()
-    
 
     def delete(self):
         selected = self.list.currentItem().text()
@@ -145,4 +149,3 @@ class TableEditorPopup(QtWidgets.QDialog):
             self.mpDB.delete(self.table, cond)
         del dialog
         self.update()
-

@@ -1,27 +1,23 @@
 '''
 
 '''
-from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QHBoxLayout, 
+                             QPushButton, QLineEdit, QLabel, QDialogButtonBox)
+from PyQt6 import QtWidgets
 
 from matchypatchy.gui.popup_alert import AlertPopup
 
-class SpeciesPopup(QtWidgets.QDialog):
+class SpeciesPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Manage Species")
         #inherit survey information, db object
         self.mpDB = parent.mpDB
-
-        fullLayout = QtWidgets.QVBoxLayout(self)
-        self.container = QtWidgets.QWidget(objectName='container')
-        fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
-                                     QtWidgets.QSizePolicy.Policy.Maximum)
         
-        layout = QtWidgets.QVBoxLayout(self.container)
+        layout = QVBoxLayout()
         # SPECIES LIST
 
-        self.list = QtWidgets.QTableWidget()  
+        self.list = QTableWidget()  
         self.list.setColumnCount(2)
         self.list.setHorizontalHeaderLabels(['Scientific Name', 'Common Name'])
         self.list.setColumnWidth(0, 200)
@@ -32,29 +28,34 @@ class SpeciesPopup(QtWidgets.QDialog):
         self.list.itemSelectionChanged.connect(self.set_editdel)
  
         # Buttons
-        button_layout = QtWidgets.QHBoxLayout()
-        button_new =  QtWidgets.QPushButton("New")
-        button_new.clicked.connect(self.add)
-        button_layout.addWidget(button_new)
-
-        self.button_edit = QtWidgets.QPushButton("Edit")
-        self.button_edit.clicked.connect(self.edit)
-        self.button_edit.setEnabled(False)
-        button_layout.addWidget(self.button_edit)
+        button_layout = QHBoxLayout()
         
-        self.button_del = QtWidgets.QPushButton("Delete")
+        button_new =  QPushButton("New")
+        self.button_edit = QPushButton("Edit") 
+        self.button_del = QPushButton("Delete")
+
+        button_new.clicked.connect(self.add)
+        self.button_edit.clicked.connect(self.edit)
         self.button_del.clicked.connect(self.delete)
+
+        # not enabled until site is selected
         self.button_del.setEnabled(False)
+        self.button_edit.setEnabled(False)
+
+        button_layout.addWidget(button_new)
+        button_layout.addWidget(self.button_edit)
         button_layout.addWidget(self.button_del)
 
-        buttonBox = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        # Ok/Cancel Buttons
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
         
+        self.setLayout(layout)
         self.update()
+
 
 
     def set_editdel(self):
@@ -70,8 +71,8 @@ class SpeciesPopup(QtWidgets.QDialog):
 
         # Add data to rows
         for row in range(len(self.species_list_ordered)):
-            binomen = QtWidgets.QTableWidgetItem(self.species_list_ordered[row][1])
-            common = QtWidgets.QTableWidgetItem(self.species_list_ordered[row][2])
+            binomen = QTableWidgetItem(self.species_list_ordered[row][1])
+            common = QTableWidgetItem(self.species_list_ordered[row][2])
             self.list.setItem(row, 0, binomen)
             self.list.setItem(row, 1, common)
         self.set_editdel()   
@@ -109,32 +110,26 @@ class SpeciesPopup(QtWidgets.QDialog):
         self.update()
 
 
-class SpeciesFillPopup(QtWidgets.QDialog):
+class SpeciesFillPopup(QDialog):
     def __init__(self, parent, binomen="", common=""):
         super().__init__(parent)
         self.setWindowTitle("Edit Species")
-        fullLayout = QtWidgets.QVBoxLayout(self)
 
-        self.container = QtWidgets.QWidget(objectName='container')
-        fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
-                                     QtWidgets.QSizePolicy.Policy.Maximum)
-        layout = QtWidgets.QVBoxLayout(self.container)
+        layout = QVBoxLayout()
 
         # Scientific Name
-        layout.addWidget(QtWidgets.QLabel('Scientific Name'))
-        self.binomen = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('Scientific Name'))
+        self.binomen = QLineEdit()
         self.binomen.setText(binomen)
         layout.addWidget(self.binomen)
 
         # Common Name
-        layout.addWidget(QtWidgets.QLabel('Common Name'))
-        self.common = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('Common Name'))
+        self.common = QLineEdit()
         self.common.setText(str(common))
         layout.addWidget(self.common)
 
-        buttonBox = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)
@@ -147,6 +142,8 @@ class SpeciesFillPopup(QtWidgets.QDialog):
 
         self.binomen.returnPressed.connect(lambda: self.common.setFocus())
         self.common.returnPressed.connect(self.accept_verify)
+
+        self.setLayout(layout)
 
         self.binomen.setFocus()
 

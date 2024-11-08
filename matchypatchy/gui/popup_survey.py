@@ -1,52 +1,40 @@
 '''
 
 '''
-from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLineEdit, QLabel, QDialogButtonBox)
 
-class SurveyFillPopup(QtWidgets.QDialog):
+from PyQt6 import QtCore
+
+class SurveyFillPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Survey")
-        fullLayout = QtWidgets.QVBoxLayout(self)
+        layout = QVBoxLayout()
 
-        self.container = QtWidgets.QWidget(objectName='container')
-        fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
-                                     QtWidgets.QSizePolicy.Policy.Maximum)
-
-        
-        buttonSize = self.fontMetrics().height() 
-
-        layout = QtWidgets.QVBoxLayout(self.container)
-        layout.setContentsMargins(
-            buttonSize * 2, buttonSize, buttonSize * 2, buttonSize)
-
-        title = QtWidgets.QLabel(
-            'Enter a new Survey', 
-            objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+        title = QLabel('Enter a new Survey', objectName='title', 
+                       alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         # name
-        layout.addWidget(QtWidgets.QLabel('Name'))
-        self.name = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('Name'))
+        self.name = QLineEdit()
         layout.addWidget(self.name)
 
         #region
-        layout.addWidget(QtWidgets.QLabel('Region'))
-        self.region = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('Region'))
+        self.region = QLineEdit()
         layout.addWidget(self.region)
 
         # start year
-        layout.addWidget(QtWidgets.QLabel('Start Year'))
-        self.year_start = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('Start Year'))
+        self.year_start = QLineEdit()
         layout.addWidget(self.year_start)
 
-        layout.addWidget(QtWidgets.QLabel('End Year'))
-        self.year_end = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('End Year'))
+        self.year_end = QLineEdit()
         layout.addWidget(self.year_end)
 
-        buttonBox = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)
@@ -58,18 +46,16 @@ class SurveyFillPopup(QtWidgets.QDialog):
         self.year_start.textChanged.connect(self.checkInput)
         self.year_end.textChanged.connect(self.checkInput)
 
-        self.name.returnPressed.connect(lambda:
-                self.region.setFocus())
-        self.region.returnPressed.connect(lambda:
-                self.year_start.setFocus())
-        self.year_start.returnPressed.connect(lambda:
-                self.year_end.setFocus())
+        self.name.returnPressed.connect(lambda: self.region.setFocus())
+        self.region.returnPressed.connect(lambda: self.year_start.setFocus())
+        self.year_start.returnPressed.connect(lambda: self.year_end.setFocus())
         self.year_end.returnPressed.connect(self.accept_verify)
 
         self.name.setFocus()
 
+        self.setLayout(layout)
+
     def checkInput(self):
-        # TODO: add dtype validation
         # year end not necessary
         self.okButton.setEnabled(bool(self.get_name() and self.get_region() and self.get_year_start()))
 

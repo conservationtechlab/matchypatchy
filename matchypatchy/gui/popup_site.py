@@ -1,10 +1,12 @@
 """
 
 """
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+                             QListWidget, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6 import QtCore, QtWidgets
 from matchypatchy.gui.popup_alert import AlertPopup
 
-class SitePopup(QtWidgets.QDialog):
+class SitePopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Manage Sites")
@@ -12,44 +14,42 @@ class SitePopup(QtWidgets.QDialog):
         self.mpDB = parent.mpDB
         self.survey_id = parent.active_survey
 
-        fullLayout = QtWidgets.QVBoxLayout(self)
-
-        self.container = QtWidgets.QWidget(objectName='container')
-        fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
-                                     QtWidgets.QSizePolicy.Policy.Maximum)
-        
-        layout = QtWidgets.QVBoxLayout(self.container)
+        layout = QVBoxLayout()
 
         # SITE LIST
         # fetch from database 
-        self.list = QtWidgets.QListWidget()
+        self.list = QListWidget()
         layout.addWidget(self.list) 
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.list.itemSelectionChanged.connect(self.set_editdel)
  
         # Buttons
-        button_layout = QtWidgets.QHBoxLayout()
-        button_new =  QtWidgets.QPushButton("New")
-        button_new.clicked.connect(self.add)
-        button_layout.addWidget(button_new)
+        button_layout = QHBoxLayout()
 
-        self.button_edit = QtWidgets.QPushButton("Edit")
+        button_new =  QPushButton("New")
+        self.button_edit = QPushButton("Edit") 
+        self.button_del = QPushButton("Delete")
+
+        button_new.clicked.connect(self.add)
         self.button_edit.clicked.connect(self.edit)
-        self.button_edit.setEnabled(False)
-        button_layout.addWidget(self.button_edit)
-        
-        self.button_del = QtWidgets.QPushButton("Delete")
         self.button_del.clicked.connect(self.delete)
+
+        # not enabled until site is selected
         self.button_del.setEnabled(False)
+        self.button_edit.setEnabled(False)
+
+        button_layout.addWidget(button_new)
+        button_layout.addWidget(self.button_edit)
         button_layout.addWidget(self.button_del)
 
-        buttonBox = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        # Ok/Cancel Buttons
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
+
+        self.setLayout(layout)
         
         self.update()
 
@@ -102,47 +102,37 @@ class SitePopup(QtWidgets.QDialog):
         self.update()
 
 
-class SiteFillPopup(QtWidgets.QDialog):
+class SiteFillPopup(QDialog):
     def __init__(self, parent, name="", lat="", long=""):
         super().__init__(parent)
         self.setWindowTitle("Edit Site")
-        fullLayout = QtWidgets.QVBoxLayout(self)
 
-        self.container = QtWidgets.QWidget(objectName='container')
-        fullLayout.addWidget(self.container, alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.container.setSizePolicy(QtWidgets.QSizePolicy.Policy.Maximum,
-                                     QtWidgets.QSizePolicy.Policy.Maximum)
+        layout = QVBoxLayout()
 
-        buttonSize = self.fontMetrics().height() 
-
-        layout = QtWidgets.QVBoxLayout(self.container)
-        layout.setContentsMargins(buttonSize * 2, buttonSize, buttonSize * 2, buttonSize)
-
-        title = QtWidgets.QLabel(
-            f'Edit Site for {parent.survey_id[1]}', 
-            objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+        title = QLabel(f'Edit Site for {parent.survey_id[1]}',
+                       objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
         # name
-        layout.addWidget(QtWidgets.QLabel('Name'))
-        self.name = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('Name'))
+        self.name = QLineEdit()
         self.name.setText(name)
         layout.addWidget(self.name)
 
         #region
-        layout.addWidget(QtWidgets.QLabel('Latitude'))
-        self.lat = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('Latitude'))
+        self.lat = QLineEdit()
         self.lat.setText(str(lat))
         layout.addWidget(self.lat)
 
         # start year
-        layout.addWidget(QtWidgets.QLabel('Longitude'))
-        self.long = QtWidgets.QLineEdit()
+        layout.addWidget(QLabel('Longitude'))
+        self.long = QLineEdit()
         self.long.setText(str(long))
         layout.addWidget(self.long)
 
-        buttonBox = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+        # Ok/Cancel Buttons
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)
@@ -154,13 +144,12 @@ class SiteFillPopup(QtWidgets.QDialog):
         self.lat.textChanged.connect(self.checkInput)
         self.long.textChanged.connect(self.checkInput)
 
-        self.name.returnPressed.connect(lambda:
-                self.lat.setFocus())
-        self.lat.returnPressed.connect(lambda:
-                self.long.setFocus())
+        self.name.returnPressed.connect(lambda: self.lat.setFocus())
+        self.lat.returnPressed.connect(lambda: self.long.setFocus())
         self.long.returnPressed.connect(self.accept_verify)
-
         self.name.setFocus()
+
+        self.setLayout(layout)
 
     def checkInput(self):
         # year end not necessary
