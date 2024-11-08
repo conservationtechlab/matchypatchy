@@ -1,10 +1,8 @@
 """
 Create a new Individual Fillable Form
 """
-
-
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QComboBox, QLabel, QLineEdit,
-                             QDialogButtonBox, )
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QComboBox, 
+                             QLabel, QLineEdit, QDialogButtonBox)
 
 
 class IndividualFillPopup(QDialog):
@@ -12,16 +10,15 @@ class IndividualFillPopup(QDialog):
         super().__init__(parent)
         self.species_id = species_id
         self.mpDB = parent.mpDB
+
         self.setWindowTitle("New Individual")
 
-        buttonSize = self.fontMetrics().height() 
-
-        layout = QVBoxLayout(self.container)
-        layout.setContentsMargins(buttonSize * 2, buttonSize, buttonSize * 2, buttonSize)
+        layout = QVBoxLayout()
 
         # species
-        self.combo = QComboBox()
-        layout.addWidget()
+        self.species_combo = QComboBox()
+        layout.addWidget(self.species_combo)
+        self.set_species_options()
 
         # name
         layout.addWidget(QLabel('Name'))
@@ -33,7 +30,13 @@ class IndividualFillPopup(QDialog):
         self.sex = QLineEdit()
         layout.addWidget(self.sex)
 
+        self.name.textChanged.connect(self.checkInput)
+        self.sex.textChanged.connect(self.checkInput)
 
+        self.name.returnPressed.connect(lambda: self.sex.setFocus())
+        self.sex.returnPressed.connect(self.accept_verify)
+
+        # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
@@ -42,25 +45,19 @@ class IndividualFillPopup(QDialog):
         self.okButton.setEnabled(False) 
         self.checkInput() # will enable ok button if in edit mode
 
-        self.name.textChanged.connect(self.checkInput)
-        self.sex.textChanged.connect(self.checkInput)
+        self.setLayout(layout)
 
-        self.name.returnPressed.connect(lambda:
-                self.sex.setFocus())
-        self.sex.returnPressed.connect(self.accept_verify)
-
-        self.name.setFocus()
 
     def set_species_options(self):
         options = self.mpDB.select("species", columns = "id, common")
+        print(options)
         self.list = list(options)
-        self.combo.addItems([el[1] for el in self.list])
+        self.species_combo.addItems([el[1] for el in self.list])
         if self.species_id is not None:
             set_to_index = next((i for i, t in enumerate(self.list) if t[0] == self.species_id), None)
-            self.combo.setCurrentIndex(set_to_index)
+            self.species_combo.setCurrentIndex(set_to_index)
 
     def checkInput(self):
-        # year end not necessary
         self.okButton.setEnabled(bool(self.get_name()))
 
     def get_name(self):
@@ -71,8 +68,7 @@ class IndividualFillPopup(QDialog):
     
     def get_species_id(self):
         # return id only
-        return self.list[self.combo.currentIndex()][0]
-
+        return self.list[self.species_combo.currentIndex()][0]
 
     def accept_verify(self):
         if self.get_name():

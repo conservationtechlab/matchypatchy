@@ -2,6 +2,11 @@
 GUI Window for Match Comparisons
 
 
+TODO:
+ - Add new individual ID to all rois in query sequence and all rois in match sequence
+ - Likewise if merging
+ - Toggle match button off when moving to new query
+
 
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
@@ -14,6 +19,7 @@ from matchypatchy.database.individual import merge
 
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.popup_individual import IndividualFillPopup
 
 class DisplayCompare(QWidget):
     def __init__(self, parent):
@@ -31,13 +37,12 @@ class DisplayCompare(QWidget):
         
         layout = QVBoxLayout()
 
-        self.label = QLabel("Compare Images")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setFixedHeight(20)
-        layout.addWidget(self.label)
+        # FIRST LAYER ----------------------------------------------------------
         first_layer = QHBoxLayout()
+        button_home = QPushButton("Home")
+        button_home.clicked.connect(self.home)
+        first_layer.addWidget(button_home)
 
-        # FILTERS
         survey_label = QLabel("Filter:")
         survey_label.setFixedWidth(50)
         first_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -51,7 +56,6 @@ class DisplayCompare(QWidget):
         self.site_select = QComboBox()
         self.site_select.setFixedWidth(200)
         first_layer.addWidget(self.site_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
 
         # SPECIES 
         self.species_select = QComboBox()
@@ -77,7 +81,7 @@ class DisplayCompare(QWidget):
         # Image Comparison
         image_layout = QHBoxLayout()
         
-        # QUERY
+        # QUERY ------------------------------------------------------------------
         query_layout = QVBoxLayout()
         query_label = QLabel("Query")
         query_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -139,25 +143,28 @@ class DisplayCompare(QWidget):
         image_layout.addLayout(query_layout)
 
 
-        # MIDDLE COLUMN
+        # MIDDLE COLUMN ---------------------------------------------------
         middle_column = QVBoxLayout()
         # Viewpoint Toggle In Middle
         self.button_viewpoint = QPushButton("L/R")
         self.button_viewpoint.clicked.connect(self.toggle_viewpoint)
         self.button_viewpoint.setMaximumWidth(50)
-        middle_column.addWidget(self.button_viewpoint, alignment=Qt.AlignmentFlag.AlignTop)
+        middle_column.addWidget(self.button_viewpoint, 
+                                alignment=Qt.AlignmentFlag.AlignTop)
         middle_column.addSpacing(200)
 
 
         self.button_match = QPushButton("Match")
         self.button_match.setCheckable(True)
         self.button_match.clicked.connect(self.toggle_match)
+        self.button_match.setFixedHeight(50)
         self.button_match.setMaximumWidth(50)
-        middle_column.addWidget(self.button_match, alignment=Qt.AlignmentFlag.AlignTop)
+        middle_column.addWidget(self.button_match, 
+                                alignment=Qt.AlignmentFlag.AlignTop)
         middle_column.addStretch()
         image_layout.addLayout(middle_column)
 
-         # Match
+         # MATCH ------------------------------------------------------------ 
         match_layout = QVBoxLayout()
         match_label = QLabel("Match")
         match_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -209,9 +216,6 @@ class DisplayCompare(QWidget):
         placeholder = QLabel("Brightness, Contrast, zoom? ")
         image_buttons.addWidget(placeholder)
         match_layout.addLayout(image_buttons)
-        
-        # Add buttons to the layout
-
 
         # MetaData
         self.match_info = QLabel("Image Metadata")
@@ -225,21 +229,25 @@ class DisplayCompare(QWidget):
         # Add image block to layout
         layout.addLayout(image_layout)
 
+        # BOTTOM LAYER -------------------------------------------------------------
         # Buttons
         bottom_layer = QHBoxLayout()
-        button_home = QPushButton("Home")
-        button_home.clicked.connect(self.home)
-        button_load = QPushButton("Load Data")
+        button_validate = QPushButton("View Data")
+        button_validate.pressed.connect(self.validate)
         
         # Add buttons to the layout
-        bottom_layer.addWidget(button_home)
-        bottom_layer.addWidget(button_load)
+        bottom_layer.addWidget(button_validate)
         layout.addLayout(bottom_layer)
         
         self.setLayout(layout)
         
+    # RETURN HOME
     def home(self):
         self.parent._set_base_view()
+
+    # MEDIA VIEW
+    def validate(self):
+        self.parent._set_media_view()
 
     def set_query(self, n):
         # wrap around
@@ -249,7 +257,7 @@ class DisplayCompare(QWidget):
         # set current query
         self.current_query = n
         self.current_query_id = self.ranked_queries[self.current_query][0]
-        self.current_query_pair_id = self.rois.loc[self.current_query_id, 'pair_id']
+        self.current_query_pair_id = self.data.loc[self.current_query_id, 'capture_id']
         self.query_number.setText(str(self.current_query + 1))
 
         # get query sequences
@@ -260,7 +268,7 @@ class DisplayCompare(QWidget):
 
         # load new images
         self.load_images()
-        self.load_data()
+        self.load_metadata()
 
 
     def set_query_sequence(self, n):
@@ -287,7 +295,7 @@ class DisplayCompare(QWidget):
 
         self.current_match = n
         self.current_match_id = self.current_query_matches[self.current_match][0]
-        self.current_match_pair_id = self.rois.loc[self.current_match_id, 'pair_id']
+        self.current_match_pair_id = self.data.loc[self.current_match_id, 'capture_id']
         self.match_number.setText(str(self.current_match + 1))
 
         # get match sequences
@@ -295,7 +303,7 @@ class DisplayCompare(QWidget):
 
         # load new images
         self.load_images(match_only=True)
-        self.load_data(match_only=True)
+        self.load_metadata(match_only=True)
 
 
     def set_match_sequence(self, n):
@@ -305,27 +313,37 @@ class DisplayCompare(QWidget):
         pass
 
     def toggle_match(self):
-        # Check if the button is checked (pushed in)
         if self.button_match.isChecked():
             self.button_match.setStyleSheet("""
             QPushButton {
                 background-color: #2e7031;  /* Green background */
                 color: white;              /* White text */
             }""")
-
-            print("Match")
-            # MATCH
-            if self.data.loc[self.current_query_id, "individual_id"] == self.data.loc[self.current_match_id, "individual_id"] and \
-               self.data.loc[self.current_query_id, "individual_id"] == None:
-                #  make new individual
-                pass
-            else:
-                merge(self.mpDB, self.data.loc[self.current_query_id], self.data.loc[self.current_match_id])
-
+            self.new_match()
         else:
             self.button_match.setStyleSheet("")
+
+
+    def new_match(self):
+        # MATCH
+        if self.data.loc[self.current_query_id, "individual_id"] == self.data.loc[self.current_match_id, "individual_id"] and \
+            self.data.loc[self.current_query_id, "individual_id"] == None:
+            # make new individual
+            dialog = IndividualFillPopup(self)
+            if dialog.exec() and dialog.accepted:
+                individual_id = self.mpDB.add_individual(dialog.get_name(),dialog.get_sex(), dialog.get_species_id())
+
+                # update query and match
+                self.mpDB.edit_row('roi', self.current_query_id, {"individual_id": individual_id}) 
+                self.mpDB.edit_row('roi', self.current_match_id, {"individual_id": individual_id}) 
             
-            # UNMATCH
+            del dialog
+            # update data  
+            self.data = fetch_roi_media(self.mpDB)
+            self.load_metadata() 
+
+        else:
+            merge(self.mpDB, self.data.loc[self.current_query_id], self.data.loc[self.current_match_id])
 
     def load_images(self, match_only=False):
        """
@@ -337,7 +355,7 @@ class DisplayCompare(QWidget):
        self.match_image.display_image(self.data.loc[self.current_match_id,"filepath"],
                                       bbox=get_bbox(self.data.loc[self.current_match_id]))
 
-    def load_data(self, match_only=False):
+    def load_metadata(self, match_only=False):
         """
         Load MetaData for Current Query and Match
         """
@@ -345,7 +363,7 @@ class DisplayCompare(QWidget):
             self.query_info.setText(roi_metadata(self.data.loc[self.current_query_id]))
         self.match_info.setText(roi_metadata(self.data.loc[self.current_match_id]))
 
-    # RUN ON ENTRY
+    # RUN ON ENTRY ==========================================================================
     def calculate_neighbors(self):
         """
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
@@ -355,22 +373,29 @@ class DisplayCompare(QWidget):
         # must have embeddings to continue
         if not (self.data["emb_id"] == 0).all():
             self.neighbor_dict, nearest_dict = match(self.mpDB)
-            self.ranked_queries = rank(nearest_dict)
 
-            # set number of queries to validate
-            self.n_queries = len(self.neighbor_dict)
-            self.query_n.setText("/" + str(self.n_queries))
+            if self.neighbor_dict:
+                self.ranked_queries = rank(nearest_dict)
 
-            # set first query to highest rank 
-            self.set_query(0)
+                # set number of queries to validate
+                self.n_queries = len(self.neighbor_dict)
+                self.query_n.setText("/" + str(self.n_queries))
+
+                # set first query to highest rank 
+                self.set_query(0)
+            # filtered neighbor dict returns empty, all existing data must be from same individual
+            else:
+                dialog = AlertPopup(self, prompt="No data to compare, all available data from same sequence/capture.")
+                if dialog.exec():
+                    del dialog
+                self.parent._set_base_view()
         else:
             dialog = AlertPopup(self, prompt="No data to match, process images first.")
             if dialog.exec():
                 del dialog
             self.parent._set_base_view()
         
-
-        # Keyboard Handler
+    # KEYBOARD HANDLER ======================================================================
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()
@@ -389,10 +414,9 @@ class DisplayCompare(QWidget):
             self.set_match(self.current_match + 1)
 
         # M - Match
-        elif key == 'm':
+        elif key == 77:
+            self.button_match.click()
             self.toggle_match()
 
         else:
             print(f"Key pressed: {key_text} (Qt key code: {key})")
-
-
