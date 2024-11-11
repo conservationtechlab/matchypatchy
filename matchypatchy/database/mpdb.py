@@ -450,7 +450,7 @@ class MatchyPatchyDB():
                         ORDER BY distance
                         LIMIT ?
                         """
-            data_tuple = (query,k)
+            data_tuple = (query,k+1)
             cursor.execute(command,data_tuple)
             results = cursor.fetchall()
             db.close()
