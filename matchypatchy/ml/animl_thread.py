@@ -71,6 +71,9 @@ class AnimlThread(QThread):
     
     def get_species(self):
         # TODO: Utilize probability for captures/sequences
+        if self.classifier_filepath is None:
+            return
+
         classes = pd.read_csv(self.classifier_classlist).set_index("Code")
 
         info = "roi.id, media_id, filepath, frame, species_id, bbox_x, bbox_y, bbox_w, bbox_h"

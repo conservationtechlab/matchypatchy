@@ -114,7 +114,7 @@ class MLOptionsPopup(QDialog):
         layout.addWidget(self.classifier_label)
         layout.addWidget(self.classifier)
 
-        self.available_classifiers = list(models.available_models(models.CLASSIFIERS))
+        self.available_classifiers = ['None'] + list(models.available_models(models.CLASSIFIERS))
         self.classifier.addItems(self.available_classifiers)
 
         # Re-ID
@@ -154,8 +154,11 @@ class MLOptionsPopup(QDialog):
         return self.selected_detector_key
 
     def select_classifier(self):
-        self.selected_classifier_key = self.available_classifiers[self.classifier.currentIndex()]
-        return self.selected_classifier_key
+        if self.classifier.currentIndex() == 0:
+            return None
+        else:
+            self.selected_classifier_key = self.available_classifiers[self.classifier.currentIndex()]
+            return self.selected_classifier_key
     
     def select_reid(self): 
         self.selected_reid_key = self.available_reids[self.reid.currentIndex()]
