@@ -10,9 +10,9 @@ TODO:
 
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QLineEdit)
+                             QLabel, QComboBox, QLineEdit, QSlider)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtGui import QKeyEvent, QIntValidator
 
 from matchypatchy.database.roi import (fetch_roi_media, match, rank, get_bbox, roi_metadata, get_sequence)
 from matchypatchy.database.individual import merge
@@ -25,6 +25,8 @@ class DisplayCompare(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.k = 3  # default knn
+        self.threshold = 80
         self.mpDB = parent.mpDB
 
         self.current_query_id = 0
@@ -42,7 +44,33 @@ class DisplayCompare(QWidget):
         button_home = QPushButton("Home")
         button_home.clicked.connect(self.home)
         first_layer.addWidget(button_home)
+        first_layer.addSpacing(10)
 
+        # Match Options
+        first_layer.addWidget(QLabel("Max # of Matches:"), 0, 
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        self.knn_number = QLineEdit(str(self.k))
+        self.knn_number.setValidator(QIntValidator(0, 1000))
+        self.knn_number.textChanged.connect(self.change_k)
+        self.knn_number.setMaximumWidth(50)
+        first_layer.addWidget(self.knn_number, 0, 
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+
+        first_layer.addWidget(QLabel("Distance Threshold:"), 0, 
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
+        self.threshold_slider.setRange(1, 100)  # Set range from 1 to 100
+        self.threshold_slider.setValue(self.threshold)  # Set initial value
+        self.threshold_slider.valueChanged.connect(self.change_threshold)
+        first_layer.addWidget(self.threshold_slider, 0, 
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        
+        button_recalc = QPushButton("Recalculate Matches")
+        button_recalc.clicked.connect(self.calculate_neighbors)
+        first_layer.addWidget(button_recalc)
+
+        # Filters
+        first_layer.addSpacing(20)
         survey_label = QLabel("Filter:")
         survey_label.setFixedWidth(50)
         first_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -250,6 +278,9 @@ class DisplayCompare(QWidget):
         self.parent._set_media_view()
 
     def set_query(self, n):
+        """
+        Set the Query side to a particular (n) image in the list
+        """
         # wrap around
         if n < 0: n = self.n_queries - 1
         if n > self.n_queries - 1: n = 0
@@ -261,7 +292,8 @@ class DisplayCompare(QWidget):
         self.query_number.setText(str(self.current_query + 1))
 
         # get query sequences
-        get_sequence(self.current_query_id, self.data)
+        self.query_sequence_ids = get_sequence(self.current_query_id, self.data)
+        print(self.query_sequence_ids)
 
         # update matches
         self.update_matches()
@@ -299,11 +331,13 @@ class DisplayCompare(QWidget):
         self.match_number.setText(str(self.current_match + 1))
 
         # get match sequences
-        get_sequence(self.current_match_id, self.data)
+        self.match_sequence_ids = get_sequence(self.current_match_id, self.data)
+        print(self.match_sequence_ids)
 
         # load new images
         self.load_images(match_only=True)
         self.load_metadata(match_only=True)
+
 
 
     def set_match_sequence(self, n):
@@ -363,6 +397,16 @@ class DisplayCompare(QWidget):
             self.query_info.setText(roi_metadata(self.data.loc[self.current_query_id]))
         self.match_info.setText(roi_metadata(self.data.loc[self.current_match_id]))
 
+
+    def change_k(self):
+        # Set new k value and recalculate neighbors
+        if self.knn_number.text() != '':
+            self.k = int(self.knn_number.text())
+
+    def change_threshold(self):
+        # set new threshold value and recalculate neighbors
+        self.threshold = self.threshold_slider.value()
+
     # RUN ON ENTRY ==========================================================================
     def calculate_neighbors(self):
         """
@@ -372,10 +416,13 @@ class DisplayCompare(QWidget):
 
         # must have embeddings to continue
         if not (self.data["emb_id"] == 0).all():
-            self.neighbor_dict, nearest_dict = match(self.mpDB)
+            self.neighbor_dict, nearest_dict = match(self.mpDB, k=self.k)
+            #print(self.neighbor_dict)
 
             if self.neighbor_dict:
                 self.ranked_queries = rank(nearest_dict)
+
+                #print(self.ranked_queries)
 
                 # set number of queries to validate
                 self.n_queries = len(self.neighbor_dict)
@@ -394,6 +441,8 @@ class DisplayCompare(QWidget):
             if dialog.exec():
                 del dialog
             self.parent._set_base_view()
+
+
         
     # KEYBOARD HANDLER ======================================================================
     def keyPressEvent(self, event):

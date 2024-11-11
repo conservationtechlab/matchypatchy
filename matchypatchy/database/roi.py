@@ -44,7 +44,7 @@ def roi_knn(mpDB, emb_id, k=5):
     return neighbors
 
 
-def match(mpDB): 
+def match(mpDB, k=3): 
     # 1. Get KNN for each ROI
     # 2. filter out matches from same sequence, capture
     # 3. rank ROIs by match scores 
@@ -58,7 +58,7 @@ def match(mpDB):
 
     # TODO: WHAT TO DO IF NO NEIGHBORS?
     for _,roi in rois.iterrows():
-        neighbors = roi_knn(mpDB, roi["emb_id"]) 
+        neighbors = roi_knn(mpDB, roi["emb_id"], k=k) 
         filtered_neighbors = filter(rois, roi['id'], neighbors)
         if filtered_neighbors:
             neighbor_dict[roi['id']] = filtered_neighbors
@@ -66,7 +66,7 @@ def match(mpDB):
 
     return neighbor_dict, nearest_dict
 
-
+# TODO: MERGE SEQUENCES
 def filter(rois, roi_id, neighbors, threshold = 100):
     """
     Returns list of valid neighbors by roi_emb.id
@@ -137,8 +137,23 @@ def get_sequence(id, roi_media):
 
     Group by capture, order by frame number
     """
+    sequence
     sequence_id = roi_media.loc[id, "sequence_id"]
     sequence = roi_media[roi_media['sequence_id'] == sequence_id]
-    #print(sequence.sort_values(by=['capture_id']))
+    sequence = sequence.sort_values(by=['capture_id'])
+    return sequence.index.to_list()
 
 
+
+def sequence_roi_dict(roi_media):
+    """
+    Return two lists of roi.ids
+
+    Group by capture, order by frame number
+    """
+    sequence_dict = dict()
+    sequence_ids = roi_media["sequence_id"].to_list()
+    for s in sequence_ids:
+        sequence = roi_media[roi_media['sequence_id'] == s]
+        sequence_dict[s] = sequence.index.to_list()
+    return sequence_dict
