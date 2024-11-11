@@ -30,6 +30,10 @@ class DisplayBase(QWidget):
         super().__init__()
         self.parent = parent
         self.mpDB = parent.mpDB
+
+        container = QWidget()
+        container.setObjectName("mainBorderWidget")
+        #container.setStyleSheet("#mainBorderWidget { border: 20px solid gray; }")
         
         layout = QVBoxLayout()
 
@@ -37,7 +41,8 @@ class DisplayBase(QWidget):
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFixedHeight(20)
         layout.addWidget(self.label)
-        layout.addSpacing(400)
+        layout.addSpacing(500)
+        layout.addStretch()
 
         column_layout = QHBoxLayout()
         column_layout.addSpacing(100) # add spacing to left side
@@ -149,11 +154,16 @@ class DisplayBase(QWidget):
 
         
         layout.addLayout(column_layout)
-        layout.addSpacing(100)
+        layout.addSpacing(50) # add spacing to bottom
 
-        self.setStyleSheet("QPushButton, QComboBox { height: 30px; }"
+        self.setStyleSheet("QPushButton, QComboBox { height: 40px; }"
                            "#QLabel_Base { font-size: 16px; }")
-        self.setLayout(layout)
+        
+        container.setLayout(layout)
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(container)
+
+        self.setLayout(main_layout)
 
         self.update_survey()
 
