@@ -50,8 +50,8 @@ class IndividualFillPopup(QDialog):
 
     def set_species_options(self):
         options = self.mpDB.select("species", columns = "id, common")
-        print(options)
-        self.list = list(options)
+        self.list = [(None,"Species")] + list(options)
+        print(self.list)
         self.species_combo.addItems([el[1] for el in self.list])
         if self.species_id is not None:
             set_to_index = next((i for i, t in enumerate(self.list) if t[0] == self.species_id), None)

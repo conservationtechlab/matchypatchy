@@ -19,7 +19,7 @@ def setup_database(filepath='matchypatchy.db'):
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL,
-                        year_start INTEGER NOT NULL,
+                        year_start INTEGER,
                         year_end INTEGER,
                         region TEXT NOT NULL )''')
 
@@ -40,12 +40,11 @@ def setup_database(filepath='matchypatchy.db'):
                         timestamp TEXT NOT NULL,
                         site_id INTEGER NOT NULL,
                         sequence_id INTEGER,
-                        capture_id INTEGER,
+                        external_id INTEGER,
                         comment TEXT,
                         favorite INTEGER NOT NULL,
                         FOREIGN KEY (site_id) REFERENCES site (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id),
-                        FOREIGN KEY (capture_id) REFERENCES capture (id) )''')
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id) )''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
@@ -75,7 +74,7 @@ def setup_database(filepath='matchypatchy.db'):
     # INDIVIDUAL
     cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
                         id INTEGER PRIMARY KEY,
-                        species_id INT NOT NULL,
+                        species_id INTEGER,
                         name TEXT NOT NULL,
                         sex TEXT,
                         FOREIGN KEY(species_id) REFERENCES species (id)
@@ -86,10 +85,6 @@ def setup_database(filepath='matchypatchy.db'):
                         id INTEGER PRIMARY KEY
                     )''')
 
-    # CAPTURE
-    cursor.execute('''CREATE TABLE IF NOT EXISTS capture (
-                        id INTEGER PRIMARY KEY
-                    )''')
 
     # Commit changes and close connection
     db.commit()

@@ -20,9 +20,10 @@ class SequenceThread(QThread):
 
     progress_update = pyqtSignal(str)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, max_time = 60, max_n = 3):
+    def __init__(self, mpDB, flag, max_time = 60, max_n = 3):
         super().__init__()
         self.mpDB = mpDB
+        self.flag = flag
         self.max_time = timedelta(seconds=max_time)
         self.max_n = max_n
 
@@ -31,63 +32,43 @@ class SequenceThread(QThread):
         self.media = self.media.sort_values(by=['site_id','timestamp'])
 
     def run(self):
-        self.progress_update.emit("Processing sequences...")
+        # if process sequence option is checked, will rewrite sequence_id
+        if self.flag:
+            self.progress_update.emit("Processing sequences...")
 
-        sequences = []
-        current_sequence = []
-        seen_pairs = {}
-        for _, image in self.media.iterrows():
-            if current_sequence:
-                # site is the same, timestamp under threshold, n under threshold
-                if (image['site_id'] == current_sequence[0]['site_id']) and \
-                    (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
-                    (len(current_sequence) < self.max_n):
-                    current_sequence.append(image)
+            sequences = []
+            current_sequence = []
+            seen_pairs = {}
+            for _, image in self.media.iterrows():
+                if current_sequence:
+                    # site is the same, timestamp under threshold, n under threshold
+                    if (image['site_id'] == current_sequence[0]['site_id']) and \
+                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
+                        (len(current_sequence) < self.max_n):
+                        current_sequence.append(image)
+                    else:
+                        # bank the current sequence and start a new group
+                        sequences.append(current_sequence)
+                        current_sequence = [image]  
                 else:
-                    # bank the current sequence and start a new group
-                    sequences.append(current_sequence)
-                    current_sequence = [image]  
-            else:
-                current_sequence = [image]
+                    current_sequence = [image]
 
-            # get pair id, make note to group
-            capture_id = image['capture_id']
-            g = len(sequences)
-            if capture_id in seen_pairs: 
-                if g not in seen_pairs[capture_id]:
-                    seen_pairs[capture_id].extend([g])  # Merge the current list with the existing one
-            else:
-                seen_pairs[capture_id] = [g]
+            # Append the last group
+            if current_sequence:
+                sequences.append(current_sequence)
 
-        # Append the last group
-        if current_sequence:
-            sequences.append(current_sequence)
+            # update media entries
+            for _, group in enumerate(sequences):
+                # create a sequence id
+                sequence_id = self.mpDB.add_sequence()
+                for image in group:
 
-        # merge pairs into the same sequence
-        paired_sequences = [value for value in seen_pairs.values() if len(value) > 1]
-        sequences = self.merge_paired_sequences(sequences, paired_sequences)
+                    self.mpDB.edit_row('media', image['id'], {"sequence_id":sequence_id})
 
-        # update media entries
-        for _, group in enumerate(sequences):
-            # create a sequence id
-            sequence_id = self.mpDB.add_sequence()
-            for image in group:
+        # if not calculating sequence, each media entry gets own sequence_id
+        else:
+            # only add sequence_id where blank
+            self.media = self.media[self.media['sequence_id'].isna()]
+            for _, image in self.media.iterrows():
+                sequence_id = self.mpDB.add_sequence()
                 self.mpDB.edit_row('media', image['id'], {"sequence_id":sequence_id})
-
-    def merge_paired_sequences(self, sequences, pairs):
-        # save index of other element to remove later
-        to_remove = []
-        for pair in pairs:
-            min_i = min(pair)
-            remainder = [p for p in pair if p != min_i]
-            if 0 <= min_i < len(sequences):
-                for index in remainder:
-                    sequences[min_i] += sequences[index]  # Concatenate the list at the given index
-                to_remove.extend(remainder)
-    
-        # remove duplicate sequences
-        to_remove.sort(reverse=True)
-        for index in to_remove:
-            sequences.pop(index)
-
-        return sequences

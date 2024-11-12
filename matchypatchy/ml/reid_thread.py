@@ -23,8 +23,8 @@ class ReIDThread(QThread):
     def run(self):
         # must be fetched after start() to chain with animl
         self.rois = fetch_roi(self.mpDB)
-        media, _ = self.mpDB.select_join("roi","media", "roi.media_id = media.id", columns="roi.id, media_id, filepath, capture_id, sequence_id")
-        self.media = pd.DataFrame(media, columns=["id", "media_id", "filepath", "capture_id", "sequence_id"])
+        media, _ = self.mpDB.select_join("roi","media", "roi.media_id = media.id", columns="roi.id, media_id, filepath, external_id, sequence_id")
+        self.media = pd.DataFrame(media, columns=["id", "media_id", "filepath", "external_id", "sequence_id"])
         self.image_paths = pd.Series(self.media["filepath"].values,index=self.media["id"]).to_dict() 
 
         self.progress_update.emit("Calculating viewpoint...")

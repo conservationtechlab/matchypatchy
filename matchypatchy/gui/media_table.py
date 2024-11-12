@@ -2,7 +2,7 @@
 Widget for displaying list of Media
 ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 'reviewed', 
 'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'timestamp', 
-'site_id', 'sequence_id', 'capture_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+'site_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 
 # TODO: MAKE TABLE EDITABLE
@@ -34,7 +34,7 @@ class MediaTable(QWidget):
         self.edits = list()
         self.columns = ["reviewed","thumbnail", "filepath", "timestamp", 
                         "viewpoint", "binomen", "common", "individual_id", "sex", 
-                        "site", "sequence_id", "capture_id", "favorite", "comment"]
+                        "site", "sequence_id", "external_id", "favorite", "comment"]
         # Set up layout
         layout = QVBoxLayout()
 
@@ -43,7 +43,7 @@ class MediaTable(QWidget):
         self.table.setColumnCount(14)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", 
                                               "Viewpoint", "Species", "Common", "Individual", "Sex", 
-                                              "Site", "Sequence ID", "Capture ID", "Favorite", "Comment"])
+                                              "Site", "Sequence ID", "External ID", "Favorite", "Comment"])
         self.table.resizeColumnsToContents()
         self.table.setColumnWidth(1, 100)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
@@ -204,7 +204,7 @@ class MediaTable(QWidget):
         self.table.setItem(i, 8, QTableWidgetItem(roi["sex"]))  # Sex column
         self.table.setItem(i, 9, QTableWidgetItem(roi["site"]))   # Site column
         self.table.setItem(i, 10, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
-        self.table.setItem(i, 11, QTableWidgetItem(str(roi["capture_id"])))  # Sequence ID column
+        self.table.setItem(i, 11, QTableWidgetItem(str(roi["external_id"])))  # Sequence ID column
         
         # Favorite Checkbox
         favorite = QTableWidgetItem()

@@ -26,7 +26,7 @@ class AnimlThread(QThread):
 
 
         self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "site", 
-                                                  "sequence_id", "capture_id", "comment", "favorite"])
+                                                  "sequence_id", "external_id", "comment", "favorite"])
         self.image_paths = pd.Series(self.media["filepath"].values,index=self.media["id"]).to_dict() 
 
         self.md_filepath = models.get_path(detector_key)

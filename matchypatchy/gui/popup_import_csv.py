@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 
-columns=["filepath", "timestamp", 'site_id', 'sequence_id', "capture_id", 'comment',
+columns=["filepath", "timestamp", 'site_id', 'sequence_id', "external_id", 'comment',
          "viewpoint", "species_id", "individual_id"]
 
 class ImportCSVPopup(QDialog):
@@ -24,7 +24,7 @@ class ImportCSVPopup(QDialog):
         self.selected_timestamp = self.columns[0]
         self.selected_site = self.columns[0]
         self.selected_sequence_id = self.columns[0]
-        self.selected_capture_id = self.columns[0]
+        self.selected_external_id = self.columns[0]
         self.selected_viewpoint = self.columns[0]
         self.selected_species = self.columns[0]
         self.selected_individual = self.columns[0]
@@ -89,11 +89,11 @@ class ImportCSVPopup(QDialog):
 
         # capture
         capture_layout = QHBoxLayout()
-        capture_layout.addWidget(QLabel("Capture ID:"))
-        self.capture_id = QComboBox()
-        self.capture_id.addItems(self.columns)
-        self.capture_id.currentTextChanged.connect(self.select_capture)
-        capture_layout.addWidget(self.capture_id)
+        capture_layout.addWidget(QLabel("External ID:"))
+        self.external_id = QComboBox()
+        self.external_id.addItems(self.columns)
+        self.external_id.currentTextChanged.connect(self.select_capture)
+        capture_layout.addWidget(self.external_id)
         layout.addLayout(capture_layout)
         layout.addSpacing(5)
 
@@ -185,9 +185,9 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
         
-    def select_capture(self):
+    def select_external(self):
         try:
-            self.selected_capture_id = self.columns[self.capture_id.currentIndex()]
+            self.selected_external_id = self.columns[self.external_id.currentIndex()]
             return True
         except IndexError:
             return False
@@ -234,7 +234,7 @@ class ImportCSVPopup(QDialog):
                 "timestamp": self.selected_timestamp,
                 "site": self.selected_site,
                 "sequence_id": self.selected_sequence_id,
-                "capture_id": self.selected_capture_id,
+                "external_id": self.selected_external_id,
                 "viewpoint": self.selected_viewpoint,
                 "species": self.selected_species,
                 "individual": self.selected_individual,
@@ -299,22 +299,17 @@ class CSVImportThread(QThread):
             # Optional data
             sequence_id = int(exemplar[self.selected_columns['sequence_id']].item()) if self.selected_columns['sequence_id'] != 'None' else None
 
-            # get capture_id and convert or create new one
-            if self.selected_columns['capture_id'] != 'None':
-                temp_id = int(exemplar[self.selected_columns['capture_id']].item())
-                try:
-                    capture_id = capture_dict[temp_id]
-                except KeyError:
-                    capture_id = self.mpDB.add_capture()
-                    capture_dict[temp_id] = capture_id
+            # get external_id and convert or create new one
+            if self.selected_columns['external_id'] != 'None':
+                external_id = int(exemplar[self.selected_columns['external_id']].item())
             else:
-                capture_id = self.mpDB.add_capture()
+                external_id = None
 
             comment = exemplar[self.selected_columns['comment']].item() if self.selected_columns['comment'] != 'None' else None
 
             media_id = self.mpDB.add_media(filepath, ext, timestamp, site_id,
                                            sequence_id=sequence_id, 
-                                           capture_id=capture_id,
+                                           external_id=external_id,
                                            comment=comment)
             # TODO: add dtype checks
             for i, roi in group.iterrows():

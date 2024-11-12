@@ -163,7 +163,7 @@ class MatchyPatchyDB():
             return False
 
     def add_media(self, filepath: str, ext: str, timestamp: str, site_id: int, 
-                  sequence_id: Optional[int]=None, capture_id: Optional[int]=None, 
+                  sequence_id: Optional[int]=None, external_id: Optional[int]=None, 
                   comment: Optional[str]=None, favorite: int=0):
         """
         Media has 9 attributes not including id:
@@ -173,7 +173,7 @@ class MatchyPatchyDB():
             timestamp TEXT NOT NULL,
             site_id INTEGER NOT NULL,
             sequence_id INTEGER,
-            capture_id INTEGER,
+            external_id INTEGER,
             comment TEXT,
             favorite INTEGER,
         """
@@ -182,10 +182,10 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO media
                         (filepath, ext, timestamp, site_id,
-                        sequence_id, capture_id, comment, favorite) 
+                        sequence_id, external_id, comment, favorite) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (filepath, ext, timestamp, site_id, 
-                          sequence_id, capture_id, comment, favorite)
+                          sequence_id, external_id, comment, favorite)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -355,7 +355,7 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed, 
                          roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp, 
-                         site_id, sequence_id, capture_id, comment, favorite, binomen, common, name, sex"""
+                         site_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex"""
             command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
                                            LEFT JOIN species ON roi.species_id = species.id
                                            LEFT JOIN individual ON roi.individual_id = individual.id;"""

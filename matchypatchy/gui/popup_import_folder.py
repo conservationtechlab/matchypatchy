@@ -14,7 +14,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from animl.file_management import build_file_manifest
 
 
-columns=["filepath", "timestamp", 'site_id', 'sequence_id', "capture_id", 'comment',
+columns=["filepath", "timestamp", 'site_id', 'sequence_id', "external_id", 'comment',
          "viewpoint", "species_id", "individual_id"]
 
 class ImportFolderPopup(QDialog):
@@ -164,7 +164,7 @@ class FolderImportThread(QThread):
                                            str(timestamp), 
                                            int(site_id),
                                            sequence_id=None, 
-                                           capture_id=None,
+                                           external_id=None,
                                            comment=None)
 
             self.progress_update.emit(i)

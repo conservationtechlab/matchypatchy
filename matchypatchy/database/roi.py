@@ -19,6 +19,7 @@ def fetch_roi(mpDB):
     if manifest:
         rois = pd.DataFrame(manifest, columns=["id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
                                                "species_id", "viewpoint", "reviewed", "individual_id", "emb_id"])
+        rois = rois.replace({float('nan'): None})
         return rois
     else:
         return False
@@ -30,10 +31,11 @@ def fetch_roi_media(mpDB):
     """
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 
                 'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id', 
-                'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'capture_id',
+                'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
     media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
+    rois = rois.replace({float('nan'): None})
     rois = rois.set_index("id")
     return rois
 
@@ -44,7 +46,7 @@ def roi_knn(mpDB, emb_id, k=5):
     return neighbors
 
 
-def match(mpDB, sequences, k=3):
+def match(mpDB, sequences, k=3, threshold=100):
     """
     # 1. Get sequences of ROIS
     # 2. Get KNN for each ROI in sequence
@@ -52,12 +54,11 @@ def match(mpDB, sequences, k=3):
     # 4. rank ROIs by match scores 
     
     """
-    info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id, capture_id"
+    info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id"
     # need sequence and capture ids from media to restrict comparisons shown to 
     rois, columns = mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
     rois = pd.DataFrame(rois,columns=columns)
     neighbor_dict = dict()
-    distance_dict = dict()
     nearest_dict = dict()
 
     # TODO: WHAT TO DO IF NO NEIGHBORS?
@@ -65,7 +66,7 @@ def match(mpDB, sequences, k=3):
         for roi_id in sequences[s]:
             emb_id = rois.loc[rois['id'] == roi_id, "emb_id"].item()
             neighbors = roi_knn(mpDB, emb_id, k=k)
-            filtered_neighbors = filter(rois, roi_id, neighbors)
+            filtered_neighbors = filter(rois, roi_id, neighbors, threshold)
             if filtered_neighbors:
                 neighbor_dict.setdefault(s, []).extend(filtered_neighbors)
         # sort after matching full sequence
@@ -80,7 +81,7 @@ def match(mpDB, sequences, k=3):
     
 
 # TODO: MERGE SEQUENCES
-def filter(rois, roi_id, neighbors, threshold = 100):
+def filter(rois, roi_id, neighbors, threshold):
     """
     Returns list of valid neighbors by roi_emb.id
     """
@@ -88,18 +89,15 @@ def filter(rois, roi_id, neighbors, threshold = 100):
     query = rois[rois['id'] == roi_id].squeeze()
     for i in range(len(neighbors)):  # skip first one, self match
         match = rois[rois['emb_id'] == neighbors[i][0]].squeeze()
-
         # if not same individual or unlabeled individual:
         if (query['individual_id'] is None) or (match['individual_id'] != query['individual_id']):
             # if not in same sequence
             if (query['sequence_id'] is None) or (match['sequence_id'] != query['sequence_id']):
-                # if not in same capture (should be redundent to sequence)
-                if (query['capture_id'] is None) or (match['capture_id'] != query['capture_id']):
-                    # distance check (do first or last?)
-                    if neighbors[i][1] < threshold and neighbors[i][1] > 0:
-                        # replace emb_id with roi_id
-                        match_roi_id = int(match['id'])
-                        filtered.append((match_roi_id, neighbors[i][1]))
+                # distance check (do first or last?)
+                if neighbors[i][1] < threshold and neighbors[i][1] > 0:
+                    # replace emb_id with roi_id
+                    match_roi_id = int(match['id'])
+                    filtered.append((match_roi_id, neighbors[i][1]))
     return filtered
 
 
@@ -157,7 +155,7 @@ def get_sequence(id, roi_media):
     sequence
     sequence_id = roi_media.loc[id, "sequence_id"]
     sequence = roi_media[roi_media['sequence_id'] == sequence_id]
-    sequence = sequence.sort_values(by=['capture_id'])
+    sequence = sequence.sort_values(by=['timestamp'])
     return sequence.index.to_list()
 
 
