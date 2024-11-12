@@ -11,7 +11,7 @@ from matchypatchy.database.individual import (merge,)
 from matchypatchy.database.media import (IMAGE_EXT, VIDEO_EXT, fetch_media,)
 from matchypatchy.database.mpdb import (MatchyPatchyDB,)
 from matchypatchy.database.roi import (VIEWPOINT, fetch_roi, fetch_roi_media,
-                                       get_bbox, get_sequence, match, rank,
+                                       get_bbox, get_sequence, match,                                       
                                        roi_knn, roi_metadata,)
 from matchypatchy.database.setup import (setup_database,)
 from matchypatchy.database.site import (fetch_sites, import_csv,)

@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent, QIntValidator
 
-from matchypatchy.database.roi import (fetch_roi_media, match, rank, get_bbox, roi_metadata, get_sequence)
+import matchypatchy.database.roi as db_roi
 from matchypatchy.database.individual import merge
 
 from matchypatchy.gui.widget_image import ImageWidget
@@ -29,13 +29,13 @@ class DisplayCompare(QWidget):
         self.threshold = 80
         self.mpDB = parent.mpDB
 
-        self.current_query_id = 0
-        self.current_match_id = 0
-
         self.current_query = 0
         self.current_match = 0
-        self.current_query_seq = 0
-        self.current_match_seq = 0
+        self.current_query_sn = 0
+
+        # ROI REFERENCE
+        self.current_query_rid = 0
+        self.current_match_rid = 0
         
         layout = QVBoxLayout()
 
@@ -93,7 +93,7 @@ class DisplayCompare(QWidget):
         first_layer.addStretch()
         layout.addLayout(first_layer)
 
-        # Control Panel
+        # Control Panel NOT ACTIVE
         control_panel = QVBoxLayout()
         layer_one = QHBoxLayout()
         layer_one.addWidget(QPushButton("Button 1"))
@@ -102,7 +102,7 @@ class DisplayCompare(QWidget):
         layer_two.addWidget(QLabel("Label 1"))
         layer_two.addWidget(QLabel("Label 2"))
         control_panel.addLayout(layer_one)
-        layout.addLayout(control_panel)
+        #layout.addLayout(control_panel)
 
         layout.addSpacing(20)
 
@@ -116,6 +116,7 @@ class DisplayCompare(QWidget):
         query_layout.addWidget(query_label)
         # Options
         query_options = QHBoxLayout()
+        query_options.addStretch()
         # # Query Number
         query_options.addWidget(QLabel("Query Image:"))
         self.button_previous_query = QPushButton("<<")
@@ -131,21 +132,20 @@ class DisplayCompare(QWidget):
         self.button_next_query.setMaximumWidth(40)
         self.button_next_query.clicked.connect(lambda: self.set_query(self.current_query + 1))
         query_options.addWidget(self.button_next_query)
-        query_options.addStretch()  # stretch the gap
         # # Sequence Number
         query_options.addWidget(QLabel("Sequence:"))
         self.button_previous_query_seq = QPushButton("<<")
         self.button_previous_query_seq.setMaximumWidth(40)
-        self.button_previous_query_seq.clicked.connect(lambda: self.set_query_sequence(self.current_query_seq - 1))
+        self.button_previous_query_seq.clicked.connect(lambda: self.set_within_query_sequence(self.current_query_sn - 1))
         query_options.addWidget(self.button_previous_query_seq)
-        self.query_seq_number = QLineEdit(str(self.current_query_seq + 1))
+        self.query_seq_number = QLineEdit(str(self.current_query_sn + 1))
         self.query_seq_number.setMaximumWidth(100)
         query_options.addWidget(self.query_seq_number)
         self.query_sequence_n = QLabel("/3")
         query_options.addWidget(self.query_sequence_n)
         self.button_next_query_seq = QPushButton(">>")
         self.button_next_query_seq.setMaximumWidth(40)
-        self.button_next_query_seq.clicked.connect(lambda: self.set_query_sequence(self.current_query_seq + 1))
+        self.button_next_query_seq.clicked.connect(lambda: self.set_within_query_sequence(self.current_query_sn + 1))
         query_options.addWidget(self.button_next_query_seq)
         query_options.addStretch()
         query_layout.addLayout(query_options)
@@ -199,6 +199,7 @@ class DisplayCompare(QWidget):
         match_layout.addWidget(match_label)
         # Options
         match_options = QHBoxLayout()
+        match_options.addStretch()
         # # Match Number
         match_options.addWidget(QLabel("Match Image:"))
         self.button_previous_match = QPushButton("<<")
@@ -214,22 +215,6 @@ class DisplayCompare(QWidget):
         self.button_next_match.setMaximumWidth(40)
         self.button_next_match.clicked.connect(lambda: self.set_match(self.current_match + 1))
         match_options.addWidget(self.button_next_match)
-        match_options.addStretch()  # stretch the gap
-        # # Sequence Number
-        match_options.addWidget(QLabel("Sequence:"))
-        self.button_previous_match_seq = QPushButton("<<")
-        self.button_previous_match_seq.setMaximumWidth(40)
-        self.button_previous_match_seq.clicked.connect(lambda: self.set_match_sequence(self.current_match_seq - 1))
-        match_options.addWidget(self.button_previous_match_seq)
-        self.match_seq_number = QLineEdit(str(self.current_match_seq + 1))
-        self.match_seq_number.setMaximumWidth(100)
-        match_options.addWidget(self.match_seq_number)
-        self.match_sequence_n = QLabel("/3")
-        match_options.addWidget(self.match_sequence_n)
-        self.button_next_match_seq = QPushButton(">>")
-        self.button_next_match_seq.setMaximumWidth(40)
-        self.button_next_match_seq.clicked.connect(lambda: self.set_match_sequence(self.current_match_seq + 1))
-        match_options.addWidget(self.button_next_match_seq)
         match_options.addStretch()
         match_layout.addLayout(match_options)
 
@@ -277,6 +262,47 @@ class DisplayCompare(QWidget):
     def validate(self):
         self.parent._set_media_view()
 
+
+    # RUN ON ENTRY ==========================================================================
+    # Step 1 Calculate neighbors
+    def calculate_neighbors(self):
+        """
+        Calculates knn for all unvalidated images, ranks by smallest distance to NN
+        """
+        self.data = db_roi.fetch_roi_media(self.mpDB)
+        self.sequences = db_roi.sequence_roi_dict(self.data)
+
+        # must have embeddings to continue
+        if not (self.data["emb_id"] == 0).all():
+            #neighbor_dict referenced by sequence_id
+            self.neighbor_dict, nearest_dict = db_roi.match(self.mpDB, self.sequences, k=self.k)
+            #print(self.neighbor_dict)
+
+            if self.neighbor_dict:
+                self.ranked_sequences = sorted(nearest_dict.items(), key=lambda x: x[1])
+                #print(self.ranked_sequences)
+
+                # set number of queries to validate
+                self.n_queries = len(self.neighbor_dict)
+                self.query_n.setText("/" + str(self.n_queries))
+
+                # set first query to highest ranking sequence
+                self.set_query(0)
+            # filtered neighbor dict returns empty, all existing data must be from same individual
+            else:
+                dialog = AlertPopup(self, prompt="No data to compare, all available data from same sequence/capture.")
+                if dialog.exec():
+                    del dialog
+                self.parent._set_base_view()
+        else:
+            dialog = AlertPopup(self, prompt="No data to match, process images first.")
+            if dialog.exec():
+                del dialog
+            self.parent._set_base_view()
+    # ========================================================================================
+
+
+    # STEP 2 - set query
     def set_query(self, n):
         """
         Set the Query side to a particular (n) image in the list
@@ -287,33 +313,44 @@ class DisplayCompare(QWidget):
 
         # set current query
         self.current_query = n
-        self.current_query_id = self.ranked_queries[self.current_query][0]
-        self.current_query_pair_id = self.data.loc[self.current_query_id, 'capture_id']
         self.query_number.setText(str(self.current_query + 1))
 
-        # get query sequences
-        self.query_sequence_ids = get_sequence(self.current_query_id, self.data)
-        print(self.query_sequence_ids)
+        # get corresponding sequence_id and rois
+        self.current_sequence_id = self.ranked_sequences[self.current_query][0]
+        self.current_query_rois = self.sequences[self.current_sequence_id]
+        print("query rois:", self.current_query_rois)
+
+        self.query_sequence_n.setText(str(len(self.current_query_rois)))
+        self.set_within_query_sequence(0)
 
         # update matches
         self.update_matches()
 
+
+    def set_within_query_sequence(self, n):
+        # wrap around
+        if n < 0: n = len(self.current_query_rois) - 1
+        if n > len(self.current_query_rois) - 1: n = 0
+
+        self.current_query_sn = n
+        self.current_query_rid = self.current_query_rois[self.current_query_sn]
+        self.query_seq_number.setText(str(self.current_query_sn + 1))
         # load new images
-        self.load_images()
-        self.load_metadata()
+        self.load_query()
 
 
-    def set_query_sequence(self, n):
-        pass
-
-
+    # refresh match list
     def update_matches(self):
         """
-        Update images if current_query, sequence changes
+        Update images if current_query changes
         """
         # get all matches for query
-        self.current_query_matches = self.neighbor_dict[self.current_query_id]
-        self.match_n.setText("/" + str(len(self.current_query_matches)))
+        full_match_set = self.neighbor_dict[self.current_sequence_id]
+        print(full_match_set)
+        self.current_match_rois =[x[0] for x in full_match_set]
+        self.match_n.setText("/" + str(len(self.current_match_rois)))
+
+        print("match rois:", self.current_match_rois)
         # set to top of matches
         self.set_match(0)
         
@@ -322,26 +359,21 @@ class DisplayCompare(QWidget):
         """
         Set the curent match index and id 
         """
-        if n < 0: n = len(self.current_query_matches) - 1
-        if n > len(self.current_query_matches) - 1: n = 0
+        if n < 0: n = len(self.current_match_rois) - 1
+        if n > len(self.current_match_rois) - 1: n = 0
+
+        print(self.current_match)
 
         self.current_match = n
-        self.current_match_id = self.current_query_matches[self.current_match][0]
-        self.current_match_pair_id = self.data.loc[self.current_match_id, 'capture_id']
+        self.current_match_rid = self.current_match_rois[self.current_match]
+
+        print(self.current_match_rid)
+
         self.match_number.setText(str(self.current_match + 1))
 
-        # get match sequences
-        self.match_sequence_ids = get_sequence(self.current_match_id, self.data)
-        print(self.match_sequence_ids)
-
         # load new images
-        self.load_images(match_only=True)
-        self.load_metadata(match_only=True)
+        self.load_match()
 
-
-
-    def set_match_sequence(self, n):
-        pass
 
     def toggle_viewpoint(self):
         pass
@@ -373,29 +405,29 @@ class DisplayCompare(QWidget):
             
             del dialog
             # update data  
-            self.data = fetch_roi_media(self.mpDB)
+            self.data = db_roi.fetch_roi_media(self.mpDB)
             self.load_metadata() 
 
         else:
             merge(self.mpDB, self.data.loc[self.current_query_id], self.data.loc[self.current_match_id])
 
-    def load_images(self, match_only=False):
-       """
-       Load Images for Current Query and Match
-       """
-       if not match_only: # dont update query if only updating match
-           self.query_image.display_image(self.data.loc[self.current_query_id,"filepath"],
-                                        bbox=get_bbox(self.data.loc[self.current_query_id]))
-       self.match_image.display_image(self.data.loc[self.current_match_id,"filepath"],
-                                      bbox=get_bbox(self.data.loc[self.current_match_id]))
 
-    def load_metadata(self, match_only=False):
+    def load_query(self):
+       """
+       Load Images for Current Query ROI
+       """
+       self.query_image.display_image(self.data.loc[self.current_query_rid,"filepath"],
+                                        bbox=db_roi.get_bbox(self.data.loc[self.current_query_rid]))
+       self.query_info.setText(db_roi.roi_metadata(self.data.loc[self.current_query_rid]))
+
+
+    def load_match(self):
         """
-        Load MetaData for Current Query and Match
+        Load MetaData for Current Match ROI
         """
-        if not match_only: # dont update query if only updating match
-            self.query_info.setText(roi_metadata(self.data.loc[self.current_query_id]))
-        self.match_info.setText(roi_metadata(self.data.loc[self.current_match_id]))
+        self.match_image.display_image(self.data.loc[self.current_match_rid,"filepath"],
+                                      bbox=db_roi.get_bbox(self.data.loc[self.current_match_rid]))
+        self.match_info.setText(db_roi.roi_metadata(self.data.loc[self.current_match_rid]))
 
 
     def change_k(self):
@@ -407,43 +439,6 @@ class DisplayCompare(QWidget):
         # set new threshold value and recalculate neighbors
         self.threshold = self.threshold_slider.value()
 
-    # RUN ON ENTRY ==========================================================================
-    def calculate_neighbors(self):
-        """
-        Calculates knn for all unvalidated images, ranks by smallest distance to NN
-        """
-        self.data = fetch_roi_media(self.mpDB)
-
-        # must have embeddings to continue
-        if not (self.data["emb_id"] == 0).all():
-            self.neighbor_dict, nearest_dict = match(self.mpDB, k=self.k)
-            #print(self.neighbor_dict)
-
-            if self.neighbor_dict:
-                self.ranked_queries = rank(nearest_dict)
-
-                #print(self.ranked_queries)
-
-                # set number of queries to validate
-                self.n_queries = len(self.neighbor_dict)
-                self.query_n.setText("/" + str(self.n_queries))
-
-                # set first query to highest rank 
-                self.set_query(0)
-            # filtered neighbor dict returns empty, all existing data must be from same individual
-            else:
-                dialog = AlertPopup(self, prompt="No data to compare, all available data from same sequence/capture.")
-                if dialog.exec():
-                    del dialog
-                self.parent._set_base_view()
-        else:
-            dialog = AlertPopup(self, prompt="No data to match, process images first.")
-            if dialog.exec():
-                del dialog
-            self.parent._set_base_view()
-
-
-        
     # KEYBOARD HANDLER ======================================================================
     def keyPressEvent(self, event):
         key = event.key()

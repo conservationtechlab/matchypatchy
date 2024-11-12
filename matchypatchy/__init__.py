@@ -12,7 +12,7 @@ from matchypatchy.database import (IMAGE_EXT, MatchyPatchyDB, VIDEO_EXT,
                                    fetch_roi_media, fetch_sites, fetch_species,
                                    fetch_surveys, get_bbox, get_sequence,
                                    import_csv, individual, match, media, merge,
-                                   mpdb, rank, roi, roi_knn, roi_metadata,
+                                   mpdb, roi, roi_knn, roi_metadata,
                                    setup, setup_database, site, species,
                                    survey,)
 from matchypatchy.gui import (AlertPopup, BuildManifestThread, CSVImportThread,
