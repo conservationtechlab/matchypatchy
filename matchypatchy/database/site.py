@@ -10,7 +10,7 @@ def fetch_sites(mpDB, survey_id=None):
 
     Args
         - mpDB
-        - survey_id (int): requested survey id 
+        - survey_id (int): requested survey id
     Returns
         - an inverted dictionary in order to match manifest site names to table id
     """

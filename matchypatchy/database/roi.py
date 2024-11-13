@@ -5,13 +5,13 @@ import pandas as pd
 
 from matchypatchy.config import VIEWPOINT
 
+
 def fetch_roi(mpDB):
     """
-    Fetches sites associated with given survey, checks that they have unique names,
+    Fetches roi table, converts to dataframe
 
     Args
         - mpDB
-        - survey_id (int): requested survey id 
     Returns
         - an inverted dictionary in order to match manifest site names to table id
     """
@@ -24,15 +24,15 @@ def fetch_roi(mpDB):
     else:
         return False
 
-    
+
 def fetch_roi_media(mpDB):
     """
-    Fetch Info for Media Table 
-    """
-    columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 
-                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id', 
+    Fetch Info for Media Table
+    columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
                 'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+    """
     media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
     rois = rois.replace({float('nan'): None})
@@ -40,40 +40,38 @@ def fetch_roi_media(mpDB):
     return rois
 
 
-
 def roi_metadata(roi, spacing=1.5):
     """
     Display relevant metadata in comparison label box
     """
-    roi = roi.rename(index={"name": "Name", 
+    roi = roi.rename(index={"name": "Name",
                             "filepath": "File Path",
-                            "comment":"Comment",
+                            "comment": "Comment",
                             "timestamp": "Timestamp",
                             "site_id": "Site",
                             "sequence_id": "Sequence ID",
                             "viewpoint": "Viewpoint"})
 
-    info_dict = roi[['Name','File Path','Timestamp','Site','Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+    info_dict = roi[['Name', 'File Path', 'Timestamp', 'Site',
+                     'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
-    # convert viewpoint to human-readable
+    # convert viewpoint to human-readable (0=Left, 1=Right)
     info_dict['Viewpoint'] = VIEWPOINT[info_dict['Viewpoint']]
 
     info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
 
-    html_text = f"""
-        <div style="line-height: {spacing};">
-            {info_label}
-        </div>
-        """
-
+    html_text = f"""<div style="line-height: {spacing};">
+                        {info_label}
+                    </div>
+                """
     return html_text
 
 
-def get_bbox(roi): 
+def get_bbox(roi):
     """
     Return the bbox coordinates for a given roi row
     """
-    return roi[['bbox_x','bbox_y','bbox_w','bbox_h']]
+    return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
 
 
 def get_sequence(id, roi_media):
@@ -82,7 +80,6 @@ def get_sequence(id, roi_media):
 
     Group by capture, order by frame number
     """
-    sequence
     sequence_id = roi_media.loc[id, "sequence_id"]
     sequence = roi_media[roi_media['sequence_id'] == sequence_id]
     sequence = sequence.sort_values(by=['timestamp'])

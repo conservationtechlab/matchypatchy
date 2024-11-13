@@ -136,7 +136,8 @@ class MainWindow(QMainWindow):
         """
         # SPECIES
         if table == "species":
-            file_path = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
+            file_path = QFileDialog.getOpenFileName(self, "Open File", 
+                                                    os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
             site.import_csv(self.mpDB, file_path)
 
         else:
@@ -146,7 +147,8 @@ class MainWindow(QMainWindow):
                 survey_id = dialog.get_selection()[0]
                 print(survey_id)
             del dialog
-            file_path = QFileDialog.getOpenFileName(self, "Open File", os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
+            file_path = QFileDialog.getOpenFileName(self, "Open File", 
+                                                    os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
 
             # SITE
             if table == "site":

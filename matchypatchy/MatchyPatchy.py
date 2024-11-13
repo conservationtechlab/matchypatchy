@@ -2,8 +2,9 @@
 Installable Version of Main Function
 
 '''
-# GET CWD 
-import sys, os
+# GET CWD
+import os
+import sys
 if getattr(sys, 'frozen', False):
     application_path = os.path.dirname(sys.executable)
     os.chdir(application_path)
@@ -24,7 +25,7 @@ from matchypatchy.gui import main_gui
 from matchypatchy.database import mpdb
 from matchypatchy.config import DB_PATH
 
-def main():   
+def main():
     mpDB = mpdb.MatchyPatchyDB(DB_PATH)
     main_gui.main_display(mpDB)
 

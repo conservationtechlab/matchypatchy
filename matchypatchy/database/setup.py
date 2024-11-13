@@ -14,7 +14,7 @@ def setup_database(filepath='matchypatchy.db'):
     sqlite_vec.load(db)
     db.enable_load_extension(False)
     cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152])")
-    
+
     # SURVEY
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
@@ -64,13 +64,13 @@ def setup_database(filepath='matchypatchy.db'):
                         FOREIGN KEY(species_id) REFERENCES species (id)
                         FOREIGN KEY(individual_id) REFERENCES individual (id)
                         FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) )''')
-    
+
     # SPECIES
     cursor.execute('''CREATE TABLE IF NOT EXISTS species (
                         id INTEGER PRIMARY KEY,
                         binomen TEXT NOT NULL,
                         common TEXT NOT NULL )''')
-    
+
     # INDIVIDUAL
     cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
                         id INTEGER PRIMARY KEY,
@@ -79,12 +79,11 @@ def setup_database(filepath='matchypatchy.db'):
                         sex TEXT,
                         FOREIGN KEY(species_id) REFERENCES species (id)
                     )''')
-    
+
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY
                     )''')
-
 
     # Commit changes and close connection
     db.commit()

@@ -6,15 +6,14 @@ from typing import Optional
 import sqlite3
 
 from matchypatchy.database.setup import setup_database
-from matchypatchy import sqlite_vec 
+from matchypatchy import sqlite_vec
 
 
 class MatchyPatchyDB():
     def __init__(self, filepath='matchypatchy.db'):
         self.filepath = filepath
         self.initiate = setup_database(self.filepath)
-        #self.validate()
-    
+
     def validate(self):
         """
         Validate All Tables Are Present
@@ -26,17 +25,16 @@ class MatchyPatchyDB():
         cursor = db.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
-        print(tables)
-        cursor.execute(f"PRAGMA table_info(roi_emb)")
+        logging.info(tables)
+        cursor.execute("PRAGMA table_info(roi_emb)")
         columns = cursor.fetchall()
-        print(columns)
+        logging.info(columns)
         db.close()
-
 
     def _fetch(self, command):
         """
         Execute a specific sql query to fetch data
-        Meant for one-time use 
+        Meant for one-time use
         """
         try:
             db = sqlite3.connect(self.filepath)
@@ -56,7 +54,6 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    
     def add_survey(self, name: str, region: str, year_start: int, year_end: int):
         """
         Add a survey with
@@ -83,14 +80,14 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
-        
+
     def add_site(self, name: str, lat: float, long: float, survey_id: int):
         """
         Add a site with
-            - name
-            - lat
-            - long
-            - survey_id
+            - name (str) NOT NULL
+            - lat (float): latitude
+            - long (float): longitude
+            - survey_id (int) NOT NULL
         """
         try:
             db = sqlite3.connect(self.filepath)
@@ -110,12 +107,12 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
-        
+
     def add_species(self, binomen: str, common: str):
         """
         Add species with
-            - binomen (str): Scientific name
-            - common (str): common name 
+            - binomen (str) NOT NULL: Scientific name
+            - common (str) NOT NULL: common name
         """
         try:
             db = sqlite3.connect(self.filepath)
@@ -135,13 +132,13 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
-        
-    def add_individual(self, species_id: int, name:str, sex: Optional[str]=None):
+
+    def add_individual(self, species_id: int, name: str, sex: Optional[str]=None):
         """
         Add an individual with
-            - species_id
-            - name
-            - sex
+            - species_id (int)
+            - name (str)
+            - sex (str)
         """
         try:
             db = sqlite3.connect(self.filepath)
@@ -162,7 +159,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def add_media(self, filepath: str, ext: str, timestamp: str, site_id: int, 
+    def add_media(self, filepath: str, ext: str, timestamp: str, site_id: int,
                   sequence_id: Optional[int]=None, external_id: Optional[int]=None, 
                   comment: Optional[str]=None, favorite: int=0):
         """
@@ -197,9 +194,9 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
-        
+
     def add_roi(self, media_id: int, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
-                species_id:  Optional[int]=None, viewpoint: Optional[str]=None, reviewed: int=0, 
+                species_id: Optional[int]=None, viewpoint: Optional[str]=None, reviewed: int=0, 
                 individual_id: Optional[int]=None, emb_id: int=0):
         # Note difference in variable order, foreign keys
 
@@ -211,7 +208,7 @@ class MatchyPatchyDB():
                          species_id, viewpoint, reviewed, individual_id, emb_id) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                         species_id, viewpoint, reviewed, individual_id, emb_id)
+                          species_id, viewpoint, reviewed, individual_id, emb_id)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -223,14 +220,13 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
-        
+
     def add_emb(self, embedding):
         try:
             db = sqlite3.connect(self.filepath)
             db.enable_load_extension(True)
             sqlite_vec.load(db)
             db.enable_load_extension(False)
-
             cursor = db.cursor()
             command = """INSERT INTO roi_emb (embedding)
                         VALUES (?);"""
@@ -258,30 +254,12 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print(f"Failed to add sequence.", error)
+            print("Failed to add sequence.", error)
             logging.error("Failed to add sequence: ", error)
             if db:
                 db.close()
             return False
-        
-    def add_capture(self):
-        # Note difference in variable order, foreign keys
-        try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
-            command = """INSERT INTO capture DEFAULT VALUES;"""
-            cursor.execute(command)
-            id = cursor.lastrowid
-            db.commit()
-            db.close()
-            return id
-        except sqlite3.Error as error:
-            print(f"Failed to add capture.", error)
-            logging.error("Failed to add capture: " + error)
-            if db:
-                db.close()
-            return False
-        
+
     def edit_row(self, table: str, id: int, replace: dict, allow_none=False, quiet=True):
         """
         Args
@@ -297,7 +275,7 @@ class MatchyPatchyDB():
             for key, value in replace.items():
                 if value in (None, ''):
                     replace[key] = 'NULL'
-            replace_values = ",".join(f"{k}={v}" for k,v in replace.items())
+            replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
             command = f"UPDATE {table} SET {replace_values} WHERE id={id}"
             if not quiet: print(command)
             cursor.execute(command)
@@ -310,7 +288,7 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
-    
+
     def select(self, table: str, columns: str="*", row_cond: Optional[str]=None, quiet=True):
         try:
             db = sqlite3.connect(self.filepath)
@@ -454,8 +432,8 @@ class MatchyPatchyDB():
                         ORDER BY distance
                         LIMIT ?
                         """
-            data_tuple = (query,k+1)
-            cursor.execute(command,data_tuple)
+            data_tuple = (query, k+1)
+            cursor.execute(command, data_tuple)
             results = cursor.fetchall()
             db.close()
             return results

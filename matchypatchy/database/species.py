@@ -3,6 +3,7 @@ Functions for Managing Species Table
 """
 import pandas as pd
 
+
 def fetch_species(mpDB):
     """
     Fetches species Table, Converts to DataFrame
@@ -27,7 +28,7 @@ def import_csv(mpDB, file_path):
 
     Args
         - mpDB
-        - file_path (str): path to csv of species 
+        - file_path (str): path to csv of species
     """
     # TODO: Check not none
     species_list = pd.read_csv(file_path)
@@ -37,6 +38,6 @@ def import_csv(mpDB, file_path):
 
     for _, species in species_list.iterrows():
 
-        species_id = mpDB.add_species(species['Binomen'],species['Common'])
+        species_id = mpDB.add_species(species['Binomen'], species['Common'])
 
     print(f"Added {len(species_list)} species to Database")
