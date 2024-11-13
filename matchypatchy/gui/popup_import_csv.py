@@ -336,12 +336,11 @@ class CSVImportThread(QThread):
 
             # get or create new survey
             survey_name = exemplar[self.selected_columns['survey']].item()
-            region_name = exemplar[self.selected_columns['region']].item()
-            region_name = None if region_name == 'None' else str(region_name)
+            region_name = exemplar[self.selected_columns['region']].item() if self.selected_columns['region'] != 'None' else None
             try:
                 survey_id = self.mpDB.select("survey", columns='id', row_cond=f'name="{survey_name}"')[0][0]
             except IndexError:
-                survey_id = self.mpDB.add_site(str(site_name), region_name, None, None)
+                survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
 
             # get or create site
             site_name = exemplar[self.selected_columns['site']].item()  
