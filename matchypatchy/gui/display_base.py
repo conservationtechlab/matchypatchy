@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.gui.popup_survey import SurveyFillPopup
+from matchypatchy.gui.popup_survey import SurveyPopup
 from matchypatchy.gui.popup_site import SitePopup
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_species import SpeciesPopup
@@ -62,28 +62,26 @@ class DisplayBase(QWidget):
         survey_layout.addWidget(survey_label,0)
         self.survey_select = QComboBox()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
-        survey_layout.addWidget(self.survey_select,1)
-        button_survey_new = QPushButton("+")
+        survey_layout.addWidget(self.survey_select, 1)
+        button_survey_new = QPushButton("Manage Surveys")
         button_survey_new.clicked.connect(self.new_survey)
-        survey_layout.addWidget(button_survey_new,0)
-        db_layer.addLayout(survey_layout,0)
+        survey_layout.addWidget(button_survey_new, 1)
+        db_layer.addLayout(survey_layout)
         
-        self.button_site_manage = QPushButton("Manage Sites")
-        self.button_species_manage = QPushButton("Manage Species")
-        self.button_media_manage = QPushButton("Manage Media")
-        self.button_individual_manage = QPushButton("Manage Individuals")
+        button_site_manage = QPushButton("Manage Sites")
+        button_species_manage = QPushButton("Manage Species")
+        button_media_manage = QPushButton("Manage Media")
+        button_individual_manage = QPushButton("Manage Individuals")
 
-        self.button_site_manage.clicked.connect(self.new_site)
-        self.button_species_manage.clicked.connect(self.manage_species)
-        self.button_media_manage.clicked.connect(self.validate)
-        self.button_individual_manage.clicked.connect(self.manage_individual)
+        button_site_manage.clicked.connect(self.new_site)
+        button_species_manage.clicked.connect(self.manage_species)
+        button_media_manage.clicked.connect(self.validate)
+        button_individual_manage.clicked.connect(self.manage_individual)
 
-        db_layer.addWidget(self.button_site_manage)
-        self.button_manage_site_flag = False
-        self.button_site_manage.setEnabled(self.button_manage_site_flag)
-        db_layer.addWidget(self.button_species_manage)
-        db_layer.addWidget(self.button_media_manage)
-        db_layer.addWidget(self.button_individual_manage)
+        db_layer.addWidget(button_site_manage)
+        db_layer.addWidget(button_species_manage)
+        db_layer.addWidget(button_media_manage)
+        db_layer.addWidget(button_individual_manage)
 
         db_layer.addStretch()
         border_db.setLayout(db_layer)
@@ -167,14 +165,13 @@ class DisplayBase(QWidget):
 
         self.update_survey()
 
+    # Database Management --------------------------------------------------------------
+
     def new_survey(self):
-        dialog = SurveyFillPopup(self)
+        dialog = SurveyPopup(self)
         if dialog.exec():
-            confirm = self.mpDB.add_survey(dialog.get_name(), dialog.get_region(),
-                                           dialog.get_year_start(), dialog.get_year_start())
-            if confirm:
-                self.update_survey()
-        del dialog
+            self.update_survey()
+            del dialog
 
     def update_survey(self):
         self.survey_select.clear() 
@@ -183,14 +180,13 @@ class DisplayBase(QWidget):
         self.survey_list_ordered = list(survey_names)
         if self.survey_list_ordered:
             self.survey_select.addItems([el[1] for el in survey_names])
-        self.button_manage_site_flag = self.select_survey()
-        self.button_site_manage.setEnabled(self.button_manage_site_flag)     
 
     def select_survey(self):
         try:
             self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
             return True
         except IndexError:
+            self.active_survey = (0, None)
             return False
 
     def new_site(self):
@@ -219,18 +215,15 @@ class DisplayBase(QWidget):
         self.mpDB.clear('media')
         self.mpDB.clear('roi')
         self.mpDB.clear('roi_emb')
-        if self.select_survey():
-            manifest = QFileDialog.getOpenFileName(self, "Open File", 
-                                                   os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
-            if manifest:
-                
-                dialog = ImportCSVPopup(self, manifest)
-                if dialog.exec():
-                    del dialog                
-        else:
-            dialog = AlertPopup(self, "Please create a new survey before uploading.")
+        self.select_survey()
+        manifest = QFileDialog.getOpenFileName(self, "Open File", 
+                                                os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
+        if manifest:
+            
+            dialog = ImportCSVPopup(self, manifest)
             if dialog.exec():
-                del dialog
+                del dialog                
+
             
     # STEP 1: Import from FOLDER
     def import_folder(self):
@@ -276,10 +269,9 @@ class DisplayBase(QWidget):
             viewpoint_key = animl_options.select_viewpoint()
 
             # 1. SEQUENCE 
-            if sequence_checked:
-                self.sequence_thread = SequenceThread(self.mpDB)
-                self.sequence_thread.progress_update.connect(dialog.update)
-                self.sequence_thread.start()
+            self.sequence_thread = SequenceThread(self.mpDB, sequence_checked)
+            self.sequence_thread.progress_update.connect(dialog.update)
+            self.sequence_thread.start()
 
             # 2. ANIML (BBOX + SPECIES)
             self.animl_thread = AnimlThread(self.mpDB, detector_key, classifier_key)

@@ -13,6 +13,6 @@ def fetch_surveys(mpDB):
     """
     surveys = mpDB.select("survey")
     if surveys:
-        return pd.DataFrame(surveys, columns=["id", "name", "year_start", "year_end", "region"])
+        return pd.DataFrame(surveys, columns=["id", "name", "region", "year_start", "year_end"])
     else:
-        return pd.DataFrame(columns=["id", "name", "year_start", "year_end", "region"])
+        return pd.DataFrame(columns=["id", "name", "region", "year_start", "year_end"])

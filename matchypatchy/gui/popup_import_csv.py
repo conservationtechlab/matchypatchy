@@ -16,13 +16,15 @@ class ImportCSVPopup(QDialog):
     def __init__(self, parent, manifest):
         super().__init__(parent)
         self.mpDB = parent.mpDB
-        self.active_survey = parent.active_survey
         self.data = pd.read_csv(manifest)
         self.columns = ["None"] + list(self.data.columns)
+        self.survey_columns = [str(parent.active_survey[1])] + list(self.data.columns)
         
         self.selected_filepath = self.columns[0]
         self.selected_timestamp = self.columns[0]
         self.selected_site = self.columns[0]
+        self.selected_survey = self.columns[0]
+        self.selected_region = self.columns[0]
         self.selected_sequence_id = self.columns[0]
         self.selected_external_id = self.columns[0]
         self.selected_viewpoint = self.columns[0]
@@ -64,6 +66,19 @@ class ImportCSVPopup(QDialog):
         layout.addLayout(timestamp_layout)
         layout.addSpacing(5)
 
+        # Survey
+        survey_layout = QHBoxLayout()
+        survey_layout.addWidget(QLabel("Survey:"))
+        asterisk = QLabel("*")
+        asterisk.setStyleSheet("QLabel { color : red; }")
+        survey_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
+        self.survey = QComboBox()
+        self.survey.addItems(self.survey_columns)
+        self.survey.currentTextChanged.connect(self.select_survey)
+        survey_layout.addWidget(self.survey)
+        layout.addLayout(survey_layout)
+        layout.addSpacing(5)
+
         # Site
         site_layout = QHBoxLayout()
         site_layout.addWidget(QLabel("Site:"))
@@ -77,6 +92,16 @@ class ImportCSVPopup(QDialog):
         layout.addLayout(site_layout)
         layout.addSpacing(5)
 
+        # Region
+        region_layout = QHBoxLayout()
+        region_layout.addWidget(QLabel("Region:"))
+        self.region = QComboBox()
+        self.region.addItems(self.columns)
+        self.region.currentTextChanged.connect(self.select_region)
+        region_layout.addWidget(self.region)
+        layout.addLayout(region_layout)
+        layout.addSpacing(5)
+
         # Sequence
         sequence_layout = QHBoxLayout()
         sequence_layout.addWidget(QLabel("Sequence ID:"))
@@ -87,14 +112,14 @@ class ImportCSVPopup(QDialog):
         layout.addLayout(sequence_layout)
         layout.addSpacing(5)
 
-        # capture
-        capture_layout = QHBoxLayout()
-        capture_layout.addWidget(QLabel("External ID:"))
+        # External ID
+        external_layout = QHBoxLayout()
+        external_layout.addWidget(QLabel("External ID:"))
         self.external_id = QComboBox()
         self.external_id.addItems(self.columns)
-        self.external_id.currentTextChanged.connect(self.select_capture)
-        capture_layout.addWidget(self.external_id)
-        layout.addLayout(capture_layout)
+        self.external_id.currentTextChanged.connect(self.select_external)
+        external_layout.addWidget(self.external_id)
+        layout.addLayout(external_layout)
         layout.addSpacing(5)
 
         # Viewpoint
@@ -170,6 +195,14 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
         
+    def select_survey(self):
+        try:
+            self.selected_survey = self.survey_columns[self.survey.currentIndex()]
+            self.check_ok_button()
+            return True
+        except IndexError:
+            return False
+        
     def select_site(self):
         try:
             self.selected_site = self.columns[self.site.currentIndex()]
@@ -178,6 +211,14 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
         
+    def select_region(self):
+        try:
+            self.selected_region = self.columns[self.region.currentIndex()]
+            self.check_ok_button()
+            return True
+        except IndexError:
+            return False
+
     def select_sequence(self):
         try:
             self.selected_sequence_id = self.columns[self.sequence_id.currentIndex()]
@@ -226,13 +267,18 @@ class ImportCSVPopup(QDialog):
 
         Must include filepath, timestamp, site
         """
-        if (self.selected_filepath != 0) and (self.selected_timestamp != 0) and (self.select_site != 0):
+        if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
+              (self.selected_site != "None") and (self.selected_survey != "None"):
             self.okButton.setEnabled(True)
+        else:
+            self.okButton.setEnabled(False)
 
     def collate_selections(self):
         return {"filepath": self.selected_filepath,
                 "timestamp": self.selected_timestamp,
+                "survey": self.selected_survey,
                 "site": self.selected_site,
+                "region": self.selected_region,
                 "sequence_id": self.selected_sequence_id,
                 "external_id": self.selected_external_id,
                 "viewpoint": self.selected_viewpoint,
@@ -256,8 +302,7 @@ class ImportCSVPopup(QDialog):
 
         print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
 
-        self.import_thread = CSVImportThread(self.mpDB, self.active_survey, 
-                                          unique_images, selected_columns)
+        self.import_thread = CSVImportThread(self.mpDB, unique_images, selected_columns)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.close)
         self.import_thread.start()
@@ -266,16 +311,14 @@ class ImportCSVPopup(QDialog):
 class CSVImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, active_survey, unique_images, selected_columns):
+    def __init__(self, mpDB, unique_images, selected_columns):
         super().__init__()
         self.mpDB = mpDB
-        self.active_survey = active_survey
         self.unique_images = unique_images
         self.selected_columns = selected_columns
     
     def run(self):
         roi_counter = 0  # progressbar counter
-        capture_dict = {}
         for filepath, group in self.unique_images:
 
             # check to see if file exists 
@@ -290,11 +333,22 @@ class CSVImportThread(QThread):
             exemplar = group.head(1)
 
             timestamp = exemplar[self.selected_columns['timestamp']].item()
+
+            # get or create new survey
+            survey_name = exemplar[self.selected_columns['survey']].item()
+            region_name = exemplar[self.selected_columns['region']].item()
+            region_name = None if region_name == 'None' else str(region_name)
+            try:
+                survey_id = self.mpDB.select("survey", columns='id', row_cond=f'name="{survey_name}"')[0][0]
+            except IndexError:
+                survey_id = self.mpDB.add_site(str(site_name), region_name, None, None)
+
+            # get or create site
             site_name = exemplar[self.selected_columns['site']].item()  
             try:
                 site_id = self.mpDB.select("site", columns='id', row_cond=f'name="{site_name}"')[0][0]
             except IndexError:
-                site_id = self.mpDB.add_site(str(site_name), None, None, int(self.active_survey[0]))
+                site_id = self.mpDB.add_site(str(site_name), None, None, survey_id)
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns['sequence_id']].item()) if self.selected_columns['sequence_id'] != 'None' else None

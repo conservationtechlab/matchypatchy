@@ -19,9 +19,9 @@ def setup_database(filepath='matchypatchy.db'):
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL,
+                        region TEXT,
                         year_start INTEGER,
-                        year_end INTEGER,
-                        region TEXT NOT NULL )''')
+                        year_end INTEGER )''')
 
     # SITE
     cursor.execute('''CREATE TABLE IF NOT EXISTS site (

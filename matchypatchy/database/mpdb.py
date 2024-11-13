@@ -57,21 +57,21 @@ class MatchyPatchyDB():
             return False
 
     
-    def add_survey(self, name: str, year_start: int, year_end: int, region: str):
+    def add_survey(self, name: str, region: str, year_start: int, year_end: int):
         """
         Add a survey with
             - name (str) Not Null
-            - year_start (int) Not Null
-            - year_end (int)
             - region (str)
+            - year_start (int)
+            - year_end (int)
         """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO survey
-                        (name, year_start, year_end, region) 
+                        (name, region, year_start, year_end) 
                         VALUES (?, ?, ?, ?);"""
-            data_tuple = (name,  year_start, year_end, region)
+            data_tuple = (name, region, year_start, year_end)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -282,7 +282,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
         
-    def edit_row(self, table: str, id: int, replace: dict, quiet=True):
+    def edit_row(self, table: str, id: int, replace: dict, allow_none=False, quiet=True):
         """
         Args
             - table (str):
@@ -293,6 +293,10 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
+            # convert empty values to SQL NULL
+            for key, value in replace.items():
+                if value in (None, ''):
+                    replace[key] = 'NULL'
             replace_values = ",".join(f"{k}={v}" for k,v in replace.items())
             command = f"UPDATE {table} SET {replace_values} WHERE id={id}"
             if not quiet: print(command)
