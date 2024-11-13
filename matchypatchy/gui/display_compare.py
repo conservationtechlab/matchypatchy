@@ -17,8 +17,10 @@ import matchypatchy.database.roi as db_roi
 from matchypatchy.database.individual import merge
 
 from matchypatchy.gui.widget_image import ImageWidget
-from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.popup_alert import AlertPopup, ProgressPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
+
+from matchypatchy.ml.match_thread import MatchEmbeddingThread
 
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
 
@@ -29,6 +31,9 @@ class DisplayCompare(QWidget):
         self.k = 3  # default knn
         self.threshold = 80
         self.mpDB = parent.mpDB
+
+        self.neighbor_dict = dict()
+        self.nearest_dict = dict()
 
         self.current_query = 0
         self.current_match = 0
@@ -52,7 +57,7 @@ class DisplayCompare(QWidget):
                               alignment=Qt.AlignmentFlag.AlignLeft)
         self.knn_number = QLineEdit(str(self.k))
         self.knn_number.setValidator(QIntValidator(0, 1000))
-        self.knn_number.setToolTip('Maximum number of matches allowed per query.')
+        self.knn_number.setToolTip('Maximum number of matches allowed per ROI (not per sequence)')
         self.knn_number.textChanged.connect(self.change_k)
         self.knn_number.setMaximumWidth(50)
         first_layer.addWidget(self.knn_number, 0, 
@@ -280,37 +285,57 @@ class DisplayCompare(QWidget):
         """
         self.data = db_roi.fetch_roi_media(self.mpDB)
         self.sequences = db_roi.sequence_roi_dict(self.data)
-        #print(self.sequences)
-
         # must have embeddings to continue
         if not (self.data["emb_id"] == 0).all():
-            #neighbor_dict referenced by sequence_id
-            self.neighbor_dict, nearest_dict = db_roi.match(self.mpDB, self.sequences, 
-                                                            k=self.k, threshold=self.threshold)
-            #print(self.neighbor_dict)
 
-            if self.neighbor_dict:
-                self.ranked_sequences = sorted(nearest_dict.items(), key=lambda x: x[1])
-                #print(self.ranked_sequences)
+            dialog = ProgressPopup(self, "Matching embeddings...")
+            dialog.set_max(len(self.sequences))
+            dialog.show()
 
-                # set number of queries to validate
-                self.n_queries = len(self.neighbor_dict)
-                self.query_n.setText("/" + str(self.n_queries))
-
-                # set first query to highest ranking sequence
-                self.set_query(0)
-            # filtered neighbor dict returns empty, all existing data must be from same individual
-            else:
-                dialog = AlertPopup(self, prompt="No data to compare, all available data from same sequence/capture.")
-                if dialog.exec():
-                    del dialog
-                self.parent._set_base_view()
+            self.match_thread = MatchEmbeddingThread(self.mpDB, self.sequences, 
+                                                     k=self.k, threshold=self.threshold)
+            self.match_thread.progress_update.connect(dialog.set_counter)
+            self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
+            self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
+            self.match_thread.finished.connect(self.establish_queries)  # do not continue until finished
+            self.match_thread.start()
+            
         else:
             dialog = AlertPopup(self, prompt="No data to match, process images first.")
             if dialog.exec():
                 del dialog
             self.parent._set_base_view()
+
+    def capture_neighbor_dict(self, neighbor_dict):
+        # capture neighbor_dict from MatchEmbeddingThread
+        print('captured')
+        self.neighbor_dict = neighbor_dict
+    
+    def capture_nearest_dict(self, nearest_dict):
+        # capture neighbor_dict from MatchEmbeddingThread
+        self.nearest_dict = nearest_dict
+    
+
     # ========================================================================================
+
+    def establish_queries(self):
+        # must have valid matches to continue
+        if self.neighbor_dict:
+            self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
+            #print(self.ranked_sequences)
+            # set number of queries to validate
+            self.n_queries = len(self.neighbor_dict)
+            self.query_n.setText("/" + str(self.n_queries))
+            # set first query to highest ranking sequence
+            self.set_query(0)
+
+        # filtered neighbor dict returns empty, all existing data must be from same individual
+        else:
+            dialog = AlertPopup(self, prompt="No data to compare, all available data from same sequence/capture.")
+            if dialog.exec():
+                del dialog
+            self.parent._set_base_view()
+    
     def set_query(self, n):
         """
         Set the Query side to a particular (n) image in the list
@@ -328,6 +353,8 @@ class DisplayCompare(QWidget):
         self.current_query_rois = self.sequences[self.current_sequence_id]
         print("query rois:", self.current_query_rois)
 
+        self.current_query_viewpoints = self.data.loc[self.current_query_rois,'viewpoint']
+        
         self.query_sequence_n.setText(str(len(self.current_query_rois)))
         self.set_within_query_sequence(0)
 

@@ -6,13 +6,13 @@ from matchypatchy import sqlite_vec
 from matchypatchy import MatchyPatchy
 from matchypatchy import utils
 
-from matchypatchy.config import (DB_PATH, LOGFILE, TEMP_DIR,)
+from matchypatchy.config import (DB_PATH, LOGFILE, TEMP_DIR, VIEWPOINT)
 from matchypatchy.database import (IMAGE_EXT, MatchyPatchyDB, VIDEO_EXT,
-                                   VIEWPOINT, fetch_media, fetch_roi,
+                                   fetch_media, fetch_roi,
                                    fetch_roi_media, fetch_sites, fetch_species,
                                    fetch_surveys, get_bbox, get_sequence,
-                                   import_csv, individual, match, media, merge,
-                                   mpdb, roi, roi_knn, roi_metadata,
+                                   import_csv, individual, media, merge,
+                                   mpdb, roi, roi_metadata,
                                    setup, setup_database, site, species,
                                    survey,)
 from matchypatchy.gui import (AlertPopup, BuildManifestThread, CSVImportThread,

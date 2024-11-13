@@ -40,11 +40,12 @@ class ProgressPopup(QDialog):
         self.layout = QVBoxLayout()
 
         self.counter = 0
+        self.min = 0
         self.max = 100
         
         self.label = QLabel(prompt)
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(self.counter, self.max)
+        self.progress_bar.setRange(self.min, self.max)
 
         self.layout.addWidget(self.label)
         self.layout.addWidget(self.progress_bar)
@@ -61,10 +62,15 @@ class ProgressPopup(QDialog):
         if self.counter >= self.max:  # Stop the timer when progress reaches 100
             self.close()
 
+    def set_min(self, min):
+        """Update the progress bar maximum value"""
+        self.min = min
+        self.progress_bar.setRange(self.min, self.max)
+
     def set_max(self, max):
         """Update the progress bar maximum value"""
-        print(max)
         self.max = max
+        self.progress_bar.setRange(self.min, self.max)
 
     def set_counter(self, counter):
         """Update the progress bar to specific"""
