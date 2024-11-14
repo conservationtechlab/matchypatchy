@@ -1,7 +1,7 @@
 """
 Thread Class for Processing Sequence
 
-Pair_ID should be given in advance since there is likely 
+Pair_ID should be given in advance since there is likely
 some mismatch between camera timestamps and they won't be exactly the same
 
 """
@@ -10,17 +10,16 @@ from datetime import timedelta
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.database.media import fetch_media, IMAGE_EXT
+from matchypatchy.database.media import fetch_media
 
-
-# TODO: what to do if sequence_id already exists? 
+# TODO: what to do if sequence_id already exists?
 # TODO: sequence ids for individual videos should be one number, validate
 
-class SequenceThread(QThread):
 
+class SequenceThread(QThread):
     progress_update = pyqtSignal(str)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, flag, max_time = 60, max_n = 3):
+    def __init__(self, mpDB, flag, max_time=60, max_n=3):
         super().__init__()
         self.mpDB = mpDB
         self.flag = flag
@@ -29,7 +28,7 @@ class SequenceThread(QThread):
 
         self.media = fetch_media(self.mpDB)
         self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')
-        self.media = self.media.sort_values(by=['site_id','timestamp'])
+        self.media = self.media.sort_values(by=['site_id', 'timestamp'])
 
     def run(self):
         # if process sequence option is checked, will rewrite sequence_id
@@ -38,18 +37,17 @@ class SequenceThread(QThread):
 
             sequences = []
             current_sequence = []
-            seen_pairs = {}
             for _, image in self.media.iterrows():
                 if current_sequence:
                     # site is the same, timestamp under threshold, n under threshold
                     if (image['site_id'] == current_sequence[0]['site_id']) and \
-                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
-                        (len(current_sequence) < self.max_n):
+                       (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
+                       (len(current_sequence) < self.max_n):
                         current_sequence.append(image)
                     else:
                         # bank the current sequence and start a new group
                         sequences.append(current_sequence)
-                        current_sequence = [image]  
+                        current_sequence = [image]
                 else:
                     current_sequence = [image]
 
@@ -62,8 +60,7 @@ class SequenceThread(QThread):
                 # create a sequence id
                 sequence_id = self.mpDB.add_sequence()
                 for image in group:
-
-                    self.mpDB.edit_row('media', image['id'], {"sequence_id":sequence_id})
+                    self.mpDB.edit_row('media', image['id'], {"sequence_id": sequence_id})
 
         # if not calculating sequence, each media entry gets own sequence_id
         else:
@@ -71,4 +68,4 @@ class SequenceThread(QThread):
             self.media = self.media[self.media['sequence_id'].isna()]
             for _, image in self.media.iterrows():
                 sequence_id = self.mpDB.add_sequence()
-                self.mpDB.edit_row('media', image['id'], {"sequence_id":sequence_id})
+                self.mpDB.edit_row('media', image['id'], {"sequence_id": sequence_id})

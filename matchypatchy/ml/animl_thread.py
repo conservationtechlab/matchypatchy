@@ -13,6 +13,7 @@ from animl import matchypatchy as animl_mp
 
 # TODO: HANDLE VIDEOS
 
+
 class AnimlThread(QThread):
     progress_update = pyqtSignal(str)  # Signal to update the progress bar
 
@@ -21,18 +22,17 @@ class AnimlThread(QThread):
         self.mpDB = mpDB
 
         # select media that do not have rois
-        media = self.mpDB._fetch("""SELECT * FROM media WHERE NOT EXISTS 
+        media = self.mpDB._fetch("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
 
-
-        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "site", 
+        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "site",
                                                   "sequence_id", "external_id", "comment", "favorite"])
-        self.image_paths = pd.Series(self.media["filepath"].values,index=self.media["id"]).to_dict() 
+        self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 
         self.md_filepath = models.get_path(detector_key)
         self.classifier_filepath = models.get_path(classifier_key)
         self.classifier_classlist = models.get_class_path(classifier_key)
-    
+
     def run(self):
         if not self.media.empty:
             self.progress_update.emit("Extracting frames from videos...")
@@ -46,14 +46,14 @@ class AnimlThread(QThread):
         self.media = animl_mp.process_videos(self.media, config.FRAME_DIR)
 
     def get_bbox(self):
-        # 1 RUN MED 
+        # 1 RUN MED
         detections = animl_mp.detect(self.md_filepath, self.media)
         # 2 GET BOXES
         for i, roi in detections.iterrows():
             media_id = roi['id']
 
             frame = roi['FrameNumber'] if 'FrameNumber' in roi.index else 1
- 
+
             bbox_x = roi['bbox1']
             bbox_y = roi['bbox2']
             bbox_w = roi['bbox3']
@@ -64,13 +64,13 @@ class AnimlThread(QThread):
             viewpoint = None
             individual_id = None
 
-                # do not add emb_id, to be determined later
+            # do not add emb_id, to be determined later
             self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                              species_id, viewpoint=viewpoint, reviewed=0, 
+                              species_id, viewpoint=viewpoint, reviewed=0,
                               individual_id=individual_id, emb_id=0)
-    
+
     def get_species(self):
-        # TODO: Utilize probability for captures/sequences
+        # TODO: Utilize probability for sequences
         if self.classifier_filepath is None:
             return
 
@@ -78,11 +78,11 @@ class AnimlThread(QThread):
 
         info = "roi.id, media_id, filepath, frame, species_id, bbox_x, bbox_y, bbox_w, bbox_h"
         rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
-        rois = pd.DataFrame(rois,columns=columns)
+        rois = pd.DataFrame(rois, columns=columns)
 
         filtered_rois = rois[rois["species_id"].isna()]
-        
-        # if there are unlabeled rois 
+
+        # if there are unlabeled rois
         if not filtered_rois.empty:
             filtered_rois = animl_mp.classify(filtered_rois, self.classifier_filepath, self.classifier_classlist)
             for i, row in filtered_rois.iterrows():
@@ -91,7 +91,7 @@ class AnimlThread(QThread):
                 try:
                     species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{prediction}"')[0][0]
                 except IndexError:
-                    binomen = classes.loc[prediction,'Species']  # FIXME: Hardcoded column name 
+                    binomen = classes.loc[prediction, 'Species']   # FIXME: Hardcoded column name
                     species_id = self.mpDB.add_species(binomen, prediction)
-                # update species_id        
+                # update species_id
                 self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})
