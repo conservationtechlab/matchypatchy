@@ -1,12 +1,12 @@
 """
 GUI Window for Match Comparisons
 
-
 TODO:
  - Add new individual ID to all rois in query sequence and all rois in match sequence
  - Likewise if merging
- - Toggle match button off when moving to new query
- - ENABLE VIEWPOINT/CAPTURE PAIRS
+ - enable merge
+ - ENABLE VIEWPOINT
+ - image manipulation
 """
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
@@ -23,6 +23,7 @@ from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.ml.match_thread import MatchEmbeddingThread
 
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
+
 
 class DisplayCompare(QWidget):
     def __init__(self, parent):
@@ -42,7 +43,7 @@ class DisplayCompare(QWidget):
         # ROI REFERENCE
         self.current_query_rid = 0
         self.current_match_rid = 0
-        
+
         layout = QVBoxLayout()
 
         # FIRST LAYER ----------------------------------------------------------
@@ -53,51 +54,50 @@ class DisplayCompare(QWidget):
         first_layer.addSpacing(10)
 
         # Match Options
-        first_layer.addWidget(QLabel("Max # of Matches:"), 0, 
+        first_layer.addWidget(QLabel("Max # of Matches:"), 0,
                               alignment=Qt.AlignmentFlag.AlignLeft)
         self.knn_number = QLineEdit(str(self.k))
         self.knn_number.setValidator(QIntValidator(0, 1000))
         self.knn_number.setToolTip('Maximum number of matches allowed per ROI (not per sequence)')
         self.knn_number.textChanged.connect(self.change_k)
         self.knn_number.setMaximumWidth(50)
-        first_layer.addWidget(self.knn_number, 0, 
+        first_layer.addWidget(self.knn_number, 0,
                               alignment=Qt.AlignmentFlag.AlignLeft)
 
-        first_layer.addWidget(QLabel("Distance Threshold:"), 0, 
+        first_layer.addWidget(QLabel("Distance Threshold:"), 0,
                               alignment=Qt.AlignmentFlag.AlignLeft)
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self.threshold_slider.setRange(1, 100)  # Set range from 1 to 100
         self.threshold_slider.setValue(self.threshold)  # Set initial value
         self.threshold_slider.valueChanged.connect(self.change_threshold)
-        first_layer.addWidget(self.threshold_slider, 0, 
+        first_layer.addWidget(self.threshold_slider, 0,
                               alignment=Qt.AlignmentFlag.AlignLeft)
-        
+
         button_recalc = QPushButton("Recalculate Matches")
         button_recalc.clicked.connect(self.calculate_neighbors)
         first_layer.addWidget(button_recalc)
 
         # Filters
         first_layer.addSpacing(20)
-        first_layer.addWidget( QLabel("Filter:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(QLabel("Filter:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # REGION 
+        # REGION
         self.region_select = QComboBox()
         self.region_select.setFixedWidth(200)
         # filter out null entries (region not a table yet)
-        self.region_list_ordered = [(0,'Region')] + list(filter(lambda x: x[1] not in (None, ''),
+        self.region_list_ordered = [(0, 'Region')] + list(filter(lambda x: x[1] not in (None, ''),
                                                                 list(self.mpDB.select('survey', columns='id, region'))))
-        print(self.region_list_ordered)
         self.region_select.addItems([el[1] for el in self.region_list_ordered])
         first_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # SURVEY
         self.survey_select = QComboBox()
         self.survey_select.setFixedWidth(200)
-        self.survey_list_ordered = [(0,'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
+        self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
         first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # SPECIES 
+        # SPECIES
         self.species_select = QComboBox()
         self.species_select.setFixedWidth(200)
         first_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -114,14 +114,13 @@ class DisplayCompare(QWidget):
         layer_two.addWidget(QLabel("Label 1"))
         layer_two.addWidget(QLabel("Label 2"))
         control_panel.addLayout(layer_one)
-        #layout.addLayout(control_panel)
+        # layout.addLayout(control_panel)
 
+        # Image Comparison =====================================================
         layout.addSpacing(20)
-
-        # Image Comparison
         image_layout = QHBoxLayout()
-        
-        # QUERY ------------------------------------------------------------------
+
+        # QUERY ----------------------------------------------------------------
         query_layout = QVBoxLayout()
         query_label = QLabel("Query")
         query_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -144,7 +143,7 @@ class DisplayCompare(QWidget):
         self.button_next_query.setMaximumWidth(40)
         self.button_next_query.clicked.connect(lambda: self.set_query(self.current_query + 1))
         query_options.addWidget(self.button_next_query)
-        #Viewpoint Toggle
+        # Viewpoint Toggle
         self.button_viewpoint = QPushButton("L/R")
         self.button_viewpoint.clicked.connect(self.toggle_viewpoint)
         self.button_viewpoint.setMaximumWidth(50)
@@ -171,7 +170,7 @@ class DisplayCompare(QWidget):
         self.query_image = ImageWidget()
         self.query_image.setStyleSheet("border: 1px solid black;")
         self.query_image.setAlignment(Qt.AlignmentFlag.AlignTop)
-        query_layout.addWidget(self.query_image,1)
+        query_layout.addWidget(self.query_image, 1)
         # Query Image Tools
         image_buttons = QHBoxLayout()
         placeholder = QLabel("Brightness, Contrast, zoom? ")
@@ -184,11 +183,10 @@ class DisplayCompare(QWidget):
         self.query_info.setContentsMargins(10, 20, 10, 20)
         self.query_info.setMaximumHeight(200)
         self.query_info.setStyleSheet("border: 1px solid black;")
-        query_layout.addWidget(self.query_info,1)
+        query_layout.addWidget(self.query_info, 1)
         image_layout.addLayout(query_layout)
 
-
-        # MIDDLE COLUMN ---------------------------------------------------
+        # MIDDLE COLUMN --------------------------------------------------------
         middle_column = QVBoxLayout()
         middle_column.addStretch()
         self.button_match = QPushButton("Match")
@@ -196,12 +194,12 @@ class DisplayCompare(QWidget):
         self.button_match.clicked.connect(self.press_match_button)
         self.button_match.setFixedHeight(50)
         self.button_match.setMaximumWidth(50)
-        middle_column.addWidget(self.button_match, 
+        middle_column.addWidget(self.button_match,
                                 alignment=Qt.AlignmentFlag.AlignCenter)
         middle_column.addStretch()
         image_layout.addLayout(middle_column)
 
-         # MATCH ------------------------------------------------------------ 
+        # MATCH ----------------------------------------------------------------
         match_layout = QVBoxLayout()
         match_label = QLabel("Match")
         match_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -236,8 +234,7 @@ class DisplayCompare(QWidget):
         self.match_image = ImageWidget()
         self.match_image.setStyleSheet("border: 1px solid black;")
         self.match_image.setAlignment(Qt.AlignmentFlag.AlignTop)
-        match_layout.addWidget(self.match_image,1)
-
+        match_layout.addWidget(self.match_image, 1)
         # Match Image Tools
         image_buttons = QHBoxLayout()
         placeholder = QLabel("Brightness, Contrast, zoom? ")
@@ -251,23 +248,22 @@ class DisplayCompare(QWidget):
         self.match_info.setMaximumHeight(200)
         self.match_info.setStyleSheet("border: 1px solid black;")
 
-        match_layout.addWidget(self.match_info,1)
+        match_layout.addWidget(self.match_info, 1)
         image_layout.addLayout(match_layout)
         # Add image block to layout
         layout.addLayout(image_layout)
 
-        # BOTTOM LAYER -------------------------------------------------------------
+        # BOTTOM LAYER =========================================================
         # Buttons
         bottom_layer = QHBoxLayout()
         button_validate = QPushButton("View Data")
         button_validate.pressed.connect(self.validate)
-        
+
         # Add buttons to the layout
         bottom_layer.addWidget(button_validate)
         layout.addLayout(bottom_layer)
-        
         self.setLayout(layout)
-        
+
     # RETURN HOME
     def home(self):
         self.parent._set_base_view()
@@ -276,9 +272,7 @@ class DisplayCompare(QWidget):
     def validate(self):
         self.parent._set_media_view()
 
-
-    # RUN ON ENTRY ==========================================================================
-    # Step 1 Calculate neighbors
+    # RUN ON ENTRY =============================================================
     def calculate_neighbors(self):
         """
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
@@ -292,14 +286,14 @@ class DisplayCompare(QWidget):
             dialog.set_max(len(self.sequences))
             dialog.show()
 
-            self.match_thread = MatchEmbeddingThread(self.mpDB, self.sequences, 
+            self.match_thread = MatchEmbeddingThread(self.mpDB, self.sequences,
                                                      k=self.k, threshold=self.threshold)
             self.match_thread.progress_update.connect(dialog.set_counter)
             self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
             self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
             self.match_thread.finished.connect(self.establish_queries)  # do not continue until finished
             self.match_thread.start()
-            
+
         else:
             dialog = AlertPopup(self, prompt="No data to match, process images first.")
             if dialog.exec():
@@ -308,21 +302,17 @@ class DisplayCompare(QWidget):
 
     def capture_neighbor_dict(self, neighbor_dict):
         # capture neighbor_dict from MatchEmbeddingThread
-        print('captured')
         self.neighbor_dict = neighbor_dict
-    
+
     def capture_nearest_dict(self, nearest_dict):
         # capture neighbor_dict from MatchEmbeddingThread
         self.nearest_dict = nearest_dict
-    
-
-    # ========================================================================================
+    # ==========================================================================
 
     def establish_queries(self):
         # must have valid matches to continue
         if self.neighbor_dict:
             self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
-            #print(self.ranked_sequences)
             # set number of queries to validate
             self.n_queries = len(self.neighbor_dict)
             self.query_n.setText("/" + str(self.n_queries))
@@ -335,7 +325,7 @@ class DisplayCompare(QWidget):
             if dialog.exec():
                 del dialog
             self.parent._set_base_view()
-    
+
     def set_query(self, n):
         """
         Set the Query side to a particular (n) image in the list
@@ -353,8 +343,10 @@ class DisplayCompare(QWidget):
         self.current_query_rois = self.sequences[self.current_sequence_id]
         print("query rois:", self.current_query_rois)
 
-        self.current_query_viewpoints = self.data.loc[self.current_query_rois,'viewpoint']
-        
+        # get viewpoints
+        self.current_query_viewpoints = self.data.loc[self.current_query_rois, 'viewpoint']
+
+        # set view to first in sequence
         self.query_sequence_n.setText(str(len(self.current_query_rois)))
         self.set_within_query_sequence(0)
 
@@ -363,7 +355,7 @@ class DisplayCompare(QWidget):
 
     def set_within_query_sequence(self, n):
         """
-        If the query sequence contains more than one image, 
+        If the query sequence contains more than one image,
         set the display to the nth element in the sequence
         """
         # wrap around
@@ -384,13 +376,13 @@ class DisplayCompare(QWidget):
         """
         # get all matches for query
         full_match_set = self.neighbor_dict[self.current_sequence_id]
-        self.current_match_rois =[x[0] for x in full_match_set]
+        self.current_match_rois = [x[0] for x in full_match_set]
         self.match_n.setText("/" + str(len(self.current_match_rois)))
 
         print("match rois:", self.current_match_rois)
         # set to top of matches
         self.set_match(0)
-        
+
     def set_match(self, n):
         """
         Set the curent match index and id 
@@ -406,7 +398,7 @@ class DisplayCompare(QWidget):
         # load new images
         self.load_match()
         self.toggle_match()
-        
+
     # VIEWPOINT TOGGLE
     def toggle_viewpoint(self):
         """
@@ -414,8 +406,7 @@ class DisplayCompare(QWidget):
         """
         pass
 
-    # MATCHING PROCESS --------------------------------------------------------------
-
+    # MATCHING PROCESS ---------------------------------------------------------
     def press_match_button(self):
         if self.button_match.isChecked():
             self.toggle_match(True)
@@ -423,26 +414,18 @@ class DisplayCompare(QWidget):
         else:
             self.toggle_match(False)
 
-
     def toggle_match(self, set=''):
         # already a match
         if self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
-            self.data.loc[self.current_query_rid, "individual_id"] is not None:
-            print('match')
+           self.data.loc[self.current_query_rid, "individual_id"] is not None:
             self.button_match.setStyleSheet(MATCH_STYLE)
-
         # force set
-        elif set == True:
-            print('Force true')
+        elif set is True:
             self.button_match.setStyleSheet(MATCH_STYLE)
-
-        elif set == False:
-            print('Force false')
+        elif set is False:
             self.button_match.setStyleSheet("")
-
         # not a match
         else:
-            print('not a match')
             self.button_match.setStyleSheet("")
 
     def new_match(self):
@@ -451,37 +434,34 @@ class DisplayCompare(QWidget):
         """
         # Both individual_ids are None
         if self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
-            self.data.loc[self.current_query_rid, "individual_id"] is None:
+           self.data.loc[self.current_query_rid, "individual_id"] is None:
             # make new individual
             dialog = IndividualFillPopup(self)
             if dialog.exec():
                 individual_id = self.mpDB.add_individual(dialog.get_species_id(), dialog.get_name(), dialog.get_sex())
-
                 # update query and match
-                self.mpDB.edit_row('roi', self.current_query_rid, {"individual_id": individual_id}) 
-                self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id}) 
-            
+                self.mpDB.edit_row('roi', self.current_query_rid, {"individual_id": individual_id})
+                self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id})
             del dialog
             # update data  
             self.data = db_roi.fetch_roi_media(self.mpDB)
             self.load_query()
-            self.load_match() 
-    
+            self.load_match()
+
         # Match has a name
         else:
+            # TODO
             print("Match has a name")
             #merge(self.mpDB, self.data.loc[self.current_query_rid], self.data.loc[self.current_match_rid])
 
-
-    # LOAD FUNCTIONS ----------------------------------------------------------------
+    # LOAD FUNCTIONS -----------------------------------------------------------
     def load_query(self):
-       """
-       Load Images for Current Query ROI
-       """
-       self.query_image.display_image(self.data.loc[self.current_query_rid,"filepath"],
-                                        bbox=db_roi.get_bbox(self.data.loc[self.current_query_rid]))
-       self.query_info.setText(db_roi.roi_metadata(self.data.loc[self.current_query_rid]))
-
+        """
+        Load Images for Current Query ROI
+        """
+        self.query_image.display_image(self.data.loc[self.current_query_rid, "filepath"],
+                                       bbox=db_roi.get_bbox(self.data.loc[self.current_query_rid]))
+        self.query_info.setText(db_roi.roi_metadata(self.data.loc[self.current_query_rid]))
 
     def load_match(self):
         """
@@ -490,13 +470,11 @@ class DisplayCompare(QWidget):
         distance = self.neighbor_dict[self.current_sequence_id][self.current_match][1]
         self.match_distance.setText(f"Distance: {distance:.2f}")
 
-        self.match_image.display_image(self.data.loc[self.current_match_rid,"filepath"],
-                                      bbox=db_roi.get_bbox(self.data.loc[self.current_match_rid]))
+        self.match_image.display_image(self.data.loc[self.current_match_rid, "filepath"],
+                                       bbox=db_roi.get_bbox(self.data.loc[self.current_match_rid]))
         self.match_info.setText(db_roi.roi_metadata(self.data.loc[self.current_match_rid]))
 
-
-    # GUI HANDLERS ======================================================================
-
+    # GUI HANDLERS =============================================================
     def change_k(self):
         # Set new k value and recalculate neighbors
         if self.knn_number.text() != '':
@@ -505,19 +483,15 @@ class DisplayCompare(QWidget):
     def change_threshold(self):
         # set new threshold value and recalculate neighbors
         self.threshold = self.threshold_slider.value()
-        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() * 
-                                                                          (self.threshold - self.threshold_slider.minimum()) // 
-                                                                          (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
+        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() * (self.threshold - self.threshold_slider.minimum()) //
+                                                                         (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
         QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
-    # Image Manipulations ---------------------------------------------------------------
+    # Image Manipulations ------------------------------------------------------
 
 
 
-
-
-    # Keyboard Handler ------------------------------------------------------------------
-
+    # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()

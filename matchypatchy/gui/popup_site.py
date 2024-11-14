@@ -1,33 +1,31 @@
 """
-
+Creat or edit site
 """
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QListWidget, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6 import QtCore, QtWidgets
 from matchypatchy.gui.popup_alert import AlertPopup
+
 
 class SitePopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Manage Sites")
-        #inherit survey information, db object
         self.mpDB = parent.mpDB
         self.survey_id = parent.active_survey
 
         layout = QVBoxLayout()
-
         # SITE LIST
-        # fetch from database 
         self.list = QListWidget()
-        layout.addWidget(self.list) 
+        layout.addWidget(self.list)
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.list.itemSelectionChanged.connect(self.set_editdel)
- 
+
         # Buttons
         button_layout = QHBoxLayout()
 
-        button_new =  QPushButton("New")
-        self.button_edit = QPushButton("Edit") 
+        button_new = QPushButton("New")
+        self.button_edit = QPushButton("Edit")
         self.button_del = QPushButton("Delete")
 
         button_new.clicked.connect(self.add)
@@ -50,13 +48,12 @@ class SitePopup(QDialog):
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
-        
-        self.update()
 
+        self.update()
 
     def set_editdel(self):
         # currentRow() returns -1 if nothing selected
-        flag = bool(self.list.currentRow()+1) 
+        flag = bool(self.list.currentRow() + 1)
         self.button_edit.setEnabled(flag)
         self.button_del.setEnabled(flag)
 
@@ -67,13 +64,13 @@ class SitePopup(QDialog):
         self.site_list = dict(self.site_list_ordered)
         if self.site_list_ordered:
             self.list.addItems([el[1] for el in self.site_list_ordered])
-        self.set_editdel()   
+        self.set_editdel()
 
     def add(self):
         dialog = SiteFillPopup(self)
         if dialog.exec():
-            confirm = self.mpDB.add_site(dialog.get_name(),dialog.get_lat(),
-                                         dialog.get_long(),self.survey_id[0])
+            self.mpDB.add_site(dialog.get_name(), dialog.get_lat(),
+                               dialog.get_long(), self.survey_id[0])
         del dialog
         self.sites = self.update()
 
@@ -81,23 +78,20 @@ class SitePopup(QDialog):
         selected_site = self.list.currentRow()
         id = self.site_list_ordered[selected_site][0]
         cond = f'id={id}'
-        id, name, lat, long = self.mpDB.select('site',columns='id, name, lat, long', row_cond=cond)[0]
+        id, name, lat, long = self.mpDB.select('site', columns='id, name, lat, long', row_cond=cond)[0]
         dialog = SiteFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
-            replace_dict = {"name":f"'{dialog.get_name()}'", "lat":dialog.get_lat(), "long":dialog.get_long()}
-            confirm = self.mpDB.edit_row("site",id,replace_dict)
+            replace_dict = {"name": f"'{dialog.get_name()}'", "lat": dialog.get_lat(), "long": dialog.get_long()}
+            self.mpDB.edit_row("site", id, replace_dict)
         del dialog
         self.sites = self.update()
-    
+
     def delete(self):
         selected = self.list.currentItem().text()
-        prompt = f'Are you sure you want to delete {selected}?'
-        print(prompt)
-        dialog = AlertPopup(self, prompt)
+        dialog = AlertPopup(self, f'Are you sure you want to delete {selected}?')
         if dialog.exec():
             row = self.site_list_ordered[self.list.currentRow()][0]
-            cond = f'id={row}'
-            self.mpDB.delete("site",cond)
+            self.mpDB.delete("site", f'id={row}')
         del dialog
         self.update()
 
@@ -119,13 +113,13 @@ class SiteFillPopup(QDialog):
         self.name.setText(name)
         layout.addWidget(self.name)
 
-        #region
+        # latitude
         layout.addWidget(QLabel('Latitude'))
         self.lat = QLineEdit()
         self.lat.setText(str(lat))
         layout.addWidget(self.lat)
 
-        # start year
+        # longitude
         layout.addWidget(QLabel('Longitude'))
         self.long = QLineEdit()
         self.long.setText(str(long))
@@ -137,8 +131,8 @@ class SiteFillPopup(QDialog):
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)
         self.okButton = buttonBox.button(buttonBox.StandardButton.Ok)
-        self.okButton.setEnabled(False) 
-        self.checkInput() # will enable ok button if in edit mode
+        self.okButton.setEnabled(False)
+        self.checkInput()  # will enable ok button if in edit mode
 
         self.name.textChanged.connect(self.checkInput)
         self.lat.textChanged.connect(self.checkInput)
@@ -160,7 +154,7 @@ class SiteFillPopup(QDialog):
 
     def get_lat(self):
         return self.lat.text()
-    
+
     def get_long(self):
         return self.long.text()
 

@@ -29,19 +29,19 @@ class TableEditorPopup(QDialog):
         print(self.data)
 
         self.setWindowTitle(f"Edit {self.table}")
-        self.setFixedSize(600,425)
+        self.setFixedSize(600, 425)
         layout = QVBoxLayout()
 
         self.list = QTableWidget()  
         self.list.setColumnCount(self.data.shape[1])
         self.list.setHorizontalHeaderLabels(self.data.columns.tolist())
-        self.list.setColumnWidth(0,25)  # set id column to be small
+        self.list.setColumnWidth(0, 25)  # set id column to be small
         self.list.horizontalHeader().setStretchLastSection(True)
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.list.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.list.itemChanged.connect(self.edit)
         layout.addWidget(self.list) 
- 
+
         # Buttons
         button_layout = QHBoxLayout()
         button_new = QPushButton("New")
@@ -52,7 +52,7 @@ class TableEditorPopup(QDialog):
         self.button_save.clicked.connect(self.edit)
         self.button_save.setEnabled(False)
         button_layout.addWidget(self.button_save)
-        
+
         self.button_del = QPushButton("Delete")
         self.button_del.clicked.connect(self.delete)
         self.button_del.setEnabled(False)
@@ -64,10 +64,9 @@ class TableEditorPopup(QDialog):
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
-        
+
         self.setLayout(layout)
         self.update()
-       
 
     def fetch(self):
         # REFACTOR THIS?

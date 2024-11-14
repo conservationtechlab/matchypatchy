@@ -1,7 +1,7 @@
 """
 Create a new Individual Fillable Form
 """
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QComboBox, 
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QComboBox,
                              QLabel, QLineEdit, QDialogButtonBox)
 
 
@@ -42,16 +42,14 @@ class IndividualFillPopup(QDialog):
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)
         self.okButton = buttonBox.button(buttonBox.StandardButton.Ok)
-        self.okButton.setEnabled(False) 
-        self.checkInput() # will enable ok button if in edit mode
+        self.okButton.setEnabled(False)
+        self.checkInput()  # will enable ok button if in edit mode
 
         self.setLayout(layout)
 
-
     def set_species_options(self):
-        options = self.mpDB.select("species", columns = "id, common")
-        self.list = [(None,"Species")] + list(options)
-        print(self.list)
+        options = self.mpDB.select("species", columns="id, common")
+        self.list = [(None, "Species")] + list(options)
         self.species_combo.addItems([el[1] for el in self.list])
         if self.species_id is not None:
             set_to_index = next((i for i, t in enumerate(self.list) if t[0] == self.species_id), None)
@@ -65,7 +63,7 @@ class IndividualFillPopup(QDialog):
 
     def get_sex(self):
         return self.sex.text()
-    
+
     def get_species_id(self):
         # return id only
         return self.list[self.species_combo.currentIndex()][0]

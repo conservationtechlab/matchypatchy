@@ -55,7 +55,7 @@ class MainWindow(QMainWindow):
         # Set the layout for the window
         container.setLayout(self.pages)
         self._set_base_view()
-        self.setCentralWidget(container)        
+        self.setCentralWidget(container)
 
     def _createMenuBar(self):
         menuBar = QMenuBar(self)
@@ -83,8 +83,8 @@ class MainWindow(QMainWindow):
         file_import_media = QAction("Media", self)
         file_import_media.triggered.connect(lambda: self.import_popup('media'))
         file_import.addAction(file_import_media)
-        
-        # EDIT 
+
+        # EDIT
         edit_preferences = QAction("Preferences", self)
         edit.addAction(edit_preferences)
 
@@ -104,7 +104,6 @@ class MainWindow(QMainWindow):
         edit_media.triggered.connect(lambda: self.edit_popup('media'))
         edit.addAction(edit_media)
 
-
     def _set_base_view(self):
         self.pages.setCurrentIndex(0)
         self.Intro.setFocus()
@@ -112,7 +111,7 @@ class MainWindow(QMainWindow):
     def _set_media_view(self):
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
-        self.Media.refresh_filters() 
+        self.Media.refresh_filters()
         self.Media.connect_filters()
         self.Media.load_table()
 
@@ -136,8 +135,9 @@ class MainWindow(QMainWindow):
         """
         # SPECIES
         if table == "species":
-            file_path = QFileDialog.getOpenFileName(self, "Open File", 
-                                                    os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
+            file_path = QFileDialog.getOpenFileName(self, "Open File",
+                                                    os.path.expanduser('~'),
+                                                    ("CSV Files (*.csv)"))[0]
             site.import_csv(self.mpDB, file_path)
 
         else:
@@ -147,13 +147,13 @@ class MainWindow(QMainWindow):
                 survey_id = dialog.get_selection()[0]
                 print(survey_id)
             del dialog
-            file_path = QFileDialog.getOpenFileName(self, "Open File", 
-                                                    os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
+            file_path = QFileDialog.getOpenFileName(self, "Open File",
+                                                    os.path.expanduser('~'),
+                                                    ("CSV Files (*.csv)"))[0]
 
             # SITE
             if table == "site":
                 site.import_csv(self.mpDB, file_path, survey_id=survey_id)
-
 
 
 def main_display(mpDB):

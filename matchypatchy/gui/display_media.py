@@ -14,27 +14,27 @@ class DisplayMedia(QWidget):
         super().__init__()
         self.parent = parent
         self.mpDB = parent.mpDB
-        
+
         layout = QVBoxLayout()
-        
+
         first_layer = QHBoxLayout()
         # Home Button
         first_layer.addSpacing(10)
         return_button = QPushButton("Home")
         return_button.clicked.connect(self.home)
         return_button.setFixedWidth(100)
-        first_layer.addWidget(return_button, 0,  alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(return_button, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # FILTERS
         survey_label = QLabel("Filter:")
         survey_label.setFixedWidth(50)
         first_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # SURVEY 
+        # SURVEY
         self.survey_select = QComboBox()
         self.survey_select.setFixedWidth(200)
         first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.survey_list_ordered = [(0,'Survey')]
+        self.survey_list_ordered = [(0, 'Survey')]
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
         self.active_survey = self.survey_list_ordered[0]
 
@@ -43,37 +43,37 @@ class DisplayMedia(QWidget):
         self.site_select.setFixedWidth(200)
         first_layer.addWidget(self.site_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.valid_sites = None
-        self.site_list_ordered = [(0,'Site')]
+        self.site_list_ordered = [(0, 'Site')]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])
         self.active_site = self.site_list_ordered[0]
 
-        # SPECIES 
+        # SPECIES
         self.species_select = QComboBox()
         self.species_select.setFixedWidth(200)
         first_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.species_list_ordered = [(0,'Species')]
+        self.species_list_ordered = [(0, 'Species')]
         self.species_select.addItems([el[1] for el in self.species_list_ordered])
         self.active_species = self.species_list_ordered[0]
 
-        # INDIVIDUAL 
+        # INDIVIDUAL
         self.individual_select = QComboBox()
         self.individual_select.setFixedWidth(200)
         first_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.individual_list_ordered = [(0,'Individual')]
+        self.individual_list_ordered = [(0, 'Individual')]
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
         self.active_individual = self.individual_list_ordered[0]
 
         # UNIDENTIFIED
         unidentified = QPushButton("Unidentified")
         unidentified.setCheckable(True)
-        unidentified.toggled.connect(self.select_unidentified) 
+        unidentified.toggled.connect(self.select_unidentified)
         self.unidentified_only = False
         first_layer.addWidget(unidentified, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # FAVORITE
         favorites = QPushButton("Favorites")
         favorites.setCheckable(True)
-        favorites.toggled.connect(self.select_favorites) 
+        favorites.toggled.connect(self.select_favorites)
         self.favorites_only = False
         first_layer.addWidget(favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -95,23 +95,23 @@ class DisplayMedia(QWidget):
         Update Dropdown Lists
         """
         self.survey_select.clear()
-        self.survey_list_ordered = [(0,'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
+        self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
         self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
 
         self.site_select.clear()
         self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
-        self.site_list_ordered = [(0,'Site')] + [(k, v) for k, v in self.valid_sites.items()]
+        self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])
         self.active_site = self.site_list_ordered[self.site_select.currentIndex()]
 
         self.species_select.clear()
-        self.species_list_ordered = [(0,'Species')] + list(self.mpDB.select('species', columns='id, common'))
+        self.species_list_ordered = [(0, 'Species')] + list(self.mpDB.select('species', columns='id, common'))
         self.species_select.addItems([el[1] for el in self.species_list_ordered])
         self.active_species = self.species_list_ordered[self.species_select.currentIndex()]
 
         self.individual_select.clear()
-        self.individual_list_ordered = [(0,'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
+        self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
         self.active_individual = self.individual_list_ordered[self.individual_select.currentIndex()]
 
@@ -137,11 +137,11 @@ class DisplayMedia(QWidget):
 
     def select_unidentified(self):
         self.unidentified_only = not self.unidentified_only
-        self.filter_table() 
+        self.filter_table()
 
     def select_favorites(self):
         self.favorites_only = not self.favorites_only
-        self.filter_table()    
+        self.filter_table()
 
     def select_survey(self):
         self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
@@ -151,7 +151,7 @@ class DisplayMedia(QWidget):
     def select_site(self):
         self.active_site = self.site_list_ordered[self.site_select.currentIndex()]
         self.filter_table()
-        
+
     def select_species(self):
         self.active_species = self.species_list_ordered[self.species_select.currentIndex()]
         self.filter_table()
@@ -167,6 +167,5 @@ class DisplayMedia(QWidget):
             self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=f'survey_id={self.active_survey[0]}'))
         else:
             self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
-        self.site_list_ordered = [(0,'Site')] + [(k, v) for k, v in self.valid_sites.items()]
+        self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])
-

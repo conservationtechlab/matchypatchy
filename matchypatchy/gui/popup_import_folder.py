@@ -14,9 +14,6 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from animl.file_management import build_file_manifest
 
 
-columns=["filepath", "timestamp", 'site_id', 'sequence_id', "external_id", 'comment',
-         "viewpoint", "species_id", "individual_id"]
-
 class ImportFolderPopup(QDialog):
     def __init__(self, parent, directory):
         super().__init__(parent)
@@ -41,7 +38,7 @@ class ImportFolderPopup(QDialog):
         # Ok/Cancel
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.buttonBox.accepted.connect(self.import_manifest)  
+        self.buttonBox.accepted.connect(self.import_manifest)
         self.buttonBox.rejected.connect(self.reject)
         self.buttonBox.hide()
 
@@ -54,7 +51,7 @@ class ImportFolderPopup(QDialog):
 
         # build manifest
         self.build_manifest()
-    
+
     # 1. Run Thread on entry
     def build_manifest(self):
         # show progress bar
@@ -81,12 +78,12 @@ class ImportFolderPopup(QDialog):
         self.site.show()
         self.buttonBox.show()
 
-        example = self.data.loc[0,'FilePath']
-        # get potential site 
+        example = self.data.loc[0, 'FilePath']
+        # get potential site
         file_tree = ['None'] + example.split(os.sep)
         self.site.addItems(file_tree)
 
-    #. 4. Import manifest into media table
+    # 4. Import manifest into media table
     def import_manifest(self):
         """
         Media entry (id, filepath, ext, timestamp, comment, site_id)
@@ -95,7 +92,7 @@ class ImportFolderPopup(QDialog):
         self.progress_bar.setRange(0, len(self.data))
         self.progress_bar.show()
 
-        site_level = 0 if self.site.currentIndex()==0 else self.site.currentIndex() - 1
+        site_level = 0 if self.site.currentIndex() == 0 else self.site.currentIndex() - 1
 
         print(f"Adding {len(self.data)} files to Database")
 
@@ -107,7 +104,7 @@ class ImportFolderPopup(QDialog):
 
 class BuildManifestThread(QThread):
     """
-    Thread for launching 
+    Thread for launching buildfilemanifest
     """
     manifest = pyqtSignal(pd.DataFrame)
 
@@ -122,7 +119,7 @@ class BuildManifestThread(QThread):
 
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
-    
+
     def __init__(self, mpDB, active_survey, data, site_level):
         super().__init__()
         self.mpDB = mpDB
@@ -131,7 +128,7 @@ class FolderImportThread(QThread):
         self.site_level = site_level
         self.default_site = None
         self.animl_conversion = {"filepath": "FilePath",
-                                "timestamp": "DateTime"}    
+                                 "timestamp": "DateTime"}
 
     def run(self):
         for i, file in self.data.iterrows():
@@ -139,14 +136,14 @@ class FolderImportThread(QThread):
             filepath = file[self.animl_conversion['filepath']]
             timestamp = file[self.animl_conversion['timestamp']]
 
-            # check to see if file exists 
+            # check to see if file exists
             if not os.path.exists(filepath):
                 print(f"Warning, file {filepath} does not exist")
                 continue
 
             # get file extension
             _, ext = os.path.splitext(os.path.basename(filepath))
-            
+
             # get remaining information
             if self.site_level > 0:
                 site_name = os.path.normpath(filepath).split(os.sep)[self.site_level]
@@ -160,10 +157,10 @@ class FolderImportThread(QThread):
                 site_id = self.default_site
 
             # insert into table, force type
-            media_id = self.mpDB.add_media(filepath, ext, 
-                                           str(timestamp), 
+            media_id = self.mpDB.add_media(filepath, ext,
+                                           str(timestamp),
                                            int(site_id),
-                                           sequence_id=None, 
+                                           sequence_id=None,
                                            external_id=None,
                                            comment=None)
 

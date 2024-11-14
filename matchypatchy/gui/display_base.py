@@ -23,7 +23,6 @@ from matchypatchy.ml.sequence_thread import SequenceThread
 from matchypatchy.ml.animl_thread import AnimlThread
 from matchypatchy.ml.reid_thread import ReIDThread
 
-# TODO: add download models button/popup
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
@@ -34,18 +33,18 @@ class DisplayBase(QWidget):
         container = QWidget()
         container.setObjectName("mainBorderWidget")
         #container.setStyleSheet("#mainBorderWidget { border: 20px solid gray; }")
-        
         layout = QVBoxLayout()
 
         self.label = QLabel("Welcome To MatchyPatchy")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFixedHeight(20)
         layout.addWidget(self.label)
+        # TODO: add logo
         layout.addSpacing(500)
         layout.addStretch()
 
         column_layout = QHBoxLayout()
-        column_layout.addSpacing(100) # add spacing to left side
+        column_layout.addSpacing(100)  # add spacing to left side
 
         # DB MANAGEMENT
         border_db = QWidget()
@@ -56,10 +55,10 @@ class DisplayBase(QWidget):
         db_label.setObjectName("QLabel_Base")
         db_layer.addWidget(db_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        #Survey
+        # Survey
         survey_layout = QHBoxLayout()
         survey_label = QLabel("Survey:")
-        survey_layout.addWidget(survey_label,0)
+        survey_layout.addWidget(survey_label, 0)
         self.survey_select = QComboBox()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         survey_layout.addWidget(self.survey_select, 1)
@@ -67,7 +66,7 @@ class DisplayBase(QWidget):
         button_survey_new.clicked.connect(self.new_survey)
         survey_layout.addWidget(button_survey_new, 1)
         db_layer.addLayout(survey_layout)
-        
+
         button_site_manage = QPushButton("Manage Sites")
         button_species_manage = QPushButton("Manage Species")
         button_media_manage = QPushButton("Manage Media")
@@ -83,10 +82,9 @@ class DisplayBase(QWidget):
         db_layer.addWidget(button_media_manage)
         db_layer.addWidget(button_individual_manage)
 
-        db_layer.addStretch()
         border_db.setLayout(db_layer)
-        column_layout.addWidget(border_db,1)
-        column_layout.addSpacing(20)
+        column_layout.addWidget(border_db, 1)
+        column_layout.addSpacing(20)  # gap between sections
 
         # MAIN PROCESS
         border_import = QWidget()
@@ -103,7 +101,7 @@ class DisplayBase(QWidget):
         button_validate = QPushButton("3. Validate")
         button_match = QPushButton("4. Match")
         button_export = QPushButton("5.Export")
-        
+
         button_load_csv.clicked.connect(self.import_csv)
         button_load_folder.clicked.connect(self.import_folder)
         button_process.clicked.connect(self.process_images)
@@ -120,11 +118,10 @@ class DisplayBase(QWidget):
         import_layer.addWidget(button_match)
         import_layer.addWidget(button_export)
 
-        import_layer.addStretch()
         border_import.setLayout(import_layer)
-        column_layout.addWidget(border_import,1)
+        column_layout.addWidget(border_import, 1)
         column_layout.addSpacing(20)
-        
+
         # OTHER
         border_other = QWidget()
         border_other.setObjectName("borderWidget")
@@ -137,49 +134,49 @@ class DisplayBase(QWidget):
         # ML models
         button_configuration = QPushButton("Configuration")
         button_download_ml = QPushButton("Download Models")
+        button_ph1 = QPushButton("Placeholder")
+        button_ph2 = QPushButton("Placeholder")
+        button_ph3 = QPushButton("Placeholder")
 
         other_layer.addWidget(button_configuration)
         other_layer.addWidget(button_download_ml)
+        other_layer.addWidget(button_ph1)
+        other_layer.addWidget(button_ph2)
+        other_layer.addWidget(button_ph3)
 
         button_configuration.clicked.connect(self.edit_config)
         button_download_ml.clicked.connect(self.download_ml)
 
-
-        other_layer.addStretch()
         border_other.setLayout(other_layer)
-        column_layout.addWidget(border_other,1)
-        column_layout.addSpacing(100) # add spacing to right side
+        column_layout.addWidget(border_other, 1)
+        column_layout.addSpacing(100)  # add spacing to right side
 
-        
         layout.addLayout(column_layout)
-        layout.addSpacing(50) # add spacing to bottom
+        layout.addSpacing(50)  # add spacing to bottom
 
         self.setStyleSheet("QPushButton, QComboBox { height: 40px; }"
                            "#QLabel_Base { font-size: 16px; }")
-        
         container.setLayout(layout)
         main_layout = QVBoxLayout()
         main_layout.addWidget(container)
-
         self.setLayout(main_layout)
 
         self.update_survey()
 
-    # Database Management --------------------------------------------------------------
+    # Database Management ------------------------------------------------------
+    def update_survey(self):
+        self.survey_select.clear()
+        survey_names = self.mpDB.select('survey', columns='id, name')
+        self.survey_list = dict(survey_names)
+        self.survey_list_ordered = list(survey_names)
+        if self.survey_list_ordered:
+            self.survey_select.addItems([el[1] for el in survey_names])
 
     def new_survey(self):
         dialog = SurveyPopup(self)
         if dialog.exec():
             self.update_survey()
             del dialog
-
-    def update_survey(self):
-        self.survey_select.clear() 
-        survey_names = self.mpDB.select('survey', columns='id, name')
-        self.survey_list = dict(survey_names)
-        self.survey_list_ordered = list(survey_names)
-        if self.survey_list_ordered:
-            self.survey_select.addItems([el[1] for el in survey_names])
 
     def select_survey(self):
         try:
@@ -202,10 +199,10 @@ class DisplayBase(QWidget):
             del dialog
 
     def manage_individual(self):
+        # TODO
         pass
 
-    # MAIN PROCESS --------------------------------------------------------------
-
+    # MAIN PROCESS -------------------------------------------------------------
     # STEP 1: Import from CSV
     def import_csv(self):
         '''
@@ -216,15 +213,14 @@ class DisplayBase(QWidget):
         self.mpDB.clear('roi')
         self.mpDB.clear('roi_emb')
         self.select_survey()
-        manifest = QFileDialog.getOpenFileName(self, "Open File", 
-                                                os.path.expanduser('~'),("CSV Files (*.csv)"))[0]
+        manifest = QFileDialog.getOpenFileName(self, "Open File",
+                                               os.path.expanduser('~'),
+                                               ("CSV Files (*.csv)"))[0]
         if manifest:
-            
             dialog = ImportCSVPopup(self, manifest)
             if dialog.exec():
-                del dialog                
+                del dialog
 
-            
     # STEP 1: Import from FOLDER
     def import_folder(self):
         """
@@ -234,16 +230,14 @@ class DisplayBase(QWidget):
         self.mpDB.clear('roi')
         self.mpDB.clear('roi_emb')
         if self.select_survey():
-            directory = QFileDialog.getExistingDirectory(self, "Open File", 
-                                                         os.path.expanduser('~'), 
+            directory = QFileDialog.getExistingDirectory(self, "Open File",
+                                                         os.path.expanduser('~'),
                                                          QFileDialog.Option.ShowDirsOnly)
             if directory:
                 dialog = ImportFolderPopup(self, directory)
                 if dialog.exec() == QDialog.DialogCode.Rejected:
-                   del dialog
-                   self.import_folder()
-                else:
-                    del dialog 
+                    self.import_folder()
+                del dialog
         else:
             dialog = AlertPopup(self, "Please create a new survey before uploading.")
             if dialog.exec():
@@ -268,7 +262,7 @@ class DisplayBase(QWidget):
             reid_key = animl_options.select_reid()
             viewpoint_key = animl_options.select_viewpoint()
 
-            # 1. SEQUENCE 
+            # 1. SEQUENCE
             self.sequence_thread = SequenceThread(self.mpDB, sequence_checked)
             self.sequence_thread.progress_update.connect(dialog.update)
             self.sequence_thread.start()
@@ -305,14 +299,12 @@ class DisplayBase(QWidget):
         # TODO
         pass
 
-    # OTHER OPTIONS ------------------------------------------------------------------
-
+    # OTHER OPTIONS ------------------------------------------------------------
     def edit_config(self):
-        # TODO 
+        # TODO
         pass
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)
         if dialog.exec():
-            del dialog  
-    
+            del dialog

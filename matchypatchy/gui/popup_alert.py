@@ -1,6 +1,6 @@
 '''
 Alert Popup displaying simple text and OK/Cancel buttons
-ProgressBar Popup 
+ProgressBar Popup
 '''
 from PyQt6.QtWidgets import QVBoxLayout, QDialogButtonBox, QLabel, QDialog, QProgressBar
 from PyQt6.QtCore import Qt
@@ -9,24 +9,22 @@ from PyQt6.QtCore import Qt
 class AlertPopup(QDialog):
     def __init__(self, parent, prompt, title="Alert", progressbar=False):
         super().__init__(parent)
-        
         self.setWindowTitle(title)
         layout = QVBoxLayout(self)
-        
-        self.prompt = QLabel(prompt, objectName='title', 
-                            alignment=Qt.AlignmentFlag.AlignCenter)
+        self.prompt = QLabel(prompt, objectName='title',
+                             alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.prompt)
 
         if progressbar:
             self.progress_bar = QProgressBar()
             self.progress_bar.setTextVisible(False)
-            self.progress_bar.setRange(0,0)
+            self.progress_bar.setRange(0, 0)
             layout.addWidget(self.progress_bar)
- 
+
         # buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
-        buttonBox.accepted.connect(self.accept)  
+        buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
 
     def update(self, prompt):
@@ -42,7 +40,7 @@ class ProgressPopup(QDialog):
         self.counter = 0
         self.min = 0
         self.max = 100
-        
+
         self.label = QLabel(prompt)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(self.min, self.max)
@@ -51,7 +49,6 @@ class ProgressPopup(QDialog):
         self.layout.addWidget(self.progress_bar)
 
         self.setLayout(self.layout)
-
 
     def update_progress(self):
         """Update the progress bar based on the counter value."""

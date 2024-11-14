@@ -5,13 +5,12 @@ Popup for Selection within a list, ie Survey selection
 
 """
 import wget
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QProgressBar, 
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 from matchypatchy import config
 from matchypatchy.ml import models
-
 
 
 class MLDownloadPopup(QDialog):
@@ -37,10 +36,10 @@ class MLDownloadPopup(QDialog):
         layout.addSpacing(20)
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.buttonBox.accepted.connect(self.accept)  
+        self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
-          # Progress Bar (hidden at start)
+        # Progress Bar (hidden at start)
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
         self.progress_bar.hide()
@@ -49,18 +48,17 @@ class MLDownloadPopup(QDialog):
         self.available_models = models.available_models()
         print(self.available_models)
         self.set_checkboxes()
-        
 
     def set_checkboxes(self):
         for m in self.available_models.keys():
-            checkbox = self.checkbox_layout.itemAtPosition(self.models.index(m),0).widget()
+            checkbox = self.checkbox_layout.itemAtPosition(self.models.index(m), 0).widget()
             checkbox.setChecked(True)
 
     def toggle_checkbox(self):
         pass
-    
+
     def download_ml(self):
-        self.progress_bar.setRange(0,len(self.checked_models))
+        self.progress_bar.setRange(0, len(self.checked_models))
         self.progress_bar.show()
         self.build_thread = DownloadMLThread(self.checked_models)
         self.build_thread.downloaded.connect(self.progress_bar.setValue)
@@ -69,10 +67,9 @@ class MLDownloadPopup(QDialog):
 
 class DownloadMLThread(QThread):
     """
-    Thread for launching 
+    Thread for downloading ML model
     """
     downloaded = pyqtSignal(int)
-   
 
     def __init__(self, checked_models):
         super().__init__()
@@ -84,7 +81,6 @@ class DownloadMLThread(QThread):
             self.downloaded.emit(model)
 
 
-
 class MLOptionsPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
@@ -93,7 +89,7 @@ class MLOptionsPopup(QDialog):
         layout = QVBoxLayout()
         layout.addSpacing(10)
 
-        # Sequence 
+        # Sequence
         self.sequence = QCheckBox("Calculate Sequence")
         self.sequence.setStyleSheet("""QCheckBox {padding: 5px;}
                                        QCheckBox::indicator {width: 25px; height: 25px;}""")
@@ -140,16 +136,15 @@ class MLOptionsPopup(QDialog):
         layout.addSpacing(20)
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
-        self.buttonBox.accepted.connect(self.accept)  
+        self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
         self.setLayout(layout)
 
-
     def select_sequence(self):
         return self.sequence.isChecked()
 
-    def select_detector(self): 
+    def select_detector(self):
         self.selected_detector_key = self.available_detectors[self.detector.currentIndex()]
         return self.selected_detector_key
 
@@ -159,8 +154,8 @@ class MLOptionsPopup(QDialog):
         else:
             self.selected_classifier_key = self.available_classifiers[self.classifier.currentIndex()]
             return self.selected_classifier_key
-    
-    def select_reid(self): 
+
+    def select_reid(self):
         self.selected_reid_key = self.available_reids[self.reid.currentIndex()]
         return self.selected_reid_key
 

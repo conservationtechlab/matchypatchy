@@ -7,6 +7,9 @@ import pandas as pd
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.avi', '.mp4', '.wmv', '.mov']
 
+COLUMNS = ["filepath", "timestamp", "site_id", "sequence_id", "external_id", 
+           "comment", "viewpoint", "species_id", "individual_id"]
+
 
 def fetch_media(mpDB):
     """
