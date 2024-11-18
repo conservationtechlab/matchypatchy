@@ -6,6 +6,7 @@ Note:
 
 """
 import os
+import logging
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
@@ -13,6 +14,7 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.popup_survey import SurveyPopup
 from matchypatchy.gui.popup_site import SitePopup
+from matchypatchy.gui.popup_individual import IndividualPopup
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_species import SpeciesPopup
 from matchypatchy.gui.popup_import_csv import ImportCSVPopup
@@ -22,6 +24,8 @@ from matchypatchy.gui.popup_ml import MLDownloadPopup, MLOptionsPopup
 from matchypatchy.ml.sequence_thread import SequenceThread
 from matchypatchy.ml.animl_thread import AnimlThread
 from matchypatchy.ml.reid_thread import ReIDThread
+
+from matchypatchy.database.roi import fetch_roi_media
 
 
 class DisplayBase(QWidget):
@@ -188,7 +192,6 @@ class DisplayBase(QWidget):
 
     def new_site(self):
         self.select_survey()
-        # create new from scratch, be able to import list from another survey
         dialog = SitePopup(self)
         if dialog.exec():
             del dialog
@@ -199,24 +202,22 @@ class DisplayBase(QWidget):
             del dialog
 
     def manage_individual(self):
-        # TODO
-        pass
+        dialog = IndividualPopup(self)
+        if dialog.exec():
+            del dialog
 
     # MAIN PROCESS -------------------------------------------------------------
     # STEP 1: Import from CSV
     def import_csv(self):
-        '''
-        Add media from CSV
-        '''
         # remove after finish testing
         self.mpDB.clear('media')
         self.mpDB.clear('roi')
-        self.mpDB.clear('roi_emb')
         self.select_survey()
         manifest = QFileDialog.getOpenFileName(self, "Open File",
                                                os.path.expanduser('~'),
                                                ("CSV Files (*.csv)"))[0]
         if manifest:
+            logging.info(f"Importing from manifest: {manifest}")
             dialog = ImportCSVPopup(self, manifest)
             if dialog.exec():
                 del dialog
@@ -228,13 +229,13 @@ class DisplayBase(QWidget):
         """
         self.mpDB.clear('media')
         self.mpDB.clear('roi')
-        self.mpDB.clear('roi_emb')
         if self.select_survey():
             directory = QFileDialog.getExistingDirectory(self, "Open File",
                                                          os.path.expanduser('~'),
                                                          QFileDialog.Option.ShowDirsOnly)
             if directory:
                 dialog = ImportFolderPopup(self, directory)
+                logging.info(f"Importing from directory: {directory}")
                 if dialog.exec() == QDialog.DialogCode.Rejected:
                     self.import_folder()
                 del dialog
@@ -296,8 +297,17 @@ class DisplayBase(QWidget):
 
     # STEP 5: Export Button
     def export(self):
-        # TODO
-        pass
+        data = fetch_roi_media(self.mpDB)
+
+        file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
+        if file_path:
+            # add csv if user didnt enter
+            if not file_path.endswith(".csv"):
+                file_path += ".csv"
+            
+            with open(file_path, 'w') as file:
+                data.to_csv(file)
+            logging.info(f"Data exported to: {file_path}")
 
     # OTHER OPTIONS ------------------------------------------------------------
     def edit_config(self):

@@ -13,7 +13,6 @@ from matchypatchy.gui import popup_ml
 from matchypatchy.gui import popup_site
 from matchypatchy.gui import popup_species
 from matchypatchy.gui import popup_survey
-from matchypatchy.gui import popup_table
 from matchypatchy.gui import widget_image
 
 from matchypatchy.gui.display_base import (DisplayBase,)
@@ -36,7 +35,6 @@ from matchypatchy.gui.popup_ml import (DownloadMLThread, MLDownloadPopup,
 from matchypatchy.gui.popup_site import (SiteFillPopup, SitePopup,)
 from matchypatchy.gui.popup_species import (SpeciesFillPopup, SpeciesPopup,)
 from matchypatchy.gui.popup_survey import (SurveyFillPopup, SurveyPopup,)
-from matchypatchy.gui.popup_table import (TableEditorPopup,)
 from matchypatchy.gui.widget_image import (ImageWidget,)
 
 __all__ = ['AlertPopup', 'BuildManifestThread', 'CSVImportThread',

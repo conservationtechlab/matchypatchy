@@ -20,7 +20,6 @@ from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
 from matchypatchy.gui.display_compare import DisplayCompare
 from matchypatchy.gui.display_single import DisplaySingle
-from matchypatchy.gui.popup_table import TableEditorPopup
 from matchypatchy.gui.popup_dropdown import DropdownPopup
 
 from matchypatchy.database import site
@@ -86,22 +85,15 @@ class MainWindow(QMainWindow):
 
         # EDIT
         edit_preferences = QAction("Preferences", self)
-        edit.addAction(edit_preferences)
-
         edit_survey = QAction("Surveys", self)
-        edit_survey.triggered.connect(lambda: self.edit_popup('survey'))
-        edit.addAction(edit_survey)
-
         edit_site = QAction("Sites", self)
-        edit_site.triggered.connect(lambda: self.edit_popup('site'))
-        edit.addAction(edit_site)
-
         edit_species = QAction("Species", self)
-        edit_species.triggered.connect(lambda: self.edit_popup('species'))
-        edit.addAction(edit_species)
-
         edit_media = QAction("Media", self)
-        edit_media.triggered.connect(lambda: self.edit_popup('media'))
+
+        edit.addAction(edit_preferences)
+        edit.addAction(edit_survey)
+        edit.addAction(edit_site)
+        edit.addAction(edit_species)
         edit.addAction(edit_media)
 
     def _set_base_view(self):
@@ -124,10 +116,6 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(3)
         self.Compare.setFocus()
 
-    def edit_popup(self, table):
-        dialog = TableEditorPopup(self, table)
-        if dialog.exec():
-            del dialog
 
     def import_popup(self, table):
         """
