@@ -5,6 +5,14 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QComboBox,
                              QLabel, QLineEdit, QDialogButtonBox)
 
 
+class IndividualPopup(QDialog):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWindowTitle("Manage Individuals")
+        self.mpDB = parent.mpDB
+
+
+
 class IndividualFillPopup(QDialog):
     def __init__(self, parent, species_id=None):
         super().__init__(parent)

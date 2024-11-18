@@ -30,6 +30,7 @@ class MLDownloadPopup(QDialog):
         # Add checkboxes to the grid layout in two columns
         for i, m in enumerate(self.models):
             checkbox = QCheckBox(m)
+            checkbox.stateChanged.connect(self.toggle_checkbox)
             self.checkbox_layout.addWidget(checkbox, i, 0)
 
         # Add OK and Cancel buttons
@@ -45,8 +46,8 @@ class MLDownloadPopup(QDialog):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
+        # get already downloaded models
         self.available_models = models.available_models()
-        print(self.available_models)
         self.set_checkboxes()
 
     def set_checkboxes(self):
@@ -55,30 +56,42 @@ class MLDownloadPopup(QDialog):
             checkbox.setChecked(True)
 
     def toggle_checkbox(self):
-        pass
+        print('checked')
+        all = set()
+        for i, m in enumerate(self.models):
+            checkbox = self.checkbox_layout.itemAtPosition(i, 0).widget()
+            if checkbox.isChecked():
+                all.add(m)
+        # see if any are newly checked
+        self.checked_models = all - set(self.available_models.keys())
+        if self.checked_models:
+            self.download_ml()
+
 
     def download_ml(self):
-        self.progress_bar.setRange(0, len(self.checked_models))
+        # Start download thread
+        self.progress_bar.setRange(0, 0)
         self.progress_bar.show()
         self.build_thread = DownloadMLThread(self.checked_models)
-        self.build_thread.downloaded.connect(self.progress_bar.setValue)
+        self.build_thread.finished.connect(self.progress_bar.hide)
         self.build_thread.start()
+
 
 
 class DownloadMLThread(QThread):
     """
     Thread for downloading ML model
     """
-    downloaded = pyqtSignal(int)
+    downloaded = pyqtSignal(str)
 
     def __init__(self, checked_models):
         super().__init__()
         self.checked_models = checked_models
 
     def run(self):
-        for model in self.checked_models:
-            wget.download(models.MODELS[model][2], out=config.ML_PATH)
-            self.downloaded.emit(model)
+        for key in self.checked_models:
+            print(key)
+            models.download(key)
 
 
 class MLOptionsPopup(QDialog):
@@ -165,3 +178,4 @@ class MLOptionsPopup(QDialog):
         else:
             self.selected_viewpoint_key = self.available_viewpoints[self.viewpoint.currentIndex() - 1]
             return self.selected_viewpoint_key
+        
