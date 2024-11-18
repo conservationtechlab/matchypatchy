@@ -66,7 +66,7 @@ def get_class_path(key):
     else:
         return None
 
-    
+
 def get_config_path(key):
     if key is None:
         return None
@@ -78,21 +78,28 @@ def get_config_path(key):
 
 
 def download(key):
-    path = config.ML_DIR / MODELS[key][0] 
-    wget.download(MODELS[key][1], out=str(path))
-    # validate 
-    if path.exists():
-        if key in CLASSIFIERS:  # get class list and config
+    path = config.ML_DIR / MODELS[key][0]
+    if not path.exists():  # check to see if it already exists first
+        wget.download(MODELS[key][1], out=str(path))
+    if path.exists():  # validate that it downloaded
+        # if key is a classifier, get class list and config
+        if key in CLASSIFIERS: 
             class_path = config.ML_DIR / CLASS_FILES[key][0]
             config_path = config.ML_DIR / CONFIG_FILES[key][0]
-            wget.download(CLASS_FILES[key][1], out=str(class_path))
-            wget.download(CONFIG_FILES[key][1], out=str(config_path))
+            if not class_path.exists():
+                wget.download(CLASS_FILES[key][1], out=str(class_path))
+            if not config_path.exists():
+                wget.download(CONFIG_FILES[key][1], out=str(config_path))
             if class_path.exists() and config_path.exists():
+                # validate download
                 return True
-            else: # download failed
+            else: 
+                # download failed
                 return False
         else:
+            # model downloaded, not a classifier
             return True
     else:
+        # download failed
         return False
     
