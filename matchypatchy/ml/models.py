@@ -7,8 +7,8 @@ from matchypatchy import config
 
 MODELS = {"MegaDetector v5a": ("md_v5a.0.0.pt", "https://sandiegozoo.box.com/shared/static/xj3496ii5hxtomf0s38axb1agn5u9up8.pt"),
           "MegaDetector v5b": ("md_v5b.0.0.pt", ),
-          "Andes": ("sdzwa_andes_v1.onnx", "https://sandiegozoo.box.com/shared/static/mdt2nlxwl92hc7943646bo3gdjsquaao.onnx"),
-          "Amazon Rainforest": ("sdzwa_amazon_v1.onnx", "https://sandiegozoo.box.com/shared/static/ttpbht9n9cgzngq47ru5iz9jhphbuwj4.onnx"),
+          "Andes": ("sdzwa_andes_v1.pt", "https://sandiegozoo.box.com/shared/static/a25q2uojqj8undj1x9mz26w1xayotcbl.pt"),
+          "Amazon Rainforest": ("sdzwa_amazon_v1.onnx", ""),
           "Savanna": ("sdzwa_savanna_v3.pt", "https://sandiegozoo.box.com/shared/static/m1h1q689bma52rosuk00k3o6zgt2nrc1.pt"),
           "SE Asian Rainforest": ("sdzwa_seasia_v1.pt",),
           "Southwest USA": ("sdzwa_southwest_v3.pt", 'https://sandiegozoo.box.com/shared/static/ucbk8kc2h3qu15g4xbg0nvbghvo1cl97.pt'),
@@ -17,13 +17,13 @@ MODELS = {"MegaDetector v5a": ("md_v5a.0.0.pt", "https://sandiegozoo.box.com/sha
           "Jaguar Viewpoint": ("viewpoint_jaguar.pt",)}
 
 CLASS_FILES = {"Andes": ("sdzwa_andes_v1_classes.csv", "https://sandiegozoo.box.com/shared/static/dopxswxuhaxa6m8ff8uezsa1mrmun7v6.csv"),
-               "Amazon Rainforest": ("sdzwa_amazon_v1_classes.csv", "https://sandiegozoo.box.com/shared/static/480tyju45p51p2aip7nyl60hwzm7zvu2.csv"),
+               "Amazon Rainforest": ("sdzwa_amazon_v1_classes.csv", ""),
                "Savanna": ("sdzwa_savanna_v3_classes.csv", "https://sandiegozoo.box.com/shared/static/r5fcvksluzgk1qfi1ayjik3ew5v9279s.csv"),
                "SE Asian Rainforest": ("sdzwa_seasia_v1_classes.csv"),
                "Southwest USA": ("sdzwa_southwest_v3_classes.csv", 'https://sandiegozoo.box.com/shared/static/tetfkotf295espoaw8jyco4tk1t0trtt.csv')}
 
 CONFIG_FILES = {"Andes": ("sdzwa_andes_v1_config.yml", "https://sandiegozoo.box.com/shared/static/doup3sv4qa7q700c5v4wfeg82f5zia1r.yml"),
-               "Amazon Rainforest": ("sdzwa_amazon_v1_config.yml", "https://sandiegozoo.box.com/shared/static/pxq25lm8mumdvoskv299lfoedl9mtw1p.yml"),
+               "Amazon Rainforest": ("sdzwa_amazon_v1_config.yml", ""),
                "Savanna": ("sdzwa_savanna_v3_config.yml", "https://sandiegozoo.box.com/shared/static/i2gwllghyc0ezmy5pb83h0h1i19f7yhx.yml"),
                "SE Asian Rainforest": ("sdzwa_seasia_v1_config.yml"),
                "Southwest USA": ("sdzwa_southwest_v3_config.yml", 'https://sandiegozoo.box.com/shared/static/tetfkotf295espoaw8jyco4tk1t0trtt.csv')}

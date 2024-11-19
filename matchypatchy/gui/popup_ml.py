@@ -4,12 +4,10 @@ Popup for Selection within a list, ie Survey selection
 
 
 """
-import wget
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-from matchypatchy import config
 from matchypatchy.ml import models
 
 
@@ -56,7 +54,6 @@ class MLDownloadPopup(QDialog):
             checkbox.setChecked(True)
 
     def toggle_checkbox(self):
-        print('checked')
         all = set()
         for i, m in enumerate(self.models):
             checkbox = self.checkbox_layout.itemAtPosition(i, 0).widget()
@@ -67,7 +64,6 @@ class MLDownloadPopup(QDialog):
         if self.checked_models:
             self.download_ml()
 
-
     def download_ml(self):
         # Start download thread
         self.progress_bar.setRange(0, 0)
@@ -75,7 +71,6 @@ class MLDownloadPopup(QDialog):
         self.build_thread = DownloadMLThread(self.checked_models)
         self.build_thread.finished.connect(self.progress_bar.hide)
         self.build_thread.start()
-
 
 
 class DownloadMLThread(QThread):
@@ -90,7 +85,6 @@ class DownloadMLThread(QThread):
 
     def run(self):
         for key in self.checked_models:
-            print(key)
             models.download(key)
 
 

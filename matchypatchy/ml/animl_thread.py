@@ -31,7 +31,8 @@ class AnimlThread(QThread):
 
         self.md_filepath = models.get_path(detector_key)
         self.classifier_filepath = models.get_path(classifier_key)
-        self.classifier_classlist = models.get_class_path(classifier_key)
+        self.class_filepath = models.get_class_path(classifier_key)
+        self.config_filepath = models.get_config_path(classifier_key)
 
     def run(self):
         if not self.media.empty:
@@ -71,10 +72,14 @@ class AnimlThread(QThread):
 
     def get_species(self):
         # TODO: Utilize probability for sequences
+        # TODO: fix hardcoded column names
         if self.classifier_filepath is None:
+            # user opted to skip classification
             return
+        
+        print(self.classifier_filepath, self.class_filepath)
 
-        classes = pd.read_csv(self.classifier_classlist).set_index("Code")
+        classes = pd.read_csv(self.class_filepath).set_index("Code")  # HARD CODED
 
         info = "roi.id, media_id, filepath, frame, species_id, bbox_x, bbox_y, bbox_w, bbox_h"
         rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
@@ -84,7 +89,7 @@ class AnimlThread(QThread):
 
         # if there are unlabeled rois
         if not filtered_rois.empty:
-            filtered_rois = animl_mp.classify(filtered_rois, self.classifier_filepath, self.classifier_classlist)
+            filtered_rois = animl_mp.classify(filtered_rois, self.config_filepath)
             for i, row in filtered_rois.iterrows():
                 prediction = row['prediction']
                 # get species_id for prediction
