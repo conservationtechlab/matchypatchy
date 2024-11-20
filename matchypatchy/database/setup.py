@@ -13,7 +13,7 @@ def setup_database(filepath='matchypatchy.db'):
     db.enable_load_extension(True)
     sqlite_vec.load(db)
     db.enable_load_extension(False)
-    cursor.execute("CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152])")
+    cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
 
     # SURVEY
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
@@ -30,7 +30,7 @@ def setup_database(filepath='matchypatchy.db'):
                         lat REAL,
                         long REAL,
                         survey_id INTEGER NOT NULL,
-                        FOREIGN KEY (survey_id) REFERENCES survey (id) )''')
+                        FOREIGN KEY (survey_id) REFERENCES survey (id) );''')
 
     # MEDIA
     cursor.execute('''CREATE TABLE IF NOT EXISTS media (
@@ -44,7 +44,7 @@ def setup_database(filepath='matchypatchy.db'):
                         comment TEXT,
                         favorite INTEGER NOT NULL,
                         FOREIGN KEY (site_id) REFERENCES site (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id) )''')
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id) );''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
@@ -63,13 +63,13 @@ def setup_database(filepath='matchypatchy.db'):
                         FOREIGN KEY(media_id) REFERENCES media (id)
                         FOREIGN KEY(species_id) REFERENCES species (id)
                         FOREIGN KEY(individual_id) REFERENCES individual (id)
-                        FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) )''')
+                        FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) );''')
 
     # SPECIES
     cursor.execute('''CREATE TABLE IF NOT EXISTS species (
                         id INTEGER PRIMARY KEY,
                         binomen TEXT NOT NULL,
-                        common TEXT NOT NULL )''')
+                        common TEXT NOT NULL );''')
 
     # INDIVIDUAL
     cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
@@ -77,13 +77,11 @@ def setup_database(filepath='matchypatchy.db'):
                         species_id INTEGER,
                         name TEXT NOT NULL,
                         sex TEXT,
-                        FOREIGN KEY(species_id) REFERENCES species (id)
-                    )''')
+                        FOREIGN KEY(species_id) REFERENCES species (id));''')
 
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
-                        id INTEGER PRIMARY KEY
-                    )''')
+                        id INTEGER PRIMARY KEY);''')
 
     # Commit changes and close connection
     db.commit()

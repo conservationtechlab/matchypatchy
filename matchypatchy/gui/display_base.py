@@ -140,16 +140,17 @@ class DisplayBase(QWidget):
         button_download_ml = QPushButton("Download Models")
         button_ph1 = QPushButton("Placeholder")
         button_ph2 = QPushButton("Placeholder")
-        button_ph3 = QPushButton("Placeholder")
+        button_clear_data = QPushButton("Clear Data")
 
         other_layer.addWidget(button_configuration)
         other_layer.addWidget(button_download_ml)
         other_layer.addWidget(button_ph1)
         other_layer.addWidget(button_ph2)
-        other_layer.addWidget(button_ph3)
+        other_layer.addWidget(button_clear_data)
 
         button_configuration.clicked.connect(self.edit_config)
         button_download_ml.clicked.connect(self.download_ml)
+        button_clear_data.clicked.connect(self.clear_data)
 
         border_other.setLayout(other_layer)
         column_layout.addWidget(border_other, 1)
@@ -209,9 +210,6 @@ class DisplayBase(QWidget):
     # MAIN PROCESS -------------------------------------------------------------
     # STEP 1: Import from CSV
     def import_csv(self):
-        # remove after finish testing
-        self.mpDB.clear('media')
-        self.mpDB.clear('roi')
         self.select_survey()
         manifest = QFileDialog.getOpenFileName(self, "Open File",
                                                os.path.expanduser('~'),
@@ -227,8 +225,6 @@ class DisplayBase(QWidget):
         """
         Add media from a folder
         """
-        self.mpDB.clear('media')
-        self.mpDB.clear('roi')
         if self.select_survey():
             directory = QFileDialog.getExistingDirectory(self, "Open File",
                                                          os.path.expanduser('~'),
@@ -318,3 +314,13 @@ class DisplayBase(QWidget):
         dialog = MLDownloadPopup(self)
         if dialog.exec():
             del dialog
+
+    def clear_data(self):
+        dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
+        if dialog.exec(): 
+            self.mpDB.validate()
+            logging.warning("DELETING DATA")
+            self.mpDB.clear("media")
+            self.mpDB.clear("roi")
+            self.mpDB.clear_emb()
+        del dialog

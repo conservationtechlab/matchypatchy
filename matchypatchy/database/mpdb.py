@@ -26,9 +26,15 @@ class MatchyPatchyDB():
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
         logging.info(tables)
-        cursor.execute("PRAGMA table_info(roi_emb)")
-        columns = cursor.fetchall()
-        logging.info(columns)
+        cursor.execute("SELECT COUNT(id) FROM media")
+        media = cursor.fetchone()[0]
+        logging.info(f"Media: {media}")
+        cursor.execute("SELECT COUNT(id) FROM roi;")
+        roi = cursor.fetchone()[0]
+        logging.info(f"ROI: {roi}")
+        cursor.execute("SELECT COUNT(rowid) FROM roi_emb")
+        emb = cursor.fetchone()[0]
+        logging.info(f"Emb: {emb}")
         db.close()
 
     def _command(self, command):
@@ -48,7 +54,6 @@ class MatchyPatchyDB():
             db.close()
             return rows
         except sqlite3.Error as error:
-            print("Failed to execute fetch.", error)
             logging.error("Failed to execute fetch.", error)
             if db:
                 db.close()
@@ -75,7 +80,6 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print("Failed to add survey", error)
             logging.error("Failed to add survey: ", error)
             if db:
                 db.close()
@@ -102,7 +106,6 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print("Failed to add site", error)
             logging.error("Failed to add site: ", error)
             if db:
                 db.close()
@@ -127,7 +130,6 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print("Failed to add species", error)
             logging.error("Failed to add species: ", error)
             if db:
                 db.close()
@@ -153,7 +155,6 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print("Failed to add individual", error)
             logging.error("Failed to add individual: ", error)
             if db:
                 db.close()
@@ -189,7 +190,6 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print(f"Failed to add media: {filepath}.", error)
             logging.error("Failed to add media: ", error)
             if db:
                 db.close()
@@ -215,8 +215,7 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print(f"Failed to add roi for media: {media_id}.", error)
-            logging.error("Failed to add roi: ", error)
+            logging.error(f"Failed to add roi for media: {media_id}.", error)
             if db:
                 db.close()
             return False
@@ -236,7 +235,6 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print("Failed to add embedding.", error)
             logging.error("Failed to add embedding: ", error)
             if db:
                 db.close()
@@ -254,7 +252,6 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            print("Failed to add sequence.", error)
             logging.error("Failed to add sequence: ", error)
             if db:
                 db.close()
@@ -283,7 +280,6 @@ class MatchyPatchyDB():
             db.close()
             return True
         except sqlite3.Error as error:
-            print("Failed to update table", error)
             logging.error("Failed to update table: ", error)
             if db:
                 db.close()
@@ -307,7 +303,6 @@ class MatchyPatchyDB():
             db.close()
             return rows
         except sqlite3.Error as error:
-            print("Failed to fetch", error)
             logging.error("Failed fetch: ", error)
             if db:
                 db.close()
@@ -325,7 +320,6 @@ class MatchyPatchyDB():
             db.close()
             return rows, column_names
         except sqlite3.Error as error:
-            print("Failed to fetch", error)
             logging.error("Failed fetch: ", error)
             if db:
                 db.close()
@@ -347,7 +341,6 @@ class MatchyPatchyDB():
             db.close()
             return rows, column_names
         except sqlite3.Error as error:
-            print("Failed to fetch", error)
             logging.error("Failed all_media fetch:", error)
             if db:
                 db.close()
@@ -366,7 +359,6 @@ class MatchyPatchyDB():
             db.close()
             return True
         except sqlite3.Error as error:
-            print("Failed to delete", error)
             logging.error("Failed delete: ", error)
             if db:
                 db.close()
@@ -378,11 +370,6 @@ class MatchyPatchyDB():
         """
         try:
             db = sqlite3.connect(self.filepath)
-            # enable clear vec database
-            if table == "roi_emb":
-                db.enable_load_extension(True)
-                sqlite_vec.load(db)
-                db.enable_load_extension(False)
             cursor = db.cursor()
             command = f'DELETE FROM {table};'
             cursor.execute(command)
@@ -390,11 +377,33 @@ class MatchyPatchyDB():
             db.close()
             return True
         except sqlite3.Error as error:
-            print(f"Failed to clear {table}", error)
             logging.error(f"Failed to clear {table}: ", error)
             if db:
                 db.close()
             return False 
+        
+    def clear_emb(self):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            db.enable_load_extension(True)
+            sqlite_vec.load(db)
+            db.enable_load_extension(False)
+            cursor.execute("DROP TABLE IF EXISTS roi_emb;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_chunks;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_rowids;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_vector_chunks00;")
+            cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.Error as error:
+            logging.error(f"Failed to clear roi_emb: ", error)
+            if db:
+                db.close()
+            return False 
+
+            
         
     def count(self, table):
         """
@@ -408,7 +417,6 @@ class MatchyPatchyDB():
             db.close()
             return row_count
         except sqlite3.Error as error:
-            print(f"Failed to count for {table}", error)
             logging.error(f"Failed to count for {table}:", error)
             if db:
                 db.close()
@@ -437,9 +445,7 @@ class MatchyPatchyDB():
             results = cursor.fetchall()
             db.close()
             return results
-
         except sqlite3.Error as error:
-            print("Failed to get knn for ROI", error)
             logging.error("Failed to get knn for ROI", error)
             if db:
                 db.close()
