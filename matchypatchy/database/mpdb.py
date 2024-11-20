@@ -31,7 +31,7 @@ class MatchyPatchyDB():
         logging.info(columns)
         db.close()
 
-    def _fetch(self, command):
+    def _command(self, command):
         """
         Execute a specific sql query to fetch data
         Meant for one-time use

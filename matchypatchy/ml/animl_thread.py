@@ -22,7 +22,7 @@ class AnimlThread(QThread):
         self.mpDB = mpDB
 
         # select media that do not have rois
-        media = self.mpDB._fetch("""SELECT * FROM media WHERE NOT EXISTS
+        media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
 
         self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "site",
