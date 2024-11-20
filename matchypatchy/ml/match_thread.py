@@ -3,6 +3,8 @@
 """
 
 import pandas as pd
+import warnings
+warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -12,17 +14,14 @@ class MatchEmbeddingThread(QThread):
     neighbor_dict_return = pyqtSignal(dict)
     nearest_dict_return = pyqtSignal(dict)
 
-    def __init__(self, mpDB, sequences, k=3, threshold=100):
+    def __init__(self, mpDB, rois, sequences, k=3, threshold=100):
         super().__init__()
         self.mpDB = mpDB
+        self.rois = rois
         self.sequences = sequences
         self.k = k
         self.threshold = threshold
 
-        info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id"
-        # need sequence and capture ids from media to restrict comparisons shown to
-        rois, columns = mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
-        self.rois = pd.DataFrame(rois, columns=columns)
 
     def run(self):
         """
@@ -35,18 +34,21 @@ class MatchEmbeddingThread(QThread):
         nearest_dict = {}
 
         for i, s in enumerate(self.sequences):
-            for roi_id in self.sequences[s]:
-                emb_id = self.rois.loc[self.rois['id'] == roi_id, "emb_id"].item()
-                neighbors = self.roi_knn(emb_id)
-                filtered_neighbors = self.filter(roi_id, neighbors)
-                if filtered_neighbors:
-                    neighbor_dict.setdefault(s, []).extend(filtered_neighbors)
-            # sort after matching full sequence
-            if s in neighbor_dict.keys():
-                # save closest neighbor
-                ranked = sorted(neighbor_dict[s], key=lambda x: x[1])
-                nearest_dict[s] = ranked[0][1]
+            sequence_rois = self.sequences[s]
+            emb_ids = self.rois.loc[self.rois['id'].isin(sequence_rois), "emb_id"].tolist()
+
+            # get all neighbors for sequence
+            all_neighbors = []
+            for emb_id in emb_ids:
+                all_neighbors.extend(self.roi_knn(emb_id))
+            # remove impossible matches
+            filtered_neighbors = self.filter(sequence_rois, all_neighbors)
+            
+            # still have neighbors remaining after filtering, rank by difference
+            if filtered_neighbors:
+                ranked = sorted(filtered_neighbors, key=lambda x: x[1])
                 neighbor_dict[s] = self.remove_duplicate_matches(ranked)
+                nearest_dict[s] = ranked[0][1]
             self.progress_update.emit(i+1)
 
         self.neighbor_dict_return.emit(neighbor_dict)
@@ -57,27 +59,32 @@ class MatchEmbeddingThread(QThread):
         Calcualtes knn for single roi embedding
         """
         query = self.mpDB.select("roi_emb", columns="embedding", row_cond=f'rowid={emb_id}')[0][0]
-        neighbors = self.mpDB.knn(query, k=self.k)
-        return neighbors
+        return self.mpDB.knn(query, k=self.k)
 
-    def filter(self, roi_id, neighbors):
+
+    def filter(self, sequence_rois, neighbors):
         """
         Returns list of valid neighbors by roi_emb.id
         """
         filtered = []
-        query = self.rois[self.rois['id'] == roi_id].squeeze()
-        for i in range(len(neighbors)):  # skip first one, self match
-            match = self.rois[self.rois['emb_id'] == neighbors[i][0]].squeeze()
-            # if not same individual or unlabeled individual:
-            if (query['individual_id'] is None) or (match['individual_id'] != query['individual_id']):
-                # if not in same sequence
-                if (query['sequence_id'] is None) or (match['sequence_id'] != query['sequence_id']):
-                    # distance check (do first or last?)
-                    if neighbors[i][1] < self.threshold and neighbors[i][1] > 0:
-                        # replace emb_id with roi_id
-                        match_roi_id = int(match['id'])
-                        filtered.append((match_roi_id, neighbors[i][1]))
-        return filtered
+        query_rois = self.rois.loc[self.rois['id'].isin(sequence_rois)]
+        neighbors_df = self.rois[self.rois['emb_id'].isin([n[0] for n in neighbors])]
+        neighbors_df["distance"] = [n[1] for n in neighbors]  # Add distances from KNN
+
+        # Perform a cross-join using a Cartesian product
+        query_rois["key"] = 1  # Temporary key for cross-join
+        neighbors_df["key"] = 1
+        merged = query_rois.merge(neighbors_df, on="key", suffixes=("_query", "_neighbor")).drop("key", axis=1)
+        # Apply filtering conditions
+        filtered = merged[
+            (merged["individual_id_query"].isnull() | (merged["individual_id_query"] != merged["individual_id_neighbor"])) &
+            (merged["sequence_id_query"].isnull() | (merged["sequence_id_query"] != merged["sequence_id_neighbor"])) &
+            (merged["distance"] < self.threshold) & (merged["distance"] > 0)
+        ]
+
+        # Return filtered neighbors as tuples of (ROI ID, distance)
+        return list(zip(filtered["id_neighbor"], filtered["distance"]))
+
 
     def remove_duplicate_matches(self, matches):
         """
