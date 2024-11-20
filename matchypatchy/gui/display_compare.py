@@ -8,6 +8,7 @@ TODO:
  - ENABLE VIEWPOINT
  - image manipulation
 """
+import pandas as pd
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
 from PyQt6.QtCore import Qt, QPoint
@@ -286,7 +287,13 @@ class DisplayCompare(QWidget):
             dialog.set_max(len(self.sequences))
             dialog.show()
 
-            self.match_thread = MatchEmbeddingThread(self.mpDB, self.sequences,
+            info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id"
+            # need sequence and capture ids from media to restrict comparisons shown to
+            rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
+            self.rois = pd.DataFrame(rois, columns=columns)
+
+
+            self.match_thread = MatchEmbeddingThread(self.mpDB, self.rois, self.sequences,
                                                      k=self.k, threshold=self.threshold)
             self.match_thread.progress_update.connect(dialog.set_counter)
             self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
@@ -345,6 +352,7 @@ class DisplayCompare(QWidget):
 
         # get viewpoints
         self.current_query_viewpoints = self.data.loc[self.current_query_rois, 'viewpoint']
+        print(self.current_query_viewpoints)
 
         # set view to first in sequence
         self.query_sequence_n.setText(str(len(self.current_query_rois)))
@@ -362,7 +370,7 @@ class DisplayCompare(QWidget):
         if n < 0: n = len(self.current_query_rois) - 1
         if n > len(self.current_query_rois) - 1: n = 0
 
-        self.current_query_sn = n
+        self.current_query_sn = n  # number within sequence
         self.current_query_rid = self.current_query_rois[self.current_query_sn]
         self.query_seq_number.setText(str(self.current_query_sn + 1))
 
@@ -397,7 +405,7 @@ class DisplayCompare(QWidget):
 
         # load new images
         self.load_match()
-        self.toggle_match()
+        self.toggle_match_button()
 
     # VIEWPOINT TOGGLE
     def toggle_viewpoint(self):
@@ -409,12 +417,12 @@ class DisplayCompare(QWidget):
     # MATCHING PROCESS ---------------------------------------------------------
     def press_match_button(self):
         if self.button_match.isChecked():
-            self.toggle_match(True)
+            self.toggle_match_button(set=True)
             self.new_match()
         else:
-            self.toggle_match(False)
+            self.toggle_match_button(set=False)
 
-    def toggle_match(self, set=''):
+    def toggle_match_button(self, set=''):
         # already a match
         if self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
            self.data.loc[self.current_query_rid, "individual_id"] is not None:
@@ -450,9 +458,11 @@ class DisplayCompare(QWidget):
 
         # Match has a name
         else:
-            # TODO
-            print("Match has a name")
-            #merge(self.mpDB, self.data.loc[self.current_query_rid], self.data.loc[self.current_match_rid])
+            merge(self.mpDB, self.data, self.current_query_rois, self.current_match_rid)
+            # update data  
+            self.data = db_roi.fetch_roi_media(self.mpDB)
+            self.load_query()
+            self.load_match()
 
     # LOAD FUNCTIONS -----------------------------------------------------------
     def load_query(self):
@@ -512,7 +522,5 @@ class DisplayCompare(QWidget):
         # M - Match
         elif key == 77:
             self.button_match.click()
-            self.toggle_match()
-
         else:
             print(f"Key pressed: {key_text} (Qt key code: {key})")
