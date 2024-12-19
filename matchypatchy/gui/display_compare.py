@@ -173,10 +173,40 @@ class DisplayCompare(QWidget):
         self.query_image.setAlignment(Qt.AlignmentFlag.AlignTop)
         query_layout.addWidget(self.query_image, 1)
         # Query Image Tools
-        image_buttons = QHBoxLayout()
-        placeholder = QLabel("Brightness, Contrast, zoom? ")
-        image_buttons.addWidget(placeholder)
-        query_layout.addLayout(image_buttons)
+        query_image_buttons = QHBoxLayout()
+        # Brightness
+        query_image_buttons.addWidget(QLabel("Brightness:"), 0,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_query_brightness = QSlider(Qt.Orientation.Horizontal)
+        self.slider_query_brightness.setRange(1, 100)  # Set range from 1 to 100
+        self.slider_query_brightness.setValue(50)  # Set initial value
+        self.slider_query_brightness.valueChanged.connect(self.query_image.adjust_brightness)
+        query_image_buttons.addWidget(self.slider_query_brightness, 0,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        # Contrast
+        query_image_buttons.addWidget(QLabel("Contrast:"), 0,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_query_contrast = QSlider(Qt.Orientation.Horizontal)
+        self.slider_query_contrast.setRange(1, 100)  # Set range from 1 to 100
+        self.slider_query_contrast.setValue(50)  # Set initial value
+        self.slider_query_contrast.valueChanged.connect(self.query_image.adjust_contrast)
+        query_image_buttons.addWidget(self.slider_query_contrast, 0,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        
+        self.button_query_zoom = QPushButton("Placeholder") 
+        query_image_buttons.addWidget(self.button_query_zoom, 0,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+        
+        button_query_image_reset = QPushButton("Reset") 
+        button_query_image_reset.clicked.connect(self.query_image.reset)
+        query_image_buttons.addWidget(button_query_image_reset, 0,
+                              alignment=Qt.AlignmentFlag.AlignLeft)
+
+        query_image_buttons.addStretch()
+        query_layout.addLayout(query_image_buttons)
+
+        
+
 
         # MetaData
         self.query_info = QLabel("Image Metadata")
@@ -384,6 +414,7 @@ class DisplayCompare(QWidget):
         """
         # get all matches for query
         full_match_set = self.neighbor_dict[self.current_sequence_id]
+        print(full_match_set)
         self.current_match_rois = [x[0] for x in full_match_set]
         self.match_n.setText("/" + str(len(self.current_match_rois)))
 

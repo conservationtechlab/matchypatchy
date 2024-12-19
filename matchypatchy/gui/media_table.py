@@ -54,7 +54,6 @@ class MediaTable(QWidget):
         layout.addWidget(self.table)
         self.setLayout(layout)
 
-
     def fetch(self):
         """
         Select all media, store in dataframe
@@ -219,7 +218,7 @@ class MediaTable(QWidget):
     def add_thumbnail_path(self, i, thumbnail_path):
         self.data.loc[i,'thumbnail_path'] = thumbnail_path
 
-
+# IMAGE LOAD =====================================================================================
 class LoadThumbnailThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     loaded_image = pyqtSignal(int, str)
