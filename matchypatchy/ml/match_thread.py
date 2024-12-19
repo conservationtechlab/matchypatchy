@@ -42,13 +42,14 @@ class MatchEmbeddingThread(QThread):
             for emb_id in emb_ids:
                 all_neighbors.extend(self.roi_knn(emb_id))
             # remove impossible matches
+            all_neighbors = self.remove_duplicate_matches(all_neighbors) 
             filtered_neighbors = self.filter(sequence_rois, all_neighbors)
-            
+
             # still have neighbors remaining after filtering, rank by difference
             if filtered_neighbors:
-                ranked = sorted(filtered_neighbors, key=lambda x: x[1])
-                neighbor_dict[s] = self.remove_duplicate_matches(ranked)
-                nearest_dict[s] = ranked[0][1]
+                filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
+                neighbor_dict[s] = filtered_neighbors
+                nearest_dict[s] = filtered_neighbors[0][1]
             self.progress_update.emit(i+1)
 
         self.neighbor_dict_return.emit(neighbor_dict)
@@ -60,7 +61,6 @@ class MatchEmbeddingThread(QThread):
         """
         query = self.mpDB.select("roi_emb", columns="embedding", row_cond=f'rowid={emb_id}')[0][0]
         return self.mpDB.knn(query, k=self.k)
-
 
     def filter(self, sequence_rois, neighbors):
         """
@@ -81,10 +81,8 @@ class MatchEmbeddingThread(QThread):
             (merged["sequence_id_query"].isnull() | (merged["sequence_id_query"] != merged["sequence_id_neighbor"])) &
             (merged["distance"] < self.threshold) & (merged["distance"] > 0)
         ]
-
         # Return filtered neighbors as tuples of (ROI ID, distance)
         return list(zip(filtered["id_neighbor"], filtered["distance"]))
-
 
     def remove_duplicate_matches(self, matches):
         """
@@ -93,7 +91,7 @@ class MatchEmbeddingThread(QThread):
         """
         filtered = []
         seen = set()
-        for item in matches:
+        for item in sorted(matches, key=lambda x: x[1]):
             if item[0] not in seen:
                 filtered.append(item)
                 seen.add(item[0])
