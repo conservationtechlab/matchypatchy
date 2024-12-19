@@ -7,4 +7,8 @@ TODO
    and separate sequence ids, etc
  - make media_table editable
  - utilize capture/sequence for viewpoint
- - adjust query to incorporate capture
+ - adjust query to incorporate viewpoint
+ - handle videos
+ - edit config
+ - add logo
+ - add undo for match

@@ -322,5 +322,6 @@ class DisplayBase(QWidget):
             logging.warning("DELETING DATA")
             self.mpDB.clear("media")
             self.mpDB.clear("roi")
+            self.mpDB.clear("sequence")
             self.mpDB.clear_emb()
         del dialog
