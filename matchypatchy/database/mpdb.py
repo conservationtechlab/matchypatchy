@@ -354,6 +354,7 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = f'DELETE FROM {table} WHERE {cond};'
+            print(command)
             cursor.execute(command)
             db.commit()
             db.close()

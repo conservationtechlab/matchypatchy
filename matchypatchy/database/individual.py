@@ -2,6 +2,7 @@
 Functions for manipulating the individual table
 """
 
+# TODO: Mismatched sex??
 
 def merge(mpDB, data, query_sequence, match):
     """
@@ -35,4 +36,4 @@ def merge(mpDB, data, query_sequence, match):
         mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
     
     # delete newer individual in table 
-
+    mpDB.delete('individual', f"id=={drop_id}")
