@@ -11,6 +11,7 @@ import logging
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPixmap, QImage
 
 from matchypatchy.gui.popup_survey import SurveyPopup
 from matchypatchy.gui.popup_site import SitePopup
@@ -43,8 +44,17 @@ class DisplayBase(QWidget):
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFixedHeight(20)
         layout.addWidget(self.label)
-        # TODO: add logo
-        layout.addSpacing(500)
+        layout.addSpacing(20)
+
+        self.logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
+        self.logo.setFixedSize(600, 400)
+        self.logo.setObjectName("borderWidget")
+        #self.logo.setStyleSheet("#borderWidget { border: 1px solid gray; }")
+        logo_img = QImage("/home/kyra/matchypatchy/matchypatchy/gui/assets/matchypatchy_logo.png")
+        self.logo.setPixmap(QPixmap.fromImage(logo_img))
+        layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
+
+       #layout.addSpacing(100)
         layout.addStretch()
 
         column_layout = QHBoxLayout()
