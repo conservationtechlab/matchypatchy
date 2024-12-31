@@ -98,10 +98,15 @@ class DisplayCompare(QWidget):
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
         first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # SPECIES
-        self.species_select = QComboBox()
-        self.species_select.setFixedWidth(200)
-        first_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Site
+        self.site_select = QComboBox()
+        self.site_select.setFixedWidth(200)
+        self.site_list_ordered = [(0, 'Site')] + list(self.mpDB.select('Site', columns='id, name'))
+        # TODO: Get active survey
+        #cond = f'survey_id={self.survey_list_ordered[0]}'
+        #self.site_list_ordered = self.mpDB.select("site", columns="id, name", row_cond=cond)
+        self.site_select.addItems([el[1] for el in self.site_list_ordered])
+        first_layer.addWidget(self.site_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addStretch()
         layout.addLayout(first_layer)
@@ -175,38 +180,33 @@ class DisplayCompare(QWidget):
         # Query Image Tools
         query_image_buttons = QHBoxLayout()
         # Brightness
-        query_image_buttons.addWidget(QLabel("Brightness:"), 0,
-                              alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(QLabel("Brightness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.slider_query_brightness = QSlider(Qt.Orientation.Horizontal)
-        self.slider_query_brightness.setRange(1, 100)  # Set range from 1 to 100
+        self.slider_query_brightness.setRange(25, 75)  # Set range from 1 to 100
         self.slider_query_brightness.setValue(50)  # Set initial value
         self.slider_query_brightness.valueChanged.connect(self.query_image.adjust_brightness)
-        query_image_buttons.addWidget(self.slider_query_brightness, 0,
-                              alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(self.slider_query_brightness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Contrast
-        query_image_buttons.addWidget(QLabel("Contrast:"), 0,
-                              alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(QLabel("Contrast:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.slider_query_contrast = QSlider(Qt.Orientation.Horizontal)
-        self.slider_query_contrast.setRange(1, 100)  # Set range from 1 to 100
+        self.slider_query_contrast.setRange(25, 75)  # Set range from 1 to 100
         self.slider_query_contrast.setValue(50)  # Set initial value
         self.slider_query_contrast.valueChanged.connect(self.query_image.adjust_contrast)
-        query_image_buttons.addWidget(self.slider_query_contrast, 0,
-                              alignment=Qt.AlignmentFlag.AlignLeft)
-        
-        self.button_query_zoom = QPushButton("Placeholder") 
-        query_image_buttons.addWidget(self.button_query_zoom, 0,
-                              alignment=Qt.AlignmentFlag.AlignLeft)
-        
+        query_image_buttons.addWidget(self.slider_query_contrast, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Sharpness
+        query_image_buttons.addWidget(QLabel("Sharpness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_query_sharpness = QSlider(Qt.Orientation.Horizontal)
+        self.slider_query_sharpness.setRange(25, 75)  # Set range from 1 to 100
+        self.slider_query_sharpness.setValue(50)  # Set initial value
+        self.slider_query_sharpness.valueChanged.connect(self.query_image.adjust_sharpness)
+        query_image_buttons.addWidget(self.slider_query_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Reset
         button_query_image_reset = QPushButton("Reset") 
-        button_query_image_reset.clicked.connect(self.query_image.reset)
-        query_image_buttons.addWidget(button_query_image_reset, 0,
-                              alignment=Qt.AlignmentFlag.AlignLeft)
+        button_query_image_reset.clicked.connect(self.query_image_reset)
+        query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         query_image_buttons.addStretch()
         query_layout.addLayout(query_image_buttons)
-
-        
-
 
         # MetaData
         self.query_info = QLabel("Image Metadata")
@@ -267,10 +267,35 @@ class DisplayCompare(QWidget):
         self.match_image.setAlignment(Qt.AlignmentFlag.AlignTop)
         match_layout.addWidget(self.match_image, 1)
         # Match Image Tools
-        image_buttons = QHBoxLayout()
-        placeholder = QLabel("Brightness, Contrast, zoom? ")
-        image_buttons.addWidget(placeholder)
-        match_layout.addLayout(image_buttons)
+        match_image_buttons = QHBoxLayout()
+        # Brightness
+        match_image_buttons.addWidget(QLabel("Brightness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_match_brightness = QSlider(Qt.Orientation.Horizontal)
+        self.slider_match_brightness.setRange(25, 75)  # Set range from 1 to 100
+        self.slider_match_brightness.setValue(50)  # Set initial value
+        self.slider_match_brightness.valueChanged.connect(self.match_image.adjust_brightness)
+        match_image_buttons.addWidget(self.slider_match_brightness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Contrast
+        match_image_buttons.addWidget(QLabel("Contrast:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_match_contrast = QSlider(Qt.Orientation.Horizontal)
+        self.slider_match_contrast.setRange(25, 75)  # Set range from 1 to 100
+        self.slider_match_contrast.setValue(50)  # Set initial value
+        self.slider_match_contrast.valueChanged.connect(self.match_image.adjust_contrast)
+        match_image_buttons.addWidget(self.slider_match_contrast, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Sharpness
+        match_image_buttons.addWidget(QLabel("Sharpness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_match_sharpness = QSlider(Qt.Orientation.Horizontal)
+        self.slider_match_sharpness.setRange(25, 75)  # Set range from 1 to 100
+        self.slider_match_sharpness.setValue(50)  # Set initial value
+        self.slider_match_sharpness.valueChanged.connect(self.match_image.adjust_sharpness)
+        match_image_buttons.addWidget(self.slider_match_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Reset
+        button_match_image_reset = QPushButton("Reset") 
+        button_match_image_reset.clicked.connect(self.match_image_reset)
+        match_image_buttons.addWidget(button_match_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        match_image_buttons.addStretch()
+        match_layout.addLayout(match_image_buttons)
 
         # MetaData
         self.match_info = QLabel("Image Metadata")
@@ -500,7 +525,7 @@ class DisplayCompare(QWidget):
         """
         Load Images for Current Query ROI
         """
-        self.query_image.display_image(self.data.loc[self.current_query_rid, "filepath"],
+        self.query_image.load(self.data.loc[self.current_query_rid, "filepath"],
                                        bbox=db_roi.get_bbox(self.data.loc[self.current_query_rid]))
         self.query_info.setText(db_roi.roi_metadata(self.data.loc[self.current_query_rid]))
 
@@ -511,7 +536,7 @@ class DisplayCompare(QWidget):
         distance = self.neighbor_dict[self.current_sequence_id][self.current_match][1]
         self.match_distance.setText(f"Distance: {distance:.2f}")
 
-        self.match_image.display_image(self.data.loc[self.current_match_rid, "filepath"],
+        self.match_image.load(self.data.loc[self.current_match_rid, "filepath"],
                                        bbox=db_roi.get_bbox(self.data.loc[self.current_match_rid]))
         self.match_info.setText(db_roi.roi_metadata(self.data.loc[self.current_match_rid]))
 
@@ -528,9 +553,30 @@ class DisplayCompare(QWidget):
                                                                          (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
         QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
+    # TODO
+    def filter_region(self):
+        pass
+
+    def filter_survey(self):
+        pass
+
+    def filter_site(self):
+        active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
+
+
     # Image Manipulations ------------------------------------------------------
 
+    def query_image_reset(self):
+        self.query_image.reset()
+        self.slider_query_brightness.setValue(50)
+        self.slider_query_contrast.setValue(50)
+        self.slider_query_sharpness.setValue(50)
 
+    def match_image_reset(self):
+        self.match_image.reset()
+        self.slider_match_brightness.setValue(50)
+        self.slider_match_contrast.setValue(50)
+        self.slider_match_sharpness.setValue(50)
 
     # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):
