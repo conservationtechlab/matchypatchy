@@ -21,6 +21,7 @@ from matchypatchy.gui.popup_species import SpeciesPopup
 from matchypatchy.gui.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.popup_ml import MLDownloadPopup, MLOptionsPopup
+from matchypatchy.gui.popup_config import ConfigPopup
 
 from matchypatchy.ml.sequence_thread import SequenceThread
 from matchypatchy.ml.animl_thread import AnimlThread
@@ -37,7 +38,6 @@ class DisplayBase(QWidget):
 
         container = QWidget()
         container.setObjectName("mainBorderWidget")
-        #container.setStyleSheet("#mainBorderWidget { border: 20px solid gray; }")
         layout = QVBoxLayout()
 
         self.label = QLabel("Welcome To MatchyPatchy")
@@ -49,8 +49,9 @@ class DisplayBase(QWidget):
         self.logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
         self.logo.setFixedSize(600, 400)
         self.logo.setObjectName("borderWidget")
-        #self.logo.setStyleSheet("#borderWidget { border: 1px solid gray; }")
-        logo_img = QImage("/home/kyra/matchypatchy/matchypatchy/gui/assets/matchypatchy_logo.png")
+        # TODO: change before packaging
+        logo_img = QImage("/home/kyra/matchypatchy/matchypatchy/gui/assets/logo.png")
+        #logo_img = QImage("/assets/logo.png")
         self.logo.setPixmap(QPixmap.fromImage(logo_img))
         layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -148,8 +149,10 @@ class DisplayBase(QWidget):
         # ML models
         button_configuration = QPushButton("Configuration")
         button_download_ml = QPushButton("Download Models")
-        button_ph1 = QPushButton("Placeholder")
-        button_ph2 = QPushButton("Placeholder")
+        button_ph1 = QPushButton("")
+        button_ph1.setEnabled(False)
+        button_ph2 = QPushButton("")
+        button_ph2.setEnabled(False)
         button_clear_data = QPushButton("Clear Data")
 
         other_layer.addWidget(button_configuration)
@@ -317,8 +320,9 @@ class DisplayBase(QWidget):
 
     # OTHER OPTIONS ------------------------------------------------------------
     def edit_config(self):
-        # TODO
-        pass
+        dialog = ConfigPopup(self)
+        if dialog.exec():
+            del dialog
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)
