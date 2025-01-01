@@ -204,6 +204,10 @@ class DisplayCompare(QWidget):
         button_query_image_reset = QPushButton("Reset") 
         button_query_image_reset.clicked.connect(self.query_image_reset)
         query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+         # View Image
+        button_query_image_view = QPushButton("View Image") 
+        button_query_image_view.clicked.connect(lambda: self.view_image('query'))
+        match_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         query_image_buttons.addStretch()
         query_layout.addLayout(query_image_buttons)
@@ -293,6 +297,11 @@ class DisplayCompare(QWidget):
         button_match_image_reset = QPushButton("Reset") 
         button_match_image_reset.clicked.connect(self.match_image_reset)
         match_image_buttons.addWidget(button_match_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # View Image
+        button_match_image_view = QPushButton("View Image") 
+        button_match_image_view.clicked.connect(lambda: self.view_image('match'))
+        match_image_buttons.addWidget(button_match_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
 
         match_image_buttons.addStretch()
         match_layout.addLayout(match_image_buttons)
@@ -577,6 +586,10 @@ class DisplayCompare(QWidget):
         self.slider_match_brightness.setValue(50)
         self.slider_match_contrast.setValue(50)
         self.slider_match_sharpness.setValue(50)
+
+    # TODO
+    def view_image(self, selection):
+        pass
 
     # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):
