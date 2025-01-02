@@ -20,6 +20,7 @@ from matchypatchy.database.individual import merge
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_alert import AlertPopup, ProgressPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
+from matchypatchy.gui.popup_single_image import ImagePopup
 
 from matchypatchy.ml.match_thread import MatchEmbeddingThread
 
@@ -85,10 +86,11 @@ class DisplayCompare(QWidget):
         # REGION
         self.region_select = QComboBox()
         self.region_select.setFixedWidth(200)
-        # filter out null entries (region not a table yet)
+        # filter out null entries, duplicates, dict will be {Name: [surveyids]}
         self.region_list_ordered = [(0, 'Region')] + list(filter(lambda x: x[1] not in (None, ''),
                                                                 list(self.mpDB.select('survey', columns='id, region'))))
         self.region_select.addItems([el[1] for el in self.region_list_ordered])
+        self.region_select.currentIndexChanged.connect(self.filter_region)
         first_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # SURVEY
@@ -96,31 +98,19 @@ class DisplayCompare(QWidget):
         self.survey_select.setFixedWidth(200)
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
+        self.survey_select.currentIndexChanged.connect(self.filter_survey)
         first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Site
         self.site_select = QComboBox()
         self.site_select.setFixedWidth(200)
-        self.site_list_ordered = [(0, 'Site')] + list(self.mpDB.select('Site', columns='id, name'))
-        # TODO: Get active survey
-        #cond = f'survey_id={self.survey_list_ordered[0]}'
-        #self.site_list_ordered = self.mpDB.select("site", columns="id, name", row_cond=cond)
-        self.site_select.addItems([el[1] for el in self.site_list_ordered])
+        self.set_sites()
+        self.site_select.currentIndexChanged.connect(self.filter_site)
         first_layer.addWidget(self.site_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addStretch()
         layout.addLayout(first_layer)
 
-        # Control Panel NOT ACTIVE
-        control_panel = QVBoxLayout()
-        layer_one = QHBoxLayout()
-        layer_one.addWidget(QPushButton("Button 1"))
-        layer_one.addWidget(QPushButton("Button 2"))
-        layer_two = QHBoxLayout()
-        layer_two.addWidget(QLabel("Label 1"))
-        layer_two.addWidget(QLabel("Label 2"))
-        control_panel.addLayout(layer_one)
-        # layout.addLayout(control_panel)
 
         # Image Comparison =====================================================
         layout.addSpacing(20)
@@ -206,8 +196,8 @@ class DisplayCompare(QWidget):
         query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
          # View Image
         button_query_image_view = QPushButton("View Image") 
-        button_query_image_view.clicked.connect(lambda: self.view_image('query'))
-        match_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        button_query_image_view.clicked.connect(lambda: self.view_image(self.current_query_rid))
+        query_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         query_image_buttons.addStretch()
         query_layout.addLayout(query_image_buttons)
@@ -299,7 +289,7 @@ class DisplayCompare(QWidget):
         match_image_buttons.addWidget(button_match_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # View Image
         button_match_image_view = QPushButton("View Image") 
-        button_match_image_view.clicked.connect(lambda: self.view_image('match'))
+        button_match_image_view.clicked.connect(lambda: self.view_image(self.current_match_rid))
         match_image_buttons.addWidget(button_match_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
 
@@ -343,7 +333,13 @@ class DisplayCompare(QWidget):
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
         """
         self.data = db_roi.fetch_roi_media(self.mpDB)
+        print(self.data.iloc[0])
         self.sequences = db_roi.sequence_roi_dict(self.data)
+
+        # create backups for filtering
+        self.data_raw = self.data.copy()
+        self.sequences_raw = self.sequences
+
         # must have embeddings to continue
         if not (self.data["emb_id"] == 0).all():
 
@@ -564,14 +560,25 @@ class DisplayCompare(QWidget):
 
     # TODO
     def filter_region(self):
+        #create query for all rois connected to media connected to sites connected to surveys 
         pass
 
     def filter_survey(self):
         pass
 
     def filter_site(self):
-        active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
+        active_site = self.site_list_ordered[self.site_select.currentIndex()]
+        print(active_site)
 
+    def set_sites(self):
+        # set sites to active survey
+        self.site_select.clear()
+        if self.survey_select.currentIndex() > 0:
+            self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=f'survey_id={self.active_survey[0]}'))
+        else:
+            self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
+        self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
+        self.site_select.addItems([el[1] for el in self.site_list_ordered])
 
     # Image Manipulations ------------------------------------------------------
 
@@ -588,8 +595,10 @@ class DisplayCompare(QWidget):
         self.slider_match_sharpness.setValue(50)
 
     # TODO
-    def view_image(self, selection):
-        pass
+    def view_image(self, rid):
+        dialog = ImagePopup(self, rid)
+        if dialog.exec():
+            del dialog
 
     # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):

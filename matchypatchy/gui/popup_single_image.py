@@ -7,11 +7,13 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QList
                              QLabel, QLineEdit, QDialogButtonBox)
 from PyQt6 import QtCore, QtWidgets
 
-class IndividualPopup(QDialog):
-    def __init__(self, parent):
+class ImagePopup(QDialog):
+    def __init__(self, parent, rid):
         super().__init__(parent)
-        self.setWindowTitle("Manage Individuals")
+        self.setWindowTitle("View Image")
         self.mpDB = parent.mpDB
+        self.rid = rid
+        print(self.rid)
 
         layout = QVBoxLayout()
         # SITE LIST

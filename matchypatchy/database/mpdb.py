@@ -84,6 +84,28 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
+        
+    def add_region(self, name: str):
+        """
+        Add a region with
+            - name (str) Not Null
+        """
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = """INSERT INTO region (name) VALUES (?);"""
+            data_tuple = (name)
+            cursor.execute(command, data_tuple)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            logging.error("Failed to add region: ", error)
+            if db:
+                db.close()
+            return False
+
 
     def add_site(self, name: str, lat: float, long: float, survey_id: int):
         """

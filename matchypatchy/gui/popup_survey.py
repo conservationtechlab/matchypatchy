@@ -72,6 +72,7 @@ class SurveyPopup(QDialog):
         if dialog.exec():
             self.mpDB.add_survey(dialog.get_name(), dialog.get_region(),
                                  dialog.get_year_start(), dialog.get_year_start())
+            # TODO: ADD REGION IF NOT NULL and DNE IN region
         del dialog
         self.surveys = self.update()
 

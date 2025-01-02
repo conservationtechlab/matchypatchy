@@ -15,6 +15,12 @@ def setup_database(filepath='matchypatchy.db'):
     db.enable_load_extension(False)
     cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
 
+    # REGION
+    # Corresponds to "Site" in CameraBase
+    cursor.execute('''CREATE TABLE IF NOT EXISTS region (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL );''')
+
     # SURVEY
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
@@ -24,6 +30,7 @@ def setup_database(filepath='matchypatchy.db'):
                         year_end INTEGER )''')
 
     # SITE
+    # Corresponds to "Station" in CameraBase
     cursor.execute('''CREATE TABLE IF NOT EXISTS site (
                         id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
