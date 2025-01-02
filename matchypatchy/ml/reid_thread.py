@@ -9,7 +9,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.ml import models
 from matchypatchy.database.roi import fetch_roi
 
-from animl import matchypatchy as animl_mp
+from animl.api import matchypatchy as animl_mp
 
 
 class ReIDThread(QThread):

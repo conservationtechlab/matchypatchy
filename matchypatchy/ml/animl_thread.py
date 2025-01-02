@@ -9,7 +9,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.ml import models
 from matchypatchy import config
 
-from animl import matchypatchy as animl_mp
+from animl.api import matchypatchy as animl_mp
 
 # TODO: HANDLE VIDEOS
 
@@ -48,7 +48,7 @@ class AnimlThread(QThread):
 
     def get_bbox(self):
         # 1 RUN MED
-        detections = animl_mp.detect(self.md_filepath, self.media)
+        detections = animl_mp.detect_mp(self.md_filepath, self.media)
         # 2 GET BOXES
         for i, roi in detections.iterrows():
             media_id = roi['id']

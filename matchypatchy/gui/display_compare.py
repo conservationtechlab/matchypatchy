@@ -333,7 +333,10 @@ class DisplayCompare(QWidget):
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
         """
         self.data = db_roi.fetch_roi_media(self.mpDB)
-        print(self.data.iloc[0])
+        if self.data.empty:
+            self.home()
+            return
+
         self.sequences = db_roi.sequence_roi_dict(self.data)
 
         # create backups for filtering
