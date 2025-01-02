@@ -61,22 +61,11 @@ class MediaTable(QWidget):
         if roi_n > 0:
             media, column_names = self.mpDB.all_media()
             self.data = pd.DataFrame(media, columns=column_names)  
+            
         # no rois processed, default to full image
         else:
             self.data = fetch_media(self.mpDB)
             self.crop = False  # display full image
-            if not self.data.empty:
-                # fill in missing columns
-                self.data =self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
-                                            name=None, sex=None, individual_id=0)
-            else: 
-                # no media, give warning, go home
-                self.parent.loading_bar.close()
-                dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
-                if dialog.exec():
-                    self.parent.home()
-                    del dialog
-
 
     # RUN ON ENTRY
     def load(self):
@@ -84,6 +73,18 @@ class MediaTable(QWidget):
         Fetch table, load images and save as thumbnails to TEMP_DIR
         """
         self.fetch()  
+        if not self.data.empty:
+                # fill in missing columns
+            self.data =self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
+                                        name=None, sex=None, individual_id=0)
+        else: 
+            # no media, give warning, go home
+            self.parent.loading_bar.close()
+            dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
+            if dialog.exec():
+                self.parent.home()
+                del dialog
+            return False
         
         self.parent.loading_bar.show()
         self.table.clearContents() 
@@ -94,6 +95,7 @@ class MediaTable(QWidget):
         self.image_loader_thread.loaded_image.connect(self.add_thumbnail_path)
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
+        return True
 
     # Triggered by load()
     def filter(self):

@@ -91,28 +91,29 @@ class DisplayMedia(QWidget):
         self.parent._set_base_view()
 
     # 1. RUN ON ENTRY
+    def load_table(self):
+        print("One")
+        self.loading_bar = ProgressPopup(self, "Loading images...")
+        return self.media_table.load()
+        
     def refresh_filters(self, filters=None):
         """
         Update Dropdown Lists
         """
-        print("One")
-        self.survey_select.clear()
+        print("Two")
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
         self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
 
-        self.site_select.clear()
         self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
         self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])
         self.active_site = self.site_list_ordered[self.site_select.currentIndex()]
 
-        self.species_select.clear()
         self.species_list_ordered = [(0, 'Species')] + list(self.mpDB.select('species', columns='id, common'))
         self.species_select.addItems([el[1] for el in self.species_list_ordered])
         self.active_species = self.species_list_ordered[self.species_select.currentIndex()]
 
-        self.individual_select.clear()
         self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
         self.active_individual = self.individual_list_ordered[self.individual_select.currentIndex()]
@@ -130,21 +131,15 @@ class DisplayMedia(QWidget):
             if "individual_id" in filters:
                 self.active_individual = [filters["individual_id"]]
 
-
     # 2. RUN ON ENTRY
     def connect_filters(self):
-        print("Two")
+        print("Three")
         # connect combobox selection AFTER they've been populated
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         self.site_select.currentIndexChanged.connect(self.select_site)
         self.species_select.currentIndexChanged.connect(self.select_species)
         self.individual_select.currentIndexChanged.connect(self.select_individual)
 
-    # 3. RUN ON ENTRY
-    def load_table(self):
-        print("Three")
-        self.loading_bar = ProgressPopup(self, "Loading images...")
-        self.media_table.load()
 
     def filter_table(self):
         """
