@@ -1,6 +1,7 @@
 """
 GUI Window for viewing images
 """
+
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox)
 from PyQt6.QtCore import Qt
@@ -90,10 +91,11 @@ class DisplayMedia(QWidget):
         self.parent._set_base_view()
 
     # 1. RUN ON ENTRY
-    def refresh_filters(self):
+    def refresh_filters(self, filters=None):
         """
         Update Dropdown Lists
         """
+        print("One")
         self.survey_select.clear()
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
@@ -115,8 +117,23 @@ class DisplayMedia(QWidget):
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
         self.active_individual = self.individual_list_ordered[self.individual_select.currentIndex()]
 
+        if filters:
+            print(filters)
+            # media_table.filter() expecting [id, name]
+            if "survey_id" in filters:
+                self.active_survey = [filters['survey_id']]
+            # TODO: does not check if site_id in valid sites
+            if "site_id" in filters:
+                self.active_site = [filters["site_id"]]
+            if "species_id" in filters:
+                self.active_species = [filters["species_id"]]
+            if "individual_id" in filters:
+                self.active_individual = [filters["individual_id"]]
+
+
     # 2. RUN ON ENTRY
     def connect_filters(self):
+        print("Two")
         # connect combobox selection AFTER they've been populated
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         self.site_select.currentIndexChanged.connect(self.select_site)
@@ -125,6 +142,7 @@ class DisplayMedia(QWidget):
 
     # 3. RUN ON ENTRY
     def load_table(self):
+        print("Three")
         self.loading_bar = ProgressPopup(self, "Loading images...")
         self.media_table.load()
 

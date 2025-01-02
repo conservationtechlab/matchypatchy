@@ -220,6 +220,9 @@ class DisplayBase(QWidget):
         if dialog.exec():
             del dialog
 
+    def set_filtered_view(self, filters):
+        self.parent._set_media_view(filters=filters)
+
     # MAIN PROCESS -------------------------------------------------------------
     # STEP 1: Import from CSV
     def import_csv(self):

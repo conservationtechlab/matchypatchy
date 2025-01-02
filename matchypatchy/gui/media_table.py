@@ -8,7 +8,6 @@ Widget for displaying list of Media
 # TODO: MAKE TABLE EDITABLE
 # TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
 # TODO: MAKE THUMBNAIL LOAD FASTER
-# NOTE: INDIVIDUAL TABLE REFERENCES SPECIES
 
 import tempfile
 import pandas as pd
@@ -17,7 +16,7 @@ from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
-from matchypatchy.config import TEMP_DIR, VIEWPOINT
+from matchypatchy.config import VIEWPOINT
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.database.media import fetch_media
 
@@ -78,8 +77,6 @@ class MediaTable(QWidget):
                     self.parent.home()
                     del dialog
 
-        # set df index to table index
-        #self.data = self.data.set_index("id")
 
     # RUN ON ENTRY
     def load(self):
@@ -98,14 +95,19 @@ class MediaTable(QWidget):
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
 
-
+    # Triggered by load()
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
         Always run before updating table
+
+        if filter > 0 : use id
+        if filter == 0: do not filter
+        if filter is None: select None
         """
         # create new copy of full dataset
-        self.data_filtered = self.data
+        self.data_filtered = self.data.copy()
+    
         # Survey Filter
         if self.parent.valid_sites:
             self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(self.parent.valid_sites.keys()))]
@@ -114,17 +116,31 @@ class MediaTable(QWidget):
             self.data_filtered['site'] = self.data_filtered['site_id']
 
         # Single Site Filter
+        #print("Site:", self.parent.active_site[0])
         if self.parent.active_site[0] > 0:
             self.data_filtered = self.data_filtered[self.data_filtered['site_id'] == self.parent.active_site[0]]
 
         # Species Filter
+        #print("Species:", self.parent.active_species[0])
         if self.parent.active_species[0] > 0:
             self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == self.parent.active_species[0]]
+        elif self.parent.active_species[0] is None: 
+            self.data_filtered = self.data_filtered[self.data_filtered['species_id'].isna()]
+
+        # Individual Filter
+        #print("Individual:", self.parent.active_individual[0])
+        if self.parent.active_individual[0] > 0:
+            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == self.parent.active_individual[0]]
+        elif self.parent.active_individual[0] is None: 
+            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
         # Unidentified Filter
+        #print("Unidentified Only", self.parent.unidentified_only)
         if self.parent.unidentified_only:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == 0]
+            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
+        # Favorites Filter
+        #print("Favotires Only", self.parent.favorites_only)
         if self.parent.favorites_only:
             self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 

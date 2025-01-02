@@ -11,6 +11,7 @@ Display Pages:
 """
 import sys
 import os
+from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
@@ -100,10 +101,10 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(0)
         self.Intro.setFocus()
 
-    def _set_media_view(self):
+    def _set_media_view(self, filters: Optional[dict]=None):
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
-        self.Media.refresh_filters()
+        self.Media.refresh_filters(filters)
         self.Media.connect_filters()
         self.Media.load_table()
 
