@@ -17,7 +17,6 @@ from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
 from matchypatchy.config import VIEWPOINT
-from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.database.media import fetch_media
 
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
@@ -68,34 +67,35 @@ class MediaTable(QWidget):
             self.crop = False  # display full image
 
     # RUN ON ENTRY
-    def load(self):
+    def load_data(self):
         """
         Fetch table, load images and save as thumbnails to TEMP_DIR
         """
-        self.fetch()  
+        # clear old view
+        self.table.clearContents() 
+        # fetch data
+        self.fetch()
         if not self.data.empty:
-                # fill in missing columns
+            # fill in missing columns
             self.data =self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
                                         name=None, sex=None, individual_id=0)
+            return True
         else: 
             # no media, give warning, go home
-            self.parent.loading_bar.close()
-            dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
-            if dialog.exec():
-                self.parent.home()
-                del dialog
             return False
-        
+
+    # load images if data is available
+    def load_images(self):
         self.parent.loading_bar.show()
-        self.table.clearContents() 
-        self.table.setRowCount(len(self.data))  
         # load images
         self.image_loader_thread = LoadThumbnailThread(self.data, self.crop)
         self.image_loader_thread.progress_update.connect(self.parent.loading_bar.set_counter)
         self.image_loader_thread.loaded_image.connect(self.add_thumbnail_path)
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
+        # return true to pass to filter
         return True
+
 
     # Triggered by load()
     def filter(self):
@@ -154,7 +154,7 @@ class MediaTable(QWidget):
         Add rows to table
         """
         # clear old contents and prep for filtered data
-        self.table.clearContents() 
+        self.table.clearContents()
         # disconnect edit function while refreshing to prevent needless calls
         self.table.blockSignals(True)  
         self.table.setRowCount(self.data_filtered.shape[0])

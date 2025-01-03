@@ -27,4 +27,6 @@ def fetch_media(mpDB):
         media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", 'site_id',
                                              'sequence_id', "external_id", 'comment', 'favorite'])
         media = media.replace({float('nan'): None})
-    return media
+        return media
+    else: 
+        return pd.DataFrame()
