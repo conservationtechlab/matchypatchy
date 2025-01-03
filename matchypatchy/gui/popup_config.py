@@ -1,8 +1,12 @@
 '''
 Popup to add or edit species
 '''
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem,
-                             QHBoxLayout, QPushButton, QLineEdit, QLabel, QDialogButtonBox)
+import os
+import logging
+import sqlite3
+
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
+                             QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
 
 from matchypatchy.gui.popup_alert import AlertPopup
@@ -38,19 +42,25 @@ class ConfigPopup(QDialog):
         path_layout.addLayout(insert_layout)
 
         path_button_layout = QVBoxLayout()
+
         button_db_path = QPushButton()
         button_db_path.setMaximumHeight(30)
         button_db_path.setIcon(QIcon("/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"))
+        button_db_path.clicked.connect(self.set_db)
+
         button_log_path = QPushButton()
-        button_log_path.setIcon(QIcon("/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"))
         button_log_path.setMaximumHeight(30)
+        button_log_path.setIcon(QIcon("/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"))
+        button_log_path.clicked.connect(self.set_log)
+
         button_ml_path = QPushButton()
         button_ml_path.setIcon(QIcon("/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"))
         button_ml_path.setMaximumHeight(30)
+        button_ml_path.clicked.connect(self.set_ml)
+
         path_button_layout.addWidget(button_db_path)
         path_button_layout.addWidget(button_log_path)
         path_button_layout.addWidget(button_ml_path)
-
         path_layout.addLayout(path_button_layout)
 
         layout.addLayout(path_layout)
@@ -78,3 +88,16 @@ class ConfigPopup(QDialog):
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
+
+    def set_db(self):
+        pass
+
+    def set_log(self):
+        new_log = QFileDialog.getSaveFileName(self, "New File",
+                                              os.path.expanduser('~'),
+                                              ("Log Files (*.log)"))[0]
+        if new_log:
+            pass
+
+    def set_ml(self):
+        pass

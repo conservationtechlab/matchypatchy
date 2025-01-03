@@ -2,10 +2,12 @@
 GUI tool for human validation of AI-powered animal re-identification
 
 TODOS
+ - fix media table filters
  - edit config
+ - Create function to verify another database
  - add undo for match
- - filter compare screenn
- - add region when adding survey
+ - fix match function
+ - filter compare screen
  - manage individuals popup
 
 BIG TODOS

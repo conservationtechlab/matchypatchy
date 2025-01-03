@@ -1,8 +1,10 @@
 """
 Functions for manipulating the individual table
+
 """
 
 # TODO: Mismatched sex??
+# TODO: DROP bad id
 
 def merge(mpDB, data, query_sequence, match):
     """
@@ -20,7 +22,7 @@ def merge(mpDB, data, query_sequence, match):
         keep_id = match_iid
         drop_id = None
     # match is older, update query
-    elif query_iid > match_iid:
+    elif query_iid > match_iid and match_iid is not None:
         sequence = query_sequence['sequence_id'].iloc[0]
         keep_id = match_iid
         drop_id = query_iid
@@ -36,4 +38,4 @@ def merge(mpDB, data, query_sequence, match):
         mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
     
     # delete newer individual in table 
-    mpDB.delete('individual', f"id=={drop_id}")
+    #mpDB.delete('individual', f"id=={drop_id}")

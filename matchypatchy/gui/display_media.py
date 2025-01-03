@@ -122,11 +122,7 @@ class DisplayMedia(QWidget):
         """
         Update Dropdown Lists
         """
-        self.region_select.blockSignals(True)
-        self.survey_select.blockSignals(True)
-        self.site_select.blockSignals(True)
-        self.species_select.blockSignals(True)
-        self.individual_select.blockSignals(True)
+        self.blockSignals(True)
 
         self.region_select.clear()
         self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
@@ -169,11 +165,7 @@ class DisplayMedia(QWidget):
             if "individual_id" in filters:
                 self.active_individual = [filters["individual_id"]]
 
-        self.region_select.blockSignals(False)
-        self.survey_select.blockSignals(False)
-        self.site_select.blockSignals(False)
-        self.species_select.blockSignals(False)
-        self.individual_select.blockSignals(False)
+        self.blockSignals(False)
 
     # 3. RUN ON ENTRY
     def load_thumbnails(self):
