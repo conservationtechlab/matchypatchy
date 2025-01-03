@@ -59,11 +59,11 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def add_survey(self, name: str, region: str, year_start: int, year_end: int):
+    def add_survey(self, name: str, region_id: int, year_start: int, year_end: int):
         """
         Add a survey with
             - name (str) Not Null
-            - region (str)
+            - region_id (int)
             - year_start (int)
             - year_end (int)
         """
@@ -71,9 +71,9 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO survey
-                        (name, region, year_start, year_end) 
+                        (name, region_id, year_start, year_end) 
                         VALUES (?, ?, ?, ?);"""
-            data_tuple = (name, region, year_start, year_end)
+            data_tuple = (name, region_id, year_start, year_end)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -94,7 +94,8 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO region (name) VALUES (?);"""
-            data_tuple = (name)
+            data_tuple = (name,)
+            print(data_tuple)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -281,6 +282,8 @@ class MatchyPatchyDB():
 
     def edit_row(self, table: str, id: int, replace: dict, allow_none=False, quiet=True):
         """
+        Edit a row in place 
+        
         Args
             - table (str):
             - id (int):
@@ -308,6 +311,10 @@ class MatchyPatchyDB():
             return False
 
     def select(self, table: str, columns: str="*", row_cond: Optional[str]=None, quiet=True):
+        """
+        Select columns based on optional row_cond
+        Returns each row as a tuple
+        """
         try:
             db = sqlite3.connect(self.filepath)
             if table == "roi_emb":
@@ -321,7 +328,7 @@ class MatchyPatchyDB():
                 command = f'SELECT {columns} FROM {table};'
             if not quiet: print(command)
             cursor.execute(command)
-            rows = cursor.fetchall()  # returns in tuple
+            rows = cursor.fetchall()  
             db.close()
             return rows
         except sqlite3.Error as error:
@@ -330,11 +337,14 @@ class MatchyPatchyDB():
                 db.close()
             return False
     
-    def select_join(self, table, join_table, join_cond, columns="*", quiet=True):
+    def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str]=None, quiet=True):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
+            if row_cond:
+                command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond} WHERE {row_cond};'
+            else:
+                command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
             if not quiet: print(command)
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]
@@ -406,6 +416,9 @@ class MatchyPatchyDB():
             return False 
         
     def clear_emb(self):
+        """
+        Clear vector database and rebuild (no way to delete)
+        """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -426,8 +439,6 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False 
-
-            
         
     def count(self, table):
         """

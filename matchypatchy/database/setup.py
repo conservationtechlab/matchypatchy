@@ -6,6 +6,8 @@ import sqlite3
 from matchypatchy import sqlite_vec
 
 
+# TODO: Create function to verify another database
+
 def setup_database(filepath='matchypatchy.db'):
     # Connect to SQLite database
     db = sqlite3.connect(filepath)
@@ -25,9 +27,10 @@ def setup_database(filepath='matchypatchy.db'):
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL,
-                        region TEXT,
+                        region_id INTEGER,
                         year_start INTEGER,
-                        year_end INTEGER )''')
+                        year_end INTEGER,
+                        FOREIGN KEY (region_id) REFERENCES region (id) );''')
 
     # SITE
     # Corresponds to "Station" in CameraBase

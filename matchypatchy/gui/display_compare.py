@@ -87,8 +87,7 @@ class DisplayCompare(QWidget):
         self.region_select = QComboBox()
         self.region_select.setFixedWidth(200)
         # filter out null entries, duplicates, dict will be {Name: [surveyids]}
-        self.region_list_ordered = [(0, 'Region')] + list(filter(lambda x: x[1] not in (None, ''),
-                                                                list(self.mpDB.select('survey', columns='id, region'))))
+        self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
         self.region_select.addItems([el[1] for el in self.region_list_ordered])
         self.region_select.currentIndexChanged.connect(self.filter_region)
         first_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)

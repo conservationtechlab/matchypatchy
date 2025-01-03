@@ -70,28 +70,39 @@ class SurveyPopup(QDialog):
     def add(self):
         dialog = SurveyFillPopup(self)
         if dialog.exec():
-            self.mpDB.add_survey(dialog.get_name(), dialog.get_region(),
+            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'", quiet=False)
+            if not region_id:
+                region_id = self.mpDB.add_region(dialog.get_region())
+            else:
+                region_id = region_id[0][0]
+            self.mpDB.add_survey(dialog.get_name(),region_id,
                                  dialog.get_year_start(), dialog.get_year_start())
-            # TODO: ADD REGION IF NOT NULL and DNE IN region
         del dialog
         self.surveys = self.update()
 
     def edit(self):
         selected_survey = self.list.currentRow()
         id = self.survey_list_ordered[selected_survey][0]
-        cond = f'id={id}'
-        id, name, region, year_start, year_end = self.mpDB.select('survey',
-                                                                  columns='id, name, region, year_start, year_end',
-                                                                  row_cond=cond)[0]
-        region = '' if region is None else region
-        year_start = '' if year_start is None else year_start
-        year_end = '' if year_end is None else year_end
+        cond = f'survey.id={id}'
+        row = self.mpDB.select_join('survey', 'region', 'survey.region_id=region.id',
+                                    columns='survey.id, survey.name, region.name, year_start, year_end',
+                                    row_cond=cond, quiet=False)[0]
+        name = row[0][1]
+        region = '' if row[0][2] is None else row[0][2]
+        year_start = '' if row[0][3] is None else row[0][3]
+        year_end = '' if row[0][4] is None else row[0][4]
 
         dialog = SurveyFillPopup(self, name=name, region=region, year_start=year_start, year_end=year_end)
 
         if dialog.exec() and dialog.accepted:
+            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'", quiet=False)
+            if not region_id:
+                region_id = self.mpDB.add_region(dialog.get_region())
+            else:
+                region_id = region_id[0][0]
+
             replace_dict = {"name": f"'{dialog.get_name()}'",
-                            "region": f"'{dialog.get_region()}'",
+                            "region": f"'{region_id}'",
                             "year_start": dialog.get_year_start(),
                             "year_end": dialog.get_year_end()}
             self.mpDB.edit_row("survey", id, replace_dict, quiet=False)
