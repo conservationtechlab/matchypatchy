@@ -60,6 +60,7 @@ class MediaTable(QWidget):
         if roi_n > 0:
             media, column_names = self.mpDB.all_media()
             self.data = pd.DataFrame(media, columns=column_names)  
+            self.crop = True
             
         # no rois processed, default to full image
         else:
@@ -84,20 +85,21 @@ class MediaTable(QWidget):
             # no media, give warning, go home
             return False
 
-    # load images if data is available
+    
     def load_images(self):
+        """
+        Load images if data is available
+        Does not run if load_data returns false to MediaDisplay
+        """
         self.parent.loading_bar.show()
-        # load images
         self.image_loader_thread = LoadThumbnailThread(self.data, self.crop)
         self.image_loader_thread.progress_update.connect(self.parent.loading_bar.set_counter)
         self.image_loader_thread.loaded_image.connect(self.add_thumbnail_path)
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
-        # return true to pass to filter
-        return True
 
 
-    # Triggered by load()
+    # Triggered by load_images()
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
@@ -146,7 +148,7 @@ class MediaTable(QWidget):
         if self.parent.favorites_only:
             self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
-        # refresh table
+        # refresh table contents
         self.refresh_table()
 
     def refresh_table(self):
