@@ -18,6 +18,7 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
 from matchypatchy.config import VIEWPOINT
 from matchypatchy.database.media import fetch_media
+from matchypatchy.gui.popup_alert import ProgressPopup
 
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
 
@@ -91,9 +92,10 @@ class MediaTable(QWidget):
         Load images if data is available
         Does not run if load_data returns false to MediaDisplay
         """
-        self.parent.loading_bar.show()
+        self.loading_bar = ProgressPopup(self, "Loading images...")
+        self.loading_bar.show()
         self.image_loader_thread = LoadThumbnailThread(self.data, self.crop)
-        self.image_loader_thread.progress_update.connect(self.parent.loading_bar.set_counter)
+        self.image_loader_thread.progress_update.connect(self.loading_bar.set_counter)
         self.image_loader_thread.loaded_image.connect(self.add_thumbnail_path)
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
@@ -111,42 +113,53 @@ class MediaTable(QWidget):
         """
         # create new copy of full dataset
         self.data_filtered = self.data.copy()
+        filters = self.parent.filters
+
+        # Region Filter (depends on prefilterd sites from MediaDisplay)
+        if 'region_filter' in filters.keys() and self.parent.valid_sites:
+            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(self.parent.valid_sites.keys()))]
+            self.data_filtered['site'] = self.data_filtered['site_id'].map(self.parent.valid_sites)
+        else:
+            self.data_filtered['site'] = self.data_filtered['site_id']
     
-        # Survey Filter
-        if self.parent.valid_sites:
+        # Survey Filter (depends on prefilterd sites from MediaDisplay)
+        if 'survey_filter' in filters.keys() and self.parent.valid_sites:
             self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(self.parent.valid_sites.keys()))]
             self.data_filtered['site'] = self.data_filtered['site_id'].map(self.parent.valid_sites)
         else:
             self.data_filtered['site'] = self.data_filtered['site_id']
 
         # Single Site Filter
-        #print("Site:", self.parent.active_site[0])
-        if self.parent.active_site[0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'] == self.parent.active_site[0]]
+        if 'active_site' in filters.keys() and self.parent.valid_sites:
+            if filters['active_site'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['site_id'] == filters['active_site'][0]]
+        else:
+            # no valid sites, empty dataframe
+            self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
         # Species Filter
-        #print("Species:", self.parent.active_species[0])
-        if self.parent.active_species[0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == self.parent.active_species[0]]
-        elif self.parent.active_species[0] is None: 
-            self.data_filtered = self.data_filtered[self.data_filtered['species_id'].isna()]
+        if 'active_species' in filters.keys():
+            if filters['active_species'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == filters['active_species'][0]]
+            elif filters['active_species'][0] is None: 
+                self.data_filtered = self.data_filtered[self.data_filtered['species_id'].isna()]
 
         # Individual Filter
-        #print("Individual:", self.parent.active_individual[0])
-        if self.parent.active_individual[0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == self.parent.active_individual[0]]
-        elif self.parent.active_individual[0] is None: 
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
+        if 'active_individual' in filters.keys():
+            if filters['active_individual'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == filters['active_individual'][0]]
+            elif filters['active_individual'][0] is None: 
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
         # Unidentified Filter
-        #print("Unidentified Only", self.parent.unidentified_only)
-        if self.parent.unidentified_only:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
+        if 'unidentified_only' in filters.keys():
+            if filters['unidentified_only']:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
         # Favorites Filter
-        #print("Favotires Only", self.parent.favorites_only)
-        if self.parent.favorites_only:
-            self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
+        if 'favorites_only' in filters.keys():
+            if filters['favorites_only']:
+                self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
         # refresh table contents
         self.refresh_table()
@@ -174,7 +187,7 @@ class MediaTable(QWidget):
         """
         entry = item.row()
         reference = self.columns[item.column()]
-        print(entry,reference)
+        print(entry, reference)
         # if checkbox
         if item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
             print(item.checkState() == Qt.CheckState.Checked)
@@ -185,6 +198,7 @@ class MediaTable(QWidget):
             print(item.text())  
 
         # add to queue
+        
     
     def set_check_state(self, item):
         """
@@ -234,9 +248,17 @@ class MediaTable(QWidget):
         # Comment
         self.table.setItem(i, 13, QTableWidgetItem(roi["comment"]))  # Favorite column
 
-    # adds emitted temp thumbnail path to data 
+    # captures emitted temp thumbnail path to data 
     def add_thumbnail_path(self, i, thumbnail_path):
         self.data.loc[i,'thumbnail_path'] = thumbnail_path
+
+
+
+
+
+
+
+
 
 # IMAGE LOAD =====================================================================================
 class LoadThumbnailThread(QThread):

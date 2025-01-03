@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.media_table import MediaTable
-from matchypatchy.gui.popup_alert import ProgressPopup
 from matchypatchy.gui.popup_alert import AlertPopup
 
 
@@ -35,7 +34,6 @@ class DisplayMedia(QWidget):
         # REGION
         self.region_select = QComboBox()
         self.region_select.setFixedWidth(200)
-        # filter out null entries, duplicates, dict will be {Name: [surveyids]}
         self.region_list_ordered = [(0, 'Region')] 
         self.region_select.addItems([el[1] for el in self.region_list_ordered])
         first_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -46,7 +44,6 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.survey_list_ordered = [(0, 'Survey')]
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
-        self.active_survey = self.survey_list_ordered[0]
 
         # SITE
         self.site_select = QComboBox()
@@ -55,7 +52,6 @@ class DisplayMedia(QWidget):
         self.valid_sites = None
         self.site_list_ordered = [(0, 'Site')]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])
-        self.active_site = self.site_list_ordered[0]
 
         # SPECIES
         self.species_select = QComboBox()
@@ -63,7 +59,6 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.species_list_ordered = [(0, 'Species')]
         self.species_select.addItems([el[1] for el in self.species_list_ordered])
-        self.active_species = self.species_list_ordered[0]
 
         # INDIVIDUAL
         self.individual_select = QComboBox()
@@ -71,7 +66,6 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.individual_list_ordered = [(0, 'Individual')]
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
-        self.active_individual = self.individual_list_ordered[0]
 
         # UNIDENTIFIED
         unidentified = QPushButton("Unidentified")
@@ -101,6 +95,13 @@ class DisplayMedia(QWidget):
         self.species_select.currentIndexChanged.connect(self.select_species)
         self.individual_select.currentIndexChanged.connect(self.select_individual)
 
+        self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
+                'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
+                'active_site': self.site_list_ordered[self.site_select.currentIndex()],
+                'active_species': self.species_list_ordered[self.species_select.currentIndex()],
+                'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
+                'unidentified_only': self.unidentified_only,
+                'favorites_only': self.favorites_only}
 
     # Return Home Button
     def home(self):
@@ -117,116 +118,135 @@ class DisplayMedia(QWidget):
             return False
         return True
         
-    # 2. RUN ON ENTRY
-    def refresh_filters(self, filters=None):
+    def refresh_filters(self, prefilter=None):
         """
-        Update Dropdown Lists
+        Update Dropdown Lists, Fill Filter Dict
+        Allows refresh of dropdowns if re-entry into media view after updating database
         """
-        self.blockSignals(True)
+        # block signals while updating lists
+        self.region_select.blockSignals(True)
+        self.survey_select.blockSignals(True)
+        self.site_select.blockSignals(True)
+        self.species_select.blockSignals(True)
+        self.individual_select.blockSignals(True)
 
         self.region_select.clear()
         self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
         self.region_select.addItems([el[1] for el in self.region_list_ordered])
-        self.active_region = self.region_list_ordered[self.region_select.currentIndex()]
 
         self.survey_select.clear()
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
-        self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
 
         self.site_select.clear()
         self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
         self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])
-        self.active_site = self.site_list_ordered[self.site_select.currentIndex()]
 
         self.species_select.clear()
         self.species_list_ordered = [(0, 'Species')] + list(self.mpDB.select('species', columns='id, common'))
         self.species_select.addItems([el[1] for el in self.species_list_ordered])
-        self.active_species = self.species_list_ordered[self.species_select.currentIndex()]
 
         self.individual_select.clear()
         self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
-        self.active_individual = self.individual_list_ordered[self.individual_select.currentIndex()]
+        
+        self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
+                        'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
+                        'active_site': self.site_list_ordered[self.site_select.currentIndex()],
+                        'active_species': self.species_list_ordered[self.species_select.currentIndex()],
+                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
+                        'unidentified_only': self.unidentified_only,
+                        'favorites_only': self.favorites_only}
 
-        if filters:
-            print(filters)
-            # media_table.filter() expecting [id, name]
-            if "region_id" in filters:
-                self.active_region = [filters['region_id']]
-            if "survey_id" in filters:
-                self.active_survey = [filters['survey_id']]
-            # TODO: does not check if site_id in valid sites
-            if "site_id" in filters:
-                self.active_site = [filters["site_id"]]
-            if "species_id" in filters:
-                self.active_species = [filters["species_id"]]
-            if "individual_id" in filters:
-                self.active_individual = [filters["individual_id"]]
+        if prefilter:
+            self.filters.update({k: prefilter[k] for k in self.filters.keys() & prefilter.keys()})
 
-        self.blockSignals(False)
+        self.region_select.blockSignals(False)
+        self.survey_select.blockSignals(False)
+        self.site_select.blockSignals(False)
+        self.species_select.blockSignals(False)
+        self.individual_select.blockSignals(False)
 
     # 3. RUN ON ENTRY
     def load_thumbnails(self):
-        self.loading_bar = ProgressPopup(self, "Loading images...")
+        """
+        Load Thumbnails
+
+        Only run if self.media_table.load_data() returns true
+        self.media_table.load_images() will trigger a self filter
+        and a self refresh upon completion
+        """
         self.media_table.load_images()
 
-    # 4. RUN ON ENTRY
     def filter_table(self):
         """
         Filter the media table based on the selected options
         Run after any setting is changed
         """
+        print("filter table")
         self.media_table.filter()
 
     def select_unidentified(self):
         self.unidentified_only = not self.unidentified_only
+        self.filters['undientified_only'] = self.unidentified_only
         self.filter_table()
 
     def select_favorites(self):
         self.favorites_only = not self.favorites_only
+        self.filters['favorites_only'] = self.unidentified_only
         self.filter_table()
 
     def select_region(self):
-        self.active_region = self.region_list_ordered[self.region_select.currentIndex()]
+        print("select region")
+        self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
         self.filter_surveys()
+        self.filter_sites(survey_ids=list(self.valid_surveys.items()))
         self.filter_table()
 
     def select_survey(self):
-        self.active_survey = self.survey_list_ordered[self.survey_select.currentIndex()]
-        self.filter_sites()
+        self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
+        self.filter_sites(survey_ids=[self.filters['active_survey']])
         self.filter_table()
 
     def select_site(self):
-        self.active_site = self.site_list_ordered[self.site_select.currentIndex()]
+        self.filters['active_site'] = self.site_list_ordered[self.site_select.currentIndex()]
         self.filter_table()
 
     def select_species(self):
-        self.active_species = self.species_list_ordered[self.species_select.currentIndex()]
+        self.filters['active_species'] = self.species_list_ordered[self.species_select.currentIndex()]
         self.filter_table()
 
     def select_individual(self):
-        self.active_individual = self.individual_list_ordered[self.individual_select.currentIndex()]
+        self.filters['active_individual'] = self.individual_list_ordered[self.individual_select.currentIndex()]
         self.filter_table()
 
     def filter_surveys(self):
-        # Update site list to reflect active survey
+        # block signals while updating combobox
+        self.survey_select.blockSignals(True)
         self.survey_select.clear()
-        print(self.active_region)
         if self.region_select.currentIndex() > 0:
-            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name", row_cond=f'region_id={self.active_region[0]}'))
+            # get surveys in selected region
+            region_id = self.filters['active_region'][0]
+            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name", row_cond=f'region_id={region_id}'))
         else:
+            # get all surveys
             self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name"))
+        # Update survey list to reflect active region
         self.survey_list_ordered = [(0, 'Survey')] + [(k, v) for k, v in self.valid_surveys.items()]
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
+        self.survey_select.blockSignals(False)
+        
 
-    def filter_sites(self):
-        # Update site list to reflect active survey
+    def filter_sites(self, survey_ids=None):
+        # block signals while updating combobox
+        self.site_select.blockSignals(True)
         self.site_select.clear()
-        if self.survey_select.currentIndex() > 0:
-            self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=f'survey_id={self.active_survey[0]}'))
-        else:
-            self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
+        survey_list = ",".join([str(s[0]) for s in survey_ids])
+        selection = f'survey_id IN ({survey_list})'
+
+        self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=selection, quiet=False))
+        # Update site list to reflect active survey
         self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])
+        self.site_select.blockSignals(False)        
