@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
-from matchypatchy.ml import models
+from matchypatchy.algo import models
 
 
 class MLDownloadPopup(QDialog):

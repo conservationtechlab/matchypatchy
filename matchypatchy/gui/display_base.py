@@ -23,9 +23,9 @@ from matchypatchy.gui.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.popup_ml import MLDownloadPopup, MLOptionsPopup
 from matchypatchy.gui.popup_config import ConfigPopup
 
-from matchypatchy.ml.sequence_thread import SequenceThread
-from matchypatchy.ml.animl_thread import AnimlThread
-from matchypatchy.ml.reid_thread import ReIDThread
+from matchypatchy.algo.sequence_thread import SequenceThread
+from matchypatchy.algo.animl_thread import AnimlThread
+from matchypatchy.algo.reid_thread import ReIDThread
 
 from matchypatchy.database.roi import fetch_roi_media
 
