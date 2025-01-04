@@ -31,9 +31,10 @@ class DisplayCompare(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.mpDB = parent.mpDB
         self.k = 3  # default knn
         self.threshold = 80
-        self.mpDB = parent.mpDB
+        self.filters = dict()
 
         self.neighbor_dict = dict()
         self.nearest_dict = dict()
@@ -86,30 +87,25 @@ class DisplayCompare(QWidget):
         # REGION
         self.region_select = QComboBox()
         self.region_select.setFixedWidth(200)
-        # filter out null entries, duplicates, dict will be {Name: [surveyids]}
-        self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
-        self.region_select.addItems([el[1] for el in self.region_list_ordered])
-        self.region_select.currentIndexChanged.connect(self.filter_region)
+        self.region_select.currentIndexChanged.connect(self.select_region)
         first_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # SURVEY
         self.survey_select = QComboBox()
         self.survey_select.setFixedWidth(200)
-        self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
-        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
-        self.survey_select.currentIndexChanged.connect(self.filter_survey)
+        self.survey_select.currentIndexChanged.connect(self.select_survey)
         first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Site
         self.site_select = QComboBox()
         self.site_select.setFixedWidth(200)
-        self.set_sites()
-        self.site_select.currentIndexChanged.connect(self.filter_site)
+        self.site_select.currentIndexChanged.connect(self.select_site)
         first_layer.addWidget(self.site_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addStretch()
         layout.addLayout(first_layer)
 
+        self.refresh_filters()
 
         # Image Comparison =====================================================
         layout.addSpacing(20)
@@ -326,24 +322,44 @@ class DisplayCompare(QWidget):
     def validate(self):
         self.parent._set_media_view()
 
+    def refresh_filters(self):
+        """
+        Clear and Refresh Filters on Re-entry
+        """
+        self.region_select.blockSignals(True)
+        self.survey_select.blockSignals(True)
+
+        self.region_select.clear()
+        self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
+        self.region_select.addItems([el[1] for el in self.region_list_ordered])
+
+        self.survey_select.clear()
+        self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
+        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])    
+
+        self.filter_sites()    
+
+        self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
+                        'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
+                        'active_site': self.site_list_ordered[self.site_select.currentIndex()],}
+
+        self.region_select.blockSignals(False)
+        self.survey_select.blockSignals(False)
+
     # RUN ON ENTRY =============================================================
     def calculate_neighbors(self):
         """
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
         """
-        self.data = db_roi.fetch_roi_media(self.mpDB)
-        if self.data.empty:
+        self.data_raw = db_roi.fetch_roi_media(self.mpDB)
+        if self.data_raw.empty:
             self.home()
             return
 
-        self.sequences = db_roi.sequence_roi_dict(self.data)
-
-        # create backups for filtering
-        self.data_raw = self.data.copy()
-        self.sequences_raw = self.sequences
+        self.sequences = db_roi.sequence_roi_dict(self.data_raw)
 
         # must have embeddings to continue
-        if not (self.data["emb_id"] == 0).all():
+        if not (self.data_raw["emb_id"] == 0).all():
 
             dialog = ProgressPopup(self, "Matching embeddings...")
             dialog.set_max(len(self.sequences))
@@ -360,7 +376,7 @@ class DisplayCompare(QWidget):
             self.match_thread.progress_update.connect(dialog.set_counter)
             self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
             self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
-            self.match_thread.finished.connect(self.establish_queries)  # do not continue until finished
+            self.match_thread.finished.connect(self.filter)  # do not continue until finished
             self.match_thread.start()
 
         else:
@@ -371,11 +387,48 @@ class DisplayCompare(QWidget):
 
     def capture_neighbor_dict(self, neighbor_dict):
         # capture neighbor_dict from MatchEmbeddingThread
-        self.neighbor_dict = neighbor_dict
+        self.neighbor_dict_raw = neighbor_dict
 
     def capture_nearest_dict(self, nearest_dict):
         # capture neighbor_dict from MatchEmbeddingThread
-        self.nearest_dict = nearest_dict
+        self.nearest_dict_raw = nearest_dict
+
+    def filter(self):
+        """
+        Filter media based on active survey selected in dropdown of DisplayMedia
+        Triggered by calculate neighbors and change in filters
+
+        if filter > 0 : use id
+        if filter == 0: do not filter
+        """
+        # create backups for filtering
+        self.data = self.data_raw.copy()
+
+        # Region Filter (depends on prefilterd sites from MediaDisplay)
+        if self.filters['active_region'][0] > 0 and self.valid_sites:
+            self.data = self.data[self.data['site_id'].isin(list(self.valid_sites.keys()))]
+    
+        # Survey Filter (depends on prefilterd sites from MediaDisplay)
+        if self.filters['active_survey'][0] > 0 and self.valid_sites:
+            self.data = self.data[self.data['site_id'].isin(list(self.valid_sites.keys()))]
+
+        # Single Site Filter
+        if self.filters['active_site'][0] > 0 and self.valid_sites:
+            self.data = self.data[self.data['site_id'] == self.filters['active_site'][0]]
+        elif self.filters['active_site'][0] == 0 and self.valid_sites:
+            self.data = self.data[self.data['site_id'].isin(list(self.valid_sites.keys()))]
+            # no valid sites, empty dataframe
+        else:
+            dialog = AlertPopup(self, prompt="No data to compare within filter.")
+            if dialog.exec():
+                del dialog
+            return
+        
+        # filter neighbor dict and nearest dict
+        self.neighbor_dict = {k: self.neighbor_dict_raw[k] for k in self.data.index if k in self.neighbor_dict_raw}
+        self.nearest_dict = {k: self.nearest_dict_raw[k] for k in self.data.index if k in self.nearest_dict_raw}
+
+        self.establish_queries()
     # ==========================================================================
 
     def establish_queries(self):
@@ -393,7 +446,6 @@ class DisplayCompare(QWidget):
             dialog = AlertPopup(self, prompt="No data to compare, all available data from same sequence/capture.")
             if dialog.exec():
                 del dialog
-            self.parent._set_base_view()
 
     def set_query(self, n):
         """
@@ -560,27 +612,54 @@ class DisplayCompare(QWidget):
                                                                          (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
         QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
-    # TODO
-    def filter_region(self):
-        #create query for all rois connected to media connected to sites connected to surveys 
-        pass
+    # FILTERS
+    def select_region(self):
+        self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
+        self.filter_surveys()
+        self.filter_sites(survey_ids=list(self.valid_surveys.items()))
+        self.filter()
 
-    def filter_survey(self):
-        pass
+    def select_survey(self):
+        self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
+        self.filter_sites(survey_ids=[self.filters['active_survey']])
+        self.filter()
 
-    def filter_site(self):
-        active_site = self.site_list_ordered[self.site_select.currentIndex()]
-        print(active_site)
+    def select_site(self):
+        self.filters['active_site'] = self.site_list_ordered[self.site_select.currentIndex()]
+        self.filter()
 
-    def set_sites(self):
-        # set sites to active survey
+    def filter_surveys(self):
+        # block signals while updating combobox
+        self.survey_select.blockSignals(True)
+        self.survey_select.clear()
+        if self.region_select.currentIndex() > 0:
+            # get surveys in selected region
+            region_id = self.filters['active_region'][0]
+            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name", row_cond=f'region_id={region_id}'))
+        else:
+            # get all surveys
+            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name"))
+        # Update survey list to reflect active region
+        self.survey_list_ordered = [(0, 'Survey')] + [(k, v) for k, v in self.valid_surveys.items()]
+        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
+        self.survey_select.blockSignals(False)
+
+    def filter_sites(self, survey_ids=None):
+        # block signals while updating combobox
+        self.site_select.blockSignals(True)
         self.site_select.clear()
-        if self.survey_select.currentIndex() > 0:
-            self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=f'survey_id={self.active_survey[0]}'))
+        if survey_ids:
+            survey_list = ",".join([str(s[0]) for s in survey_ids])
+            selection = f'survey_id IN ({survey_list})'
+
+            self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=selection, quiet=False))
         else:
             self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
+
+        # Update site list to reflect active survey
         self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])
+        self.site_select.blockSignals(False)        
 
     # Image Manipulations ------------------------------------------------------
 

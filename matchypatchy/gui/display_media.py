@@ -242,10 +242,13 @@ class DisplayMedia(QWidget):
         # block signals while updating combobox
         self.site_select.blockSignals(True)
         self.site_select.clear()
-        survey_list = ",".join([str(s[0]) for s in survey_ids])
-        selection = f'survey_id IN ({survey_list})'
+        if survey_ids:
+            survey_list = ",".join([str(s[0]) for s in survey_ids])
+            selection = f'survey_id IN ({survey_list})'
 
-        self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=selection, quiet=False))
+            self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=selection, quiet=False))
+        else:
+            self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
         # Update site list to reflect active survey
         self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
         self.site_select.addItems([el[1] for el in self.site_list_ordered])

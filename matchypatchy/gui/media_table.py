@@ -113,26 +113,24 @@ class MediaTable(QWidget):
         """
         # create new copy of full dataset
         self.data_filtered = self.data.copy()
+        
+        # map 
         filters = self.parent.filters
+        valid_sites = self.parent.valid_sites
 
         # Region Filter (depends on prefilterd sites from MediaDisplay)
-        if 'region_filter' in filters.keys() and self.parent.valid_sites:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(self.parent.valid_sites.keys()))]
-            self.data_filtered['site'] = self.data_filtered['site_id'].map(self.parent.valid_sites)
-        else:
-            self.data_filtered['site'] = self.data_filtered['site_id']
+        if 'region_filter' in filters.keys() and valid_sites:
+            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(valid_sites.keys()))]
     
         # Survey Filter (depends on prefilterd sites from MediaDisplay)
-        if 'survey_filter' in filters.keys() and self.parent.valid_sites:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(self.parent.valid_sites.keys()))]
-            self.data_filtered['site'] = self.data_filtered['site_id'].map(self.parent.valid_sites)
-        else:
-            self.data_filtered['site'] = self.data_filtered['site_id']
+        if 'survey_filter' in filters.keys() and valid_sites:
+            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(valid_sites.keys()))]
 
         # Single Site Filter
-        if 'active_site' in filters.keys() and self.parent.valid_sites:
+        if 'active_site' in filters.keys() and valid_sites:
             if filters['active_site'][0] > 0:
                 self.data_filtered = self.data_filtered[self.data_filtered['site_id'] == filters['active_site'][0]]
+            self.data_filtered['site'] = self.data_filtered['site_id'].map(valid_sites)
         else:
             # no valid sites, empty dataframe
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
