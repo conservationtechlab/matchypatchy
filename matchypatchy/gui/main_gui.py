@@ -113,7 +113,9 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
         self.Compare.refresh_filters()
-        self.Compare.calculate_neighbors()
+        emb_exist = self.Compare.QueryContainer.load_data()
+        if emb_exist:
+            self.Compare.QueryContainer.calculate_neighbors()
 
     def _set_single_view(self):
         self.pages.setCurrentIndex(3)
