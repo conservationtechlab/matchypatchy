@@ -89,7 +89,7 @@ class AnimlThread(QThread):
 
         # if there are unlabeled rois
         if not filtered_rois.empty:
-            filtered_rois = animl_mp.classify(filtered_rois, self.config_filepath)
+            filtered_rois = animl_mp.classify_mp(filtered_rois, self.config_filepath)
             for i, row in filtered_rois.iterrows():
                 prediction = row['prediction']
                 # get species_id for prediction
