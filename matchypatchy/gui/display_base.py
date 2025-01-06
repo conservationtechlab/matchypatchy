@@ -38,11 +38,14 @@ class DisplayBase(QWidget):
 
         container = QWidget()
         container.setObjectName("mainBorderWidget")
+        
         layout = QVBoxLayout()
 
         self.label = QLabel("Welcome To MatchyPatchy")
+        self.label.setObjectName("Title")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFixedHeight(20)
+        self.label.setStyleSheet("""#Title {font-size: 20px;}""")
         layout.addWidget(self.label)
         layout.addSpacing(20)
 
