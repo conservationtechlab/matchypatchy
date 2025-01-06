@@ -33,10 +33,13 @@ class ConfigPopup(QDialog):
         
         insert_layout = QVBoxLayout()
         self.db_path = QLineEdit()
+        self.db_path.setText(str(cfg.DB_PATH))
         insert_layout.addWidget(self.db_path)
         self.log_path = QLineEdit()
+        self.log_path.setText(str(cfg.LOGFILE))
         insert_layout.addWidget(self.log_path)
         self.ml_path = QLineEdit()
+        self.ml_path.setText(str(cfg.ML_DIR))
         insert_layout.addWidget(self.ml_path)
 
         path_layout.addLayout(insert_layout)
@@ -97,7 +100,9 @@ class ConfigPopup(QDialog):
                                               os.path.expanduser('~'),
                                               ("Log Files (*.log)"))[0]
         if new_log:
-            pass
+            print(new_log)
+            self.log_path.setText(new_log)
+            
 
     def set_ml(self):
         pass

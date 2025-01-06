@@ -29,3 +29,5 @@ ML_DIR.mkdir(exist_ok=True)
 
 # GLOBALS
 VIEWPOINT = {None: "None", 0: "Left", 1: "Right"}
+
+# TODO: create yml file
