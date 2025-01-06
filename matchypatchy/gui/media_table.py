@@ -100,7 +100,6 @@ class MediaTable(QWidget):
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
 
-
     # Triggered by load_images()
     def filter(self):
         """

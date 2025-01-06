@@ -195,37 +195,16 @@ class QueryContainer():
         """
         pass
 
-    def is_match(self):
+    def is_existing_match(self):
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None
-
-    def new_match(self):
+    
+    def both_unnamed(self):
         """
-        Match button was clicked, merge query sequence and current match
+        Both are unnamed
         """
-        # Both individual_ids are None
-        if self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
-           self.data.loc[self.current_query_rid, "individual_id"] is None:
-            # make new individual
-            dialog = IndividualFillPopup(self)
-            if dialog.exec():
-                individual_id = self.mpDB.add_individual(dialog.get_species_id(), dialog.get_name(), dialog.get_sex())
-                # update query and match
-                self.mpDB.edit_row('roi', self.current_query_rid, {"individual_id": individual_id})
-                self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id})
-            del dialog
-            # update data  
-            self.data = db_roi.fetch_roi_media(self.mpDB)
-            self.load_query()
-            self.load_match()
-
-        # Match has a name
-        else:
-            merge(self.mpDB, self.data, self.current_query_rois, self.current_match_rid)
-            # update data  
-            self.data = db_roi.fetch_roi_media(self.mpDB)
-            self.load_query()
-            self.load_match()
+        return self.data.loc[self.current_match_rid, "individual_id"] is None and \
+               self.data.loc[self.current_query_rid, "individual_id"] is None
 
     def current_distance(self):
         # return distance between current sequence and matchs
@@ -253,3 +232,45 @@ class QueryContainer():
             return db_roi.roi_metadata(self.data.loc[self.current_match_rid])
         else:
             return self.data.loc[self.current_query_rid, column]
+        
+    # MATCH FUNCTIONS ----------------------------------------------------------
+    def new_iid(self, individual_id):
+        """
+        Update records for roi after confirming a match
+        """
+        self.mpDB.edit_row('roi', self.current_query_rid, {"individual_id": individual_id})
+        self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id})
+
+    def merge(self):
+        """
+        Merge two individuals after match
+        """
+        query = self.data.loc[self.current_query_rid]
+        match = self.data.loc[self.current_match_rid]
+        
+        query_iid = query['individual_id']
+        match_iid = match['individual_id']
+
+        # query is unknown, give match name
+        if query_iid is None:
+            sequence = self.current_sequence_id
+            keep_id = match_iid
+            drop_id = None
+        # match is older, update query
+        elif query_iid > match_iid and match_iid is not None:
+            sequence = self.current_sequence_id
+            keep_id = match_iid
+            drop_id = query_iid
+        # query is older, update match
+        else:
+            sequence = match['sequence_id']
+            keep_id = query_iid
+            drop_id = match_iid
+        # find all rois with newer name
+        to_merge = self.data[self.data["sequence_id"] == sequence]
+
+        for i in to_merge.index:
+            self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
+        
+        # delete newer individual in table 
+        self.mpDB.delete('individual', f"id=={drop_id}")

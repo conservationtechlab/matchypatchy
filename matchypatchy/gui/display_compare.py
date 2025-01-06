@@ -314,13 +314,13 @@ class DisplayCompare(QWidget):
     def press_match_button(self):
         if self.button_match.isChecked():
             self.toggle_match_button(set=True)
-            self.QueryContainer.new_match()
+            self.confirm_match()
         else:
             self.toggle_match_button(set=False)
 
     def toggle_match_button(self, set=''):
         # already a match
-        if self.QueryContainer.is_match():
+        if self.QueryContainer.is_existing_match():
             self.button_match.setStyleSheet(MATCH_STYLE)
         # force set
         elif set is True:
@@ -330,12 +330,37 @@ class DisplayCompare(QWidget):
         # not a match
         else:
             self.button_match.setStyleSheet("")
+            
+    def confirm_match(self):
+        """
+        Match button was clicked, merge query sequence and current match
+        """
+        # Both individual_ids are None
+        if self.QueryContainer.both_unnamed():
+            # make new individual
+            dialog = IndividualFillPopup(self)
+            if dialog.exec():
+                individual_id = self.mpDB.add_individual(dialog.get_species_id(), dialog.get_name(), dialog.get_sex())
+                # update query and match
+                # TODO: add stack to undo 
+                self.QueryContainer.new_iid(individual_id)   
+            del dialog
+             
+            # update data  
+            self.QueryContainer.load_data()
+            self.QueryContainer.filter()
+            self.load_query()
+            self.load_match()
 
-    def toggle_viewpoint(self):
-        """
-        Flip between viewpoints in paired images within a sequence
-        """
-        pass
+        # Match has a name
+        else:
+            self.QueryContainer.merge()   
+            # update data  
+            self.QueryContainer.load_data()
+            self.QueryContainer.filter()
+            self.load_query()
+            self.load_match()
+
 
     # LOAD FUNCTIONS -----------------------------------------------------------
 
@@ -356,10 +381,9 @@ class DisplayCompare(QWidget):
     def change_match(self, n):
         # load new images
         self.QueryContainer.set_match(n)
-        self.parent.match_number.setText(str(self.QueryContainer.current_match + 1))
+        self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.load_match()
         self.toggle_match_button()
-        pass
 
     def load_query(self):
         """
@@ -379,6 +403,13 @@ class DisplayCompare(QWidget):
         self.match_image.load(self.QueryContainer.get_match_info("filepath"),
                               bbox=self.QueryContainer.get_match_info("bbox"))
         self.match_info.setText(self.QueryContainer.get_match_info("metadata"))
+
+    def toggle_viewpoint(self):
+        """
+        Flip between viewpoints in paired images within a sequence
+        """
+        # TODO
+        pass
 
     # GUI HANDLERS =============================================================
     def change_k(self):
