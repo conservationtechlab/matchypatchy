@@ -343,5 +343,6 @@ class DisplayBase(QWidget):
             self.mpDB.clear("media")
             self.mpDB.clear("roi")
             self.mpDB.clear("sequence")
+            self.mpDB.clear("individual")
             self.mpDB.clear_emb()
         del dialog

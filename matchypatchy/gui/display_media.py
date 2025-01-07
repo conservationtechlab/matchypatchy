@@ -159,8 +159,16 @@ class DisplayMedia(QWidget):
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only}
 
+        print(prefilter)
         if prefilter:
-            self.filters.update({k: prefilter[k] for k in self.filters.keys() & prefilter.keys()})
+
+            if 'individual_id' in prefilter.keys():
+                self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
+                self.individual_select.setCurrentIndex(prefilter['individual_id'])
+            
+            # TODO: update dropdowns
+
+        print(self.filters)
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)

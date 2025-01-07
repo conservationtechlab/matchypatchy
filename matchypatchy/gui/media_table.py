@@ -53,6 +53,23 @@ class MediaTable(QWidget):
         layout.addWidget(self.table)
         self.setLayout(layout)
 
+
+    # RUN ON ENTRY -------------------------------------------------------------
+    def load_data(self):
+        """
+        Fetch table, load images and save as thumbnails to TEMP_DIR
+        """
+        # clear old view
+        self.table.clearContents() 
+        # fetch data
+        self.fetch()
+        if not self.data.empty:
+            return True
+        else: 
+            # no media, give warning, go home
+            return False
+
+
     def fetch(self):
         """
         Select all media, store in dataframe
@@ -66,25 +83,10 @@ class MediaTable(QWidget):
         # no rois processed, default to full image
         else:
             self.data = fetch_media(self.mpDB)
+            self.data = self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
+                                        name=None, sex=None, individual_id=0)
             self.crop = False  # display full image
 
-    # RUN ON ENTRY
-    def load_data(self):
-        """
-        Fetch table, load images and save as thumbnails to TEMP_DIR
-        """
-        # clear old view
-        self.table.clearContents() 
-        # fetch data
-        self.fetch()
-        if not self.data.empty:
-            # fill in missing columns
-            self.data =self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
-                                        name=None, sex=None, individual_id=0)
-            return True
-        else: 
-            # no media, give warning, go home
-            return False
 
     
     def load_images(self):

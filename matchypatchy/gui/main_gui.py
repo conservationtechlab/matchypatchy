@@ -117,9 +117,10 @@ class MainWindow(QMainWindow):
         if emb_exist:
             self.Compare.QueryContainer.calculate_neighbors()
 
-    def _set_single_view(self):
+    def _set_single_view(self, media_id):
         self.pages.setCurrentIndex(3)
-        self.Compare.setFocus()
+        self.Single.setFocus()
+        self.Single.select(media_id)
 
 
     def import_popup(self, table):
