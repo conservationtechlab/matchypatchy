@@ -61,6 +61,11 @@ class DisplayCompare(QWidget):
         button_recalc.clicked.connect(self.recalculate)
         first_layer.addWidget(button_recalc)
 
+        button_recalc = QPushButton("Query by Individual")
+        button_recalc.clicked.connect(self.recalculate_by_individual)
+        first_layer.addWidget(button_recalc)
+
+
         # FILTERS --------------------------------------------------------------
         first_layer.addSpacing(20)
         first_layer.addWidget(QLabel("Filter:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -122,7 +127,7 @@ class DisplayCompare(QWidget):
         query_options.addWidget(QLabel("Sequence:"))
         self.button_previous_query_seq = QPushButton("<<")
         self.button_previous_query_seq.setMaximumWidth(40)
-        self.button_previous_query_seq.clicked.connect(lambda: self.QueryContainer.set_within_query_sequence(self.QueryContainer.current_query_sn - 1))
+        self.button_previous_query_seq.clicked.connect(lambda: self.change_query_in_sequence(self.QueryContainer.current_query_sn - 1))
         query_options.addWidget(self.button_previous_query_seq)
         self.query_seq_number = QLineEdit(str(self.QueryContainer.current_query_sn + 1))
         self.query_seq_number.setMaximumWidth(100)
@@ -131,7 +136,7 @@ class DisplayCompare(QWidget):
         query_options.addWidget(self.query_sequence_n)
         self.button_next_query_seq = QPushButton(">>")
         self.button_next_query_seq.setMaximumWidth(40)
-        self.button_next_query_seq.clicked.connect(lambda: self.QueryContainer.set_within_query_sequence(self.QueryContainer.current_query_sn + 1))
+        self.button_next_query_seq.clicked.connect(lambda: self.change_query_in_sequence(self.QueryContainer.current_query_sn + 1))
         query_options.addWidget(self.button_next_query_seq)
         query_options.addStretch()
         query_layout.addLayout(query_options)
@@ -170,7 +175,7 @@ class DisplayCompare(QWidget):
         query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
          # View Image
         button_query_image_view = QPushButton("View Image") 
-        button_query_image_view.clicked.connect(lambda: self.view_image(self.current_query_rid))
+        button_query_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_query_rid))
         query_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         query_image_buttons.addStretch()
@@ -190,7 +195,8 @@ class DisplayCompare(QWidget):
         middle_column.addStretch()
         self.button_match = QPushButton("Match")
         self.button_match.setCheckable(True)
-        self.button_match.clicked.connect(self.press_match_button)
+        self.button_match.setChecked(False)
+        self.button_match.pressed.connect(self.press_match_button)
         self.button_match.setFixedHeight(50)
         self.button_match.setMaximumWidth(50)
         middle_column.addWidget(self.button_match,
@@ -263,7 +269,7 @@ class DisplayCompare(QWidget):
         match_image_buttons.addWidget(button_match_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # View Image
         button_match_image_view = QPushButton("View Image") 
-        button_match_image_view.clicked.connect(lambda: self.view_image(self.current_match_rid))
+        button_match_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(button_match_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         match_image_buttons.addStretch()
@@ -293,6 +299,8 @@ class DisplayCompare(QWidget):
         self.setLayout(layout)
         # ======================================================================
 
+    # GUI ----------------------------------------------------------------------
+
     # RETURN HOME
     def home(self, warn=False):
         if warn:
@@ -312,24 +320,26 @@ class DisplayCompare(QWidget):
 
     # MATCHING PROCESS ---------------------------------------------------------
     def press_match_button(self):
+        self.button_match.setChecked(not self.button_match.isChecked())
+        # check button, create match
         if self.button_match.isChecked():
-            self.toggle_match_button(set=True)
             self.confirm_match()
+        # uncheck button, undo match
         else:
-            self.toggle_match_button(set=False)
+            self.undo_match()
+        self.toggle_match_button()
 
-    def toggle_match_button(self, set=''):
-        # already a match
+    def toggle_match_button(self):
+        """
+        Change Match button to Green when query and match are same iid,
+        normal button when not
+        """
         if self.QueryContainer.is_existing_match():
             self.button_match.setStyleSheet(MATCH_STYLE)
-        # force set
-        elif set is True:
-            self.button_match.setStyleSheet(MATCH_STYLE)
-        elif set is False:
-            self.button_match.setStyleSheet("")
-        # not a match
+            self.button_match.setChecked(True)
         else:
             self.button_match.setStyleSheet("")
+            self.button_match.setChecked(False)
             
     def confirm_match(self):
         """
@@ -340,7 +350,9 @@ class DisplayCompare(QWidget):
             # make new individual
             dialog = IndividualFillPopup(self)
             if dialog.exec():
-                individual_id = self.mpDB.add_individual(dialog.get_species_id(), dialog.get_name(), dialog.get_sex())
+                individual_id = self.mpDB.add_individual(dialog.get_species_id(), 
+                                                         dialog.get_name(), 
+                                                         dialog.get_sex())
                 # update query and match
                 # TODO: add stack to undo 
                 self.QueryContainer.new_iid(individual_id)   
@@ -348,18 +360,24 @@ class DisplayCompare(QWidget):
              
             # update data  
             self.QueryContainer.load_data()
-            self.QueryContainer.filter()
+            self.QueryContainer.filter(reset=False)
             self.load_query()
             self.load_match()
+            self.toggle_match_button()
 
         # Match has a name
         else:
             self.QueryContainer.merge()   
             # update data  
             self.QueryContainer.load_data()
-            self.QueryContainer.filter()
+            self.QueryContainer.filter(reset=False)
             self.load_query()
             self.load_match()
+            self.toggle_match_button()
+
+    def undo_match(self):
+        # TODO: Undoable Match stack
+        pass
 
 
     # LOAD FUNCTIONS -----------------------------------------------------------
@@ -377,6 +395,13 @@ class DisplayCompare(QWidget):
         self.load_query()
         self.load_match()
         self.toggle_match_button()
+
+
+    def change_query_in_sequence(self, n):
+        self.QueryContainer.set_within_query_sequence(n)
+        self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
+        self.load_query()
+
 
     def change_match(self, n):
         # load new images
@@ -427,8 +452,12 @@ class DisplayCompare(QWidget):
         QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
     def recalculate(self):
-        self.QueryContainer.calculate_neighbors
-        self.QueryContainer.set_query(0)
+        self.QueryContainer.calculate_neighbors()
+        self.change_query(0)
+
+    def recalculate_by_individual(self):
+        # TODO
+        pass
 
     # FILTERS ------------------------------------------------------------------
     def refresh_filters(self):

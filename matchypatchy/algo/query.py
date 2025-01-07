@@ -5,8 +5,6 @@ Class Definition for Query Object
 import pandas as pd
 
 import matchypatchy.database.roi as db_roi
-from matchypatchy.database.individual import merge
-
 
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 from matchypatchy.gui.popup_alert import ProgressPopup
@@ -45,8 +43,8 @@ class QueryContainer():
 
         # must have embeddings to continue
         if not (self.data_raw["emb_id"] == 0).all():
-            info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id"
             # need sequence and capture ids from media to restrict comparisons shown to
+            info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id"
             rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
             self.rois = pd.DataFrame(rois, columns=columns)
             return True
@@ -56,7 +54,6 @@ class QueryContainer():
             return False
         
     def calculate_neighbors(self):
-        print("start")
         dialog = ProgressPopup(self.parent, "Matching embeddings...")
         dialog.set_max(len(self.sequences))
         dialog.show()
@@ -78,7 +75,7 @@ class QueryContainer():
         self.nearest_dict_raw = nearest_dict
 
     # STEP 2
-    def filter(self, filter_dict=None, valid_sites=None):
+    def filter(self, filter_dict=None, valid_sites=None, reset=True):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
         Triggered by calculate neighbors and change in filters
@@ -116,16 +113,13 @@ class QueryContainer():
         if self.neighbor_dict:
             self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
             # set number of queries to validate
-            self.n_queries = len(self.neighbor_dict)
-            self.reset_query()
+            self.n_queries = len(self.ranked_sequences)
+            if reset:
+                self.parent.change_query(0)
         # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
             self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
             return False
-        
-    def reset_query(self):
-        # Run on entry
-        self.parent.change_query(0)
 
     def set_query(self, n):
         """
@@ -141,11 +135,10 @@ class QueryContainer():
         # get corresponding sequence_id and rois
         self.current_sequence_id = self.ranked_sequences[self.current_query][0]
         self.current_query_rois = self.sequences[self.current_sequence_id]
-        print("query rois:", self.current_query_rois)
 
         # get viewpoints
         self.current_query_viewpoints = self.data.loc[self.current_query_rois, 'viewpoint']
-        print(self.current_query_viewpoints)
+
         # set view to first in sequence
         self.set_within_query_sequence(0)
         # update matches
@@ -170,10 +163,8 @@ class QueryContainer():
         """
         # get all matches for query
         full_match_set = self.neighbor_dict[self.current_sequence_id]
-        print(full_match_set)
         self.current_match_rois = [x[0] for x in full_match_set]
 
-        print("match rois:", self.current_match_rois)
         # set to top of matches
         self.set_match(0)
 
@@ -231,15 +222,17 @@ class QueryContainer():
         elif column == 'metadata':
             return db_roi.roi_metadata(self.data.loc[self.current_match_rid])
         else:
-            return self.data.loc[self.current_query_rid, column]
+            return self.data.loc[self.current_match_rid, column]
         
     # MATCH FUNCTIONS ----------------------------------------------------------
     def new_iid(self, individual_id):
         """
         Update records for roi after confirming a match
         """
-        self.mpDB.edit_row('roi', self.current_query_rid, {"individual_id": individual_id})
-        self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id})
+        for roi in self.current_query_rois:
+            self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
+
+        self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
 
     def merge(self):
         """
@@ -251,26 +244,26 @@ class QueryContainer():
         query_iid = query['individual_id']
         match_iid = match['individual_id']
 
+        print("Merging", query_iid, match_iid)
+
         # query is unknown, give match name
         if query_iid is None:
             sequence = self.current_sequence_id
             keep_id = match_iid
             drop_id = None
         # match is older, update query
-        elif query_iid > match_iid and match_iid is not None:
+        elif match_iid is not None and query_iid > match_iid:
             sequence = self.current_sequence_id
             keep_id = match_iid
             drop_id = query_iid
-        # query is older, update match
+        # query is older or match is None update match
         else:
             sequence = match['sequence_id']
             keep_id = query_iid
             drop_id = match_iid
+
         # find all rois with newer name
         to_merge = self.data[self.data["sequence_id"] == sequence]
 
         for i in to_merge.index:
             self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
-        
-        # delete newer individual in table 
-        self.mpDB.delete('individual', f"id=={drop_id}")
