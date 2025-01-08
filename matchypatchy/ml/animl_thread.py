@@ -9,7 +9,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.ml import models
 from matchypatchy import config
 
-from animl import matchypatchy as animl_mp
+import animl.api.matchypatchy as animl_mp
 
 # TODO: HANDLE VIDEOS
 
@@ -48,7 +48,7 @@ class AnimlThread(QThread):
 
     def get_bbox(self):
         # 1 RUN MED
-        detections = animl_mp.detect(self.md_filepath, self.media)
+        detections = animl_mp.detect_mp(self.md_filepath, self.media)
         # 2 GET BOXES
         for i, roi in detections.iterrows():
             media_id = roi['id']
@@ -89,14 +89,14 @@ class AnimlThread(QThread):
 
         # if there are unlabeled rois
         if not filtered_rois.empty:
-            filtered_rois = animl_mp.classify(filtered_rois, self.config_filepath)
+            filtered_rois = animl_mp.classify_mp(filtered_rois, self.config_filepath)
             for i, row in filtered_rois.iterrows():
                 prediction = row['prediction']
                 # get species_id for prediction
                 try:
                     species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{prediction}"')[0][0]
                 except IndexError:
-                    binomen = classes.loc[prediction, 'Species']   # FIXME: Hardcoded column name
+                    binomen = classes.loc[prediction, 'species']   # FIXME: Hardcoded column name
                     species_id = self.mpDB.add_species(binomen, prediction)
                 # update species_id
                 self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})

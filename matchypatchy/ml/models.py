@@ -14,7 +14,7 @@ MODELS = {"MegaDetector v5a": ("md_v5a.0.0.pt", "https://sandiegozoo.box.com/sha
           "Southwest USA": ("sdzwa_southwest_v3.pt", 'https://sandiegozoo.box.com/shared/static/ucbk8kc2h3qu15g4xbg0nvbghvo1cl97.pt'),
           "MiewID v2": ("miewid_v2.bin", "https://sandiegozoo.box.com/shared/static/juqbgz2s6lh0wkmqf0b7slc5ay9nvclw.bin"),
           "MiewID v3": ("miewid_v3.bin", "https://sandiegozoo.box.com/shared/static/n1yaagklcyvh7a1x8fv6coek6eaqpnbh.bin"),
-          "Jaguar Viewpoint": ("viewpoint_jaguar.pt",)}
+          "Jaguar Viewpoint": ("viewpoint.pt",)}
 
 CLASS_FILES = {"Andes": ("sdzwa_andes_v1_classes.csv", "https://sandiegozoo.box.com/shared/static/dopxswxuhaxa6m8ff8uezsa1mrmun7v6.csv"),
                "Amazon Rainforest": ("sdzwa_amazon_v1_classes.csv", ""),
