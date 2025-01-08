@@ -6,10 +6,10 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.ml import models
+from matchypatchy.algo import models
 from matchypatchy.database.roi import fetch_roi
 
-import animl.api.matchypatchy as animl_mp
+from animl.api import matchypatchy as animl_mp
 
 
 class ReIDThread(QThread):
@@ -25,8 +25,8 @@ class ReIDThread(QThread):
         # must be fetched after start() to chain with animl
         self.rois = fetch_roi(self.mpDB)
         media, _ = self.mpDB.select_join("roi", "media", "roi.media_id = media.id", columns="roi.id, media_id, filepath, external_id, sequence_id")
-        self.media = pd.DataFrame(media, columns=["id", "media_id", "filepath", "external_id", "sequence_id"])
-        self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
+        self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "sequence_id"])
+        self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
 
         self.progress_update.emit("Calculating viewpoint...")
         self.get_viewpoint()

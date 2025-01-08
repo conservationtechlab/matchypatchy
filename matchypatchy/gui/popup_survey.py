@@ -70,7 +70,12 @@ class SurveyPopup(QDialog):
     def add(self):
         dialog = SurveyFillPopup(self)
         if dialog.exec():
-            self.mpDB.add_survey(dialog.get_name(), dialog.get_region(),
+            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'", quiet=False)
+            if not region_id:
+                region_id = self.mpDB.add_region(dialog.get_region())
+            else:
+                region_id = region_id[0][0]
+            self.mpDB.add_survey(dialog.get_name(), region_id,
                                  dialog.get_year_start(), dialog.get_year_start())
         del dialog
         self.surveys = self.update()
@@ -78,19 +83,26 @@ class SurveyPopup(QDialog):
     def edit(self):
         selected_survey = self.list.currentRow()
         id = self.survey_list_ordered[selected_survey][0]
-        cond = f'id={id}'
-        id, name, region, year_start, year_end = self.mpDB.select('survey',
-                                                                  columns='id, name, region, year_start, year_end',
-                                                                  row_cond=cond)[0]
-        region = '' if region is None else region
-        year_start = '' if year_start is None else year_start
-        year_end = '' if year_end is None else year_end
+        cond = f'survey.id={id}'
+        row = self.mpDB.select_join('survey', 'region', 'survey.region_id=region.id',
+                                    columns='survey.id, survey.name, region.name, year_start, year_end',
+                                    row_cond=cond, quiet=False)[0]
+        name = row[0][1]
+        region_name = '' if row[0][2] is None else row[0][2]
+        year_start = '' if row[0][3] is None else row[0][3]
+        year_end = '' if row[0][4] is None else row[0][4]
 
-        dialog = SurveyFillPopup(self, name=name, region=region, year_start=year_start, year_end=year_end)
+        dialog = SurveyFillPopup(self, name=name, region_name=region_name, year_start=year_start, year_end=year_end)
 
         if dialog.exec() and dialog.accepted:
+            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'", quiet=False)
+            if not region_id:
+                region_id = self.mpDB.add_region(dialog.get_region())
+            else:
+                region_id = region_id[0][0]
+            
             replace_dict = {"name": f"'{dialog.get_name()}'",
-                            "region": f"'{dialog.get_region()}'",
+                            "region_id": region_id,
                             "year_start": dialog.get_year_start(),
                             "year_end": dialog.get_year_end()}
             self.mpDB.edit_row("survey", id, replace_dict, quiet=False)
@@ -98,17 +110,20 @@ class SurveyPopup(QDialog):
         self.surveys = self.update()
 
     def delete(self):
+        # TODO: check if there are images attached first
         selected = self.list.currentItem().text()
-        dialog = AlertPopup(self, f'Are you sure you want to delete {selected}?')
+        n = 0
+        dialog = AlertPopup(self, f'Are you sure you want to delete {selected}? This will remove {n} images.')
         if dialog.exec():
             row = self.survey_list_ordered[self.list.currentRow()][0]
             self.mpDB.delete("survey", f'id={row}')
+            # self.mpDB.delete("")
         del dialog
         self.update()
 
 
 class SurveyFillPopup(QDialog):
-    def __init__(self, parent, name="", region="", year_start="", year_end=""):
+    def __init__(self, parent, name="", region_name="", year_start="", year_end=""):
         super().__init__(parent)
         self.setWindowTitle("Survey")
         layout = QVBoxLayout()
@@ -126,7 +141,7 @@ class SurveyFillPopup(QDialog):
         # region
         layout.addWidget(QLabel('Region'))
         self.region = QLineEdit()
-        self.region.setText(str(region))
+        self.region.setText(str(region_name))
         layout.addWidget(self.region)
 
         # start year

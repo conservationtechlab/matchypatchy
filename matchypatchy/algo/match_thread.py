@@ -36,6 +36,9 @@ class MatchEmbeddingThread(QThread):
         for i, s in enumerate(self.sequences):
             sequence_rois = self.sequences[s]
             emb_ids = self.rois.loc[self.rois['id'].isin(sequence_rois), "emb_id"].tolist()
+            
+            # skip rois with no emb_ids
+            emb_ids = [e for e in emb_ids if e > 0]
 
             # get all neighbors for sequence
             all_neighbors = []
@@ -59,8 +62,10 @@ class MatchEmbeddingThread(QThread):
         """
         Calcualtes knn for single roi embedding
         """
+        
         query = self.mpDB.select("roi_emb", columns="embedding", row_cond=f'rowid={emb_id}')[0][0]
         return self.mpDB.knn(query, k=self.k)
+
 
     def filter(self, sequence_rois, neighbors):
         """
@@ -75,11 +80,12 @@ class MatchEmbeddingThread(QThread):
         query_rois["key"] = 1  # Temporary key for cross-join
         neighbors_df["key"] = 1
         merged = query_rois.merge(neighbors_df, on="key", suffixes=("_query", "_neighbor")).drop("key", axis=1)
+
         # Apply filtering conditions
         filtered = merged[
-            (merged["individual_id_query"].isnull() | (merged["individual_id_query"] != merged["individual_id_neighbor"])) &
-            (merged["sequence_id_query"].isnull() | (merged["sequence_id_query"] != merged["sequence_id_neighbor"])) &
-            (merged["distance"] < self.threshold) & (merged["distance"] > 0)
+            (merged["individual_id_query"].isna() | (merged["individual_id_query"] != merged["individual_id_neighbor"])) &
+            (merged["sequence_id_query"].isna() | (merged["sequence_id_query"] != merged["sequence_id_neighbor"])) &
+            (merged["distance"] < self.threshold) & (merged["distance"] > 0) 
         ]
         # Return filtered neighbors as tuples of (ROI ID, distance)
         return list(zip(filtered["id_neighbor"], filtered["distance"]))

@@ -21,10 +21,11 @@ from matchypatchy.gui.popup_species import SpeciesPopup
 from matchypatchy.gui.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.popup_ml import MLDownloadPopup, MLOptionsPopup
+from matchypatchy.gui.popup_config import ConfigPopup
 
-from matchypatchy.ml.sequence_thread import SequenceThread
-from matchypatchy.ml.animl_thread import AnimlThread
-from matchypatchy.ml.reid_thread import ReIDThread
+from matchypatchy.algo.sequence_thread import SequenceThread
+from matchypatchy.algo.animl_thread import AnimlThread
+from matchypatchy.algo.reid_thread import ReIDThread
 
 from matchypatchy.database.roi import fetch_roi_media
 
@@ -37,20 +38,23 @@ class DisplayBase(QWidget):
 
         container = QWidget()
         container.setObjectName("mainBorderWidget")
-        #container.setStyleSheet("#mainBorderWidget { border: 20px solid gray; }")
+        
         layout = QVBoxLayout()
 
         self.label = QLabel("Welcome To MatchyPatchy")
+        self.label.setObjectName("Title")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFixedHeight(20)
+        self.label.setStyleSheet("""#Title {font-size: 20px;}""")
         layout.addWidget(self.label)
         layout.addSpacing(20)
 
         self.logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
         self.logo.setFixedSize(600, 400)
         self.logo.setObjectName("borderWidget")
-        #self.logo.setStyleSheet("#borderWidget { border: 1px solid gray; }")
-        logo_img = QImage("/home/kyra/matchypatchy/matchypatchy/gui/assets/matchypatchy_logo.png")
+        # TODO: change before packaging
+        logo_img = QImage("/home/kyra/matchypatchy/matchypatchy/gui/assets/logo.png")
+        #logo_img = QImage("/assets/logo.png")
         self.logo.setPixmap(QPixmap.fromImage(logo_img))
         layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -148,8 +152,10 @@ class DisplayBase(QWidget):
         # ML models
         button_configuration = QPushButton("Configuration")
         button_download_ml = QPushButton("Download Models")
-        button_ph1 = QPushButton("Placeholder")
-        button_ph2 = QPushButton("Placeholder")
+        button_ph1 = QPushButton("")
+        button_ph1.setEnabled(False)
+        button_ph2 = QPushButton("")
+        button_ph2.setEnabled(False)
         button_clear_data = QPushButton("Clear Data")
 
         other_layer.addWidget(button_configuration)
@@ -216,6 +222,9 @@ class DisplayBase(QWidget):
         dialog = IndividualPopup(self)
         if dialog.exec():
             del dialog
+
+    def set_filtered_view(self, filters):
+        self.parent._set_media_view(filters=filters)
 
     # MAIN PROCESS -------------------------------------------------------------
     # STEP 1: Import from CSV
@@ -317,8 +326,9 @@ class DisplayBase(QWidget):
 
     # OTHER OPTIONS ------------------------------------------------------------
     def edit_config(self):
-        # TODO
-        pass
+        dialog = ConfigPopup(self)
+        if dialog.exec():
+            del dialog
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)
@@ -333,5 +343,6 @@ class DisplayBase(QWidget):
             self.mpDB.clear("media")
             self.mpDB.clear("roi")
             self.mpDB.clear("sequence")
+            self.mpDB.clear("individual")
             self.mpDB.clear_emb()
         del dialog

@@ -6,6 +6,8 @@ import sqlite3
 from matchypatchy import sqlite_vec
 
 
+# TODO: Create function to verify another database
+
 def setup_database(filepath='matchypatchy.db'):
     # Connect to SQLite database
     db = sqlite3.connect(filepath)
@@ -15,15 +17,23 @@ def setup_database(filepath='matchypatchy.db'):
     db.enable_load_extension(False)
     cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
 
+    # REGION
+    # Corresponds to "Site" in CameraBase
+    cursor.execute('''CREATE TABLE IF NOT EXISTS region (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL );''')
+
     # SURVEY
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL,
-                        region TEXT,
+                        region_id INTEGER,
                         year_start INTEGER,
-                        year_end INTEGER )''')
+                        year_end INTEGER,
+                        FOREIGN KEY (region_id) REFERENCES region (id) );''')
 
     # SITE
+    # Corresponds to "Station" in CameraBase
     cursor.execute('''CREATE TABLE IF NOT EXISTS site (
                         id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,

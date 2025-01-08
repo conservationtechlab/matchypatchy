@@ -25,3 +25,9 @@ class DisplaySingle(QWidget):
         self.image_label.setScaledContents(True)
         self.image_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
         layout.addWidget(self.image_label,1)
+
+
+    def select(self, media_id):
+        """
+        Pull up a single image based on media_id
+        """

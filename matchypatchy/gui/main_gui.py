@@ -11,6 +11,7 @@ Display Pages:
 """
 import sys
 import os
+from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
@@ -100,21 +101,26 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(0)
         self.Intro.setFocus()
 
-    def _set_media_view(self):
+    def _set_media_view(self, filters: Optional[dict]=None):
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
-        self.Media.refresh_filters()
-        self.Media.connect_filters()
-        self.Media.load_table()
+        self.Media.refresh_filters(filters)
+        data_loaded = self.Media.load_table()
+        if data_loaded:
+            self.Media.load_thumbnails()
 
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
-        self.Compare.calculate_neighbors()
+        self.Compare.refresh_filters()
+        emb_exist = self.Compare.QueryContainer.load_data()
+        if emb_exist:
+            self.Compare.QueryContainer.calculate_neighbors()
 
-    def _set_single_view(self):
+    def _set_single_view(self, media_id):
         self.pages.setCurrentIndex(3)
-        self.Compare.setFocus()
+        self.Single.setFocus()
+        self.Single.select(media_id)
 
 
     def import_popup(self, table):

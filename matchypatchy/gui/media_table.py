@@ -8,7 +8,6 @@ Widget for displaying list of Media
 # TODO: MAKE TABLE EDITABLE
 # TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
 # TODO: MAKE THUMBNAIL LOAD FASTER
-# NOTE: INDIVIDUAL TABLE REFERENCES SPECIES
 
 import tempfile
 import pandas as pd
@@ -17,9 +16,9 @@ from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
-from matchypatchy.config import TEMP_DIR, VIEWPOINT
-from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.config import VIEWPOINT
 from matchypatchy.database.media import fetch_media
+from matchypatchy.gui.popup_alert import ProgressPopup
 
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
 
@@ -54,6 +53,23 @@ class MediaTable(QWidget):
         layout.addWidget(self.table)
         self.setLayout(layout)
 
+
+    # RUN ON ENTRY -------------------------------------------------------------
+    def load_data(self):
+        """
+        Fetch table, load images and save as thumbnails to TEMP_DIR
+        """
+        # clear old view
+        self.table.clearContents() 
+        # fetch data
+        self.fetch()
+        if not self.data.empty:
+            return True
+        else: 
+            # no media, give warning, go home
+            return False
+
+
     def fetch(self):
         """
         Select all media, store in dataframe
@@ -62,73 +78,89 @@ class MediaTable(QWidget):
         if roi_n > 0:
             media, column_names = self.mpDB.all_media()
             self.data = pd.DataFrame(media, columns=column_names)  
+            self.crop = True
+            
         # no rois processed, default to full image
         else:
             self.data = fetch_media(self.mpDB)
+            self.data = self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
+                                        name=None, sex=None, individual_id=0)
             self.crop = False  # display full image
-            if not self.data.empty:
-                # fill in missing columns
-                self.data =self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
-                                            name=None, sex=None, individual_id=0)
-            else: 
-                # no media, give warning, go home
-                self.parent.loading_bar.close()
-                dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
-                if dialog.exec():
-                    self.parent.home()
-                    del dialog
 
-        # set df index to table index
-        #self.data = self.data.set_index("id")
 
-    # RUN ON ENTRY
-    def load(self):
+    
+    def load_images(self):
         """
-        Fetch table, load images and save as thumbnails to TEMP_DIR
+        Load images if data is available
+        Does not run if load_data returns false to MediaDisplay
         """
-        self.fetch()  
-        
-        self.parent.loading_bar.show()
-        self.table.clearContents() 
-        self.table.setRowCount(len(self.data))  
-        # load images
+        self.loading_bar = ProgressPopup(self, "Loading images...")
+        self.loading_bar.show()
         self.image_loader_thread = LoadThumbnailThread(self.data, self.crop)
-        self.image_loader_thread.progress_update.connect(self.parent.loading_bar.set_counter)
+        self.image_loader_thread.progress_update.connect(self.loading_bar.set_counter)
         self.image_loader_thread.loaded_image.connect(self.add_thumbnail_path)
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
 
-
+    # Triggered by load_images()
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
         Always run before updating table
+
+        if filter > 0 : use id
+        if filter == 0: do not filter
+        if filter is None: select None
         """
         # create new copy of full dataset
-        self.data_filtered = self.data
-        # Survey Filter
-        if self.parent.valid_sites:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(self.parent.valid_sites.keys()))]
-            self.data_filtered['site'] = self.data_filtered['site_id'].map(self.parent.valid_sites)
-        else:
-            self.data_filtered['site'] = self.data_filtered['site_id']
+        self.data_filtered = self.data.copy()
+        
+        # map 
+        filters = self.parent.filters
+        valid_sites = self.parent.valid_sites
+
+        # Region Filter (depends on prefilterd sites from MediaDisplay)
+        if 'region_filter' in filters.keys() and valid_sites:
+            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(valid_sites.keys()))]
+    
+        # Survey Filter (depends on prefilterd sites from MediaDisplay)
+        if 'survey_filter' in filters.keys() and valid_sites:
+            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(valid_sites.keys()))]
 
         # Single Site Filter
-        if self.parent.active_site[0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'] == self.parent.active_site[0]]
+        if 'active_site' in filters.keys() and valid_sites:
+            if filters['active_site'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['site_id'] == filters['active_site'][0]]
+            self.data_filtered['site'] = self.data_filtered['site_id'].map(valid_sites)
+        else:
+            # no valid sites, empty dataframe
+            self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
         # Species Filter
-        if self.parent.active_species[0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == self.parent.active_species[0]]
+        if 'active_species' in filters.keys():
+            if filters['active_species'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == filters['active_species'][0]]
+            elif filters['active_species'][0] is None: 
+                self.data_filtered = self.data_filtered[self.data_filtered['species_id'].isna()]
+
+        # Individual Filter
+        if 'active_individual' in filters.keys():
+            if filters['active_individual'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == filters['active_individual'][0]]
+            elif filters['active_individual'][0] is None: 
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
         # Unidentified Filter
-        if self.parent.unidentified_only:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == 0]
+        if 'unidentified_only' in filters.keys():
+            if filters['unidentified_only']:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
-        if self.parent.favorites_only:
-            self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
+        # Favorites Filter
+        if 'favorites_only' in filters.keys():
+            if filters['favorites_only']:
+                self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
-        # refresh table
+        # refresh table contents
         self.refresh_table()
 
     def refresh_table(self):
@@ -136,7 +168,7 @@ class MediaTable(QWidget):
         Add rows to table
         """
         # clear old contents and prep for filtered data
-        self.table.clearContents() 
+        self.table.clearContents()
         # disconnect edit function while refreshing to prevent needless calls
         self.table.blockSignals(True)  
         self.table.setRowCount(self.data_filtered.shape[0])
@@ -154,7 +186,7 @@ class MediaTable(QWidget):
         """
         entry = item.row()
         reference = self.columns[item.column()]
-        print(entry,reference)
+        print(entry, reference)
         # if checkbox
         if item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
             print(item.checkState() == Qt.CheckState.Checked)
@@ -165,6 +197,7 @@ class MediaTable(QWidget):
             print(item.text())  
 
         # add to queue
+        
     
     def set_check_state(self, item):
         """
@@ -214,9 +247,17 @@ class MediaTable(QWidget):
         # Comment
         self.table.setItem(i, 13, QTableWidgetItem(roi["comment"]))  # Favorite column
 
-    # adds emitted temp thumbnail path to data 
+    # captures emitted temp thumbnail path to data 
     def add_thumbnail_path(self, i, thumbnail_path):
         self.data.loc[i,'thumbnail_path'] = thumbnail_path
+
+
+
+
+
+
+
+
 
 # IMAGE LOAD =====================================================================================
 class LoadThumbnailThread(QThread):

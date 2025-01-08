@@ -17,7 +17,7 @@ def fetch_roi(mpDB):
     """
     manifest = mpDB.select("roi")
     if manifest:
-        rois = pd.DataFrame(manifest, columns=["id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
+        rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
                                                "species_id", "viewpoint", "reviewed", "individual_id", "emb_id"])
         rois = rois.replace({float('nan'): None})
         return rois

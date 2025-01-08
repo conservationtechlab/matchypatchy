@@ -6,10 +6,10 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.ml import models
+from matchypatchy.algo import models
 from matchypatchy import config
 
-import animl.api.matchypatchy as animl_mp
+from animl.api import matchypatchy as animl_mp
 
 # TODO: HANDLE VIDEOS
 
@@ -96,7 +96,7 @@ class AnimlThread(QThread):
                 try:
                     species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{prediction}"')[0][0]
                 except IndexError:
-                    binomen = classes.loc[prediction, 'species']   # FIXME: Hardcoded column name
+                    binomen = classes.loc[prediction, 'Species']   # FIXME: Hardcoded column name
                     species_id = self.mpDB.add_species(binomen, prediction)
                 # update species_id
                 self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})
