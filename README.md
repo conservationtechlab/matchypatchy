@@ -1,12 +1,16 @@
 # matchypatchy
 GUI tool for human validation of AI-powered animal re-identification
 
-TODOS
+TODOS 
+ - update match prioritization - id'd and number of matches 
  - edit config, create yaml
  - add undo for match
  - manage individuals popup
  - filter reviewed/named images
  - keep track of thumbnails for media_table
+ - auto compare single individual for QC
+ - open image in default image viewer
+
 
 BIG TODOS
  - make media_table editable, add undo
@@ -23,3 +27,5 @@ Long Term
    and separate sequence ids, etc
  - adjust site schema to align with camtrapdp deployments schema
  - Create function to verify another database
+ - ask server what models are valid for download
+ - cosine distance for knn?
