@@ -119,10 +119,18 @@ class DisplayCompare(QWidget):
         self.button_next_query.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query + 1))
         query_options.addWidget(self.button_next_query)
         # Viewpoint Toggle
+        '''
         self.button_viewpoint = QPushButton("L/R")
         self.button_viewpoint.clicked.connect(self.toggle_viewpoint)
         self.button_viewpoint.setMaximumWidth(50)
         query_options.addWidget(self.button_viewpoint)
+        '''
+        self.dropdown_viewpoint = QComboBox()
+        self.dropdown_viewpoint.addItems(['All','Left','Right'])
+        self.dropdown_viewpoint.setCurrentIndex(0)
+        self.dropdown_viewpoint.currentIndexChanged.connect(self.toggle_viewpoint)
+        self.dropdown_viewpoint.setMaximumWidth(100)
+        query_options.addWidget(self.dropdown_viewpoint)
         # # Sequence Number
         query_options.addWidget(QLabel("Sequence:"))
         self.button_previous_query_seq = QPushButton("<<")
@@ -434,7 +442,11 @@ class DisplayCompare(QWidget):
         Flip between viewpoints in paired images within a sequence
         """
         # TODO
-        pass
+
+        selected_viewpoint = self.dropdown_viewpoint.currentText().lower()
+    
+        self.QueryContainer.toggle_viewpoint(selected_viewpoint)
+        self.load_query()
 
     # GUI HANDLERS =============================================================
     def change_k(self):

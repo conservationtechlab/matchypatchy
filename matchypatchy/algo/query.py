@@ -26,7 +26,9 @@ class QueryContainer():
 
         # ROI REFERENCE
         self.current_query_rid = 0
-        self.current_match_rid = 0        
+        self.current_match_rid = 0 
+
+        self.viewpoints = {}      
 
     
     def load_data(self):
@@ -47,12 +49,17 @@ class QueryContainer():
             info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id"
             rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
             self.rois = pd.DataFrame(rois, columns=columns)
+
+       
+
+
             return True
         # no embeddings
         else:
             self.parent.home(warn=True)
             return False
         
+    # RUN ON ENTRY IF LOAD_DATA
     def calculate_neighbors(self):
         dialog = ProgressPopup(self.parent, "Matching embeddings...")
         dialog.set_max(len(self.sequences))
@@ -85,6 +92,8 @@ class QueryContainer():
         """
         # create backups for filtering
         self.data = self.data_raw.copy()
+        print(f'The data is {self.data}')
+
 
         if filter_dict is not None and valid_sites is not None:
             # Region Filter (depends on prefilterd sites from MediaDisplay)
@@ -107,6 +116,9 @@ class QueryContainer():
         # filter neighbor dict and nearest dict
         self.neighbor_dict = {k: self.neighbor_dict_raw[k] for k in self.data.index if k in self.neighbor_dict_raw}
         self.nearest_dict = {k: self.nearest_dict_raw[k] for k in self.data.index if k in self.nearest_dict_raw}
+
+        #compute viewpoints
+        self.compute_viewpoints()
 
         # Sort by Distance
         # must have valid matches to continue
@@ -179,12 +191,32 @@ class QueryContainer():
         self.current_match = n
         self.current_match_rid = self.current_match_rois[self.current_match]
 
+
     # VIEWPOINT TOGGLE
-    def toggle_viewpoint(self):
+
+    def compute_viewpoints(self):
+        self.viewpoints = {
+            'all': self.data.index.tolist(),
+            'left': [rid for rid in self.data.index if self.data.loc[rid, 'viewpoint'] == 0],
+            'right': [rid for rid in self.data.index if self.data.loc[rid, 'viewpoint'] == 1]
+        }
+
+    def toggle_viewpoint(self,selected_viewpoint):
         """
         Flip between viewpoints in paired images within a sequence
         """
-        pass
+        if selected_viewpoint == 'all':
+            self.current_query_rois = self.viewpoints['all']
+        else:
+            self.current_query_rois = self.viewpoints.get(selected_viewpoint,[])
+        
+        if self.current_query_rois:
+            self.set_within_query_sequence(0)
+        else:
+            self.warn(f'No query image with {selected_viewpoint} viewpoint are available')
+
+
+        
 
     def is_existing_match(self):
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
