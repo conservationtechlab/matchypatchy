@@ -196,24 +196,41 @@ class QueryContainer():
 
     def compute_viewpoints(self):
         self.viewpoints = {
-            'all': self.data.index.tolist(),
-            'left': [rid for rid in self.data.index if self.data.loc[rid, 'viewpoint'] == 0],
-            'right': [rid for rid in self.data.index if self.data.loc[rid, 'viewpoint'] == 1]
+            'all': {}, #{sequence_id: list of ROIs}
+            'left': {},
+            'right': {}
         }
+
+        for sequence_id, rois in self.sequences.items():
+            all_rois = rois
+            left_rois = [rid for rid in rois if self.data.loc[rid,'viewpoint'] == 0]
+            right_rois = [rid for rid in rois if self.data.loc[rid,'viewpoint'] == 1]
+
+            self.viewpoints['all'][sequence_id] = all_rois
+            self.viewpoints['left'][sequence_id] = left_rois
+            self.viewpoints['right'][sequence_id] = right_rois
+
+
 
     def toggle_viewpoint(self,selected_viewpoint):
         """
         Flip between viewpoints in paired images within a sequence
         """
+        #TO DO:
+        #update number of images in the sequence(GUI)
+        #doesn't need to reselect viewpoint for every query image
+        sequence_id = self.data.loc[self.current_query_rid,'sequence_id']
+
+
         if selected_viewpoint == 'all':
-            self.current_query_rois = self.viewpoints['all']
+            self.current_query_rois = self.viewpoints['all'].get(sequence_id,[])
         else:
-            self.current_query_rois = self.viewpoints.get(selected_viewpoint,[])
+            self.current_query_rois = self.viewpoints[selected_viewpoint].get(sequence_id,[])
         
         if self.current_query_rois:
             self.set_within_query_sequence(0)
         else:
-            self.warn(f'No query image with {selected_viewpoint} viewpoint are available')
+            self.parent.warn(f'No query image with {selected_viewpoint} viewpoint in the current sequence')
 
 
         
