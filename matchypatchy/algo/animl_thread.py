@@ -9,11 +9,27 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.algo import models
 from matchypatchy import config
 
+from animl.file_management import build_file_manifest
 from animl.api import matchypatchy as animl_mp
 
+
+
+class BuildManifestThread(QThread):
+    """
+    Thread for launching buildfilemanifest
+    """
+    manifest = pyqtSignal(pd.DataFrame)
+
+    def __init__(self, directory):
+        super().__init__()
+        self.directory = directory
+
+    def run(self):
+        self.data = build_file_manifest(self.directory)
+        self.manifest.emit(self.data)
+
+
 # TODO: HANDLE VIDEOS
-
-
 class AnimlThread(QThread):
     progress_update = pyqtSignal(str)  # Signal to update the progress bar
 

@@ -7,11 +7,12 @@ import pandas as pd
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QProgressBar,
                              QComboBox, QDialogButtonBox, QLabel)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.popup_alert import AlertPopup
 
-from animl.file_management import build_file_manifest
+from matchypatchy.algo.animl_thread import BuildManifestThread
+from matchypatchy.algo.import_thread import FolderImportThread
 
 
 class ImportFolderPopup(QDialog):
@@ -100,71 +101,3 @@ class ImportFolderPopup(QDialog):
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.accept)
         self.import_thread.start()
-
-
-class BuildManifestThread(QThread):
-    """
-    Thread for launching buildfilemanifest
-    """
-    manifest = pyqtSignal(pd.DataFrame)
-
-    def __init__(self, directory):
-        super().__init__()
-        self.directory = directory
-
-    def run(self):
-        self.data = build_file_manifest(self.directory)
-        self.manifest.emit(self.data)
-
-
-class FolderImportThread(QThread):
-    progress_update = pyqtSignal(int)  # Signal to update the progress bar
-
-    def __init__(self, mpDB, active_survey, data, station_level):
-        super().__init__()
-        self.mpDB = mpDB
-        self.active_survey = active_survey
-        self.data = data
-        self.station_level = station_level
-        self.default_station = None
-        self.animl_conversion = {"filepath": "FilePath",
-                                 "timestamp": "DateTime"}
-
-    def run(self):
-        for i, file in self.data.iterrows():
-
-            filepath = file[self.animl_conversion['filepath']]
-            timestamp = file[self.animl_conversion['timestamp']]
-
-            # check to see if file exists
-            if not os.path.exists(filepath):
-                print(f"Warning, file {filepath} does not exist")
-                continue
-
-            # get file extension
-            _, ext = os.path.splitext(os.path.basename(filepath))
-
-            # get remaining information
-            if self.station_level > 0:
-                station_name = os.path.normpath(filepath).split(os.sep)[self.station_level]
-                try:
-                    station_id = self.mpDB.select("station", columns='id', row_cond=f'name="{station_name}"')[0][0]
-                except IndexError:
-                    station_id = self.mpDB.add_station(str(station_name), None, None, int(self.active_survey[0]))
-            else:
-                if not self.default_station:
-                    self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
-                station_id = self.default_station
-
-            # insert into table, force type
-            media_id = self.mpDB.add_media(filepath, ext,
-                                           str(timestamp),
-                                           int(station_id),
-                                           sequence_id=None,
-                                           external_id=None,
-                                           comment=None)
-
-            self.progress_update.emit(i)
-
-        # finished adding media
-        self.finished.emit()
