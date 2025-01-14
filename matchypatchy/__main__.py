@@ -22,11 +22,12 @@ configure_http_backend(backend_factory=backend_factory)
 # START GUI
 from matchypatchy.gui import main_gui
 from matchypatchy.database import mpdb
-from matchypatchy.config import DB_PATH
+from matchypatchy import config
 
-def main():   
-    mpDB = mpdb.MatchyPatchyDB(DB_PATH)
-    main_gui.main_display(mpDB)
+def main():
+    cfg = config.initiate()
+    mpDB = mpdb.MatchyPatchyDB(cfg['DB_PATH'])
+    main_gui.main_display(mpDB, cfg)
 
 if __name__ == "__main__":
     main()

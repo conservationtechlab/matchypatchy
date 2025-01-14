@@ -23,14 +23,15 @@ from matchypatchy.gui.display_compare import DisplayCompare
 from matchypatchy.gui.display_single import DisplaySingle
 from matchypatchy.gui.popup_dropdown import DropdownPopup
 
-from matchypatchy.database import site
+from matchypatchy.database import station
 from matchypatchy.database import species
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, mpDB):
+    def __init__(self, mpDB, cfg):
         super().__init__()
         self.mpDB = mpDB
+        self.cfg = cfg
         self.setWindowTitle("MatchyPatchy")
         self.setMinimumSize(1600, 900)
         self.resize(1600, 900)
@@ -72,9 +73,9 @@ class MainWindow(QMainWindow):
         file_import = QMenu("Import", self)
         file.addMenu(file_import)
 
-        file_import_site = QAction("Sites", self)
-        file_import_site.triggered.connect(lambda: self.import_popup('site'))
-        file_import.addAction(file_import_site)
+        file_import_station = QAction("stations", self)
+        file_import_station.triggered.connect(lambda: self.import_popup('station'))
+        file_import.addAction(file_import_station)
 
         file_import_species = QAction("Species", self)
         file_import_species.triggered.connect(lambda: self.import_popup('species'))
@@ -87,13 +88,13 @@ class MainWindow(QMainWindow):
         # EDIT
         edit_preferences = QAction("Preferences", self)
         edit_survey = QAction("Surveys", self)
-        edit_site = QAction("Sites", self)
+        edit_station = QAction("stations", self)
         edit_species = QAction("Species", self)
         edit_media = QAction("Media", self)
 
         edit.addAction(edit_preferences)
         edit.addAction(edit_survey)
-        edit.addAction(edit_site)
+        edit.addAction(edit_station)
         edit.addAction(edit_species)
         edit.addAction(edit_media)
 
@@ -132,7 +133,7 @@ class MainWindow(QMainWindow):
             file_path = QFileDialog.getOpenFileName(self, "Open File",
                                                     os.path.expanduser('~'),
                                                     ("CSV Files (*.csv)"))[0]
-            site.import_csv(self.mpDB, file_path)
+            station.import_csv(self.mpDB, file_path)
 
         else:
             # select survey first
@@ -144,13 +145,12 @@ class MainWindow(QMainWindow):
             file_path = QFileDialog.getOpenFileName(self, "Open File",
                                                     os.path.expanduser('~'),
                                                     ("CSV Files (*.csv)"))[0]
+            # station
+            if table == "station":
+                station.import_csv(self.mpDB, file_path, survey_id=survey_id)
 
-            # SITE
-            if table == "site":
-                site.import_csv(self.mpDB, file_path, survey_id=survey_id)
 
-
-def main_display(mpDB):
+def main_display(mpDB, cfg):
     """
     Launch GUI
 
@@ -158,7 +158,7 @@ def main_display(mpDB):
         mpDB: matchypatchy database object
     """
     app = QApplication(sys.argv)
-    window = MainWindow(mpDB)
+    window = MainWindow(mpDB, cfg)
     window.show()
     sys.exit(app.exec())
 

@@ -1,33 +1,58 @@
 """
-CONFIG
+Functions for Handling Config
 
-Create temp dir, log file, db file
-Global Variables
 """
 from pathlib import Path
 import tempfile
-import logging
+import logging 
+import yaml
+import wget
+
+# TODO: FIX CONFIG LOCATION
+
+def initiate():
+    cfg_path = Path('config.yml')
+
+    tempfile.tempdir = tempfile.mkdtemp(prefix="MatchyPatchy_")
+
+    default_cfg = {'TEMP_DIR': str(Path(tempfile.gettempdir())),
+           'LOG_PATH': str(Path.cwd() / 'matchpatchy.log'),
+           'DB_PATH': str(Path.cwd() / 'matchypatchy.db'),
+           'ML_DIR': str(Path.cwd() / 'Models'),
+           'FRAME_DIR': str(Path(tempfile.gettempdir()) / "Frames"),  # frame dir only temporary while processing for animl
+    }
+
+    # check if cfg exists, load
+    if cfg_path.exists():
+        cfg = load()
+    # else save default
+    else:
+        with open(cfg_path, 'w') as cfg_file:
+            yaml.dump(default_cfg, cfg_file)
+        cfg = default_cfg
+
+    # Make sure ML_DIR exists
+    Path(cfg['ML_DIR']).mkdir(exist_ok=True)
+        
+    # TODO CHECK SERVER TO UPDATE LIST
+    # LOG CONFIG
+    logging.basicConfig(filename=cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
+    logging.info('CWD: ' + str(Path.cwd()))
+    logging.info('mpDB: ' + cfg['DB_PATH'])
+    logging.info('TEMP_DIR: ' + cfg['TEMP_DIR'])
+    logging.info('ML_DIR: ' + cfg['ML_DIR'])
+    logging.debug('FRAME_DIR: ' + cfg['FRAME_DIR'])
+
+    return cfg
 
 
-tempfile.tempdir = tempfile.mkdtemp(prefix="MatchyPatchy_")
-TEMP_DIR = Path(tempfile.gettempdir())
+def load():
+    # Load the config into a dict
+    with open('config.yml', 'r') as cfg_file:
+        return yaml.safe_load(cfg_file)
 
-LOGFILE = Path.cwd() / 'matchpatchy.log'
-DB_PATH = Path.cwd() / 'matchypatchy.db'
-ML_DIR = Path.cwd() / 'Models'
-FRAME_DIR = TEMP_DIR / "Frames"  # frame dir only temporary while processing for animl
 
-logging.basicConfig(filename=LOGFILE, encoding='utf-8', level=logging.DEBUG, force=True)
-logging.info('CWD: ' + str(Path.cwd()))
-logging.info('mpDB: ' + str(DB_PATH))
-logging.info('TEMP_DIR: ' + str(TEMP_DIR))
-logging.info('MLDIR: ' + str(ML_DIR))
-logging.debug('FRAME_DIR: ' + str(FRAME_DIR))
-
-# CREATE MODEL FOLDER
-ML_DIR.mkdir(exist_ok=True)
-
-# GLOBALS
-VIEWPOINT = {None: "None", 0: "Left", 1: "Right"}
-
-# TODO: create yml file
+def update(new_cfg):
+    # Update the yaml with new values
+    with open('config.yml', 'w') as cfg_file:
+        yaml.dump(new_cfg, cfg_file)
