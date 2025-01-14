@@ -44,7 +44,7 @@ class QueryContainer():
         # must have embeddings to continue
         if not (self.data_raw["emb_id"] == 0).all():
             # need sequence and capture ids from media to restrict comparisons shown to
-            info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id"
+            info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, station_id, sequence_id"
             rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
             self.rois = pd.DataFrame(rois, columns=columns)
             return True
@@ -75,7 +75,7 @@ class QueryContainer():
         self.nearest_dict_raw = nearest_dict
 
     # STEP 2
-    def filter(self, filter_dict=None, valid_sites=None, reset=True):
+    def filter(self, filter_dict=None, valid_stations=None, reset=True):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
         Triggered by calculate neighbors and change in filters
@@ -86,21 +86,21 @@ class QueryContainer():
         # create backups for filtering
         self.data = self.data_raw.copy()
 
-        if filter_dict is not None and valid_sites is not None:
-            # Region Filter (depends on prefilterd sites from MediaDisplay)
-            if filter_dict['active_region'][0] > 0 and valid_sites:
-                self.data = self.data[self.data['site_id'].isin(list(valid_sites.keys()))]
+        if filter_dict is not None and valid_stations is not None:
+            # Region Filter (depends on prefilterd stations from MediaDisplay)
+            if filter_dict['active_region'][0] > 0 and valid_stations:
+                self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
         
-            # Survey Filter (depends on prefilterd sites from MediaDisplay)
-            if filter_dict['active_survey'][0] > 0 and valid_sites:
-                self.data = self.data[self.data['site_id'].isin(list(valid_sites.keys()))]
+            # Survey Filter (depends on prefilterd stations from MediaDisplay)
+            if filter_dict['active_survey'][0] > 0 and valid_stations:
+                self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
 
-            # Single Site Filter
-            if filter_dict['active_site'][0] > 0 and valid_sites:
-                self.data = self.data[self.data['site_id'] == filter_dict['active_site'][0]]
-            elif filter_dict['active_site'][0] == 0 and valid_sites:
-                self.data = self.data[self.data['site_id'].isin(list(valid_sites.keys()))]
-                # no valid sites, empty dataframe
+            # Single station Filter
+            if filter_dict['active_station'][0] > 0 and valid_stations:
+                self.data = self.data[self.data['station_id'] == filter_dict['active_station'][0]]
+            elif filter_dict['active_station'][0] == 0 and valid_stations:
+                self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
+                # no valid stations, empty dataframe
             else:
                 self.parent.warn("No data to compare within filter.")
         

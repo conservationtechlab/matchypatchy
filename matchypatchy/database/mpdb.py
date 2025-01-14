@@ -117,9 +117,9 @@ class MatchyPatchyDB():
             return False
 
 
-    def add_site(self, name: str, lat: float, long: float, survey_id: int):
+    def add_station(self, name: str, lat: float, long: float, survey_id: int):
         """
-        Add a site with
+        Add a station with
             - name (str) NOT NULL
             - lat (float): latitude
             - long (float): longitude
@@ -128,7 +128,7 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            command = """INSERT INTO site
+            command = """INSERT INTO station
                         (name, lat, long, survey_id) 
                         VALUES (?, ?, ?, ?);"""
             data_tuple = (name, lat, long, survey_id)
@@ -138,7 +138,7 @@ class MatchyPatchyDB():
             db.close()
             return id
         except sqlite3.Error as error:
-            logging.error("Failed to add site: ", error)
+            logging.error("Failed to add station: ", error)
             if db:
                 db.close()
             return False
@@ -192,7 +192,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def add_media(self, filepath: str, ext: str, timestamp: str, site_id: int,
+    def add_media(self, filepath: str, ext: str, timestamp: str, station_id: int,
                   sequence_id: Optional[int]=None, external_id: Optional[int]=None, 
                   comment: Optional[str]=None, favorite: int=0):
         """
@@ -201,7 +201,7 @@ class MatchyPatchyDB():
             filepath TEXT UNIQUE NOT NULL,
             ext TEXT NOT NULL,
             timestamp TEXT NOT NULL,
-            site_id INTEGER NOT NULL,
+            station_id INTEGER NOT NULL,
             sequence_id INTEGER,
             external_id INTEGER,
             comment TEXT,
@@ -211,10 +211,10 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO media
-                        (filepath, ext, timestamp, site_id,
+                        (filepath, ext, timestamp, station_id,
                         sequence_id, external_id, comment, favorite) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, ext, timestamp, site_id, 
+            data_tuple = (filepath, ext, timestamp, station_id, 
                           sequence_id, external_id, comment, favorite)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
@@ -372,7 +372,7 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed, 
                          roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp, 
-                         site_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex"""
+                         station_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex"""
             command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
                                            LEFT JOIN species ON roi.species_id = species.id
                                            LEFT JOIN individual ON roi.individual_id = individual.id;"""

@@ -45,13 +45,13 @@ class DisplayMedia(QWidget):
         self.survey_list_ordered = [(0, 'Survey')]
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
 
-        # SITE
-        self.site_select = QComboBox()
-        self.site_select.setFixedWidth(200)
-        first_layer.addWidget(self.site_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.valid_sites = None
-        self.site_list_ordered = [(0, 'Site')]
-        self.site_select.addItems([el[1] for el in self.site_list_ordered])
+        # station
+        self.station_select = QComboBox()
+        self.station_select.setFixedWidth(200)
+        first_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.valid_stations = None
+        self.station_list_ordered = [(0, 'station')]
+        self.station_select.addItems([el[1] for el in self.station_list_ordered])
 
         # SPECIES
         self.species_select = QComboBox()
@@ -91,13 +91,13 @@ class DisplayMedia(QWidget):
 
         self.region_select.currentIndexChanged.connect(self.select_region)
         self.survey_select.currentIndexChanged.connect(self.select_survey)
-        self.site_select.currentIndexChanged.connect(self.select_site)
+        self.station_select.currentIndexChanged.connect(self.select_station)
         self.species_select.currentIndexChanged.connect(self.select_species)
         self.individual_select.currentIndexChanged.connect(self.select_individual)
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                 'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                'active_site': self.site_list_ordered[self.site_select.currentIndex()],
+                'active_station': self.station_list_ordered[self.station_select.currentIndex()],
                 'active_species': self.species_list_ordered[self.species_select.currentIndex()],
                 'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                 'unidentified_only': self.unidentified_only,
@@ -126,7 +126,7 @@ class DisplayMedia(QWidget):
         # block signals while updating lists
         self.region_select.blockSignals(True)
         self.survey_select.blockSignals(True)
-        self.site_select.blockSignals(True)
+        self.station_select.blockSignals(True)
         self.species_select.blockSignals(True)
         self.individual_select.blockSignals(True)
 
@@ -138,10 +138,10 @@ class DisplayMedia(QWidget):
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
 
-        self.site_select.clear()
-        self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
-        self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
-        self.site_select.addItems([el[1] for el in self.site_list_ordered])
+        self.station_select.clear()
+        self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
+        self.station_list_ordered = [(0, 'station')] + [(k, v) for k, v in self.valid_stations.items()]
+        self.station_select.addItems([el[1] for el in self.station_list_ordered])
 
         self.species_select.clear()
         self.species_list_ordered = [(0, 'Species')] + list(self.mpDB.select('species', columns='id, common'))
@@ -153,7 +153,7 @@ class DisplayMedia(QWidget):
         
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_site': self.site_list_ordered[self.site_select.currentIndex()],
+                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],
                         'active_species': self.species_list_ordered[self.species_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
@@ -172,7 +172,7 @@ class DisplayMedia(QWidget):
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
-        self.site_select.blockSignals(False)
+        self.station_select.blockSignals(False)
         self.species_select.blockSignals(False)
         self.individual_select.blockSignals(False)
 
@@ -209,16 +209,16 @@ class DisplayMedia(QWidget):
         print("select region")
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
         self.filter_surveys()
-        self.filter_sites(survey_ids=list(self.valid_surveys.items()))
+        self.filter_stations(survey_ids=list(self.valid_surveys.items()))
         self.filter_table()
 
     def select_survey(self):
         self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
-        self.filter_sites(survey_ids=[self.filters['active_survey']])
+        self.filter_stations(survey_ids=[self.filters['active_survey']])
         self.filter_table()
 
-    def select_site(self):
-        self.filters['active_site'] = self.site_list_ordered[self.site_select.currentIndex()]
+    def select_station(self):
+        self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
         self.filter_table()
 
     def select_species(self):
@@ -246,18 +246,18 @@ class DisplayMedia(QWidget):
         self.survey_select.blockSignals(False)
         
 
-    def filter_sites(self, survey_ids=None):
+    def filter_stations(self, survey_ids=None):
         # block signals while updating combobox
-        self.site_select.blockSignals(True)
-        self.site_select.clear()
+        self.station_select.blockSignals(True)
+        self.station_select.clear()
         if survey_ids:
             survey_list = ",".join([str(s[0]) for s in survey_ids])
             selection = f'survey_id IN ({survey_list})'
 
-            self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=selection, quiet=False))
+            self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection, quiet=False))
         else:
-            self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
-        # Update site list to reflect active survey
-        self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
-        self.site_select.addItems([el[1] for el in self.site_list_ordered])
-        self.site_select.blockSignals(False)        
+            self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
+        # Update station list to reflect active survey
+        self.station_list_ordered = [(0, 'station')] + [(k, v) for k, v in self.valid_stations.items()]
+        self.station_select.addItems([el[1] for el in self.station_list_ordered])
+        self.station_select.blockSignals(False)        

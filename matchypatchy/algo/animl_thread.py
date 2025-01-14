@@ -25,7 +25,7 @@ class AnimlThread(QThread):
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
 
-        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "site",
+        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station",
                                                   "sequence_id", "external_id", "comment", "favorite"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 

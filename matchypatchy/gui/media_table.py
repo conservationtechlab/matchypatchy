@@ -2,7 +2,7 @@
 Widget for displaying list of Media
 ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 'reviewed', 
 'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'timestamp', 
-'site_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+'station_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 
 # TODO: MAKE TABLE EDITABLE
@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
-from matchypatchy.config import VIEWPOINT
+from matchypatchy.algo.models import VIEWPOINT
 from matchypatchy.database.media import fetch_media
 from matchypatchy.gui.popup_alert import ProgressPopup
 
@@ -33,7 +33,7 @@ class MediaTable(QWidget):
         self.edits = list()
         self.columns = ["reviewed","thumbnail", "filepath", "timestamp", 
                         "viewpoint", "binomen", "common", "individual_id", "sex", 
-                        "site", "sequence_id", "external_id", "favorite", "comment"]
+                        "station", "sequence_id", "external_id", "favorite", "comment"]
         # Set up layout
         layout = QVBoxLayout()
 
@@ -42,7 +42,7 @@ class MediaTable(QWidget):
         self.table.setColumnCount(14)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", 
                                               "Viewpoint", "Species", "Common", "Individual", "Sex", 
-                                              "Site", "Sequence ID", "External ID", "Favorite", "Comment"])
+                                              "station", "Sequence ID", "External ID", "Favorite", "Comment"])
         self.table.resizeColumnsToContents()
         self.table.setColumnWidth(1, 100)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
@@ -117,23 +117,23 @@ class MediaTable(QWidget):
         
         # map 
         filters = self.parent.filters
-        valid_sites = self.parent.valid_sites
+        valid_stations = self.parent.valid_stations
 
-        # Region Filter (depends on prefilterd sites from MediaDisplay)
-        if 'region_filter' in filters.keys() and valid_sites:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(valid_sites.keys()))]
+        # Region Filter (depends on prefilterd stations from MediaDisplay)
+        if 'region_filter' in filters.keys() and valid_stations:
+            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(valid_stations.keys()))]
     
-        # Survey Filter (depends on prefilterd sites from MediaDisplay)
-        if 'survey_filter' in filters.keys() and valid_sites:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(valid_sites.keys()))]
+        # Survey Filter (depends on prefilterd stations from MediaDisplay)
+        if 'survey_filter' in filters.keys() and valid_stations:
+            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(valid_stations.keys()))]
 
-        # Single Site Filter
-        if 'active_site' in filters.keys() and valid_sites:
-            if filters['active_site'][0] > 0:
-                self.data_filtered = self.data_filtered[self.data_filtered['site_id'] == filters['active_site'][0]]
-            self.data_filtered['site'] = self.data_filtered['site_id'].map(valid_sites)
+        # Single station Filter
+        if 'active_station' in filters.keys() and valid_stations:
+            if filters['active_station'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['station_id'] == filters['active_station'][0]]
+            self.data_filtered['station'] = self.data_filtered['station_id'].map(valid_stations)
         else:
-            # no valid sites, empty dataframe
+            # no valid stations, empty dataframe
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
         # Species Filter
@@ -234,7 +234,7 @@ class MediaTable(QWidget):
         self.table.setItem(i, 6, QTableWidgetItem(roi["common"]))  # Date Time column
         self.table.setItem(i, 7, QTableWidgetItem(roi["name"]))  # Individual column
         self.table.setItem(i, 8, QTableWidgetItem(roi["sex"]))  # Sex column
-        self.table.setItem(i, 9, QTableWidgetItem(roi["site"]))   # Site column
+        self.table.setItem(i, 9, QTableWidgetItem(roi["station"]))   # station column
         self.table.setItem(i, 10, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
         self.table.setItem(i, 11, QTableWidgetItem(str(roi["external_id"])))  # Sequence ID column
         

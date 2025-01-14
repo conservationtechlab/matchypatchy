@@ -1,5 +1,5 @@
 """
-Creat or edit site
+Creat or edit station
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QListWidget, QLineEdit, QLabel, QDialogButtonBox)
@@ -7,15 +7,15 @@ from PyQt6 import QtCore, QtWidgets
 from matchypatchy.gui.popup_alert import AlertPopup
 
 
-class SitePopup(QDialog):
+class StationPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle("Manage Sites")
+        self.setWindowTitle("Manage stations")
         self.mpDB = parent.mpDB
         self.survey_id = parent.active_survey
 
         layout = QVBoxLayout()
-        # SITE LIST
+        # station LIST
         self.list = QListWidget()
         layout.addWidget(self.list)
         self.list.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
@@ -32,7 +32,7 @@ class SitePopup(QDialog):
         self.button_edit.clicked.connect(self.edit)
         self.button_del.clicked.connect(self.delete)
 
-        # not enabled until site is selected
+        # not enabled until station is selected
         self.button_del.setEnabled(False)
         self.button_edit.setEnabled(False)
 
@@ -60,50 +60,50 @@ class SitePopup(QDialog):
     def update(self):
         self.list.clear()
         cond = f'survey_id={self.survey_id[0]}'
-        self.site_list_ordered = self.mpDB.select("site", columns="id, name", row_cond=cond)
-        self.site_list = dict(self.site_list_ordered)
-        if self.site_list_ordered:
-            self.list.addItems([el[1] for el in self.site_list_ordered])
+        self.station_list_ordered = self.mpDB.select("station", columns="id, name", row_cond=cond)
+        self.station_list = dict(self.station_list_ordered)
+        if self.station_list_ordered:
+            self.list.addItems([el[1] for el in self.station_list_ordered])
         self.set_editdel()
 
     def add(self):
-        dialog = SiteFillPopup(self)
+        dialog = StationFillPopup(self)
         if dialog.exec():
-            self.mpDB.add_site(dialog.get_name(), dialog.get_lat(),
+            self.mpDB.add_station(dialog.get_name(), dialog.get_lat(),
                                dialog.get_long(), self.survey_id[0])
         del dialog
-        self.sites = self.update()
+        self.stations = self.update()
 
     def edit(self):
-        selected_site = self.list.currentRow()
-        id = self.site_list_ordered[selected_site][0]
+        selected_station = self.list.currentRow()
+        id = self.station_list_ordered[selected_station][0]
         cond = f'id={id}'
-        id, name, lat, long = self.mpDB.select('site', columns='id, name, lat, long', row_cond=cond)[0]
-        dialog = SiteFillPopup(self, name=name, lat=lat, long=long)
+        id, name, lat, long = self.mpDB.select('station', columns='id, name, lat, long', row_cond=cond)[0]
+        dialog = StationFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
             replace_dict = {"name": f"'{dialog.get_name()}'", "lat": dialog.get_lat(), "long": dialog.get_long()}
-            self.mpDB.edit_row("site", id, replace_dict)
+            self.mpDB.edit_row("station", id, replace_dict)
         del dialog
-        self.sites = self.update()
+        self.stations = self.update()
 
     def delete(self):
         selected = self.list.currentItem().text()
         dialog = AlertPopup(self, f'Are you sure you want to delete {selected}?')
         if dialog.exec():
-            row = self.site_list_ordered[self.list.currentRow()][0]
-            self.mpDB.delete("site", f'id={row}')
+            row = self.station_list_ordered[self.list.currentRow()][0]
+            self.mpDB.delete("station", f'id={row}')
         del dialog
         self.update()
 
 
-class SiteFillPopup(QDialog):
+class StationFillPopup(QDialog):
     def __init__(self, parent, name="", lat="", long=""):
         super().__init__(parent)
-        self.setWindowTitle("Edit Site")
+        self.setWindowTitle("Edit station")
 
         layout = QVBoxLayout()
 
-        title = QLabel(f'Edit Site for {parent.survey_id[1]}',
+        title = QLabel(f'Edit station for {parent.survey_id[1]}',
                        objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 

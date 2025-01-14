@@ -28,7 +28,7 @@ class SequenceThread(QThread):
 
         self.media = fetch_media(self.mpDB)
         self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')
-        self.media = self.media.sort_values(by=['site_id', 'timestamp'])
+        self.media = self.media.sort_values(by=['station_id', 'timestamp'])
 
     def run(self):
         # if process sequence option is checked, will rewrite sequence_id
@@ -39,8 +39,8 @@ class SequenceThread(QThread):
             current_sequence = []
             for _, image in self.media.iterrows():
                 if current_sequence:
-                    # site is the same, timestamp under threshold, n under threshold
-                    if (image['site_id'] == current_sequence[0]['site_id']) and \
+                    # station is the same, timestamp under threshold, n under threshold
+                    if (image['station_id'] == current_sequence[0]['station_id']) and \
                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
                        (len(current_sequence) < self.max_n):
                         current_sequence.append(image)

@@ -12,7 +12,7 @@ from matchypatchy.gui import popup_import_folder
 from matchypatchy.gui import popup_individual
 from matchypatchy.gui import popup_ml
 from matchypatchy.gui import popup_single_image
-from matchypatchy.gui import popup_site
+from matchypatchy.gui import popup_station
 from matchypatchy.gui import popup_species
 from matchypatchy.gui import popup_survey
 from matchypatchy.gui import widget_image
@@ -37,7 +37,7 @@ from matchypatchy.gui.popup_individual import (IndividualFillPopup,
 from matchypatchy.gui.popup_ml import (DownloadMLThread, MLDownloadPopup,
                                        MLOptionsPopup,)
 from matchypatchy.gui.popup_single_image import (ImagePopup,)
-from matchypatchy.gui.popup_site import (SiteFillPopup, SitePopup,)
+from matchypatchy.gui.popup_station import (StationFillPopup, StationPopup,)
 from matchypatchy.gui.popup_species import (SpeciesFillPopup, SpeciesPopup,)
 from matchypatchy.gui.popup_survey import (SurveyFillPopup, SurveyPopup,)
 from matchypatchy.gui.widget_image import (ImageWidget,)
@@ -49,11 +49,11 @@ __all__ = ['AlertPopup', 'BuildManifestThread', 'CSVImportThread',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
            'LoadThumbnailThread', 'MATCH_STYLE', 'MLDownloadPopup',
            'MLOptionsPopup', 'MainWindow', 'MediaTable', 'ProgressPopup',
-           'SiteFillPopup', 'SitePopup', 'SpeciesFillPopup', 'SpeciesPopup',
+           'StationFillPopup', 'StationPopup', 'SpeciesFillPopup', 'SpeciesPopup',
            'SurveyFillPopup', 'SurveyPopup', 'THUMBNAIL_NOTFOUND',
            'display_base', 'display_compare', 'display_media',
            'display_single', 'main_display', 'main_gui', 'media_table',
            'popup_alert', 'popup_config', 'popup_dropdown', 'popup_import_csv',
            'popup_import_folder', 'popup_individual', 'popup_ml',
-           'popup_single_image', 'popup_site', 'popup_species', 'popup_survey',
+           'popup_single_image', 'popup_station', 'popup_species', 'popup_survey',
            'widget_image']
