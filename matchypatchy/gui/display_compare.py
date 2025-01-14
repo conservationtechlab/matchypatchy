@@ -7,6 +7,8 @@ TODO:
  - enable merge
  - ENABLE VIEWPOINT
 """
+from PIL import Image
+
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
 from PyQt6.QtCore import Qt, QPoint
@@ -173,10 +175,14 @@ class DisplayCompare(QWidget):
         button_query_image_reset = QPushButton("Reset") 
         button_query_image_reset.clicked.connect(self.query_image_reset)
         query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-         # View Image
+        # View Image
         button_query_image_view = QPushButton("View Image") 
         button_query_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_query_rid))
         query_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Open Image
+        button_query_image_open = QPushButton("Open Image") 
+        button_query_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_query_rid))
+        query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         query_image_buttons.addStretch()
         query_layout.addLayout(query_image_buttons)
@@ -271,6 +277,10 @@ class DisplayCompare(QWidget):
         button_match_image_view = QPushButton("View Image") 
         button_match_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(button_match_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Open Image
+        button_match_image_open = QPushButton("Open Image") 
+        button_match_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_match_rid))
+        match_image_buttons.addWidget(button_match_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         match_image_buttons.addStretch()
         match_layout.addLayout(match_image_buttons)
@@ -547,9 +557,22 @@ class DisplayCompare(QWidget):
 
     # TODO
     def view_image(self, rid):
+        """
+        Open Image in MatchyPatchy Single Image Popup
+        """
         dialog = ImagePopup(self, rid)
         if dialog.exec():
             del dialog
+
+    def open_image(self, rid):
+        """
+        Open Image in OS Default Image Viewer
+
+        Currently only supports one image at a time
+        """
+        img = Image.open(self.QueryContainer.data.loc[rid, "filepath"])
+        img.show() 
+
 
     # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):
