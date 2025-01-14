@@ -30,10 +30,10 @@ class ImportFolderPopup(QDialog):
         layout.addWidget(self.label)
         layout.addSpacing(5)
 
-        # Site
-        self.site = QComboBox()
-        self.site.hide()
-        layout.addWidget(self.site)
+        # station
+        self.station = QComboBox()
+        self.station.hide()
+        layout.addWidget(self.station)
 
         # Ok/Cancel
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
@@ -74,29 +74,29 @@ class ImportFolderPopup(QDialog):
 
     # 3. Offer
     def get_options(self):
-        self.label.setText("Select a level in the directory hierarchy that corresponds to site, if available:")
-        self.site.show()
+        self.label.setText("Select a level in the directory hierarchy that corresponds to station, if available:")
+        self.station.show()
         self.buttonBox.show()
 
         example = self.data.loc[0, 'FilePath']
-        # get potential site
+        # get potential station
         file_tree = ['None'] + example.split(os.sep)
-        self.site.addItems(file_tree)
+        self.station.addItems(file_tree)
 
     # 4. Import manifest into media table
     def import_manifest(self):
         """
-        Media entry (id, filepath, ext, timestamp, comment, site_id)
+        Media entry (id, filepath, ext, timestamp, comment, station_id)
         """
         # assert bbox in manifest.columns
         self.progress_bar.setRange(0, len(self.data))
         self.progress_bar.show()
 
-        site_level = 0 if self.site.currentIndex() == 0 else self.site.currentIndex() - 1
+        station_level = 0 if self.station.currentIndex() == 0 else self.station.currentIndex() - 1
 
         print(f"Adding {len(self.data)} files to Database")
 
-        self.import_thread = FolderImportThread(self.mpDB, self.active_survey, self.data, site_level)
+        self.import_thread = FolderImportThread(self.mpDB, self.active_survey, self.data, station_level)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.accept)
         self.import_thread.start()
@@ -120,13 +120,13 @@ class BuildManifestThread(QThread):
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, active_survey, data, site_level):
+    def __init__(self, mpDB, active_survey, data, station_level):
         super().__init__()
         self.mpDB = mpDB
         self.active_survey = active_survey
         self.data = data
-        self.site_level = site_level
-        self.default_site = None
+        self.station_level = station_level
+        self.default_station = None
         self.animl_conversion = {"filepath": "FilePath",
                                  "timestamp": "DateTime"}
 
@@ -145,21 +145,21 @@ class FolderImportThread(QThread):
             _, ext = os.path.splitext(os.path.basename(filepath))
 
             # get remaining information
-            if self.site_level > 0:
-                site_name = os.path.normpath(filepath).split(os.sep)[self.site_level]
+            if self.station_level > 0:
+                station_name = os.path.normpath(filepath).split(os.sep)[self.station_level]
                 try:
-                    site_id = self.mpDB.select("site", columns='id', row_cond=f'name="{site_name}"')[0][0]
+                    station_id = self.mpDB.select("station", columns='id', row_cond=f'name="{station_name}"')[0][0]
                 except IndexError:
-                    site_id = self.mpDB.add_site(str(site_name), None, None, int(self.active_survey[0]))
+                    station_id = self.mpDB.add_station(str(station_name), None, None, int(self.active_survey[0]))
             else:
-                if not self.default_site:
-                    self.default_site = self.mpDB.add_site("None", None, None, int(self.active_survey[0]))
-                site_id = self.default_site
+                if not self.default_station:
+                    self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
+                station_id = self.default_station
 
             # insert into table, force type
             media_id = self.mpDB.add_media(filepath, ext,
                                            str(timestamp),
-                                           int(site_id),
+                                           int(station_id),
                                            sequence_id=None,
                                            external_id=None,
                                            comment=None)

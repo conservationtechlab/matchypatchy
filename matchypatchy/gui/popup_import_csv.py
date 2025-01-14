@@ -19,7 +19,7 @@ class ImportCSVPopup(QDialog):
 
         self.selected_filepath = self.columns[0]
         self.selected_timestamp = self.columns[0]
-        self.selected_site = self.columns[0]
+        self.selected_station = self.columns[0]
         self.selected_survey = self.columns[0]
         self.selected_region = self.columns[0]
         self.selected_sequence_id = self.columns[0]
@@ -76,17 +76,17 @@ class ImportCSVPopup(QDialog):
         layout.addLayout(survey_layout)
         layout.addSpacing(5)
 
-        # Site
-        site_layout = QHBoxLayout()
-        site_layout.addWidget(QLabel("Site:"))
+        # station
+        station_layout = QHBoxLayout()
+        station_layout.addWidget(QLabel("station:"))
         asterisk = QLabel("*")
         asterisk.setStyleSheet("QLabel { color : red; }")
-        site_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.site = QComboBox()
-        self.site.addItems(self.columns)
-        self.site.currentTextChanged.connect(self.select_site)
-        site_layout.addWidget(self.site)
-        layout.addLayout(site_layout)
+        station_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
+        self.station = QComboBox()
+        self.station.addItems(self.columns)
+        self.station.currentTextChanged.connect(self.select_station)
+        station_layout.addWidget(self.station)
+        layout.addLayout(station_layout)
         layout.addSpacing(5)
 
         # Region
@@ -200,9 +200,9 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
 
-    def select_site(self):
+    def select_station(self):
         try:
-            self.selected_site = self.columns[self.site.currentIndex()]
+            self.selected_station = self.columns[self.station.currentIndex()]
             self.check_ok_button()
             return True
         except IndexError:
@@ -262,10 +262,10 @@ class ImportCSVPopup(QDialog):
         """
         Determine if sufficient information for import
 
-        Must include filepath, timestamp, site
+        Must include filepath, timestamp, station
         """
         if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
-           (self.selected_site != "None") and (self.selected_survey != "None"):
+           (self.selected_station != "None") and (self.selected_survey != "None"):
             self.okButton.setEnabled(True)
         else:
             self.okButton.setEnabled(False)
@@ -274,7 +274,7 @@ class ImportCSVPopup(QDialog):
         return {"filepath": self.selected_filepath,
                 "timestamp": self.selected_timestamp,
                 "survey": self.selected_survey,
-                "site": self.selected_site,
+                "station": self.selected_station,
                 "region": self.selected_region,
                 "sequence_id": self.selected_sequence_id,
                 "external_id": self.selected_external_id,
@@ -286,7 +286,7 @@ class ImportCSVPopup(QDialog):
     # TODO: Check for duplicates?
     def import_manifest(self):
         """
-        Media entry (id, filepath, ext, timestamp, comment, site_id)
+        Media entry (id, filepath, ext, timestamp, comment, station_id)
         """
         # assert bbox in manifest.columns
         self.progress_bar.show()
@@ -330,14 +330,14 @@ class CSVImportThread(QThread):
             timestamp = exemplar[self.selected_columns["timestamp"]].item()
 
             survey_id = self.survey(exemplar)
-            site_id = self.site(exemplar, survey_id)
+            station_id = self.station(exemplar, survey_id)
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
             external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
             comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
-            media_id = self.mpDB.add_media(filepath, ext, timestamp, site_id,
+            media_id = self.mpDB.add_media(filepath, ext, timestamp, station_id,
                                            sequence_id=sequence_id,
                                            external_id=external_id,
                                            comment=comment)
@@ -393,14 +393,14 @@ class CSVImportThread(QThread):
             survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
         return survey_id
     
-    def site(self, exemplar, survey_id):
-        # get or create site
-        site_name = exemplar[self.selected_columns["site"]].item()
+    def station(self, exemplar, survey_id):
+        # get or create station
+        station_name = exemplar[self.selected_columns["station"]].item()
         try:
-            site_id = self.mpDB.select("site", columns="id", row_cond=f'name="{site_name}"')[0][0]
+            station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
         except IndexError:
-            site_id = self.mpDB.add_site(str(site_name), None, None, survey_id)
-        return site_id
+            station_id = self.mpDB.add_station(str(station_name), None, None, survey_id)
+        return station_id
 
     def species(self, roi):
         if self.selected_columns["species"] != "None":
