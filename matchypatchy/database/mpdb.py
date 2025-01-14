@@ -14,7 +14,7 @@ class MatchyPatchyDB():
         self.filepath = filepath
         self.initiate = setup_database(self.filepath)
 
-    def validate(self):
+    def info(self):
         """
         Validate All Tables Are Present
         """
@@ -36,6 +36,15 @@ class MatchyPatchyDB():
         emb = cursor.fetchone()[0]
         logging.info(f"Emb: {emb}")
         db.close()
+
+    def validate(self):
+        db = sqlite3.connect(self.filepath)
+        db.enable_load_extension(True)
+        sqlite_vec.load(db)
+        db.enable_load_extension(False)
+        cursor = db.cursor()
+        for row in cursor.execute("pragma table_info('sqlite_master')").fetchall():
+            print(row)
 
     def _command(self, command):
         """
