@@ -91,6 +91,16 @@ def setup_database(filepath='matchypatchy.db'):
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
+    
+
+    # THUMBNAILS
+    cursor.execute('''DROP TABLE IF EXISTS thumbnails;''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS thumbnails (
+                        id INTEGER PRIMARY KEY,
+                        roi INTEGER NOT NULL,
+                        filepath TEXT NOT NULL,
+                        FOREIGN KEY(roi) REFERENCES roi (id));''')
+
 
     # Commit changes and close connection
     db.commit()
