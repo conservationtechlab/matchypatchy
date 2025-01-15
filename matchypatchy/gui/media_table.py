@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
-from matchypatchy.algo.models import VIEWPOINT
+from matchypatchy.algo import models
 from matchypatchy.database.media import fetch_media
 from matchypatchy.gui.popup_alert import ProgressPopup
 
@@ -30,6 +30,8 @@ class MediaTable(QWidget):
         self.data = pd.DataFrame()
         self.thumbnails = dict()
         self.crop = True
+        self.VIEWPOINT = models.load('VIEWPOINT')
+
         self.edits = list()
         self.columns = ["reviewed","thumbnail", "filepath", "timestamp", 
                         "viewpoint", "binomen", "common", "individual_id", "sex", 
@@ -229,7 +231,7 @@ class MediaTable(QWidget):
         # Data
         self.table.setItem(i, 2, QTableWidgetItem(roi["filepath"]))  # File Path column
         self.table.setItem(i, 3, QTableWidgetItem(roi["timestamp"]))  # Date Time column
-        self.table.setItem(i, 4, QTableWidgetItem(VIEWPOINT[roi["viewpoint"]]))  # Viewpoint column
+        self.table.setItem(i, 4, QTableWidgetItem(self.VIEWPOINT[roi["viewpoint"]]))  # Viewpoint column
         self.table.setItem(i, 5, QTableWidgetItem(roi["binomen"]))   # File Path column
         self.table.setItem(i, 6, QTableWidgetItem(roi["common"]))  # Date Time column
         self.table.setItem(i, 7, QTableWidgetItem(roi["name"]))  # Individual column

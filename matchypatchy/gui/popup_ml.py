@@ -1,22 +1,25 @@
 """
 Popup for Selection within a list, ie Survey selection
 
-
-
 """
+from pathlib import Path 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt
 
 from matchypatchy.algo import models
+from matchypatchy import config
 
 
 class MLDownloadPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.models = list(models.MODELS.keys())
+        self.ml_dir = Path(config.load('ML_DIR'))
+        self.ml_cfg = models.load()
+        self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
+        self.available_models = self.discover_models()
 
         self.setWindowTitle("Select Models")
 
@@ -26,6 +29,7 @@ class MLDownloadPopup(QDialog):
         layout.addLayout(self.checkbox_layout)
 
         # Add checkboxes to the grid layout in two columns
+        self.models = list(self.models)  # convert to ordered list
         for i, m in enumerate(self.models):
             checkbox = QCheckBox(m)
             checkbox.stateChanged.connect(self.toggle_checkbox)
@@ -44,9 +48,18 @@ class MLDownloadPopup(QDialog):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
-        # get already downloaded models
-        self.available_models = models.available_models()
+        # check already downloaded models
         self.set_checkboxes()
+    
+
+    def discover_models(self):
+        models_dict = dict()
+        for m in self.models.keys():
+            path = self.ml_dir / self.models[m][0]
+            if path.exists():
+                models_dict[m] = path
+        # if looking for a particular model, give back path
+        return models_dict
 
     def set_checkboxes(self):
         for m in self.available_models.keys():
@@ -68,24 +81,9 @@ class MLDownloadPopup(QDialog):
         # Start download thread
         self.progress_bar.setRange(0, 0)
         self.progress_bar.show()
-        self.build_thread = DownloadMLThread(self.checked_models)
+        self.build_thread = models.DownloadMLThread(self.checked_models)
         self.build_thread.finished.connect(self.progress_bar.hide)
         self.build_thread.start()
-
-
-class DownloadMLThread(QThread):
-    """
-    Thread for downloading ML model
-    """
-    downloaded = pyqtSignal(str)
-
-    def __init__(self, checked_models):
-        super().__init__()
-        self.checked_models = checked_models
-
-    def run(self):
-        for key in self.checked_models:
-            models.download(key)
 
 
 class MLOptionsPopup(QDialog):

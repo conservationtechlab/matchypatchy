@@ -3,7 +3,7 @@ Functions for Manipulating and Processing ROIs
 """
 import pandas as pd
 
-from matchypatchy.config import VIEWPOINT
+from matchypatchy.algo import models
 
 
 def fetch_roi(mpDB):
@@ -13,7 +13,7 @@ def fetch_roi(mpDB):
     Args
         - mpDB
     Returns
-        - an inverted dictionary in order to match manifest site names to table id
+        - an inverted dictionary in order to match manifest station names to table id
     """
     manifest = mpDB.select("roi")
     if manifest:
@@ -30,7 +30,7 @@ def fetch_roi_media(mpDB):
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
-                'filepath', 'ext', 'timestamp', 'site_id', 'sequence_id', 'external_id',
+                'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
     """
     media, column_names = mpDB.all_media()
@@ -48,14 +48,15 @@ def roi_metadata(roi, spacing=1.5):
                             "filepath": "File Path",
                             "comment": "Comment",
                             "timestamp": "Timestamp",
-                            "site_id": "Site",
+                            "station_id": "station",
                             "sequence_id": "Sequence ID",
                             "viewpoint": "Viewpoint"})
 
-    info_dict = roi[['Name', 'File Path', 'Timestamp', 'Site',
+    info_dict = roi[['Name', 'File Path', 'Timestamp', 'station',
                      'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
     # convert viewpoint to human-readable (0=Left, 1=Right)
+    VIEWPOINT = models.load('VIEWPOINT')
     info_dict['Viewpoint'] = VIEWPOINT[info_dict['Viewpoint']]
 
     info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())

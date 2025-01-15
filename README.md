@@ -3,7 +3,6 @@ GUI tool for human validation of AI-powered animal re-identification
 
 TODOS 
  - update match prioritization - id'd and number of matches 
- - edit config, create yaml
  - add undo for match
  - manage individuals popup
  - filter reviewed/named images
@@ -25,7 +24,6 @@ Long Term
  - handle videos
  - in the rare instance that an image has two individuals, build infrastructure to duplicate media entry
    and separate sequence ids, etc
- - adjust site schema to align with camtrapdp deployments schema
+ - adjust station schema to align with camtrapdp deployments schema, CB schema
  - Create function to verify another database
- - ask server what models are valid for download
  - cosine distance for knn?
