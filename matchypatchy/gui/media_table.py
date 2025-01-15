@@ -7,6 +7,8 @@ Widget for displaying list of Media
 
 # TODO: MAKE TABLE EDITABLE
 # TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
+# TODO: keep track of thumbnails
+
 
 import pandas as pd
 
@@ -42,7 +44,7 @@ class MediaTable(QWidget):
         self.table.setColumnCount(14)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", 
                                               "Viewpoint", "Species", "Common", "Individual", "Sex", 
-                                              "station", "Sequence ID", "External ID", "Favorite", "Comment"])
+                                              "Station", "Sequence ID", "External ID", "Favorite", "Comment"])
         self.table.resizeColumnsToContents()
         self.table.setColumnWidth(1, 100)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
@@ -226,7 +228,7 @@ class MediaTable(QWidget):
         # Data
         self.table.setItem(i, 2, QTableWidgetItem(roi["filepath"]))  # File Path column
         self.table.setItem(i, 3, QTableWidgetItem(roi["timestamp"]))  # Date Time column
-        self.table.setItem(i, 4, QTableWidgetItem(self.VIEWPOINT[roi["viewpoint"]]))  # Viewpoint column
+        self.table.setItem(i, 4, QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"])]))  # Viewpoint column
         self.table.setItem(i, 5, QTableWidgetItem(roi["binomen"]))   # File Path column
         self.table.setItem(i, 6, QTableWidgetItem(roi["common"]))  # Date Time column
         self.table.setItem(i, 7, QTableWidgetItem(roi["name"]))  # Individual column
