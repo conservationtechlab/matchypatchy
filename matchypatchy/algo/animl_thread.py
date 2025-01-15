@@ -9,11 +9,27 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.algo import models
 from matchypatchy import config
 
+from animl.file_management import build_file_manifest
 from animl.api import matchypatchy as animl_mp
 
+
+
+class BuildManifestThread(QThread):
+    """
+    Thread for launching buildfilemanifest
+    """
+    manifest = pyqtSignal(pd.DataFrame)
+
+    def __init__(self, directory):
+        super().__init__()
+        self.directory = directory
+
+    def run(self):
+        self.data = build_file_manifest(self.directory)
+        self.manifest.emit(self.data)
+
+
 # TODO: HANDLE VIDEOS
-
-
 class AnimlThread(QThread):
     progress_update = pyqtSignal(str)  # Signal to update the progress bar
 
@@ -21,11 +37,12 @@ class AnimlThread(QThread):
         super().__init__()
         self.mpDB = mpDB
 
+
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
 
-        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "site",
+        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station",
                                                   "sequence_id", "external_id", "comment", "favorite"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 
@@ -44,7 +61,7 @@ class AnimlThread(QThread):
         self.get_species()
 
     def get_frames(self):
-        self.media = animl_mp.process_videos(self.media, config.FRAME_DIR)
+        self.media = animl_mp.process_videos(self.media, config.load('FRAME_DIR'))
 
     def get_bbox(self):
         # 1 RUN MED

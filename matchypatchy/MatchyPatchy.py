@@ -1,10 +1,9 @@
 '''
-Installable Version of Main Function
+Main Function
 
 '''
-# GET CWD
-import os
-import sys
+# GET CWD 
+import sys, os
 if getattr(sys, 'frozen', False):
     application_path = os.path.dirname(sys.executable)
     os.chdir(application_path)
@@ -23,10 +22,11 @@ configure_http_backend(backend_factory=backend_factory)
 # START GUI
 from matchypatchy.gui import main_gui
 from matchypatchy.database import mpdb
-from matchypatchy.config import DB_PATH
+from matchypatchy import config
 
 def main():
-    mpDB = mpdb.MatchyPatchyDB(DB_PATH)
+    cfg = config.initiate()
+    mpDB = mpdb.MatchyPatchyDB(cfg['DB_PATH'])
     main_gui.main_display(mpDB)
 
 if __name__ == "__main__":

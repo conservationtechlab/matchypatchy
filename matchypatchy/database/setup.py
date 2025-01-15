@@ -32,9 +32,8 @@ def setup_database(filepath='matchypatchy.db'):
                         year_end INTEGER,
                         FOREIGN KEY (region_id) REFERENCES region (id) );''')
 
-    # SITE
-    # Corresponds to "Station" in CameraBase
-    cursor.execute('''CREATE TABLE IF NOT EXISTS site (
+    # STATION
+    cursor.execute('''CREATE TABLE IF NOT EXISTS station (
                         id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
                         lat REAL,
@@ -48,12 +47,12 @@ def setup_database(filepath='matchypatchy.db'):
                         filepath TEXT UNIQUE NOT NULL,
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
-                        site_id INTEGER NOT NULL,
+                        station_id INTEGER NOT NULL,
                         sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
                         favorite INTEGER NOT NULL,
-                        FOREIGN KEY (site_id) REFERENCES site (id),
+                        FOREIGN KEY (station_id) REFERENCES station (id),
                         FOREIGN KEY (sequence_id) REFERENCES sequence (id) );''')
 
     # ROI
@@ -92,6 +91,16 @@ def setup_database(filepath='matchypatchy.db'):
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
+    
+
+    # THUMBNAILS
+    cursor.execute('''DROP TABLE IF EXISTS thumbnails;''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS thumbnails (
+                        id INTEGER PRIMARY KEY,
+                        roi INTEGER NOT NULL,
+                        filepath TEXT NOT NULL,
+                        FOREIGN KEY(roi) REFERENCES roi (id));''')
+
 
     # Commit changes and close connection
     db.commit()

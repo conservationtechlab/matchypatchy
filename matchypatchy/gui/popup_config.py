@@ -9,16 +9,18 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
 
+from matchypatchy import config
 from matchypatchy.gui.popup_alert import AlertPopup
 
-import matchypatchy.config as cfg
 
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Edit Config")
+        self.setMinimumWidth(600)
         self.mpDB = parent.mpDB
+        self.cfg = config.load()
 
         layout = QVBoxLayout()
 
@@ -33,13 +35,13 @@ class ConfigPopup(QDialog):
         
         insert_layout = QVBoxLayout()
         self.db_path = QLineEdit()
-        self.db_path.setText(str(cfg.DB_PATH))
+        self.db_path.setText(str(self.cfg['DB_PATH']))
         insert_layout.addWidget(self.db_path)
         self.log_path = QLineEdit()
-        self.log_path.setText(str(cfg.LOGFILE))
+        self.log_path.setText(str(self.cfg['LOG_PATH']))
         insert_layout.addWidget(self.log_path)
         self.ml_path = QLineEdit()
-        self.ml_path.setText(str(cfg.ML_DIR))
+        self.ml_path.setText(str(self.cfg['ML_DIR']))
         insert_layout.addWidget(self.ml_path)
 
         path_layout.addLayout(insert_layout)
@@ -70,19 +72,6 @@ class ConfigPopup(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-
-        button_new = QPushButton("New")
-        self.button_edit = QPushButton("Edit")
-        self.button_del = QPushButton("Delete")
-
-        # not enabled until site is selected
-        self.button_del.setEnabled(False)
-        self.button_edit.setEnabled(False)
-
-        button_layout.addWidget(button_new)
-        button_layout.addWidget(self.button_edit)
-        button_layout.addWidget(self.button_del)
-
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
@@ -93,16 +82,42 @@ class ConfigPopup(QDialog):
         self.setLayout(layout)
 
     def set_db(self):
-        pass
+        new_db = QFileDialog.getOpenFileName(self, "Get Database",
+                                              os.path.expanduser('~'),
+                                              ("DB Files (*.db)"))[0]
+        if new_db:
+            self.ml_path.setText(new_db)
+            # TODO: verify db
+            # Update config
+            self.cfg['DB_PATH'] = str(new_db)
+            config.update(self.cfg)
+            # Log changes
+            logging.info("DB_PATH CHANGED")
+            logging.info('DB_PATH: ' + self.cfg['DB_PATH'])
+
+
 
     def set_log(self):
         new_log = QFileDialog.getSaveFileName(self, "New File",
                                               os.path.expanduser('~'),
                                               ("Log Files (*.log)"))[0]
         if new_log:
-            print(new_log)
             self.log_path.setText(new_log)
-            
+            # Update config
+            self.cfg['LOG_PATH'] = str(new_log)
+            config.update(self.cfg)
+            # Log changes
+            logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
+            logging.info("LOG_PATH CHANGED")
+
 
     def set_ml(self):
-        pass
+        new_ml = QFileDialog.getExistingDirectory(self)
+        if new_ml:
+            self.ml_path.setText(new_ml)
+            # Update config
+            self.cfg['ML_DIR'] = str(new_ml)
+            config.update(self.cfg)
+            # Log changes
+            logging.info("ML_DIR CHANGED")
+            logging.info('ML_DIR: ' + self.cfg['ML_DIR'])

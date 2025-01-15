@@ -7,6 +7,8 @@ TODO:
  - enable merge
  - ENABLE VIEWPOINT
 """
+from PIL import Image
+
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
 from PyQt6.QtCore import Qt, QPoint
@@ -81,11 +83,11 @@ class DisplayCompare(QWidget):
         self.survey_select.setFixedWidth(200)
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Site
-        self.site_select = QComboBox()
-        self.site_select.setFixedWidth(200)
-        self.site_select.currentIndexChanged.connect(self.select_site)
-        first_layer.addWidget(self.site_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # station
+        self.station_select = QComboBox()
+        self.station_select.setFixedWidth(200)
+        self.station_select.currentIndexChanged.connect(self.select_station)
+        first_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addStretch()
         layout.addLayout(first_layer)
@@ -182,10 +184,14 @@ class DisplayCompare(QWidget):
         button_query_image_reset = QPushButton("Reset") 
         button_query_image_reset.clicked.connect(self.query_image_reset)
         query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-         # View Image
+        # View Image
         button_query_image_view = QPushButton("View Image") 
         button_query_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_query_rid))
         query_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Open Image
+        button_query_image_open = QPushButton("Open Image") 
+        button_query_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_query_rid))
+        query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         query_image_buttons.addStretch()
         query_layout.addLayout(query_image_buttons)
@@ -280,6 +286,10 @@ class DisplayCompare(QWidget):
         button_match_image_view = QPushButton("View Image") 
         button_match_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(button_match_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Open Image
+        button_match_image_open = QPushButton("Open Image") 
+        button_match_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_match_rid))
+        match_image_buttons.addWidget(button_match_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         match_image_buttons.addStretch()
         match_layout.addLayout(match_image_buttons)
@@ -491,11 +501,11 @@ class DisplayCompare(QWidget):
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])    
 
-        self.filter_sites()    
+        self.filter_stations()    
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_site': self.site_list_ordered[self.site_select.currentIndex()],}
+                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],}
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
@@ -503,17 +513,17 @@ class DisplayCompare(QWidget):
     def select_region(self):
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
         self.filter_surveys()
-        self.filter_sites(survey_ids=list(self.valid_surveys.items()))
-        self.QueryContainer.filter(filter_dict=self.filters, valid_sites=self.valid_sites)
+        self.filter_stations(survey_ids=list(self.valid_surveys.items()))
+        self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
 
     def select_survey(self):
         self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
-        self.filter_sites(survey_ids=[self.filters['active_survey']])
-        self.QueryContainer.filter(filter_dict=self.filters, valid_sites=self.valid_sites)
+        self.filter_stations(survey_ids=[self.filters['active_survey']])
+        self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
 
-    def select_site(self):
-        self.filters['active_site'] = self.site_list_ordered[self.site_select.currentIndex()]
-        self.QueryContainer.filter(filter_dict=self.filters, valid_sites=self.valid_sites)
+    def select_station(self):
+        self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
+        self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
 
     def filter_surveys(self):
         # block signals while updating combobox
@@ -531,22 +541,22 @@ class DisplayCompare(QWidget):
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
         self.survey_select.blockSignals(False)
 
-    def filter_sites(self, survey_ids=None):
+    def filter_stations(self, survey_ids=None):
         # block signals while updating combobox
-        self.site_select.blockSignals(True)
-        self.site_select.clear()
+        self.station_select.blockSignals(True)
+        self.station_select.clear()
         if survey_ids:
             survey_list = ",".join([str(s[0]) for s in survey_ids])
             selection = f'survey_id IN ({survey_list})'
 
-            self.valid_sites = dict(self.mpDB.select("site", columns="id, name", row_cond=selection, quiet=False))
+            self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection, quiet=False))
         else:
-            self.valid_sites = dict(self.mpDB.select("site", columns="id, name"))
+            self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
 
-        # Update site list to reflect active survey
-        self.site_list_ordered = [(0, 'Site')] + [(k, v) for k, v in self.valid_sites.items()]
-        self.site_select.addItems([el[1] for el in self.site_list_ordered])
-        self.site_select.blockSignals(False)        
+        # Update station list to reflect active survey
+        self.station_list_ordered = [(0, 'station')] + [(k, v) for k, v in self.valid_stations.items()]
+        self.station_select.addItems([el[1] for el in self.station_list_ordered])
+        self.station_select.blockSignals(False)        
 
     # IMAGE MANIPULATION -------------------------------------------------------
     def query_image_reset(self):
@@ -563,9 +573,22 @@ class DisplayCompare(QWidget):
 
     # TODO
     def view_image(self, rid):
+        """
+        Open Image in MatchyPatchy Single Image Popup
+        """
         dialog = ImagePopup(self, rid)
         if dialog.exec():
             del dialog
+
+    def open_image(self, rid):
+        """
+        Open Image in OS Default Image Viewer
+
+        Currently only supports one image at a time
+        """
+        img = Image.open(self.QueryContainer.data.loc[rid, "filepath"])
+        img.show() 
+
 
     # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):

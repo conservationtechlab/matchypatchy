@@ -38,7 +38,7 @@ class SpeciesPopup(QDialog):
         self.button_edit.clicked.connect(self.edit)
         self.button_del.clicked.connect(self.delete)
 
-        # not enabled until site is selected
+        # not enabled until station is selected
         self.button_del.setEnabled(False)
         self.button_edit.setEnabled(False)
 
@@ -79,11 +79,11 @@ class SpeciesPopup(QDialog):
         if dialog.exec():
             self.mpDB.add_species(dialog.get_binomen(), dialog.get_common())
         del dialog
-        self.sites = self.update()
+        self.stations = self.update()
 
     def edit(self):
-        selected_site = self.list.currentRow()
-        id = self.species_list_ordered[selected_site][0]
+        selected_station = self.list.currentRow()
+        id = self.species_list_ordered[selected_station][0]
 
         cond = f'id={id}'
         id, binomen, common = self.mpDB.select('species', row_cond=cond)[0]
@@ -92,7 +92,7 @@ class SpeciesPopup(QDialog):
             replace_dict = {"binomen": f"'{dialog.get_binomen()}'", "common": f"'{dialog.get_common()}'"}
             self.mpDB.edit_row("species", id, replace_dict)
         del dialog
-        self.sites = self.update()
+        self.stations = self.update()
 
     def delete(self):
         selected = self.list.currentItem().text()

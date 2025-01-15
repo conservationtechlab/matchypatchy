@@ -2,25 +2,25 @@
 Widget for displaying list of Media
 ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 'reviewed', 
 'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'timestamp', 
-'site_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+'station_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 
 # TODO: MAKE TABLE EDITABLE
 # TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
-# TODO: MAKE THUMBNAIL LOAD FASTER
+# TODO: keep track of thumbnails
 
-import tempfile
+
 import pandas as pd
 
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel, QHeaderView
 from PyQt6.QtGui import QPixmap, QImage
-from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
+from PyQt6.QtCore import Qt
 
-from matchypatchy.config import VIEWPOINT
+from matchypatchy.algo import models
+from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
 from matchypatchy.database.media import fetch_media
 from matchypatchy.gui.popup_alert import ProgressPopup
 
-THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
 
 class MediaTable(QWidget):
     def __init__(self, parent):
@@ -30,10 +30,12 @@ class MediaTable(QWidget):
         self.data = pd.DataFrame()
         self.thumbnails = dict()
         self.crop = True
+        self.VIEWPOINT = models.load('VIEWPOINT')
+
         self.edits = list()
         self.columns = ["reviewed","thumbnail", "filepath", "timestamp", 
                         "viewpoint", "binomen", "common", "individual_id", "sex", 
-                        "site", "sequence_id", "external_id", "favorite", "comment"]
+                        "station", "sequence_id", "external_id", "favorite", "comment"]
         # Set up layout
         layout = QVBoxLayout()
 
@@ -42,7 +44,7 @@ class MediaTable(QWidget):
         self.table.setColumnCount(14)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", 
                                               "Viewpoint", "Species", "Common", "Individual", "Sex", 
-                                              "Site", "Sequence ID", "External ID", "Favorite", "Comment"])
+                                              "Station", "Sequence ID", "External ID", "Favorite", "Comment"])
         self.table.resizeColumnsToContents()
         self.table.setColumnWidth(1, 100)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
@@ -69,7 +71,7 @@ class MediaTable(QWidget):
             # no media, give warning, go home
             return False
 
-
+    # STEP 2 - CALLED BY load_data()
     def fetch(self):
         """
         Select all media, store in dataframe
@@ -86,9 +88,8 @@ class MediaTable(QWidget):
             self.data = self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
                                         name=None, sex=None, individual_id=0)
             self.crop = False  # display full image
-
-
     
+    # STEP 3 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
         """
         Load images if data is available
@@ -102,7 +103,7 @@ class MediaTable(QWidget):
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
 
-    # Triggered by load_images()
+    # STEP 4 - Triggered by load_images() finishing
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
@@ -117,23 +118,23 @@ class MediaTable(QWidget):
         
         # map 
         filters = self.parent.filters
-        valid_sites = self.parent.valid_sites
+        valid_stations = self.parent.valid_stations
 
-        # Region Filter (depends on prefilterd sites from MediaDisplay)
-        if 'region_filter' in filters.keys() and valid_sites:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(valid_sites.keys()))]
+        # Region Filter (depends on prefilterd stations from MediaDisplay)
+        if 'region_filter' in filters.keys() and valid_stations:
+            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(valid_stations.keys()))]
     
-        # Survey Filter (depends on prefilterd sites from MediaDisplay)
-        if 'survey_filter' in filters.keys() and valid_sites:
-            self.data_filtered = self.data_filtered[self.data_filtered['site_id'].isin(list(valid_sites.keys()))]
+        # Survey Filter (depends on prefilterd stations from MediaDisplay)
+        if 'survey_filter' in filters.keys() and valid_stations:
+            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(valid_stations.keys()))]
 
-        # Single Site Filter
-        if 'active_site' in filters.keys() and valid_sites:
-            if filters['active_site'][0] > 0:
-                self.data_filtered = self.data_filtered[self.data_filtered['site_id'] == filters['active_site'][0]]
-            self.data_filtered['site'] = self.data_filtered['site_id'].map(valid_sites)
+        # Single station Filter
+        if 'active_station' in filters.keys() and valid_stations:
+            if filters['active_station'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['station_id'] == filters['active_station'][0]]
+            self.data_filtered['station'] = self.data_filtered['station_id'].map(valid_stations)
         else:
-            # no valid sites, empty dataframe
+            # no valid stations, empty dataframe
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
         # Species Filter
@@ -195,10 +196,8 @@ class MediaTable(QWidget):
             print(self.data_filtered.at[entry, reference])
             # convert row and column to 
             print(item.text())  
-
         # add to queue
         
-    
     def set_check_state(self, item):
         """
         Set the checkbox of reviewed and favorite columns
@@ -229,12 +228,12 @@ class MediaTable(QWidget):
         # Data
         self.table.setItem(i, 2, QTableWidgetItem(roi["filepath"]))  # File Path column
         self.table.setItem(i, 3, QTableWidgetItem(roi["timestamp"]))  # Date Time column
-        self.table.setItem(i, 4, QTableWidgetItem(VIEWPOINT[roi["viewpoint"]]))  # Viewpoint column
+        self.table.setItem(i, 4, QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"])]))  # Viewpoint column
         self.table.setItem(i, 5, QTableWidgetItem(roi["binomen"]))   # File Path column
         self.table.setItem(i, 6, QTableWidgetItem(roi["common"]))  # Date Time column
         self.table.setItem(i, 7, QTableWidgetItem(roi["name"]))  # Individual column
         self.table.setItem(i, 8, QTableWidgetItem(roi["sex"]))  # Sex column
-        self.table.setItem(i, 9, QTableWidgetItem(roi["site"]))   # Site column
+        self.table.setItem(i, 9, QTableWidgetItem(roi["station"]))   # station column
         self.table.setItem(i, 10, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
         self.table.setItem(i, 11, QTableWidgetItem(str(roi["external_id"])))  # Sequence ID column
         
@@ -250,55 +249,3 @@ class MediaTable(QWidget):
     # captures emitted temp thumbnail path to data 
     def add_thumbnail_path(self, i, thumbnail_path):
         self.data.loc[i,'thumbnail_path'] = thumbnail_path
-
-
-
-
-
-
-
-
-
-# IMAGE LOAD =====================================================================================
-class LoadThumbnailThread(QThread):
-    progress_update = pyqtSignal(int)  # Signal to update the progress bar
-    loaded_image = pyqtSignal(int, str)
-
-    def __init__(self, data, crop=True):
-        super().__init__()
-        self.data = data
-        self.crop = crop
-        self.size = 99
-    
-    def run(self):
-        for i, roi in self.data.iterrows():
-            # load image
-            self.original = QImage(roi['filepath'])
-            # image not found, use placeholder
-            if self.original.isNull():
-                self.image = QImage(THUMBNAIL_NOTFOUND)
-            else:
-                # crop for rois
-                if self.crop:
-                    left = self.original.width() * roi['bbox_x']
-                    top = self.original.height() * roi['bbox_y']
-                    right = self.original.width() * roi['bbox_w']
-                    bottom = self.original.height() * roi['bbox_h']
-                    crop_rect = QRect(int(left), int(top), int(right), int(bottom))
-                    self.image = self.original.copy(crop_rect)
-                # no crop for media
-                else:
-                    self.image = self.original.copy()
-            # scale it to 99x99
-            scaled_image = self.image.scaled(self.size, self.size,
-                                            Qt.AspectRatioMode.KeepAspectRatio, 
-                                            Qt.TransformationMode.SmoothTransformation)
-            
-            # create a temporary file to hold thumbnail
-            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
-                temp_file_path = temp_file.name 
-            # save the image
-            scaled_image.save(temp_file_path, format="JPG")
-            # emit thumbnail_path and progress update
-            self.loaded_image.emit(i, temp_file_path)
-            self.progress_update.emit(int((i + 1) / len(self.data) * 100))

@@ -40,7 +40,7 @@ class IndividualPopup(QDialog):
         self.button_edit.clicked.connect(self.edit)
         self.button_view.clicked.connect(self.view)
 
-        # not enabled until site is selected
+        # not enabled until station is selected
         self.button_edit.setEnabled(False)
         self.button_view.setEnabled(False)
 
@@ -98,7 +98,7 @@ class IndividualPopup(QDialog):
             self.mpDB.edit_row("individual", id, replace_dict)
         del dialog
         # refetch data
-        self.sites = self.update()
+        self.stations = self.update()
         
 
     def view(self):

@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
 
 from matchypatchy.gui.popup_survey import SurveyPopup
-from matchypatchy.gui.popup_site import SitePopup
+from matchypatchy.gui.popup_station import StationPopup
 from matchypatchy.gui.popup_individual import IndividualPopup
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_species import SpeciesPopup
@@ -64,7 +64,7 @@ class DisplayBase(QWidget):
         column_layout = QHBoxLayout()
         column_layout.addSpacing(100)  # add spacing to left side
 
-        # DB MANAGEMENT
+        # DB MANAGEMENT ========================================================
         border_db = QWidget()
         border_db.setObjectName("borderWidget")
         border_db.setStyleSheet("#borderWidget { border: 1px solid gray; }")
@@ -85,17 +85,17 @@ class DisplayBase(QWidget):
         survey_layout.addWidget(button_survey_new, 1)
         db_layer.addLayout(survey_layout)
 
-        button_site_manage = QPushButton("Manage Sites")
+        button_station_manage = QPushButton("Manage Stations")
         button_species_manage = QPushButton("Manage Species")
         button_media_manage = QPushButton("Manage Media")
         button_individual_manage = QPushButton("Manage Individuals")
 
-        button_site_manage.clicked.connect(self.new_site)
+        button_station_manage.clicked.connect(self.new_station)
         button_species_manage.clicked.connect(self.manage_species)
         button_media_manage.clicked.connect(self.validate)
         button_individual_manage.clicked.connect(self.manage_individual)
 
-        db_layer.addWidget(button_site_manage)
+        db_layer.addWidget(button_station_manage)
         db_layer.addWidget(button_species_manage)
         db_layer.addWidget(button_media_manage)
         db_layer.addWidget(button_individual_manage)
@@ -104,7 +104,7 @@ class DisplayBase(QWidget):
         column_layout.addWidget(border_db, 1)
         column_layout.addSpacing(20)  # gap between sections
 
-        # MAIN PROCESS
+        # MAIN PROCESS =========================================================
         border_import = QWidget()
         border_import.setObjectName("borderWidget")
         border_import.setStyleSheet("#borderWidget { border: 1px solid gray; }")
@@ -140,7 +140,7 @@ class DisplayBase(QWidget):
         column_layout.addWidget(border_import, 1)
         column_layout.addSpacing(20)
 
-        # OTHER
+        # OTHER ================================================================
         border_other = QWidget()
         border_other.setObjectName("borderWidget")
         border_other.setStyleSheet("#borderWidget { border: 1px solid gray; }")
@@ -154,8 +154,7 @@ class DisplayBase(QWidget):
         button_download_ml = QPushButton("Download Models")
         button_ph1 = QPushButton("")
         button_ph1.setEnabled(False)
-        button_ph2 = QPushButton("")
-        button_ph2.setEnabled(False)
+        button_ph2 = QPushButton("Validate")
         button_clear_data = QPushButton("Clear Data")
 
         other_layer.addWidget(button_configuration)
@@ -166,6 +165,8 @@ class DisplayBase(QWidget):
 
         button_configuration.clicked.connect(self.edit_config)
         button_download_ml.clicked.connect(self.download_ml)
+        button_download_ml.clicked.connect(self.download_ml)
+        button_ph2.clicked.connect(self.validate_db)
         button_clear_data.clicked.connect(self.clear_data)
 
         border_other.setLayout(other_layer)
@@ -207,9 +208,9 @@ class DisplayBase(QWidget):
             self.active_survey = (0, None)
             return False
 
-    def new_site(self):
+    def new_station(self):
         self.select_survey()
-        dialog = SitePopup(self)
+        dialog = StationPopup(self)
         if dialog.exec():
             del dialog
 
@@ -335,10 +336,13 @@ class DisplayBase(QWidget):
         if dialog.exec():
             del dialog
 
+    def validate_db(self):
+        self.mpDB.info()
+
     def clear_data(self):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
         if dialog.exec(): 
-            self.mpDB.validate()
+            self.mpDB.__info__()
             logging.warning("DELETING DATA")
             self.mpDB.clear("media")
             self.mpDB.clear("roi")
