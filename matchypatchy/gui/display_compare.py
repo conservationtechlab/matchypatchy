@@ -29,6 +29,7 @@ class DisplayCompare(QWidget):
         self.mpDB = parent.mpDB
         self.k = 3  # default knn
         self.threshold = 80
+        self.current_viewpoint ='all'
 
         ## CREATE QUERY CONTAINER ==============================================
         self.QueryContainer = QueryContainer(self)
@@ -399,6 +400,8 @@ class DisplayCompare(QWidget):
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
         self.match_n.setText("/" + str(len(self.QueryContainer.current_match_rois)))
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
+
+        self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
         # load new images
         self.load_query()
         self.load_match()
@@ -444,6 +447,7 @@ class DisplayCompare(QWidget):
         # TODO
 
         selected_viewpoint = self.dropdown_viewpoint.currentText().lower()
+        self.current_viewpoint = selected_viewpoint
     
         self.QueryContainer.toggle_viewpoint(selected_viewpoint)
         self.load_query()

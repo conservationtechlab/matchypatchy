@@ -28,7 +28,8 @@ class QueryContainer():
         self.current_query_rid = 0
         self.current_match_rid = 0 
 
-        self.viewpoints = {}      
+        self.viewpoints = {} 
+        self.selected_viewpoint = 'all'     
 
     
     def load_data(self):
@@ -48,7 +49,8 @@ class QueryContainer():
             # need sequence and capture ids from media to restrict comparisons shown to
             info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, site_id, sequence_id"
             rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
-            self.rois = pd.DataFrame(rois, columns=columns)
+            self.rois = pd.DataFrame(rois, columns=columns)           
+            print(f'rois are:{self.rois}')
 
        
 
@@ -151,6 +153,8 @@ class QueryContainer():
         # get viewpoints
         self.current_query_viewpoints = self.data.loc[self.current_query_rois, 'viewpoint']
 
+        #self.update_viewpoint_current_query()
+
         # set view to first in sequence
         self.set_within_query_sequence(0)
         # update matches
@@ -209,6 +213,7 @@ class QueryContainer():
             self.viewpoints['all'][sequence_id] = all_rois
             self.viewpoints['left'][sequence_id] = left_rois
             self.viewpoints['right'][sequence_id] = right_rois
+        print('viewpoints computed')
 
 
 
@@ -219,18 +224,23 @@ class QueryContainer():
         #TO DO:
         #update number of images in the sequence(GUI)
         #doesn't need to reselect viewpoint for every query image
+
+        self.selected_viewpoint = selected_viewpoint
+        self.update_viewpoint_current_query()
+    
+
+    def update_viewpoint_current_query(self):
+        print(f'current query rid is: {self.current_query_rid}')
         sequence_id = self.data.loc[self.current_query_rid,'sequence_id']
-
-
-        if selected_viewpoint == 'all':
+        if self.selected_viewpoint == 'all':
             self.current_query_rois = self.viewpoints['all'].get(sequence_id,[])
         else:
-            self.current_query_rois = self.viewpoints[selected_viewpoint].get(sequence_id,[])
+            self.current_query_rois = self.viewpoints[self.selected_viewpoint].get(sequence_id,[])
         
         if self.current_query_rois:
             self.set_within_query_sequence(0)
         else:
-            self.parent.warn(f'No query image with {selected_viewpoint} viewpoint in the current sequence')
+            self.parent.warn(f'No query image with {self.selected_viewpoint} viewpoint in the current sequence')
 
 
         
