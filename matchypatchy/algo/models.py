@@ -39,7 +39,7 @@ def get_path(key):
     else:
         return None
 
-def get_class_path(self, key):
+def get_class_path(key):
     ML_DIR = Path(config.load("ML_DIR"))
     CLASS_FILES = load('CLASS_FILES')
     if key is None:
@@ -50,7 +50,7 @@ def get_class_path(self, key):
     else:
         return None
 
-def get_config_path(self, key):
+def get_config_path(key):
     ML_DIR = config.load("ML_DIR")
     CONFIG_FILES = load('CONFIG_FILES')
     if key is None:

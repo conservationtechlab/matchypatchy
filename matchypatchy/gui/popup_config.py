@@ -89,7 +89,7 @@ class ConfigPopup(QDialog):
             self.ml_path.setText(new_db)
             # TODO: verify db
             # Update config
-            self.cfg['DB_PATH'] = new_db
+            self.cfg['DB_PATH'] = str(new_db)
             config.update(self.cfg)
             # Log changes
             logging.info("DB_PATH CHANGED")
@@ -104,7 +104,7 @@ class ConfigPopup(QDialog):
         if new_log:
             self.log_path.setText(new_log)
             # Update config
-            self.cfg['LOG_PATH'] = new_log
+            self.cfg['LOG_PATH'] = str(new_log)
             config.update(self.cfg)
             # Log changes
             logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
@@ -116,7 +116,7 @@ class ConfigPopup(QDialog):
         if new_ml:
             self.ml_path.setText(new_ml)
             # Update config
-            self.cfg['ML_DIR'] = new_ml
+            self.cfg['ML_DIR'] = str(new_ml)
             config.update(self.cfg)
             # Log changes
             logging.info("ML_DIR CHANGED")

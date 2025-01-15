@@ -21,6 +21,7 @@ class AnimlThread(QThread):
         super().__init__()
         self.mpDB = mpDB
 
+
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
@@ -44,7 +45,7 @@ class AnimlThread(QThread):
         self.get_species()
 
     def get_frames(self):
-        self.media = animl_mp.process_videos(self.media, config.FRAME_DIR)
+        self.media = animl_mp.process_videos(self.media, config.load('FRAME_DIR'))
 
     def get_bbox(self):
         # 1 RUN MED

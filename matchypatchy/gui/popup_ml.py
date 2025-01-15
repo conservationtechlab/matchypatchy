@@ -51,7 +51,6 @@ class MLDownloadPopup(QDialog):
         # check already downloaded models
         self.set_checkboxes()
     
-
     def discover_models(self):
         models_dict = dict()
         for m in self.models.keys():
@@ -89,6 +88,10 @@ class MLDownloadPopup(QDialog):
 class MLOptionsPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
+        self.ml_dir = Path(config.load('ML_DIR'))
+        self.ml_cfg = models.load()
+        self.available_models = self.discover_models()
+        print(self.available_models)
 
         self.setWindowTitle('Model Options')
         layout = QVBoxLayout()
@@ -106,7 +109,7 @@ class MLOptionsPopup(QDialog):
         layout.addWidget(self.detector_label)
         layout.addWidget(self.detector)
 
-        self.available_detectors = list(models.available_models(models.DETECTORS))
+        self.available_detectors = self.get_subset('DETECTOR_MODELS')
         self.detector.addItems(self.available_detectors)
 
         # Classifier
@@ -115,7 +118,7 @@ class MLOptionsPopup(QDialog):
         layout.addWidget(self.classifier_label)
         layout.addWidget(self.classifier)
 
-        self.available_classifiers = ['None'] + list(models.available_models(models.CLASSIFIERS))
+        self.available_classifiers = ['None'] + self.get_subset('CLASSIFIER_MODELS')
         self.classifier.addItems(self.available_classifiers)
 
         # Re-ID
@@ -124,7 +127,7 @@ class MLOptionsPopup(QDialog):
         layout.addWidget(self.reid_label)
         layout.addWidget(self.reid)
 
-        self.available_reids = list(models.available_models(models.REIDS))
+        self.available_reids = self.get_subset('REID_MODELS')
         self.reid.addItems(self.available_reids)
 
         # Viewpoint
@@ -133,9 +136,8 @@ class MLOptionsPopup(QDialog):
         layout.addWidget(self.viewpoint_label)
         layout.addWidget(self.viewpoint)
 
-        self.available_viewpoints = list(models.available_models(models.VIEWPOINTS))
-        self.viewpoint_list = ['None'] + self.available_viewpoints
-        self.viewpoint.addItems(self.viewpoint_list)
+        self.available_viewpoints = ['None'] + self.get_subset('VIEWPOINT_MODELS')
+        self.viewpoint.addItems(self.available_viewpoints)
 
         # Ok/Cancel
         layout.addSpacing(20)
@@ -145,6 +147,27 @@ class MLOptionsPopup(QDialog):
         self.buttonBox.rejected.connect(self.reject)
 
         self.setLayout(layout)
+
+    def discover_models(self):
+        models_dict = dict()
+        for m in self.ml_cfg['MODELS'].keys():
+            path = self.ml_dir / self.ml_cfg['MODELS'][m][0]
+            if path.exists():
+                models_dict[m] = path
+        # if looking for a particular model, give back path
+        return models_dict
+    
+    def get_subset(self, subset):
+        # GET THE AVAILABLE MODELS OF SUBSET TYPE
+        print(self.available_models)
+        models_dict = dict()
+        for m in self.ml_cfg[subset]:
+            if m in self.available_models.keys():
+                path = self.ml_dir / self.available_models[m]
+                if path.exists():
+                    models_dict[m] = path
+        # if looking for a particular model, give back path
+        return list(models_dict)
 
     def select_sequence(self):
         return self.sequence.isChecked()
