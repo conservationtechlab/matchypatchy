@@ -7,20 +7,18 @@ Widget for displaying list of Media
 
 # TODO: MAKE TABLE EDITABLE
 # TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
-# TODO: MAKE THUMBNAIL LOAD FASTER
 
-import tempfile
 import pandas as pd
 
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel, QHeaderView
 from PyQt6.QtGui import QPixmap, QImage
-from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
+from PyQt6.QtCore import Qt
 
 from matchypatchy.algo import models
+from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
 from matchypatchy.database.media import fetch_media
 from matchypatchy.gui.popup_alert import ProgressPopup
 
-THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
 
 class MediaTable(QWidget):
     def __init__(self, parent):
@@ -71,7 +69,7 @@ class MediaTable(QWidget):
             # no media, give warning, go home
             return False
 
-
+    # STEP 2 - CALLED BY load_data()
     def fetch(self):
         """
         Select all media, store in dataframe
@@ -88,9 +86,8 @@ class MediaTable(QWidget):
             self.data = self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
                                         name=None, sex=None, individual_id=0)
             self.crop = False  # display full image
-
-
     
+    # STEP 3 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
         """
         Load images if data is available
@@ -104,7 +101,7 @@ class MediaTable(QWidget):
         self.image_loader_thread.finished.connect(self.filter)
         self.image_loader_thread.start()
 
-    # Triggered by load_images()
+    # STEP 4 - Triggered by load_images() finishing
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
@@ -197,10 +194,8 @@ class MediaTable(QWidget):
             print(self.data_filtered.at[entry, reference])
             # convert row and column to 
             print(item.text())  
-
         # add to queue
         
-    
     def set_check_state(self, item):
         """
         Set the checkbox of reviewed and favorite columns
@@ -252,55 +247,3 @@ class MediaTable(QWidget):
     # captures emitted temp thumbnail path to data 
     def add_thumbnail_path(self, i, thumbnail_path):
         self.data.loc[i,'thumbnail_path'] = thumbnail_path
-
-
-
-
-
-
-
-
-
-# IMAGE LOAD =====================================================================================
-class LoadThumbnailThread(QThread):
-    progress_update = pyqtSignal(int)  # Signal to update the progress bar
-    loaded_image = pyqtSignal(int, str)
-
-    def __init__(self, data, crop=True):
-        super().__init__()
-        self.data = data
-        self.crop = crop
-        self.size = 99
-    
-    def run(self):
-        for i, roi in self.data.iterrows():
-            # load image
-            self.original = QImage(roi['filepath'])
-            # image not found, use placeholder
-            if self.original.isNull():
-                self.image = QImage(THUMBNAIL_NOTFOUND)
-            else:
-                # crop for rois
-                if self.crop:
-                    left = self.original.width() * roi['bbox_x']
-                    top = self.original.height() * roi['bbox_y']
-                    right = self.original.width() * roi['bbox_w']
-                    bottom = self.original.height() * roi['bbox_h']
-                    crop_rect = QRect(int(left), int(top), int(right), int(bottom))
-                    self.image = self.original.copy(crop_rect)
-                # no crop for media
-                else:
-                    self.image = self.original.copy()
-            # scale it to 99x99
-            scaled_image = self.image.scaled(self.size, self.size,
-                                            Qt.AspectRatioMode.KeepAspectRatio, 
-                                            Qt.TransformationMode.SmoothTransformation)
-            
-            # create a temporary file to hold thumbnail
-            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
-                temp_file_path = temp_file.name 
-            # save the image
-            scaled_image.save(temp_file_path, format="JPG")
-            # emit thumbnail_path and progress update
-            self.loaded_image.emit(i, temp_file_path)
-            self.progress_update.emit(int((i + 1) / len(self.data) * 100))
