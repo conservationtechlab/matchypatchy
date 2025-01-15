@@ -28,10 +28,9 @@ from matchypatchy.database import species
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, mpDB, cfg):
+    def __init__(self, mpDB):
         super().__init__()
         self.mpDB = mpDB
-        self.cfg = cfg
         self.setWindowTitle("MatchyPatchy")
         self.setMinimumSize(1600, 900)
         self.resize(1600, 900)
@@ -88,7 +87,7 @@ class MainWindow(QMainWindow):
         # EDIT
         edit_preferences = QAction("Preferences", self)
         edit_survey = QAction("Surveys", self)
-        edit_station = QAction("stations", self)
+        edit_station = QAction("Stations", self)
         edit_species = QAction("Species", self)
         edit_media = QAction("Media", self)
 
@@ -150,7 +149,7 @@ class MainWindow(QMainWindow):
                 station.import_csv(self.mpDB, file_path, survey_id=survey_id)
 
 
-def main_display(mpDB, cfg):
+def main_display(mpDB):
     """
     Launch GUI
 
@@ -158,7 +157,7 @@ def main_display(mpDB, cfg):
         mpDB: matchypatchy database object
     """
     app = QApplication(sys.argv)
-    window = MainWindow(mpDB, cfg)
+    window = MainWindow(mpDB)
     window.show()
     sys.exit(app.exec())
 

@@ -21,7 +21,6 @@ class ConfigPopup(QDialog):
         self.setMinimumWidth(600)
         self.mpDB = parent.mpDB
         self.cfg = config.load()
-        print(self.cfg)
 
         layout = QVBoxLayout()
 

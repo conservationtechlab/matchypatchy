@@ -6,7 +6,6 @@ from pathlib import Path
 import tempfile
 import logging 
 import yaml
-import wget
 
 # TODO: FIX CONFIG LOCATION
 
@@ -46,11 +45,14 @@ def initiate():
     return cfg
 
 
-def load():
+def load(key=None):
     # Load the config into a dict
     with open('config.yml', 'r') as cfg_file:
-        return yaml.safe_load(cfg_file)
-
+        cfg = yaml.safe_load(cfg_file)
+        if key:
+            return cfg[key]
+        else:
+            return cfg
 
 def update(new_cfg):
     # Update the yaml with new values

@@ -85,7 +85,7 @@ class DisplayBase(QWidget):
         survey_layout.addWidget(button_survey_new, 1)
         db_layer.addLayout(survey_layout)
 
-        button_station_manage = QPushButton("Manage stations")
+        button_station_manage = QPushButton("Manage Stations")
         button_species_manage = QPushButton("Manage Species")
         button_media_manage = QPushButton("Manage Media")
         button_individual_manage = QPushButton("Manage Individuals")
@@ -210,7 +210,7 @@ class DisplayBase(QWidget):
 
     def new_station(self):
         self.select_survey()
-        dialog = stationPopup(self)
+        dialog = StationPopup(self)
         if dialog.exec():
             del dialog
 
@@ -337,7 +337,7 @@ class DisplayBase(QWidget):
             del dialog
 
     def validate_db(self):
-        self.mpDB.__info__()
+        self.mpDB.info()
 
     def clear_data(self):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
