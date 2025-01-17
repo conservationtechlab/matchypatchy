@@ -1,5 +1,5 @@
-DB_PATH: C:\Users\Kyra\matchypatchy\matchypatchy.db
-FRAME_DIR: C:\Users\Kyra\AppData\Local\Temp\MatchyPatchy_7z1b_9t2\Frames
-LOG_PATH: C:\Users\Kyra\matchypatchy\matchpatchy.log
-ML_DIR: C:/Users/Kyra/matchypatchy/Models
-TEMP_DIR: C:\Users\Kyra\AppData\Local\Temp\MatchyPatchy_7z1b_9t2
+DB_PATH: /home/tongfei/matchypatchy/matchypatchy.db
+FRAME_DIR: /tmp/MatchyPatchy_pbc4vppw/Frames
+LOG_PATH: /home/tongfei/matchypatchy/matchpatchy.log
+ML_DIR: /home/tongfei/matchypatchy/Models
+TEMP_DIR: /tmp/MatchyPatchy_pbc4vppw
