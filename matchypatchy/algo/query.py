@@ -29,6 +29,7 @@ class QueryContainer():
         self.current_match_rid = 0 
 
         self.viewpoints = {} 
+        self.match_viewpoints = {}
         self.selected_viewpoint = 'all'     
 
     
@@ -121,6 +122,8 @@ class QueryContainer():
 
         #compute viewpoints
         self.compute_viewpoints()
+        self.compute_match_viewpoints()
+
 
         # Sort by Distance
         # must have valid matches to continue
@@ -152,8 +155,6 @@ class QueryContainer():
 
         # get viewpoints
         self.current_query_viewpoints = self.data.loc[self.current_query_rois, 'viewpoint']
-
-        #self.update_viewpoint_current_query()
 
         # set view to first in sequence
         self.set_within_query_sequence(0)
@@ -215,6 +216,23 @@ class QueryContainer():
             self.viewpoints['right'][sequence_id] = right_rois
         print('viewpoints computed')
 
+    def compute_match_viewpoints(self):
+        self.match_viewpoints = {
+            'all': {}, # {sequence_id: list of matching ROIs}
+            'left': {},
+            'right': {}
+        }
+        for sequence_id, matches in self.neighbor_dict.items():
+            all_matches = [x[0] for x in matches]
+            left_matches = [rid for rid in all_matches if self.data.loc[rid,'viewpoint'] == 0]
+            right_matches = [rid for rid in all_matches if self.data.loc[rid,'viewpoint'] == 1]
+
+            self.match_viewpoints['all'][sequence_id] = all_matches
+            self.match_viewpoints['left'][sequence_id] = left_matches
+            self.match_viewpoints['right'][sequence_id] = right_matches
+
+        print("match viewpoints computed")
+
 
 
     def toggle_viewpoint(self,selected_viewpoint):
@@ -227,7 +245,7 @@ class QueryContainer():
 
         self.selected_viewpoint = selected_viewpoint
         self.update_viewpoint_current_query()
-    
+        self.update_viewpoint_matching_images()
 
     def update_viewpoint_current_query(self):
         print(f'current query rid is: {self.current_query_rid}')
@@ -241,6 +259,29 @@ class QueryContainer():
             self.set_within_query_sequence(0)
         else:
             self.parent.warn(f'No query image with {self.selected_viewpoint} viewpoint in the current sequence')
+            self.parent.query_sequence_n.setText('/0')
+
+
+    def update_viewpoint_matching_images(self):
+        print(f'current sequence is {self.current_sequence_id}')
+        sequence_id = self.current_sequence_id
+        print(f'match viewpoint is {self.match_viewpoints}')
+
+        if self.selected_viewpoint == 'all':
+            self.current_match_rois = self.match_viewpoints['all'].get(sequence_id,[])
+        else:
+            self.current_match_rois = self.match_viewpoints[self.selected_viewpoint].get(sequence_id,[])
+        
+        #update GUI
+        self.parent.match_n.setText('/' + str(len(self.current_match_rois)))
+        if self.current_match_rois:
+            self.set_match(0)
+        else:
+            self.parent.warn(f'No match images with {self.selected_viewpoint} viewpoint.')
+    
+
+    
+
 
 
         

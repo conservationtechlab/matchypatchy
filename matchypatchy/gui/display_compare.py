@@ -406,8 +406,10 @@ class DisplayCompare(QWidget):
         # update text
         self.query_n.setText("/" + str(self.QueryContainer.n_queries))
         self.query_number.setText(str(self.QueryContainer.current_query + 1))
-        self.query_sequence_n.setText(str(len(self.QueryContainer.current_query_rois)))
+
+        self.query_sequence_n.setText("/" + str(len(self.QueryContainer.current_query_rois)))
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
+
         self.match_n.setText("/" + str(len(self.QueryContainer.current_match_rois)))
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
 
@@ -460,7 +462,12 @@ class DisplayCompare(QWidget):
         self.current_viewpoint = selected_viewpoint
     
         self.QueryContainer.toggle_viewpoint(selected_viewpoint)
+        self.query_sequence_n.setText('/'+ str(len(self.QueryContainer.current_query_rois)))
+        self.query_seq_number.setText('1')
+        self.match_number.setText('1')
+    
         self.load_query()
+        self.load_match()
 
     # GUI HANDLERS =============================================================
     def change_k(self):
