@@ -33,14 +33,14 @@ class CSVImportThread(QThread):
             timestamp = exemplar[self.selected_columns["timestamp"]].item()
 
             survey_id = self.survey(exemplar)
-            site_id = self.site(exemplar, survey_id)
+            station_id = self.station(exemplar, survey_id)
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
             external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
             comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
-            media_id = self.mpDB.add_media(filepath, ext, timestamp, site_id,
+            media_id = self.mpDB.add_media(filepath, ext, timestamp, station_id,
                                            sequence_id=sequence_id,
                                            external_id=external_id,
                                            comment=comment)
@@ -96,14 +96,14 @@ class CSVImportThread(QThread):
             survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
         return survey_id
     
-    def site(self, exemplar, survey_id):
-        # get or create site
-        site_name = exemplar[self.selected_columns["site"]].item()
+    def station(self, exemplar, survey_id):
+        # get or create station
+        station_name = exemplar[self.selected_columns["station"]].item()
         try:
-            site_id = self.mpDB.select("site", columns="id", row_cond=f'name="{site_name}"')[0][0]
+            station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
         except IndexError:
-            site_id = self.mpDB.add_site(str(site_name), None, None, survey_id)
-        return site_id
+            station_id = self.mpDB.add_station(str(station_name), None, None, survey_id)
+        return station_id
 
     def species(self, roi):
         if self.selected_columns["species"] != "None":
@@ -133,13 +133,13 @@ class CSVImportThread(QThread):
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, active_survey, data, site_level):
+    def __init__(self, mpDB, active_survey, data, station_level):
         super().__init__()
         self.mpDB = mpDB
         self.active_survey = active_survey
         self.data = data
-        self.site_level = site_level
-        self.default_site = None
+        self.station_level = station_level
+        self.default_station = None
         self.animl_conversion = {"filepath": "FilePath",
                                  "timestamp": "DateTime"}
 
@@ -158,21 +158,21 @@ class FolderImportThread(QThread):
             _, ext = os.path.splitext(os.path.basename(filepath))
 
             # get remaining information
-            if self.site_level > 0:
-                site_name = os.path.normpath(filepath).split(os.sep)[self.site_level]
+            if self.station_level > 0:
+                station_name = os.path.normpath(filepath).split(os.sep)[self.station_level]
                 try:
-                    site_id = self.mpDB.select("site", columns='id', row_cond=f'name="{site_name}"')[0][0]
+                    station_id = self.mpDB.select("station", columns='id', row_cond=f'name="{station_name}"')[0][0]
                 except IndexError:
-                    site_id = self.mpDB.add_site(str(site_name), None, None, int(self.active_survey[0]))
+                    station_id = self.mpDB.add_station(str(station_name), None, None, int(self.active_survey[0]))
             else:
-                if not self.default_site:
-                    self.default_site = self.mpDB.add_site("None", None, None, int(self.active_survey[0]))
-                site_id = self.default_site
+                if not self.default_station:
+                    self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
+                station_id = self.default_station
 
             # insert into table, force type
             media_id = self.mpDB.add_media(filepath, ext,
                                            str(timestamp),
-                                           int(site_id),
+                                           int(station_id),
                                            sequence_id=None,
                                            external_id=None,
                                            comment=None)

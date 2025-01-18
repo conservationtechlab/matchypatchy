@@ -191,6 +191,6 @@ class MLOptionsPopup(QDialog):
         if self.viewpoint.currentIndex() == 0:
             return None
         else:
-            self.selected_viewpoint_key = self.available_viewpoints[self.viewpoint.currentIndex() - 1]
+            self.selected_viewpoint_key = self.available_viewpoints[self.viewpoint.currentIndex()]
             return self.selected_viewpoint_key
         
