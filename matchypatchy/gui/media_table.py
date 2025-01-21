@@ -197,6 +197,13 @@ class MediaTable(QWidget):
             # convert row and column to 
             print(item.text())  
         # add to queue
+
+    def update_row(self):
+        pass
+
+    def update_column(self):
+        pass   
+
         
     def set_check_state(self, item):
         """
@@ -246,6 +253,7 @@ class MediaTable(QWidget):
         # Comment
         self.table.setItem(i, 13, QTableWidgetItem(roi["comment"]))  # Favorite column
 
-    # captures emitted temp thumbnail path to data 
+    # captures emitted temp thumbnail path to data, saves to table
     def add_thumbnail_path(self, i, thumbnail_path):
         self.data.loc[i,'thumbnail_path'] = thumbnail_path
+ 
