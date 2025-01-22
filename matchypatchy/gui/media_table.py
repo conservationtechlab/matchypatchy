@@ -83,7 +83,6 @@ class MediaTable(QWidget):
             media, column_names = self.mpDB.all_media()
             self.data = pd.DataFrame(media, columns=column_names)  
             self.crop = True
-            self.id_col = 'roi.id'
             
         # no rois processed, default to full image
         else:
@@ -91,7 +90,6 @@ class MediaTable(QWidget):
             self.data = self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
                                         name=None, sex=None, individual_id=0)
             self.crop = False  # display full image
-            self.id_col = 'id'
     
     # STEP 3 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
@@ -202,7 +200,7 @@ class MediaTable(QWidget):
         """
         entry = item.row()  # refers to filtered dataframe, can change if refiltered
         reference = self.columns[item.column()]
-        id = int(self.data_filtered.at[entry, self.id_col])
+        id = int(self.data_filtered.at[entry, "id"])
         # get unfiltered id
         
         # checked items
@@ -231,8 +229,7 @@ class MediaTable(QWidget):
     def undo(self):
         # id, entry, reference, previous, new
         last = self.edit_stack.pop()
-        print(last)
-        self.data_filtered.at[last[1], last[2]] = last[3]
+        self.data_filtered.at[last[0], last[1]] = last[2]
 
     def save_changes(self):
         # commit all changes in self.edit_stack to database
