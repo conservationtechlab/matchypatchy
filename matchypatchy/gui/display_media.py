@@ -26,10 +26,17 @@ class DisplayMedia(QWidget):
         return_button.setFixedWidth(100)
         first_layer.addWidget(return_button, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(self.save)
+        save_button.setFixedWidth(100)
+        first_layer.addWidget(save_button, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         undo_button = QPushButton("Undo")
         undo_button.clicked.connect(self.undo)
         undo_button.setFixedWidth(100)
         first_layer.addWidget(undo_button, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        first_layer.addStretch()
 
         # FILTERS
         survey_label = QLabel("Filter:")
@@ -267,16 +274,10 @@ class DisplayMedia(QWidget):
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
         self.station_select.blockSignals(False)        
 
+    def save(self):
+        # Undo last edit
+        self.media_table.save_changes()
 
     def undo(self):
         # Undo last edit
-        pass
-
-
-    # Keyboard Handler ---------------------------------------------------------
-    def keyPressEvent(self, event):
-        key = event.key()
-        key_text = event.text()
-
-        # Right Arrow
-        print(f"Key pressed: {key_text} (Qt key code: {key})")
+        self.media_table.undo()

@@ -32,6 +32,8 @@ class MediaTable(QWidget):
         self.crop = True
         self.VIEWPOINT = models.load('VIEWPOINT')
 
+        self.edit_stack = []
+
         self.edits = list()
         self.columns = ["reviewed","thumbnail", "filepath", "timestamp", 
                         "viewpoint", "binomen", "common", "individual_id", "sex", 
@@ -81,6 +83,7 @@ class MediaTable(QWidget):
             media, column_names = self.mpDB.all_media()
             self.data = pd.DataFrame(media, columns=column_names)  
             self.crop = True
+            self.id_col = 'roi.id'
             
         # no rois processed, default to full image
         else:
@@ -88,6 +91,7 @@ class MediaTable(QWidget):
             self.data = self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
                                         name=None, sex=None, individual_id=0)
             self.crop = False  # display full image
+            self.id_col = 'id'
     
     # STEP 3 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
@@ -171,13 +175,24 @@ class MediaTable(QWidget):
         # clear old contents and prep for filtered data
         self.table.clearContents()
         # disconnect edit function while refreshing to prevent needless calls
-        self.table.blockSignals(True)  
+        self.table.blockSignals(True) 
+        # include user edits to current data_filtered:
+        self.apply_edits()
+        # display data
         self.table.setRowCount(self.data_filtered.shape[0])
         for i in range(self.data_filtered.shape[0]):
             self.add_row(i)
         self.table.blockSignals(False)  # reconnect editing
        
-    # TODO: UPDATE ENTRIES
+    # UPDATE ENTRIES -----------------------------------------------------------
+    def apply_edits(self):
+        """
+        Applies all previous edits to the current data_filter if the row is present
+        """
+        for edit in self.edit_stack:
+            if not self.data_filtered.empty and self.data_filtered[self.id_col].isin([edit[0]]).any():
+                self.data_filtered.loc[self.data_filtered[self.id_col] == edit[0], edit[1]] = edit[3]
+
     def update_entry(self, item): 
         """
         Allows user to edit entry in table 
@@ -185,42 +200,52 @@ class MediaTable(QWidget):
         Save edits in queue, allow undo 
         prompt user to save edits 
         """
-        entry = item.row()
+        entry = item.row()  # refers to filtered dataframe, can change if refiltered
         reference = self.columns[item.column()]
-        print(entry, reference)
-        # if checkbox
-        if item.flags() & Qt.ItemFlag.ItemIsUserCheckable:
-            print(item.checkState() == Qt.CheckState.Checked)
-        # else is text
-        else:
-            print(self.data_filtered.at[entry, reference])
-            # convert row and column to 
-            print(item.text())  
-        # add to queue
+        id = int(self.data_filtered.at[entry, self.id_col])
+        # get unfiltered id
+        
+        # checked items
+        if reference == 'reviewed' or reference == 'favorite':
+            print(item.checkState())
+            previous_value = self.set_check_state(self.data_filtered.at[entry, reference])
+            new_value = item.checkState()
 
+        # everything else
+        else:
+            previous_value = self.data_filtered.at[entry, reference]
+            new_value = item.text()
+            
+        # add edit to stack
+        edit = [id, reference, previous_value, new_value]
+        self.edit_stack.append(edit)
+
+    # TODO
     def update_row(self):
         pass
 
+    # TODO
     def update_column(self):
         pass   
 
-        
-    def set_check_state(self, item):
-        """
-        Set the checkbox of reviewed and favorite columns
-        when adding rows
-        """
-        if item:
-            return Qt.CheckState.Checked
-        else:
-            return Qt.CheckState.Unchecked
+    def undo(self):
+        # id, entry, reference, previous, new
+        last = self.edit_stack.pop()
+        print(last)
+        self.data_filtered.at[last[1], last[2]] = last[3]
 
+    def save_changes(self):
+        # commit all changes in self.edit_stack to database
+        for edit in self.edit_stack:
+            pass
+        
+    # Set Table Entries --------------------------------------------------------
     def add_row(self, i):
         roi = self.data_filtered.iloc[i]
         self.table.setRowHeight(i, 100)
         # Reviewed Checkbox
         reviewed = QTableWidgetItem()
-        reviewed.setFlags(reviewed.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+        reviewed.setFlags(reviewed.flags() & Qt.ItemFlag.ItemIsUserCheckable)
         reviewed.setCheckState(self.set_check_state(roi["reviewed"]))
 
         self.table.setItem(i, 0, reviewed)  # Thumbnail column
@@ -235,23 +260,48 @@ class MediaTable(QWidget):
         # Data
         self.table.setItem(i, 2, QTableWidgetItem(roi["filepath"]))  # File Path column
         self.table.setItem(i, 3, QTableWidgetItem(roi["timestamp"]))  # Date Time column
-        self.table.setItem(i, 4, QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"])]))  # Viewpoint column
-        self.table.setItem(i, 5, QTableWidgetItem(roi["binomen"]))   # File Path column
-        self.table.setItem(i, 6, QTableWidgetItem(roi["common"]))  # Date Time column
-        self.table.setItem(i, 7, QTableWidgetItem(roi["name"]))  # Individual column
-        self.table.setItem(i, 8, QTableWidgetItem(roi["sex"]))  # Sex column
+
+        viewpoint = QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"])])
+        self.table.setItem(i, 4, viewpoint)  # Viewpoint column
+        binomen = QTableWidgetItem(roi["binomen"])
+        self.table.setItem(i, 5, binomen)   # Taxon column
+        common = QTableWidgetItem(roi["common"])
+        self.table.setItem(i, 6, common)  # Species column
+        name = QTableWidgetItem(roi["name"])
+        self.table.setItem(i, 7, name)  # Individual ID column
+        sex = QTableWidgetItem(roi["sex"])
+        self.table.setItem(i, 8, sex)  # Sex column
+
         self.table.setItem(i, 9, QTableWidgetItem(roi["station"]))   # station column
         self.table.setItem(i, 10, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
         self.table.setItem(i, 11, QTableWidgetItem(str(roi["external_id"])))  # Sequence ID column
         
+        if not self.crop:
+            reviewed.setFlags(reviewed.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
+            viewpoint.setFlags(viewpoint.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            binomen.setFlags(binomen.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            common.setFlags(common.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            name.setFlags(name.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            sex.setFlags(sex.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
         # Favorite Checkbox
         favorite = QTableWidgetItem()
-        favorite.setFlags(favorite.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+        favorite.setFlags(favorite.flags() & Qt.ItemFlag.ItemIsUserCheckable)
         favorite.setCheckState(self.set_check_state(roi["favorite"]))
         self.table.setItem(i, 12, favorite)   # Comment column
 
         # Comment
         self.table.setItem(i, 13, QTableWidgetItem(roi["comment"]))  # Favorite column
+
+    def set_check_state(self, item):
+        """
+        Set the checkbox of reviewed and favorite columns
+        when adding rows
+        """
+        if item:
+            return Qt.CheckState.Checked
+        else:
+            return Qt.CheckState.Unchecked
 
     # captures emitted temp thumbnail path to data, saves to table
     def add_thumbnail_path(self, i, thumbnail_path):
