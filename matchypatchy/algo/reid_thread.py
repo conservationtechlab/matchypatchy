@@ -7,7 +7,7 @@ import pandas as pd
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.algo import models
-from matchypatchy.database.roi import fetch_roi
+from matchypatchy.database.media import fetch_roi
 
 from animl.api import matchypatchy as animl_mp
 

@@ -12,13 +12,13 @@ Widget for displaying list of Media
 
 import pandas as pd
 
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel, QHeaderView
+from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel, QHeaderView, QAbstractItemView
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
 
 from matchypatchy.algo import models
 from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
-from matchypatchy.database.media import fetch_media
+from matchypatchy.database.media import fetch_media, fetch_roi_media
 from matchypatchy.gui.popup_alert import ProgressPopup
 
 
@@ -34,19 +34,15 @@ class MediaTable(QWidget):
 
         self.edit_stack = []
 
-        self.edits = list()
-        self.columns = ["reviewed","thumbnail", "filepath", "timestamp", 
-                        "viewpoint", "binomen", "common", "individual_id", "sex", 
-                        "station", "sequence_id", "external_id", "favorite", "comment"]
         # Set up layout
         layout = QVBoxLayout()
 
         # Create QTableWidget
         self.table = QTableWidget()
-        self.table.setColumnCount(14)  # Columns: Thumbnail, Name, and Description
-        self.table.setHorizontalHeaderLabels(["Reviewed","Thumbnail", "File Path", "Timestamp", 
+        self.table.setColumnCount(15)  # Columns: Thumbnail, Name, and Description
+        self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp", 
                                               "Viewpoint", "Species", "Common", "Individual", "Sex", 
-                                              "Station", "Sequence ID", "External ID", "Favorite", "Comment"])
+                                              "Station", "Sequence ID", "External ID", "Reviewed", "Favorite", "Comment"])
         self.table.resizeColumnsToContents()
         self.table.setColumnWidth(1, 100)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
@@ -80,16 +76,31 @@ class MediaTable(QWidget):
         """
         roi_n = self.mpDB.count('roi')        
         if roi_n > 0:
-            media, column_names = self.mpDB.all_media()
-            self.data = pd.DataFrame(media, columns=column_names)  
+            self.data = fetch_roi_media(self.mpDB, reset_index=False)
+            self.columns = ["select", "thumbnail", "filepath", "timestamp",
+                            "station", "sequence_id", "external_id",
+                            "viewpoint", "binomen", "common", "individual_id", "sex", 
+                            "reviewed", "favorite", "comment"]
             self.crop = True
-            
+            self.table.setColumnCount(15)  # Columns: Thumbnail, Name, and Description
+            self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
+                                                  "Station", "Sequence ID", "External ID", 
+                                                  "Viewpoint", "Species", "Common", "Individual", "Sex",  
+                                                  "Reviewed", "Favorite", "Comment"])
+            self.table.resizeColumnsToContents()
+            self.table.setColumnWidth(1, 100)
+
         # no rois processed, default to full image
         else:
             self.data = fetch_media(self.mpDB)
-            self.data = self.data.assign(reviewed=0, binomen=None, common=None, viewpoint=None,
-                                        name=None, sex=None, individual_id=0)
+            self.columns = ["select", "thumbnail", "filepath", "timestamp",
+                            "station", "sequence_id", "external_id", "favorite", "comment"]
             self.crop = False  # display full image
+            self.table.setColumnCount(9)  # Columns: Thumbnail, Name, and Description
+            self.table.setHorizontalHeaderLabels( ["Select","Thumbnail", "File Path", "Timestamp", "Station",
+                                                   "Sequence ID", "External ID", "Favorite", "Comment"])
+            self.table.resizeColumnsToContents()
+            self.table.setColumnWidth(1, 100)
     
     # STEP 3 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
@@ -202,9 +213,15 @@ class MediaTable(QWidget):
         reference = self.columns[item.column()]
         id = int(self.data_filtered.at[entry, "id"])
         # get unfiltered id
+        print(entry, reference)
+        print("id", id)
+
+        if reference == 'select':
+            # activate edit button
+            return
         
         # checked items
-        if reference == 'reviewed' or reference == 'favorite':
+        elif reference == 'reviewed' or reference == 'favorite':
             print(item.checkState())
             previous_value = self.set_check_state(self.data_filtered.at[entry, reference])
             new_value = item.checkState()
@@ -228,67 +245,81 @@ class MediaTable(QWidget):
 
     def undo(self):
         # id, entry, reference, previous, new
-        last = self.edit_stack.pop()
-        self.data_filtered.at[last[0], last[1]] = last[2]
+        if len(self.edit_stack) > 0:
+            last = self.edit_stack.pop()
+            self.data_filtered.at[last[0], last[1]] = last[2]
+            self.refresh_table()
 
     def save_changes(self):
         # commit all changes in self.edit_stack to database
         for edit in self.edit_stack:
             pass
+
+    def edit_multiple(self, item):
+        print(item)
+
         
     # Set Table Entries --------------------------------------------------------
     def add_row(self, i):
         roi = self.data_filtered.iloc[i]
         self.table.setRowHeight(i, 100)
-        # Reviewed Checkbox
-        reviewed = QTableWidgetItem()
-        reviewed.setFlags(reviewed.flags() & Qt.ItemFlag.ItemIsUserCheckable)
-        reviewed.setCheckState(self.set_check_state(roi["reviewed"]))
+        
+        column_counter=0
 
-        self.table.setItem(i, 0, reviewed)  # Thumbnail column
+        # Edit Checkbox
+        edit = QTableWidgetItem()
+        edit.setFlags(edit.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+        edit.setCheckState(Qt.CheckState.Unchecked)
+        self.table.setItem(i, column_counter, edit) 
+        column_counter+=1
 
         # Thumbnail
         thumbnail = QImage(roi['thumbnail_path'])
         pixmap = QPixmap.fromImage(thumbnail)
         label = QLabel()
         label.setPixmap(pixmap)
-        self.table.setCellWidget(i, 1, label)
+        self.table.setCellWidget(i, column_counter, label)
+        column_counter+=1
         
         # Data
-        self.table.setItem(i, 2, QTableWidgetItem(roi["filepath"]))  # File Path column
-        self.table.setItem(i, 3, QTableWidgetItem(roi["timestamp"]))  # Date Time column
+        self.table.setItem(i, column_counter, QTableWidgetItem(roi["filepath"]))  # File Path column
+        column_counter+=1
+        self.table.setItem(i, column_counter, QTableWidgetItem(roi["timestamp"]))  # Date Time column
+        column_counter+=1
+        self.table.setItem(i, column_counter, QTableWidgetItem(roi["station"]))   # station column
+        column_counter+=1
+        self.table.setItem(i, column_counter, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
+        column_counter+=1
+        self.table.setItem(i, column_counter, QTableWidgetItem(str(roi["external_id"])))  # External ID column
+        column_counter+=1
 
-        viewpoint = QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"])])
-        self.table.setItem(i, 4, viewpoint)  # Viewpoint column
-        binomen = QTableWidgetItem(roi["binomen"])
-        self.table.setItem(i, 5, binomen)   # Taxon column
-        common = QTableWidgetItem(roi["common"])
-        self.table.setItem(i, 6, common)  # Species column
-        name = QTableWidgetItem(roi["name"])
-        self.table.setItem(i, 7, name)  # Individual ID column
-        sex = QTableWidgetItem(roi["sex"])
-        self.table.setItem(i, 8, sex)  # Sex column
+        if self.crop: # ADD ROI COLUMNS
+            self.table.setItem(i, column_counter, QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"])]))  # Viewpoint column
+            column_counter+=1
+            self.table.setItem(i, column_counter, QTableWidgetItem(roi["binomen"]))   # Taxon column
+            column_counter+=1
+            self.table.setItem(i, column_counter, QTableWidgetItem(roi["common"]))  # Species column
+            column_counter+=1
+            self.table.setItem(i, column_counter, QTableWidgetItem(roi["name"]))  # Individual ID column
+            column_counter+=1
+            self.table.setItem(i, column_counter, QTableWidgetItem(roi["sex"]))  # Sex column
+            column_counter+=1
 
-        self.table.setItem(i, 9, QTableWidgetItem(roi["station"]))   # station column
-        self.table.setItem(i, 10, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
-        self.table.setItem(i, 11, QTableWidgetItem(str(roi["external_id"])))  # Sequence ID column
-        
-        if not self.crop:
-            reviewed.setFlags(reviewed.flags() & ~Qt.ItemFlag.ItemIsUserCheckable)
-            viewpoint.setFlags(viewpoint.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            binomen.setFlags(binomen.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            common.setFlags(common.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            name.setFlags(name.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            sex.setFlags(sex.flags() & ~Qt.ItemFlag.ItemIsEditable)
-
+            reviewed = QTableWidgetItem()
+            reviewed.setFlags(reviewed.flags() & Qt.ItemFlag.ItemIsUserCheckable)
+            reviewed.setCheckState(self.set_check_state(roi["reviewed"]))
+            self.table.setItem(i, column_counter, reviewed) 
+            column_counter+=1
+            
         # Favorite Checkbox
         favorite = QTableWidgetItem()
         favorite.setFlags(favorite.flags() & Qt.ItemFlag.ItemIsUserCheckable)
         favorite.setCheckState(self.set_check_state(roi["favorite"]))
-        self.table.setItem(i, 12, favorite)   # Comment column
+        self.table.setItem(i, column_counter, favorite)  
+        column_counter+=1
 
         # Comment
-        self.table.setItem(i, 13, QTableWidgetItem(roi["comment"]))  # Favorite column
+        self.table.setItem(i, column_counter, QTableWidgetItem(roi["comment"]))  # Favorite column
 
     def set_check_state(self, item):
         """

@@ -4,7 +4,7 @@ Class Definition for Query Object
 
 import pandas as pd
 
-import matchypatchy.database.roi as db_roi
+import matchypatchy.database.media as db_roi
 
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 from matchypatchy.gui.popup_alert import ProgressPopup
