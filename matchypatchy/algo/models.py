@@ -51,7 +51,7 @@ def get_class_path(key):
         return None
 
 def get_config_path(key):
-    ML_DIR = config.load("ML_DIR")
+    ML_DIR = Path(config.load("ML_DIR"))
     CONFIG_FILES = load('CONFIG_FILES')
     if key is None:
         return None

@@ -342,7 +342,7 @@ class DisplayBase(QWidget):
     def clear_data(self):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
         if dialog.exec(): 
-            self.mpDB.__info__()
+            self.mpDB.info()
             logging.warning("DELETING DATA")
             self.mpDB.clear("media")
             self.mpDB.clear("roi")

@@ -228,7 +228,7 @@ class MediaTable(QWidget):
         # Data
         self.table.setItem(i, 2, QTableWidgetItem(roi["filepath"]))  # File Path column
         self.table.setItem(i, 3, QTableWidgetItem(roi["timestamp"]))  # Date Time column
-        self.table.setItem(i, 4, QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"])]))  # Viewpoint column
+        self.table.setItem(i, 4, QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"]) if roi['viewpoint'] is None else roi['viewpoint']])) # Viewpoint column
         self.table.setItem(i, 5, QTableWidgetItem(roi["binomen"]))   # File Path column
         self.table.setItem(i, 6, QTableWidgetItem(roi["common"]))  # Date Time column
         self.table.setItem(i, 7, QTableWidgetItem(roi["name"]))  # Individual column

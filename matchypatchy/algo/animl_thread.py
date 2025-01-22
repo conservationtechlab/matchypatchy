@@ -113,7 +113,7 @@ class AnimlThread(QThread):
                 try:
                     species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{prediction}"')[0][0]
                 except IndexError:
-                    binomen = classes.loc[prediction, 'Species']   # FIXME: Hardcoded column name
+                    binomen = classes.loc[prediction, 'species']   # FIXME: Hardcoded column name
                     species_id = self.mpDB.add_species(binomen, prediction)
                 # update species_id
                 self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})
