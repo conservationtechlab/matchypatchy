@@ -251,7 +251,7 @@ class MediaTable(QWidget):
             reviewed.setCheckState(self.set_check_state(roi["reviewed"]))
             self.table.setItem(i, column_counter, reviewed) 
             column_counter+=1
-            
+          
         # Favorite Checkbox
         favorite = QTableWidgetItem()
         favorite.setFlags(favorite.flags() & Qt.ItemFlag.ItemIsUserCheckable)

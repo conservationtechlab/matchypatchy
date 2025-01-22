@@ -31,8 +31,9 @@ class DisplayCompare(QWidget):
         self.mpDB = parent.mpDB
         self.k = 3  # default knn
         self.threshold = 80
+        self.current_viewpoint = 'all'
 
-        ## CREATE QUERY CONTAINER ==============================================
+        # CREATE QUERY CONTAINER ==============================================
         self.QueryContainer = QueryContainer(self)
 
         # FIRST LAYER ==========================================================
@@ -66,7 +67,6 @@ class DisplayCompare(QWidget):
         button_recalc = QPushButton("Query by Individual")
         button_recalc.clicked.connect(self.recalculate_by_individual)
         first_layer.addWidget(button_recalc)
-
 
         # FILTERS --------------------------------------------------------------
         first_layer.addSpacing(20)
@@ -121,10 +121,18 @@ class DisplayCompare(QWidget):
         self.button_next_query.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query + 1))
         query_options.addWidget(self.button_next_query)
         # Viewpoint Toggle
+        '''
         self.button_viewpoint = QPushButton("L/R")
         self.button_viewpoint.clicked.connect(self.toggle_viewpoint)
         self.button_viewpoint.setMaximumWidth(50)
         query_options.addWidget(self.button_viewpoint)
+        '''
+        self.dropdown_viewpoint = QComboBox()
+        self.dropdown_viewpoint.addItems(['All', 'Left', 'Right'])
+        self.dropdown_viewpoint.setCurrentIndex(0)
+        self.dropdown_viewpoint.currentIndexChanged.connect(self.toggle_viewpoint)
+        self.dropdown_viewpoint.setMaximumWidth(100)
+        query_options.addWidget(self.dropdown_viewpoint)
         # # Sequence Number
         query_options.addWidget(QLabel("Sequence:"))
         self.button_previous_query_seq = QPushButton("<<")
@@ -172,15 +180,15 @@ class DisplayCompare(QWidget):
         self.slider_query_sharpness.valueChanged.connect(self.query_image.adjust_sharpness)
         query_image_buttons.addWidget(self.slider_query_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Reset
-        button_query_image_reset = QPushButton("Reset") 
+        button_query_image_reset = QPushButton("Reset")
         button_query_image_reset.clicked.connect(self.query_image_reset)
         query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # View Image
-        button_query_image_view = QPushButton("View Image") 
+        button_query_image_view = QPushButton("View Image")
         button_query_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_query_rid))
         query_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Open Image
-        button_query_image_open = QPushButton("Open Image") 
+        button_query_image_open = QPushButton("Open Image")
         button_query_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_query_rid))
         query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -270,15 +278,15 @@ class DisplayCompare(QWidget):
         self.slider_match_sharpness.valueChanged.connect(self.match_image.adjust_sharpness)
         match_image_buttons.addWidget(self.slider_match_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Reset
-        button_match_image_reset = QPushButton("Reset") 
+        button_match_image_reset = QPushButton("Reset")
         button_match_image_reset.clicked.connect(self.match_image_reset)
         match_image_buttons.addWidget(button_match_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # View Image
-        button_match_image_view = QPushButton("View Image") 
+        button_match_image_view = QPushButton("View Image")
         button_match_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(button_match_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Open Image
-        button_match_image_open = QPushButton("Open Image") 
+        button_match_image_open = QPushButton("Open Image")
         button_match_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(button_match_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -321,7 +329,7 @@ class DisplayCompare(QWidget):
 
     # MEDIA VIEW
     def validate(self):
-        self.parent._set_media_view()    
+        self.parent._set_media_view()
 
     def warn(self, prompt):
         dialog = AlertPopup(self, prompt=prompt)
@@ -350,7 +358,7 @@ class DisplayCompare(QWidget):
         else:
             self.button_match.setStyleSheet("")
             self.button_match.setChecked(False)
-            
+
     def confirm_match(self):
         """
         Match button was clicked, merge query sequence and current match
@@ -360,15 +368,15 @@ class DisplayCompare(QWidget):
             # make new individual
             dialog = IndividualFillPopup(self)
             if dialog.exec():
-                individual_id = self.mpDB.add_individual(dialog.get_species_id(), 
-                                                         dialog.get_name(), 
+                individual_id = self.mpDB.add_individual(dialog.get_species_id(),
+                                                         dialog.get_name(),
                                                          dialog.get_sex())
                 # update query and match
-                # TODO: add stack to undo 
-                self.QueryContainer.new_iid(individual_id)   
+                # TODO: add stack to undo
+                self.QueryContainer.new_iid(individual_id)
             del dialog
-             
-            # update data  
+
+            # update data
             self.QueryContainer.load_data()
             self.QueryContainer.filter(reset=False)
             self.load_query()
@@ -377,8 +385,8 @@ class DisplayCompare(QWidget):
 
         # Match has a name
         else:
-            self.QueryContainer.merge()   
-            # update data  
+            self.QueryContainer.merge()
+            # update data
             self.QueryContainer.load_data()
             self.QueryContainer.filter(reset=False)
             self.load_query()
@@ -389,7 +397,6 @@ class DisplayCompare(QWidget):
         # TODO: Undoable Match stack
         pass
 
-
     # LOAD FUNCTIONS -----------------------------------------------------------
 
     def change_query(self, n):
@@ -397,21 +404,23 @@ class DisplayCompare(QWidget):
         # update text
         self.query_n.setText("/" + str(self.QueryContainer.n_queries))
         self.query_number.setText(str(self.QueryContainer.current_query + 1))
-        self.query_sequence_n.setText(str(len(self.QueryContainer.current_query_rois)))
+
+        self.query_sequence_n.setText("/" + str(len(self.QueryContainer.current_query_rois)))
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
+
         self.match_n.setText("/" + str(len(self.QueryContainer.current_match_rois)))
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
+
+        self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
         # load new images
         self.load_query()
         self.load_match()
         self.toggle_match_button()
 
-
     def change_query_in_sequence(self, n):
         self.QueryContainer.set_within_query_sequence(n)
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
         self.load_query()
-
 
     def change_match(self, n):
         # load new images
@@ -443,8 +452,17 @@ class DisplayCompare(QWidget):
         """
         Flip between viewpoints in paired images within a sequence
         """
-        # TODO
-        pass
+        selected_viewpoint = self.dropdown_viewpoint.currentText().lower()
+        self.current_viewpoint = selected_viewpoint
+        self.QueryContainer.toggle_viewpoint(selected_viewpoint)
+        if (self.QueryContainer.empty_query == 1 or self.QueryContainer.empty_match == 1):
+            self.dropdown_viewpoint.setCurrentIndex(0)
+
+        self.query_sequence_n.setText('/' + str(len(self.QueryContainer.current_query_rois)))
+        self.query_seq_number.setText('1')
+        self.match_number.setText('1')
+        self.load_query()
+        self.load_match()
 
     # GUI HANDLERS =============================================================
     def change_k(self):
@@ -454,11 +472,11 @@ class DisplayCompare(QWidget):
             self.k = int(self.knn_number.text())
 
     def change_threshold(self):
-        # set new threshold value 
+        # set new threshold value
         # Must recalculate neighbors to activate
         self.threshold = self.threshold_slider.value()
         slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() * (self.threshold - self.threshold_slider.minimum()) //
-                                                                         (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
+                                                                          (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
         QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
     def recalculate(self):
@@ -483,13 +501,13 @@ class DisplayCompare(QWidget):
 
         self.survey_select.clear()
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
-        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])    
+        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
 
-        self.filter_stations()    
+        self.filter_stations()
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],}
+                        'active_station': self.station_list_ordered[self.station_select.currentIndex()], }
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
@@ -540,7 +558,7 @@ class DisplayCompare(QWidget):
         # Update station list to reflect active survey
         self.station_list_ordered = [(0, 'station')] + [(k, v) for k, v in self.valid_stations.items()]
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
-        self.station_select.blockSignals(False)        
+        self.station_select.blockSignals(False)
 
     # IMAGE MANIPULATION -------------------------------------------------------
     def query_image_reset(self):
@@ -571,8 +589,7 @@ class DisplayCompare(QWidget):
         Currently only supports one image at a time
         """
         img = Image.open(self.QueryContainer.data.loc[rid, "filepath"])
-        img.show() 
-
+        img.show()
 
     # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):

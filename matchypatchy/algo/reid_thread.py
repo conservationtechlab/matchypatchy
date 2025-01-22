@@ -40,6 +40,7 @@ class ReIDThread(QThread):
             return
 
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
+        print(f'filtered_rois is: {filtered_rois}')
 
         viewpoints = animl_mp.viewpoint_estimator(filtered_rois, self.image_paths, self.viewpoint_filepath)
         viewpoints = viewpoints.set_index("id")
