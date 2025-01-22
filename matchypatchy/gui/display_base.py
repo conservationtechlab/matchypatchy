@@ -27,7 +27,7 @@ from matchypatchy.algo.sequence_thread import SequenceThread
 from matchypatchy.algo.animl_thread import AnimlThread
 from matchypatchy.algo.reid_thread import ReIDThread
 
-from matchypatchy.database.roi import fetch_roi_media
+from matchypatchy.database.media import fetch_roi_media
 
 
 class DisplayBase(QWidget):

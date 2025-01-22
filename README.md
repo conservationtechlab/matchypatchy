@@ -11,12 +11,9 @@ TODOS
 
 
 BIG TODOS
- x make media_table editable, add undo
  - add keypress functionality to compare screen
  - create single image view and popup
  - utilize capture/sequence for viewpoint
- - adjust query to incorporate viewpoint
- - sort compare view by individual instead of sequence
 
 
 Long Term

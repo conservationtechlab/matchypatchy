@@ -26,29 +26,51 @@ class DisplayMedia(QWidget):
         return_button.setFixedWidth(100)
         first_layer.addWidget(return_button, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        save_button = QPushButton("Save")
+        save_button.clicked.connect(self.save)
+        save_button.setFixedWidth(100)
+        first_layer.addWidget(save_button, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        # edit button accessible by media_table
+        self.edit_button = QPushButton("Edit Rows")
+        self.edit_button.clicked.connect(self.edit_multiple)
+        self.edit_button.setFixedWidth(100)
+        self.edit_button.setEnabled(False)
+        first_layer.addWidget(self.edit_button, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        undo_button = QPushButton("Undo")
+        undo_button.clicked.connect(self.undo)
+        undo_button.setFixedWidth(100)
+        first_layer.addWidget(undo_button, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        first_layer.addStretch()
+        layout.addLayout(first_layer)
+
         # FILTERS
+        second_layer = QHBoxLayout()
+        second_layer.addSpacing(20)
         survey_label = QLabel("Filter:")
         survey_label.setFixedWidth(50)
-        first_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # REGION
         self.region_select = QComboBox()
         self.region_select.setFixedWidth(200)
         self.region_list_ordered = [(0, 'Region')] 
         self.region_select.addItems([el[1] for el in self.region_list_ordered])
-        first_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # SURVEY
         self.survey_select = QComboBox()
         self.survey_select.setFixedWidth(200)
-        first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.survey_list_ordered = [(0, 'Survey')]
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
 
         # station
         self.station_select = QComboBox()
         self.station_select.setFixedWidth(200)
-        first_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.valid_stations = None
         self.station_list_ordered = [(0, 'station')]
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
@@ -56,14 +78,14 @@ class DisplayMedia(QWidget):
         # SPECIES
         self.species_select = QComboBox()
         self.species_select.setFixedWidth(200)
-        first_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.species_list_ordered = [(0, 'Species')]
         self.species_select.addItems([el[1] for el in self.species_list_ordered])
 
         # INDIVIDUAL
         self.individual_select = QComboBox()
         self.individual_select.setFixedWidth(200)
-        first_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.individual_list_ordered = [(0, 'Individual')]
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
 
@@ -72,17 +94,17 @@ class DisplayMedia(QWidget):
         unidentified.setCheckable(True)
         unidentified.toggled.connect(self.select_unidentified)
         self.unidentified_only = False
-        first_layer.addWidget(unidentified, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(unidentified, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # FAVORITE
         favorites = QPushButton("Favorites")
         favorites.setCheckable(True)
         favorites.toggled.connect(self.select_favorites)
         self.favorites_only = False
-        first_layer.addWidget(favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        first_layer.addStretch()
-        layout.addLayout(first_layer)
+        second_layer.addStretch()
+        layout.addLayout(second_layer)
 
         # display rois or media
         self.media_table = MediaTable(self)
@@ -261,3 +283,14 @@ class DisplayMedia(QWidget):
         self.station_list_ordered = [(0, 'station')] + [(k, v) for k, v in self.valid_stations.items()]
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
         self.station_select.blockSignals(False)        
+
+    def save(self):
+        # Undo last edit
+        self.media_table.save_changes()
+
+    def edit_multiple(self):
+        pass
+
+    def undo(self):
+        # Undo last edit
+        self.media_table.undo()
