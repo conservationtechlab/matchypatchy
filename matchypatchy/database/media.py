@@ -12,6 +12,7 @@ COLUMNS = ["filepath", "timestamp", "station_id", "sequence_id", "external_id",
            "comment", "viewpoint", "species_id", "individual_id"]
 
 
+
 def fetch_media(mpDB):
     """
     Fetches stations associated with given survey, checks that they have unique names

@@ -5,8 +5,7 @@ Widget for displaying list of Media
 'station_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 
-# TODO: MAKE TABLE EDITABLE
-# TODO: KEEP QUEUE OF EDITS, UNDOABLE, COMMIT SAVE OR RETURN
+# TODO: DISPLAY ALL MEDIA VS ALL ROIS VS BOTH
 # TODO: keep track of thumbnails
 
 
@@ -77,12 +76,13 @@ class MediaTable(QWidget):
         roi_n = self.mpDB.count('roi')        
         if roi_n > 0:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
+            # corresponding mpDB column names
             self.columns = ["select", "thumbnail", "filepath", "timestamp",
                             "station", "sequence_id", "external_id",
                             "viewpoint", "binomen", "common", "individual_id", "sex", 
                             "reviewed", "favorite", "comment"]
             self.crop = True
-            self.table.setColumnCount(15)  # Columns: Thumbnail, Name, and Description
+            self.table.setColumnCount(15)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
                                                   "Station", "Sequence ID", "External ID", 
                                                   "Viewpoint", "Species", "Common", "Individual", "Sex",  
@@ -93,6 +93,7 @@ class MediaTable(QWidget):
         # no rois processed, default to full image
         else:
             self.data = fetch_media(self.mpDB)
+            # corresponding mpDB column names
             self.columns = ["select", "thumbnail", "filepath", "timestamp",
                             "station", "sequence_id", "external_id", "favorite", "comment"]
             self.crop = False  # display full image
@@ -192,75 +193,12 @@ class MediaTable(QWidget):
         for i in range(self.data_filtered.shape[0]):
             self.add_row(i)
         self.table.blockSignals(False)  # reconnect editing
-       
-    # UPDATE ENTRIES -----------------------------------------------------------
-    def apply_edits(self):
-        """
-        Applies all previous edits to the current data_filter if the row is present
-        """
-        for edit in self.edit_stack:
-            if not self.data_filtered.empty and self.data_filtered[self.id_col].isin([edit[0]]).any():
-                self.data_filtered.loc[self.data_filtered[self.id_col] == edit[0], edit[1]] = edit[3]
-
-    def update_entry(self, item): 
-        """
-        Allows user to edit entry in table 
-
-        Save edits in queue, allow undo 
-        prompt user to save edits 
-        """
-        entry = item.row()  # refers to filtered dataframe, can change if refiltered
-        reference = self.columns[item.column()]
-        id = int(self.data_filtered.at[entry, "id"])
-        # get unfiltered id
-        print(entry, reference)
-        print("id", id)
-
-        if reference == 'select':
-            # activate edit button
-            return
-        
-        # checked items
-        elif reference == 'reviewed' or reference == 'favorite':
-            print(item.checkState())
-            previous_value = self.set_check_state(self.data_filtered.at[entry, reference])
-            new_value = item.checkState()
-
-        # everything else
-        else:
-            previous_value = self.data_filtered.at[entry, reference]
-            new_value = item.text()
-            
-        # add edit to stack
-        edit = [id, reference, previous_value, new_value]
-        self.edit_stack.append(edit)
-
-    # TODO
-    def update_row(self):
-        pass
-
-    # TODO
-    def update_column(self):
-        pass   
-
-    def undo(self):
-        # id, entry, reference, previous, new
-        if len(self.edit_stack) > 0:
-            last = self.edit_stack.pop()
-            self.data_filtered.at[last[0], last[1]] = last[2]
-            self.refresh_table()
-
-    def save_changes(self):
-        # commit all changes in self.edit_stack to database
-        for edit in self.edit_stack:
-            pass
-
-    def edit_multiple(self, item):
-        print(item)
-
         
     # Set Table Entries --------------------------------------------------------
     def add_row(self, i):
+        """
+        Adds Row to Table with Items from self.data_filtered
+        """
         roi = self.data_filtered.iloc[i]
         self.table.setRowHeight(i, 100)
         
@@ -282,8 +220,11 @@ class MediaTable(QWidget):
         column_counter+=1
         
         # Data
-        self.table.setItem(i, column_counter, QTableWidgetItem(roi["filepath"]))  # File Path column
+        filepath = QTableWidgetItem(roi["filepath"])
+        filepath.setFlags(filepath.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.table.setItem(i, column_counter, filepath)  # File Path column
         column_counter+=1
+
         self.table.setItem(i, column_counter, QTableWidgetItem(roi["timestamp"]))  # Date Time column
         column_counter+=1
         self.table.setItem(i, column_counter, QTableWidgetItem(roi["station"]))   # station column
@@ -334,4 +275,75 @@ class MediaTable(QWidget):
     # captures emitted temp thumbnail path to data, saves to table
     def add_thumbnail_path(self, i, thumbnail_path):
         self.data.loc[i,'thumbnail_path'] = thumbnail_path
+
+
+    # UPDATE ENTRIES -----------------------------------------------------------
+    def apply_edits(self):
+        """
+        Applies all previous edits to the current data_filter if the row is present
+        """
+        for edit in self.edit_stack:
+            if not self.data_filtered.empty and self.data_filtered[self.id_col].isin([edit[0]]).any():
+                self.data_filtered.loc[self.data_filtered[self.id_col] == edit[0], edit[1]] = edit[3]
+
+    def update_entry(self, item): 
+        """
+        Allows user to edit entry in table 
+
+        Save edits in queue, allow undo 
+        prompt user to save edits 
+        """
+        entry = item.row()  # refers to filtered dataframe, can change if refiltered
+        reference = self.columns[item.column()]
+        id = int(self.data_filtered.at[entry, "id"])
+        # get unfiltered id
+        print(entry, reference)
+        print("id", id)
+
+        if reference == 'select':
+            print(item.checkState())
+            # activate edit button
+            return
+        
+        # checked items
+        elif reference == 'reviewed' or reference == 'favorite':
+            print(item.checkState())
+            previous_value = self.set_check_state(self.data_filtered.at[entry, reference])
+            new_value = item.checkState()
+
+        # everything else
+        else:
+            previous_value = self.data_filtered.at[entry, reference]
+            new_value = item.text()
+            
+        # add edit to stack
+        edit = [id, reference, previous_value, new_value]
+        self.edit_stack.append(edit)
+
+    def undo(self):
+        """
+        Undo last edit and refresh table
+        """
+        if len(self.edit_stack) > 0:
+            last = self.edit_stack.pop()
+            self.data_filtered.at[last[0], last[1]] = last[2]
+            self.refresh_table()
+
+    # TODO
+    def save_changes(self):
+        # commit all changes in self.edit_stack to database
+        for edit in self.edit_stack:
+            id = edit[0]
+            replace_dict = {edit[1]: edit[3]}
+            if self.crop:
+                #self.mpDB.edit_row("roi", edit[0], replace_dict, allow_none=False, quiet=True)
+                pass
+            else:
+                #self.mpDB.edit_row("media", edit[0], replace_dict, allow_none=False, quiet=True)
+                pass
+
+    # TODO
+    def edit_multiple(self, item):
+        print(item)
+
  

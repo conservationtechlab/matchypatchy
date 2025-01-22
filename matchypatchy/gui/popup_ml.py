@@ -91,7 +91,6 @@ class MLOptionsPopup(QDialog):
         self.ml_dir = Path(config.load('ML_DIR'))
         self.ml_cfg = models.load()
         self.available_models = self.discover_models()
-        print(self.available_models)
 
         self.setWindowTitle('Model Options')
         layout = QVBoxLayout()
@@ -159,7 +158,6 @@ class MLOptionsPopup(QDialog):
     
     def get_subset(self, subset):
         # GET THE AVAILABLE MODELS OF SUBSET TYPE
-        print(self.available_models)
         models_dict = dict()
         for m in self.ml_cfg[subset]:
             if m in self.available_models.keys():
