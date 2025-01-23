@@ -3,15 +3,13 @@ GUI tool for human validation of AI-powered animal re-identification
 
 TODOS 
  - add undo for match
- - manage individuals popup
- - filter reviewed/named images
  - edit media_table
  - auto compare single individual for QC
 
 BIG TODOS
  - add keypress functionality to compare screen
  - create single image view and popup
- - utilize capture/sequence for viewpoint
+ - utilize sequence for viewpoint
 
 Long Term
  - handle videos
