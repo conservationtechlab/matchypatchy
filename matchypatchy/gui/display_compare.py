@@ -19,7 +19,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_single_image import ImagePopup
 
-from matchypatchy.algo.query import QueryContainer
+from matchypatchy.algo.query import QueryContainer, QC_QueryContainer
 
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
 
@@ -484,8 +484,8 @@ class DisplayCompare(QWidget):
         self.change_query(0)
 
     def recalculate_by_individual(self):
-        # TODO
-        pass
+        self.QueryContainer = QC_QueryContainer(self)
+        self.change_query(0)
 
     # FILTERS ------------------------------------------------------------------
     def refresh_filters(self):

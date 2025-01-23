@@ -5,7 +5,6 @@ TODOS
  - add undo for match
  - manage individuals popup
  - filter reviewed/named images
- x keep track of thumbnails for media_table
  - edit media_table
  - auto compare single individual for QC
 
@@ -20,3 +19,4 @@ Long Term
    and separate sequence ids, etc
  - Create function to verify another database
  - cosine distance for knn?
+ - keep track of thumbnails for media_table
