@@ -124,21 +124,31 @@ class QueryContainer():
             self.rank()
             if reset:
                 self.parent.change_query(0)
+        # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
             self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
             return False
         
-    # TODO
     def rank(self):
         """
         Ranking Function
             Prioritizes previously IDd individuals and number of matches,
             then ranks matchs by distances
         """
-        self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
+        # get sequences with IDs 
+        ided_sequences = self.data[~self.data["individual_id"].isna()]["sequence_id"].unique().tolist()
+
+        # rank sequences by number of matches
+        rank_by_n_match = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
+
+        # prioritize already id'd sequences
+        prioritize_ided = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
+
+        #self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1]) (old formula)
+        self.ranked_sequences = prioritize_ided
+
         # set number of queries to validate
         self.n_queries = len(self.ranked_sequences)
-        # filtered neighbor dict returns empty, all existing data must be from same individual
 
 
     def set_query(self, n):
