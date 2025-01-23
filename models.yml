@@ -81,6 +81,6 @@ REID_MODELS: ["MiewID v3", "MiewID v2"]
 VIEWPOINT_MODELS: ["SDZWA Viewpoint"]
 
 VIEWPOINT:
-  None: "None"
-  0: "Left"
-  1: "Right"
+  'None': "None"
+  '0': "Left"
+  '1': "Right"

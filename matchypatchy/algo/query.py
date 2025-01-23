@@ -121,15 +121,25 @@ class QueryContainer():
         # Sort by Distance
         # must have valid matches to continue
         if self.neighbor_dict:
-            self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
-            # set number of queries to validate
-            self.n_queries = len(self.ranked_sequences)
+            self.rank()
             if reset:
                 self.parent.change_query(0)
-        # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
             self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
             return False
+        
+    # TODO
+    def rank(self):
+        """
+        Ranking Function
+            Prioritizes previously IDd individuals and number of matches,
+            then ranks matchs by distances
+        """
+        self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
+        # set number of queries to validate
+        self.n_queries = len(self.ranked_sequences)
+        # filtered neighbor dict returns empty, all existing data must be from same individual
+
 
     def set_query(self, n):
         """
@@ -195,7 +205,7 @@ class QueryContainer():
         self.current_match = n
         self.current_match_rid = self.current_match_rois[self.current_match]
 
-    # VIEWPOINT TOGGLE
+    # VIEWPOINT ----------------------------------------------------------------
     def compute_viewpoints(self):
         self.viewpoints = {
             'all': {},  # {sequence_id: list of ROIs}
@@ -282,6 +292,7 @@ class QueryContainer():
             self.set_match(0)
             self.parent.match_n.setText('/' + str(len(self.current_match_rois)))
 
+    # RETURN INFO --------------------------------------------------------------------
     def is_existing_match(self):
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None

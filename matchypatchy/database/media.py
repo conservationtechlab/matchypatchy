@@ -86,7 +86,7 @@ def roi_metadata(roi, spacing=1.5):
 
     # convert viewpoint to human-readable (0=Left, 1=Right)
     VIEWPOINT = models.load('VIEWPOINT')
-    info_dict['Viewpoint'] = VIEWPOINT[info_dict['Viewpoint']]
+    info_dict['Viewpoint'] = VIEWPOINT[str(info_dict['Viewpoint'])]
 
     info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
 
