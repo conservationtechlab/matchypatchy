@@ -23,9 +23,11 @@ configure_http_backend(backend_factory=backend_factory)
 from matchypatchy.gui import main_gui
 from matchypatchy.database import mpdb
 from matchypatchy import config
+from matchypatchy import models
 
 def main():
     cfg = config.initiate()
+    models.update_model_yml()
     mpDB = mpdb.MatchyPatchyDB(cfg['DB_PATH'])
     main_gui.main_display(mpDB)
 

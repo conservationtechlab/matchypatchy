@@ -16,7 +16,8 @@ def update_model_yml():
     Downloads the most recent version of the models.yml file from SDZWA server and updates internal file
     """
     # download current version
-    urllib.request.urlretrieve("http://www.example.com", "models.yml")
+    urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", "models.yml")
+    print("Updated models.yml")
 
 
 def load(key=None):
