@@ -10,7 +10,10 @@ from matchypatchy.algo.match_thread import MatchEmbeddingThread
 from matchypatchy.gui.popup_alert import ProgressPopup
 
 
-class QueryContainer():
+class QC_QueryContainer():
+    """
+    Alternate Query Container for QC Only
+    """
     def __init__(self, parent):
         self.mpDB = parent.mpDB
         self.parent = parent
@@ -58,28 +61,6 @@ class QueryContainer():
             self.parent.home(warn=True)
             return False
 
-    # RUN ON ENTRY IF LOAD_DATA
-    def calculate_neighbors(self):
-        dialog = ProgressPopup(self.parent, "Matching embeddings...")
-        dialog.set_max(len(self.sequences))
-        dialog.show()
-
-        self.match_thread = MatchEmbeddingThread(self.mpDB, self.rois, self.sequences,
-                                                 k=self.parent.k, threshold=self.parent.threshold)
-        self.match_thread.progress_update.connect(dialog.set_counter)
-        self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
-        self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
-        self.match_thread.finished.connect(self.filter)  # do not continue until finished
-        self.match_thread.start()
-
-    def capture_neighbor_dict(self, neighbor_dict):
-        # capture neighbor_dict from MatchEmbeddingThread
-        self.neighbor_dict_raw = neighbor_dict
-
-    def capture_nearest_dict(self, nearest_dict):
-        # capture neighbor_dict from MatchEmbeddingThread
-        self.nearest_dict_raw = nearest_dict
-
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None, reset=True):
         """
@@ -110,10 +91,6 @@ class QueryContainer():
             else:
                 self.parent.warn("No data to compare within filter.")
 
-        # filter neighbor dict and nearest dict
-        self.neighbor_dict = {k: self.neighbor_dict_raw[k] for k in self.data.index if k in self.neighbor_dict_raw}
-        self.nearest_dict = {k: self.nearest_dict_raw[k] for k in self.data.index if k in self.nearest_dict_raw}
-
         # compute viewpoints
         self.compute_viewpoints()
         self.compute_match_viewpoints()
@@ -132,23 +109,9 @@ class QueryContainer():
     def rank(self):
         """
         Ranking Function
-            Prioritizes previously IDd individuals and number of matches,
-            then ranks matchs by distances
+            Prioritizes ids with number of rois
         """
-        # get sequences with IDs 
-        ided_sequences = self.data[~self.data["individual_id"].isna()]["sequence_id"].unique().tolist()
-
-        # rank sequences by number of matches
-        rank_by_n_match = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
-
-        # prioritize already id'd sequences
-        prioritize_ided = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
-
-        #self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1]) (old formula)
-        self.ranked_sequences = prioritize_ided
-
-        # set number of queries to validate
-        self.n_queries = len(self.ranked_sequences)
+        pass
 
 
     def set_query(self, n):
@@ -302,23 +265,7 @@ class QueryContainer():
             self.set_match(0)
             self.parent.match_n.setText('/' + str(len(self.current_match_rois)))
 
-    # RETURN INFO --------------------------------------------------------------------
-    def is_existing_match(self):
-        return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
-            self.data.loc[self.current_query_rid, "individual_id"] is not None
-
-    def both_unnamed(self):
-        """
-        Both are unnamed
-        """
-        return self.data.loc[self.current_match_rid, "individual_id"] is None and \
-            self.data.loc[self.current_query_rid, "individual_id"] is None
-
-    def current_distance(self):
-        # return distance between current sequence and matchs
-        return self.neighbor_dict[self.current_sequence_id][self.current_match][1]
-
-    # Accessing Info
+    # RETURN INFO ---------------------------------------------------------------
     def get_query_info(self, column=None):
         if column is None:  # return whole row
             return self.data.loc[self.current_query_rid]
@@ -350,37 +297,3 @@ class QueryContainer():
             self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
 
         self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
-
-    def merge(self):
-        """
-        Merge two individuals after match
-        """
-        query = self.data.loc[self.current_query_rid]
-        match = self.data.loc[self.current_match_rid]
-
-        query_iid = query['individual_id']
-        match_iid = match['individual_id']
-
-        print("Merging", query_iid, match_iid)
-
-        # query is unknown, give match name
-        if query_iid is None:
-            sequence = self.current_sequence_id
-            keep_id = match_iid
-            drop_id = None
-        # match is older, update query
-        elif match_iid is not None and query_iid > match_iid:
-            sequence = self.current_sequence_id
-            keep_id = match_iid
-            drop_id = query_iid
-        # query is older or match is None update match
-        else:
-            sequence = match['sequence_id']
-            keep_id = query_iid
-            drop_id = match_iid
-
-        # find all rois with newer name
-        to_merge = self.data[self.data["sequence_id"] == sequence]
-
-        for i in to_merge.index:
-            self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
