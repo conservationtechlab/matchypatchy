@@ -12,9 +12,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.media import fetch_media
 
-# TODO: what to do if sequence_id already exists?
 # TODO: sequence ids for individual videos should be one number, validate
-
 
 class SequenceThread(QThread):
     progress_update = pyqtSignal(str)  # Signal to update the progress bar

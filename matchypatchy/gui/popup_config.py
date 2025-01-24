@@ -95,8 +95,6 @@ class ConfigPopup(QDialog):
             logging.info("DB_PATH CHANGED")
             logging.info('DB_PATH: ' + self.cfg['DB_PATH'])
 
-
-
     def set_log(self):
         new_log = QFileDialog.getSaveFileName(self, "New File",
                                               os.path.expanduser('~'),
@@ -109,7 +107,6 @@ class ConfigPopup(QDialog):
             # Log changes
             logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
             logging.info("LOG_PATH CHANGED")
-
 
     def set_ml(self):
         new_ml = QFileDialog.getExistingDirectory(self)

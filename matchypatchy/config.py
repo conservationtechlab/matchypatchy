@@ -33,7 +33,6 @@ def initiate():
     # Make sure ML_DIR exists
     Path(cfg['ML_DIR']).mkdir(exist_ok=True)
         
-    # TODO CHECK SERVER TO UPDATE LIST
     # LOG CONFIG
     logging.basicConfig(filename=cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
     logging.info('CWD: ' + str(Path.cwd()))

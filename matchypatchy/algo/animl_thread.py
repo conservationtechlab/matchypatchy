@@ -13,7 +13,6 @@ from animl.file_management import build_file_manifest
 from animl.api import matchypatchy as animl_mp
 
 
-
 class BuildManifestThread(QThread):
     """
     Thread for launching buildfilemanifest
@@ -29,7 +28,6 @@ class BuildManifestThread(QThread):
         self.manifest.emit(self.data)
 
 
-# TODO: HANDLE VIDEOS
 class AnimlThread(QThread):
     progress_update = pyqtSignal(str)  # Signal to update the progress bar
 
@@ -67,7 +65,7 @@ class AnimlThread(QThread):
         # 1 RUN MED
         detections = animl_mp.detect_mp(self.md_filepath, self.media)
         # 2 GET BOXES
-        for i, roi in detections.iterrows():
+        for _, roi in detections.iterrows():
             media_id = roi['id']
 
             frame = roi['FrameNumber'] if 'FrameNumber' in roi.index else 1
@@ -87,16 +85,15 @@ class AnimlThread(QThread):
                               species_id, viewpoint=viewpoint, reviewed=0,
                               individual_id=individual_id, emb_id=0)
 
-    def get_species(self):
+    def get_species(self, label_col="Code"):
         # TODO: Utilize probability for sequences
-        # TODO: fix hardcoded column names
         if self.classifier_filepath is None:
             # user opted to skip classification
             return
         
         print(self.classifier_filepath, self.class_filepath)
 
-        classes = pd.read_csv(self.class_filepath).set_index("Code")  # HARD CODED
+        classes = pd.read_csv(self.class_filepath).set_index(label_col)
 
         info = "roi.id, media_id, filepath, frame, species_id, bbox_x, bbox_y, bbox_w, bbox_h"
         rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)

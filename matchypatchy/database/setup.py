@@ -6,8 +6,6 @@ import sqlite3
 from matchypatchy import sqlite_vec
 
 
-# TODO: Create function to verify another database
-
 def setup_database(filepath='matchypatchy.db'):
     # Connect to SQLite database
     db = sqlite3.connect(filepath)
