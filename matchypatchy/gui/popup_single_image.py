@@ -3,12 +3,14 @@ Edit A Single Image
 
 
 """
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QListWidget,
+import pandas as pd
+from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QFrame,
                              QLabel, QLineEdit, QDialogButtonBox, QPushButton)
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.widget_image import ImageWidget
+import matchypatchy.database.media as db_roi
 
 class ImagePopup(QDialog):
     def __init__(self, parent, rid):
@@ -18,60 +20,114 @@ class ImagePopup(QDialog):
         self.rid = rid
         print(self.rid)
 
-        self.roi_data = self.mpDB.select("roi", row_cond=f"id={self.rid}")
+        data, column_names = self.mpDB.all_media(row_cond=f"roi.id={self.rid}")
+        self.roi_data = pd.DataFrame(data, columns=column_names).replace({float('nan'): None}).reset_index(drop=True)
         print(self.roi_data)
 
         layout = QVBoxLayout()
         # Title
-        label = QLabel()
+        label = QLabel(self.roi_data.at[0,"filepath"])
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(label)
-
-
-        # Options
-        query_options = QHBoxLayout()
-        query_options.addStretch()
-        # # Query Number
-        query_options.addWidget(QLabel("Query Image:"))
-        self.button_previous_query = QPushButton("<<")
-        self.button_previous_query.setMaximumWidth(40)
-        self.button_previous_query.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query - 1))
-        query_options.addWidget(self.button_previous_query)
 
         # Image
         self.image = ImageWidget()
         self.image.setStyleSheet("border: 1px solid black;")
         self.image.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.image.load(image_path=self.roi_data.at[0,"filepath"])
         layout.addWidget(self.image, 1)
 
 
-        # Query Image Tools
-        query_image_buttons = QHBoxLayout()
-        # Reset
-        button_query_image_reset = QPushButton("Reset") 
-        button_query_image_reset.clicked.connect(self.query_image_reset)
-        query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # View Image
-        button_query_image_view = QPushButton("View Image") 
-        button_query_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_query_rid))
-        query_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Open Image
-        button_query_image_open = QPushButton("Open Image") 
-        button_query_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_query_rid))
-        query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        query_image_buttons.addStretch()
-        layout.addLayout(query_image_buttons)
-
         # MetaData
-        self.query_info = QLabel("Image Metadata")
-        self.query_info.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.query_info.setContentsMargins(10, 20, 10, 20)
-        self.query_info.setMaximumHeight(200)
-        self.query_info.setStyleSheet("border: 1px solid black;")
-        query_layout.addWidget(self.query_info, 1)
-        image_layout.addLayout(query_layout)
+        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+                    'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
+                    'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
+                    'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+        
+        # VIEWPOINT, REVIEWED, FAVORITE, NAME, SEX, COMMON, COMMENT, 
+        # EXTERNAL ID, SEQUENCE ID, TIMESTAMP, STATION
+        # REGION, SURVEY?
+        
+        border_widget = QWidget()
+        border_widget.setObjectName("borderWidget")
+        border_widget.setStyleSheet("""#borderWidget { border: 1px solid black; }
+                                       QLabel {font-size: 20px;}""")
+        info_layout = QVBoxLayout()
 
+
+
+        # Timestamp
+        timestamp = QHBoxLayout()
+        timestamp_label = QLabel("Timestamp: ")
+        timestamp_label.setFixedWidth(75)
+        timestamp.addWidget(timestamp_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        timestamp.addWidget(QLabel(str(self.roi_data.at[0,"timestamp"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        info_layout.addLayout(timestamp)
+
+        # Station
+        # TODO: Convert to name, get survey and region
+        station = QHBoxLayout()
+        station_label = QLabel("Station: ")
+        station_label.setFixedWidth(75)
+        station.addWidget(station_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        station.addWidget(QLabel(str(self.roi_data.at[0,"station_id"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        info_layout.addLayout(station)
+
+        # Sequence ID
+        sequence = QHBoxLayout()
+        sequence_label = QLabel("Sequence ID: ")
+        sequence_label.setFixedWidth(75)
+        sequence.addWidget(sequence_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        sequence.addWidget(QLabel(str(self.roi_data.at[0,"sequence_id"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        info_layout.addLayout(sequence)
+
+        # External ID
+        external = QHBoxLayout()
+        external_label = QLabel("External ID: ")
+        external_label.setFixedWidth(75)
+        external.addWidget(external_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        external.addWidget(QLabel(str(self.roi_data.at[0,"external_id"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        info_layout.addLayout(external)
+
+        line = QFrame()
+        line.setFrameStyle(QFrame.Shape.HLine | QFrame.Shadow.Raised)
+        line.setLineWidth(2)
+        info_layout.addWidget(line)
+
+
+        # Species - EDITABLE
+        species = QHBoxLayout()
+        species_label = QLabel("Species: ")
+        species_label.setFixedWidth(75)
+        species.addWidget(species_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.species = QLineEdit()
+        self.species.setText(str(self.roi_data.at[0,"common"]))
+        species.addWidget(self.species, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        info_layout.addLayout(species)
+
+        # Viewpoint - EDITABLE
+        viewpoint = QHBoxLayout()
+        viewpoint_label = QLabel("Viewpoint: ")
+        viewpoint_label.setFixedWidth(75)
+        viewpoint.addWidget(viewpoint_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.viewpoint = QComboBox()
+        viewpoint.addWidget(self.viewpoint, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        info_layout.addLayout(viewpoint)
+
+        # Comment - EDITABLE
+        comment = QHBoxLayout()
+        comment_label = QLabel("Comment: ")
+        comment_label.setFixedWidth(75)
+        comment.addWidget(comment_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.comment = QLineEdit()
+        self.comment.setText(str(self.roi_data.at[0,"comment"]))
+        comment.addWidget(self.comment, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        info_layout.addLayout(comment)
+
+        info_layout.addSpacing(10)
+
+        border_widget.setLayout(info_layout)
+        layout.addWidget(border_widget, 1)
 
         # OK/Cancel Buttons
         button_layout = QHBoxLayout()

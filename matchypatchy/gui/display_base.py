@@ -154,7 +154,7 @@ class DisplayBase(QWidget):
         button_download_ml = QPushButton("Download Models")
         button_ph1 = QPushButton("")
         button_ph1.setEnabled(False)
-        button_ph2 = QPushButton("Validate")
+        button_ph2 = QPushButton("Validate Database")
         button_clear_data = QPushButton("Clear Data")
 
         other_layer.addWidget(button_configuration)

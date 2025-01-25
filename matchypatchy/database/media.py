@@ -77,11 +77,11 @@ def roi_metadata(roi, spacing=1.5):
                             "filepath": "File Path",
                             "comment": "Comment",
                             "timestamp": "Timestamp",
-                            "station_id": "station",
+                            "station_id": "Station",
                             "sequence_id": "Sequence ID",
                             "viewpoint": "Viewpoint"})
 
-    info_dict = roi[['Name', 'File Path', 'Timestamp', 'station',
+    info_dict = roi[['Name', 'File Path', 'Timestamp', 'Station',
                      'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
     # convert viewpoint to human-readable (0=Left, 1=Right)

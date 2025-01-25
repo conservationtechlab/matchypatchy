@@ -1,11 +1,6 @@
 """
 GUI Window for Match Comparisons
 
-TODO:
- - Add new individual ID to all rois in query sequence and all rois in match sequence
- - Likewise if merging
- - enable merge
- - ENABLE VIEWPOINT
 """
 from PIL import Image
 
@@ -19,7 +14,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_single_image import ImagePopup
 
-from matchypatchy.algo.query import QueryContainer, QC_QueryContainer
+from matchypatchy.algo.query import QueryContainer
 
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
 
@@ -121,12 +116,6 @@ class DisplayCompare(QWidget):
         self.button_next_query.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query + 1))
         query_options.addWidget(self.button_next_query)
         # Viewpoint Toggle
-        '''
-        self.button_viewpoint = QPushButton("L/R")
-        self.button_viewpoint.clicked.connect(self.toggle_viewpoint)
-        self.button_viewpoint.setMaximumWidth(50)
-        query_options.addWidget(self.button_viewpoint)
-        '''
         self.dropdown_viewpoint = QComboBox()
         self.dropdown_viewpoint.addItems(['All', 'Left', 'Right'])
         self.dropdown_viewpoint.setCurrentIndex(0)
@@ -184,9 +173,9 @@ class DisplayCompare(QWidget):
         button_query_image_reset.clicked.connect(self.query_image_reset)
         query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # View Image
-        button_query_image_view = QPushButton("View Image")
-        button_query_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_query_rid))
-        query_image_buttons.addWidget(button_query_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        button_query_image_edit = QPushButton("Edit Image")
+        button_query_image_edit.clicked.connect(lambda: self.edit_image(self.QueryContainer.current_query_rid))
+        query_image_buttons.addWidget(button_query_image_edit, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Open Image
         button_query_image_open = QPushButton("Open Image")
         button_query_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_query_rid))
@@ -282,9 +271,9 @@ class DisplayCompare(QWidget):
         button_match_image_reset.clicked.connect(self.match_image_reset)
         match_image_buttons.addWidget(button_match_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # View Image
-        button_match_image_view = QPushButton("View Image")
-        button_match_image_view.clicked.connect(lambda: self.view_image(self.QueryContainer.current_match_rid))
-        match_image_buttons.addWidget(button_match_image_view, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        button_match_image_edit = QPushButton("Edit Image")
+        button_match_image_edit.clicked.connect(lambda: self.edit_image(self.QueryContainer.current_match_rid))
+        match_image_buttons.addWidget(button_match_image_edit, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Open Image
         button_match_image_open = QPushButton("Open Image")
         button_match_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_match_rid))
@@ -484,7 +473,7 @@ class DisplayCompare(QWidget):
         self.change_query(0)
 
     def recalculate_by_individual(self):
-        self.QueryContainer = QC_QueryContainer(self)
+        self.QueryContainer = QueryContainer(self)
         self.change_query(0)
 
     # FILTERS ------------------------------------------------------------------
@@ -573,8 +562,7 @@ class DisplayCompare(QWidget):
         self.slider_match_contrast.setValue(50)
         self.slider_match_sharpness.setValue(50)
 
-    # TODO
-    def view_image(self, rid):
+    def edit_image(self, rid):
         """
         Open Image in MatchyPatchy Single Image Popup
         """

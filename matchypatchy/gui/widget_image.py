@@ -35,7 +35,7 @@ class ImageWidget(QLabel):
         """
         Load image path with pillow
         """
-        if image_path != self.image_path:
+        if self.image_path is None or image_path != self.image_path:
             self.image_path = image_path
         
         if bbox is not None:
@@ -97,6 +97,10 @@ class ImageWidget(QLabel):
             qimage = self.qimage.copy()
 
         return qimage
+    
+    def draw_bbox(self, bbox):
+        # TODO
+        pass
 
     # ---- IMAGE ADJUSTMENTS ----
 
