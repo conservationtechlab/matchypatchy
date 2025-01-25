@@ -366,16 +366,22 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def all_media(self):
+    def all_media(self, row_cond: Optional[str]=None):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed, 
                          roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp, 
                          station_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex"""
-            command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                           LEFT JOIN species ON roi.species_id = species.id
-                                           LEFT JOIN individual ON roi.individual_id = individual.id;"""
+            if row_cond:
+                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
+                                            LEFT JOIN species ON roi.species_id = species.id
+                                            LEFT JOIN individual ON roi.individual_id = individual.id
+                                            WHERE {row_cond};"""
+            else:
+                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
+                                            LEFT JOIN species ON roi.species_id = species.id
+                                            LEFT JOIN individual ON roi.individual_id = individual.id;"""
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
