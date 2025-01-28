@@ -180,6 +180,13 @@ class DisplayCompare(QWidget):
         button_query_image_open = QPushButton("Open Image")
         button_query_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_query_rid))
         query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # favorite
+        button_query_favorite = QPushButton("♥")
+        button_query_favorite.setFixedWidth(30)
+        button_query_favorite.clicked.connect(lambda: self.favorite(self.QueryContainer.current_query_rid))
+        query_image_buttons.addWidget(button_query_favorite)
+        button_query_favorite.setCheckable(True)
+        button_query_favorite.setChecked(False)
 
         query_image_buttons.addStretch()
         query_layout.addLayout(query_image_buttons)
@@ -278,6 +285,13 @@ class DisplayCompare(QWidget):
         button_match_image_open = QPushButton("Open Image")
         button_match_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(button_match_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Favorite
+        button_match_favorite = QPushButton("♥")
+        button_match_favorite.setFixedWidth(30)
+        button_match_favorite.clicked.connect(lambda: self.favorite(self.QueryContainer.current_match_rid))
+        match_image_buttons.addWidget(button_match_favorite)
+        button_match_favorite.setCheckable(True)
+        button_match_favorite.setChecked(False)
 
         match_image_buttons.addStretch()
         match_layout.addLayout(match_image_buttons)
@@ -578,6 +592,10 @@ class DisplayCompare(QWidget):
         """
         img = Image.open(self.QueryContainer.data.loc[rid, "filepath"])
         img.show()
+
+    def favorite(self, rid):
+        # TODO
+        pass
 
     # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):

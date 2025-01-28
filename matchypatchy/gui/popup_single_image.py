@@ -5,7 +5,7 @@ Edit A Single Image
 """
 import pandas as pd
 from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QFrame,
-                             QLabel, QLineEdit, QDialogButtonBox, QPushButton)
+                             QLabel, QTextEdit, QDialogButtonBox, QPushButton)
 from PyQt6 import QtWidgets
 from PyQt6.QtCore import Qt
 
@@ -35,6 +35,7 @@ class ImagePopup(QDialog):
         self.image.setStyleSheet("border: 1px solid black;")
         self.image.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.image.load(image_path=self.roi_data.at[0,"filepath"])
+        # draw box
         layout.addWidget(self.image, 1)
 
 
@@ -54,77 +55,121 @@ class ImagePopup(QDialog):
                                        QLabel {font-size: 20px;}""")
         info_layout = QVBoxLayout()
 
+        horizontal_gap = 120
+        vertical_gap = 8
 
 
-        # Timestamp
+
+        # Timestamp 
         timestamp = QHBoxLayout()
         timestamp_label = QLabel("Timestamp: ")
-        timestamp_label.setFixedWidth(75)
+        timestamp_label.setFixedWidth(horizontal_gap)
         timestamp.addWidget(timestamp_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         timestamp.addWidget(QLabel(str(self.roi_data.at[0,"timestamp"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(timestamp)
+
+        favorite_label = QLabel("Favorite: ")
+        timestamp.addWidget(favorite_label)
+
+
+        info_layout.addSpacing(vertical_gap)
 
         # Station
         # TODO: Convert to name, get survey and region
         station = QHBoxLayout()
         station_label = QLabel("Station: ")
-        station_label.setFixedWidth(75)
+        station_label.setFixedWidth(horizontal_gap)
         station.addWidget(station_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         station.addWidget(QLabel(str(self.roi_data.at[0,"station_id"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(station)
+        info_layout.addSpacing(vertical_gap)
+
 
         # Sequence ID
         sequence = QHBoxLayout()
         sequence_label = QLabel("Sequence ID: ")
-        sequence_label.setFixedWidth(75)
+        sequence_label.setFixedWidth(horizontal_gap)
         sequence.addWidget(sequence_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         sequence.addWidget(QLabel(str(self.roi_data.at[0,"sequence_id"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(sequence)
+        info_layout.addSpacing(vertical_gap)
+
 
         # External ID
         external = QHBoxLayout()
         external_label = QLabel("External ID: ")
-        external_label.setFixedWidth(75)
+        external_label.setFixedWidth(horizontal_gap)
         external.addWidget(external_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         external.addWidget(QLabel(str(self.roi_data.at[0,"external_id"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(external)
+        info_layout.addSpacing(int(vertical_gap/2))
 
         line = QFrame()
         line.setFrameStyle(QFrame.Shape.HLine | QFrame.Shadow.Raised)
         line.setLineWidth(2)
         info_layout.addWidget(line)
+        info_layout.addSpacing(int(vertical_gap/2))
+
+        # Name - EDITABLE
+        species = QHBoxLayout()
+        species_label = QLabel("Name: ")
+        species_label.setFixedWidth(horizontal_gap)
+        species.addWidget(species_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.species = QComboBox()
+        #self.species.setText(str(self.roi_data.at[0,"common"]))
+        species.addWidget(self.species, stretch=1)
+        add_species = QPushButton("+")
+        species.addWidget(add_species)
+        info_layout.addLayout(species)
+        info_layout.addSpacing(vertical_gap)
+
+        # Sex - EDITABLE
+        species = QHBoxLayout()
+        species_label = QLabel("Sex: ")
+        species_label.setFixedWidth(horizontal_gap)
+        species.addWidget(species_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.species = QComboBox()
+        species.addWidget(self.species, stretch=1)
+        info_layout.addLayout(species)
+        info_layout.addSpacing(vertical_gap)
 
 
         # Species - EDITABLE
         species = QHBoxLayout()
         species_label = QLabel("Species: ")
-        species_label.setFixedWidth(75)
-        species.addWidget(species_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.species = QLineEdit()
-        self.species.setText(str(self.roi_data.at[0,"common"]))
-        species.addWidget(self.species, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        species_label.setFixedWidth(horizontal_gap)
+        species.addWidget(species_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.species = QComboBox()
+        #self.species.setText(str(self.roi_data.at[0,"common"]))
+        species.addWidget(self.species, stretch=1)
+        add_species = QPushButton("+")
+        species.addWidget(add_species)
         info_layout.addLayout(species)
+        info_layout.addSpacing(vertical_gap)
+
 
         # Viewpoint - EDITABLE
         viewpoint = QHBoxLayout()
         viewpoint_label = QLabel("Viewpoint: ")
-        viewpoint_label.setFixedWidth(75)
+        viewpoint_label.setFixedWidth(horizontal_gap)
         viewpoint.addWidget(viewpoint_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.viewpoint = QComboBox()
-        viewpoint.addWidget(self.viewpoint, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        viewpoint.addWidget(self.viewpoint, 1)
         info_layout.addLayout(viewpoint)
+        info_layout.addSpacing(vertical_gap)
+
 
         # Comment - EDITABLE
         comment = QHBoxLayout()
         comment_label = QLabel("Comment: ")
-        comment_label.setFixedWidth(75)
+        comment_label.setFixedWidth(horizontal_gap)
         comment.addWidget(comment_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.comment = QLineEdit()
+        self.comment = QTextEdit()
         self.comment.setText(str(self.roi_data.at[0,"comment"]))
-        comment.addWidget(self.comment, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.comment.setFixedHeight(100)
+        comment.addWidget(self.comment, 1)
+        comment.addStretch()
         info_layout.addLayout(comment)
-
-        info_layout.addSpacing(10)
 
         border_widget.setLayout(info_layout)
         layout.addWidget(border_widget, 1)
