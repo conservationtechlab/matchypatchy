@@ -139,16 +139,19 @@ class QueryContainer():
         """
         # get sequences with IDs 
         ided_sequences = self.data[~self.data["individual_id"].isna()]["sequence_id"].unique().tolist()
+        if ided_sequences:
+            # rank sequences by number of matches
+            rank_by_n_match = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
 
-        # rank sequences by number of matches
-        rank_by_n_match = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
-
-        # prioritize already id'd sequences
-        self.ranked_sequences = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
+            # prioritize already id'd sequences
+            self.ranked_sequences = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
+       
+        # if no ids, rank by distance
+        else:
+            self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
 
         # set number of queries to validate
         self.n_queries = len(self.ranked_sequences)
-
 
     def set_query(self, n):
         """
