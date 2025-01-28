@@ -15,7 +15,7 @@ from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QGuiApplication
 
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
@@ -32,8 +32,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
-        self.setMinimumSize(1600, 900)
-        self.resize(1600, 900)
+        screen_resolution = QGuiApplication.primaryScreen().geometry()
+        self.setMinimumSize(1200, 900)
+        # resize to full screen if small screen
+        if screen_resolution.width() < 1600:
+            self.resize(screen_resolution.width(), screen_resolution.height())
 
         # Create Menu Bar
         self._createMenuBar()
