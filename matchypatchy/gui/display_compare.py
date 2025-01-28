@@ -15,6 +15,7 @@ from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_single_image import ImagePopup
 
 from matchypatchy.algo.query import QueryContainer
+from matchypatchy.algo.qc_query import QC_QueryContainer
 
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
 
@@ -26,7 +27,7 @@ class DisplayCompare(QWidget):
         self.mpDB = parent.mpDB
         self.k = 3  # default knn
         self.threshold = 80
-        self.current_viewpoint = 'all'
+        self.current_viewpoint = 'Any'
 
         # CREATE QUERY CONTAINER ==============================================
         self.QueryContainer = QueryContainer(self)
@@ -117,7 +118,8 @@ class DisplayCompare(QWidget):
         query_options.addWidget(self.button_next_query)
         # Viewpoint Toggle
         self.dropdown_viewpoint = QComboBox()
-        self.dropdown_viewpoint.addItems(['All', 'Left', 'Right'])
+        # TODO: FIX HARDCODE VIEWPOINTS
+        self.dropdown_viewpoint.addItems(['Any', 'Left', 'Right'])
         self.dropdown_viewpoint.setCurrentIndex(0)
         self.dropdown_viewpoint.currentIndexChanged.connect(self.toggle_viewpoint)
         self.dropdown_viewpoint.setMaximumWidth(100)
@@ -455,13 +457,15 @@ class DisplayCompare(QWidget):
         """
         Flip between viewpoints in paired images within a sequence
         """
-        selected_viewpoint = self.dropdown_viewpoint.currentText().lower()
+        selected_viewpoint = self.dropdown_viewpoint.currentText()
         self.current_viewpoint = selected_viewpoint
         self.QueryContainer.toggle_viewpoint(selected_viewpoint)
-        if (self.QueryContainer.empty_query == 1 or self.QueryContainer.empty_match == 1):
+        # either query or match has no examples with selected viewpoint, defaults to all viewpoints
+        if (self.QueryContainer.empty_query == True or self.QueryContainer.empty_match == True):
+            self.warn(f'No query image with {selected_viewpoint} viewpoint in the current sequence.')
             self.dropdown_viewpoint.setCurrentIndex(0)
-
         self.query_sequence_n.setText('/' + str(len(self.QueryContainer.current_query_rois)))
+        self.match_n.setText('/' + str(len(self.QueryContainer.current_match_rois)))
         self.query_seq_number.setText('1')
         self.match_number.setText('1')
         self.load_query()
@@ -487,7 +491,10 @@ class DisplayCompare(QWidget):
         self.change_query(0)
 
     def recalculate_by_individual(self):
-        self.QueryContainer = QueryContainer(self)
+        #self.refresh_filters()
+        self.QueryContainer = QC_QueryContainer(self)
+        self.QueryContainer.load_data()
+        self.QueryContainer.filter()
         self.change_query(0)
 
     # FILTERS ------------------------------------------------------------------
@@ -559,7 +566,7 @@ class DisplayCompare(QWidget):
             self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
 
         # Update station list to reflect active survey
-        self.station_list_ordered = [(0, 'station')] + [(k, v) for k, v in self.valid_stations.items()]
+        self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
         self.station_select.blockSignals(False)
 

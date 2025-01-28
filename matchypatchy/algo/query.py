@@ -6,6 +6,7 @@ import pandas as pd
 
 import matchypatchy.database.media as db_roi
 
+from matchypatchy.algo.models import load
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 from matchypatchy.gui.popup_alert import ProgressPopup
 
@@ -18,6 +19,7 @@ class QueryContainer():
         self.neighbor_dict = dict()
         self.nearest_dict = dict()
         self.ranked_sequences = []
+        self.VIEWPOINT_DICT = load('VIEWPOINTS')
 
         self.current_query = 0
         self.current_match = 0
@@ -142,10 +144,7 @@ class QueryContainer():
         rank_by_n_match = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
 
         # prioritize already id'd sequences
-        prioritize_ided = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
-
-        #self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1]) (old formula)
-        self.ranked_sequences = prioritize_ided
+        self.ranked_sequences = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
 
         # set number of queries to validate
         self.n_queries = len(self.ranked_sequences)
@@ -167,9 +166,6 @@ class QueryContainer():
         # get corresponding sequence_id and rois
         self.current_sequence_id = self.ranked_sequences[self.current_query][0]
         self.current_query_rois = self.sequences[self.current_sequence_id]
-
-        # get viewpoints
-        self.current_query_viewpoints = self.data.loc[self.current_query_rois, 'viewpoint']
 
         # set view to first in sequence
         self.set_within_query_sequence(0)
@@ -217,39 +213,37 @@ class QueryContainer():
 
     # VIEWPOINT ----------------------------------------------------------------
     def compute_viewpoints(self):
-        self.viewpoints = {
-            'all': {},  # {sequence_id: list of ROIs}
-            'left': {},
-            'right': {}
-        }
+        self.viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
 
         for sequence_id, rois in self.sequences.items():
-            all_rois = rois
-            left_rois = [rid for rid in rois if self.data.loc[rid, 'viewpoint'] == 0]
-            right_rois = [rid for rid in rois if self.data.loc[rid, 'viewpoint'] == 1]
-
-            self.viewpoints['all'][sequence_id] = all_rois
-            self.viewpoints['left'][sequence_id] = left_rois
-            self.viewpoints['right'][sequence_id] = right_rois
+            for key,value in self.VIEWPOINT_DICT.items():
+                if key == "Any":
+                    self.viewpoints[value][sequence_id] = rois
+                else:
+                    try:
+                        self.viewpoints[value][sequence_id] = [rid for rid in rois if str(self.data.loc[rid, 'viewpoint']) == key]
+                    except KeyError:
+                        self.viewpoints[value][sequence_id] = []
 
     def compute_match_viewpoints(self):
-        self.match_viewpoints = {
-            'all': {},  # {sequence_id: list of matching ROIs}
-            'left': {},
-            'right': {}
-        }
+        self.match_viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
+
         for sequence_id, matches in self.neighbor_dict.items():
             all_matches = [x[0] for x in matches]
-            left_matches = [rid for rid in all_matches if self.data.loc[rid, 'viewpoint'] == 0]
-            right_matches = [rid for rid in all_matches if self.data.loc[rid, 'viewpoint'] == 1]
-
-            self.match_viewpoints['all'][sequence_id] = all_matches
-            self.match_viewpoints['left'][sequence_id] = left_matches
-            self.match_viewpoints['right'][sequence_id] = right_matches
+            for key,value in self.VIEWPOINT_DICT.items():
+                if key == "Any":
+                    self.match_viewpoints[value][sequence_id] = all_matches
+                else:
+                    try:
+                        self.match_viewpoints[value][sequence_id] = [rid for rid in all_matches if str(self.data.loc[rid, 'viewpoint']) == key]
+                    except KeyError:
+                        self.match_viewpoints[value][sequence_id] = []
 
     def show_all_query_image(self):
-        sequence_id = self.data.loc[self.current_query_rid, 'sequence_id']
-        self.current_query_rois = self.viewpoints['all'].get(sequence_id, [])
+        """
+        Show All Viewpoints for Query
+        """
+        self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
         self.set_within_query_sequence(0)
 
     def toggle_viewpoint(self, selected_viewpoint):
@@ -261,46 +255,40 @@ class QueryContainer():
         self.update_viewpoint_matching_images()
 
     def update_viewpoint_current_query(self):
-        self.empty_query = 0
-        sequence_id = self.data.loc[self.current_query_rid, 'sequence_id']
-        if self.selected_viewpoint == 'all':
-            self.current_query_rois = self.viewpoints['all'].get(sequence_id, [])
+        # Sets Query to Display Only Selected Viewpoint
+        self.empty_query = False
+        if self.selected_viewpoint == 'Any':
+            self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
         else:
-            self.current_query_rois = self.viewpoints[self.selected_viewpoint].get(sequence_id, [])
+            self.current_query_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
 
         if self.current_query_rois:
             self.set_within_query_sequence(0)
         else:
-            self.parent.warn(f'No query image with {self.selected_viewpoint} viewpoint in the current sequence. Show all viewpoints.')
-            self.empty_query = 1
+            self.empty_query = True
             # show all viewpoints
-            self.current_query_rois = self.viewpoints['all'].get(sequence_id, [])
+            self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
             self.set_within_query_sequence(0)
 
     def update_viewpoint_matching_images(self):
-        self.empty_match = 0
-        sequence_id = self.current_sequence_id
-
-        if self.selected_viewpoint == 'all':
-            self.current_match_rois = self.match_viewpoints['all'].get(sequence_id, [])
+        # Sets Match to Display Only Selected Viewpoint
+        self.empty_match = False
+        if self.selected_viewpoint == 'Any':
+            self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
         else:
-            self.current_match_rois = self.match_viewpoints[self.selected_viewpoint].get(sequence_id, [])
+            self.current_match_rois = self.match_viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
 
-        if self.current_match_rois and self.empty_query == 0:
-            self.parent.match_n.setText('/' + str(len(self.current_match_rois)))
+        if self.current_match_rois and self.empty_query == False:
             self.set_match(0)
-        elif not self.current_match_rois and self.empty_query == 0:  # need to update query image to all viewpoints
-            self.empty_match = 1
-            self.parent.warn(f'No match images with {self.selected_viewpoint} viewpoint. Show all viewpoints.')
-            self.current_match_rois = self.match_viewpoints['all'].get(sequence_id, [])
+        elif not self.current_match_rois and self.empty_query == False:  # need to update query image to all viewpoints
+            self.empty_match = True
+            self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
             self.set_match(0)
-            self.parent.match_n.setText('/' + str(len(self.current_match_rois)))
             self.show_all_query_image()
         else:  # empty query
             # show all viewpoints
-            self.current_match_rois = self.match_viewpoints['all'].get(sequence_id, [])
+            self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
             self.set_match(0)
-            self.parent.match_n.setText('/' + str(len(self.current_match_rois)))
 
     # RETURN INFO --------------------------------------------------------------------
     def is_existing_match(self):

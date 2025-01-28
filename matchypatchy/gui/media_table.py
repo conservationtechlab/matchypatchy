@@ -29,7 +29,7 @@ class MediaTable(QWidget):
         self.data = pd.DataFrame()
         self.thumbnails = dict()
         self.crop = True
-        self.VIEWPOINT = models.load('VIEWPOINT')
+        self.VIEWPOINT = models.load('VIEWPOINTS')
 
         self.edit_stack = []
 

@@ -85,7 +85,7 @@ def roi_metadata(roi, spacing=1.5):
                      'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
     # convert viewpoint to human-readable (0=Left, 1=Right)
-    VIEWPOINT = models.load('VIEWPOINT')
+    VIEWPOINT = models.load('VIEWPOINTS')
     info_dict['Viewpoint'] = VIEWPOINT[str(info_dict['Viewpoint'])]
 
     info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
@@ -128,3 +128,17 @@ def sequence_roi_dict(roi_media):
         sequence = roi_media[roi_media['sequence_id'] == s]
         sequence_dict[s] = sequence.index.to_list()
     return sequence_dict
+
+
+def individual_roi_dict(roi_media):
+    """
+    Return two lists of roi.ids
+
+    Group by capture, order by frame number
+    """
+    individual_dict = dict()
+    individual_ids = roi_media["individual_id"].to_list()
+    for iid in individual_ids:
+        individual = roi_media[roi_media['individual_id'] == iid]
+        individual_dict[iid] = individual.index.to_list()
+    return individual_dict
