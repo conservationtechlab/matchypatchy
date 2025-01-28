@@ -1,5 +1,0 @@
-DB_PATH: /home/tongfei/matchypatchy/matchypatchy.db
-FRAME_DIR: /tmp/MatchyPatchy_pbc4vppw/Frames
-LOG_PATH: /home/tongfei/matchypatchy/matchpatchy.log
-ML_DIR: /home/tongfei/matchypatchy/Models
-TEMP_DIR: /tmp/MatchyPatchy_pbc4vppw
