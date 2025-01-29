@@ -5,7 +5,7 @@ QThreads for Importing Data
 import os
 from PyQt6.QtCore import QThread, pyqtSignal
 
-# CSV IMPORT =====================================+++===========================
+# TODO: add dtype checks
 
 class CSVImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
@@ -44,7 +44,7 @@ class CSVImportThread(QThread):
                                            sequence_id=sequence_id,
                                            external_id=external_id,
                                            comment=comment)
-            # TODO: add dtype checks
+
             for i, roi in group.iterrows():
                 # Frame number for videos, else 1 if image
                 # WARNING! WILL HAVE TO DYNAMICALLY PULL FRAME WHEN RUNNING miewid

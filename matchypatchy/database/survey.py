@@ -18,5 +18,8 @@ def fetch_surveys(mpDB):
         return pd.DataFrame(columns=["id", "name", "region", "year_start", "year_end"])
 
 def fetch_regions(mpDB):
-    # TODO
-    pass
+    regions = mpDB.select("region")
+    if regions:
+        return pd.DataFrame(regions, columns=["id", "name"])
+    else:
+        return pd.DataFrame(columns=["id", "name"])

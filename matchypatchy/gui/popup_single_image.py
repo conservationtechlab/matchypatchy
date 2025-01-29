@@ -58,8 +58,6 @@ class ImagePopup(QDialog):
         horizontal_gap = 120
         vertical_gap = 8
 
-
-
         # Timestamp 
         timestamp = QHBoxLayout()
         timestamp_label = QLabel("Timestamp: ")
@@ -67,11 +65,6 @@ class ImagePopup(QDialog):
         timestamp.addWidget(timestamp_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         timestamp.addWidget(QLabel(str(self.roi_data.at[0,"timestamp"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(timestamp)
-
-        favorite_label = QLabel("Favorite: ")
-        timestamp.addWidget(favorite_label)
-
-
         info_layout.addSpacing(vertical_gap)
 
         # Station
@@ -84,7 +77,6 @@ class ImagePopup(QDialog):
         info_layout.addLayout(station)
         info_layout.addSpacing(vertical_gap)
 
-
         # Sequence ID
         sequence = QHBoxLayout()
         sequence_label = QLabel("Sequence ID: ")
@@ -93,7 +85,6 @@ class ImagePopup(QDialog):
         sequence.addWidget(QLabel(str(self.roi_data.at[0,"sequence_id"])), 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(sequence)
         info_layout.addSpacing(vertical_gap)
-
 
         # External ID
         external = QHBoxLayout()

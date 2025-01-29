@@ -86,12 +86,11 @@ class AnimlThread(QThread):
                               individual_id=individual_id, emb_id=0)
 
     def get_species(self, label_col="Code"):
-        # TODO: Utilize probability for sequences
         if self.classifier_filepath is None:
             # user opted to skip classification
             return
         
-        print(self.classifier_filepath, self.class_filepath)
+        #print(self.classifier_filepath, self.class_filepath)
 
         classes = pd.read_csv(self.class_filepath).set_index(label_col)
 

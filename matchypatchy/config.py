@@ -7,8 +7,6 @@ import tempfile
 import logging 
 import yaml
 
-# TODO: FIX CONFIG LOCATION
-
 def initiate():
     cfg_path = Path('config.yml')
 

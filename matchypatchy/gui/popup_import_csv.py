@@ -283,7 +283,6 @@ class ImportCSVPopup(QDialog):
                 "individual": self.selected_individual,
                 "comment": self.selected_comment}
 
-    # TODO: Check for duplicates?
     def import_manifest(self):
         """
         Media entry (id, filepath, ext, timestamp, comment, station_id)
