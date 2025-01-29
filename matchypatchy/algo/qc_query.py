@@ -204,27 +204,16 @@ class QC_QueryContainer():
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None
 
-    def get_query_info(self, column=None):
+    def get_info(self, rid, column=None):
         if column is None:  # return whole row
-            return self.data.loc[self.current_query_rid]
+            return self.data.loc[rid]
         elif column == 'bbox':
             # Return the bbox coordinates for current query
-            return db_roi.get_bbox(self.data.loc[self.current_query_rid])
+            return db_roi.get_bbox(self.data.loc[rid])
         elif column == 'metadata':
-            return db_roi.roi_metadata(self.data.loc[self.current_query_rid])
+            return db_roi.roi_metadata(self.data.loc[rid])
         else:
-            return self.data.loc[self.current_query_rid, column]
-
-    def get_match_info(self, column=None):
-        if column is None:  # return whole row
-            return self.data.loc[self.current_match_rid]
-        elif column == 'bbox':
-            # Return the bbox coordinates for current match
-            return db_roi.get_bbox(self.data.loc[self.current_match_rid])
-        elif column == 'metadata':
-            return db_roi.roi_metadata(self.data.loc[self.current_match_rid])
-        else:
-            return self.data.loc[self.current_match_rid, column]
+            return self.data.loc[rid, column]
 
     def current_distance(self):
         return 0
