@@ -4,8 +4,8 @@ Custom Widget for Displaying an Image
 from PIL import Image, ImageEnhance
 
 from PyQt6.QtWidgets import QLabel
-from PyQt6.QtGui import QPixmap, QPainter, QImage
-from PyQt6.QtCore import Qt, QRect, QPointF
+from PyQt6.QtGui import QPixmap, QPainter, QImage, QPen
+from PyQt6.QtCore import Qt, QRect, QPointF, QRectF
 
 
 class ImageWidget(QLabel):
@@ -14,7 +14,9 @@ class ImageWidget(QLabel):
         self.default_width = width
         self.default_height = height
         self.image_path = image_path
+        self.rel_bbox = None
         self.bbox = None
+        self.crop_to_bbox = False
         self.pil_image = None
         self.qimage = None
         # Image Adjustments
@@ -31,16 +33,16 @@ class ImageWidget(QLabel):
         self.pixmap = QPixmap(self.size())
         self.setPixmap(self.pixmap)
 
-    def load(self, image_path, bbox=None):
+    def load(self, image_path, bbox=None, crop=False):
         """
         Load image path with pillow
         """
         if self.image_path is None or image_path != self.image_path:
             self.image_path = image_path
         
-        if bbox is not None:
-            self.bbox = bbox
-        
+        self.rel_bbox = bbox
+        self.crop_to_bbox = crop
+
         self.pil_image = Image.open(self.image_path)
         self.adjust()
 
@@ -62,8 +64,12 @@ class ImageWidget(QLabel):
         # Convert to QImage
         self.qimage = self.to_qimage()
 
-        # Crop
-        self.qimage = self.crop(self.bbox)
+        # Get BBOX
+        self.bbox = self.get_bbox()
+
+        # crop image
+        if self.bbox is not None and self.crop_to_bbox:
+            self.qimage = self.qimage.copy(self.bbox)
 
         # Display
         self.update()
@@ -80,30 +86,20 @@ class ImageWidget(QLabel):
         # Create a QImage from the image data
         return QImage(image_data, width, height, QImage.Format.Format_RGBA8888)
     
-    def crop(self, bbox=None):
+    def get_bbox(self):
         """
         Crop to bbox before painting
         """
-        if bbox is not None:
-            self.bbox = bbox
-            left = self.qimage.width() * self.bbox['bbox_x']
-            top = self.qimage.height() * self.bbox['bbox_y']
-            right = self.qimage.width() * self.bbox['bbox_w']
-            bottom = self.qimage.height() * self.bbox['bbox_h']
-            crop_rect = QRect(int(left), int(top), int(right), int(bottom))
-            qimage = self.qimage.copy(crop_rect)
+        if self.rel_bbox is not None:
+            left = self.qimage.width() * self.rel_bbox['bbox_x']
+            top = self.qimage.height() * self.rel_bbox['bbox_y']
+            right = self.qimage.width() * self.rel_bbox['bbox_w']
+            bottom = self.qimage.height() * self.rel_bbox['bbox_h']
+            return QRect(int(left), int(top), int(right), int(bottom))
         else:
-            self.bbox=None
-            qimage = self.qimage.copy()
-
-        return qimage
-    
-    def draw_bbox(self, bbox):
-        # TODO
-        pass
+            return None 
 
     # ---- IMAGE ADJUSTMENTS ----
-
     def adjust_brightness(self, value):
         """
         QImage needs to be reconverted each time
@@ -153,6 +149,19 @@ class ImageWidget(QLabel):
             target_rect = pixmap.rect()
             target_rect.moveCenter(self.rect().center() + self.image_offset.toPoint())
             painter.drawPixmap(target_rect.topLeft(), pixmap)
+            # not cropped but draw bbox
+            if self.bbox is not None and not self.crop_to_bbox:
+                scaled_bbox = QRectF(self.bbox)
+                scale_factor_x = target_rect.width() / self.qimage.width()
+                scale_factor_y = target_rect.height() / self.qimage.height()
+                scaled_bbox.setRect(
+                    target_rect.left() + scaled_bbox.left() * scale_factor_x,
+                    target_rect.top() + scaled_bbox.top() * scale_factor_y,
+                    scaled_bbox.width() * scale_factor_x,
+                    scaled_bbox.height() * scale_factor_y)
+
+                painter.setPen(QPen(Qt.GlobalColor.green, 3))
+                painter.drawRect(scaled_bbox)
 
 
     def wheelEvent(self, event):
