@@ -14,6 +14,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_single_image import ImagePopup
 
+from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
@@ -116,14 +117,6 @@ class DisplayCompare(QWidget):
         self.button_next_query.setMaximumWidth(40)
         self.button_next_query.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query + 1))
         query_options.addWidget(self.button_next_query)
-        # Viewpoint Toggle
-        self.dropdown_viewpoint = QComboBox()
-        # TODO: FIX HARDCODE VIEWPOINTS
-        self.dropdown_viewpoint.addItems(['Any', 'Left', 'Right'])
-        self.dropdown_viewpoint.setCurrentIndex(0)
-        self.dropdown_viewpoint.currentIndexChanged.connect(self.toggle_viewpoint)
-        self.dropdown_viewpoint.setMaximumWidth(100)
-        query_options.addWidget(self.dropdown_viewpoint)
         # # Sequence Number
         query_options.addWidget(QLabel("Sequence:"))
         self.button_previous_query_seq = QPushButton("<<")
@@ -139,8 +132,25 @@ class DisplayCompare(QWidget):
         self.button_next_query_seq.setMaximumWidth(40)
         self.button_next_query_seq.clicked.connect(lambda: self.change_query_in_sequence(self.QueryContainer.current_query_sn + 1))
         query_options.addWidget(self.button_next_query_seq)
+
+        # Viewpoint Toggle
+        query_options.addSpacing(20)
+        
+        query_options.addWidget(QLabel("Viewpoint:"))
+        self.dropdown_viewpoint = QComboBox()
+        VIEWPOINT_DICT = load('VIEWPOINTS')
+        self.dropdown_viewpoint.addItems([v for v in VIEWPOINT_DICT.values() if v != 'None'])
+        self.dropdown_viewpoint.setCurrentIndex(0)
+        self.dropdown_viewpoint.currentIndexChanged.connect(self.toggle_viewpoint)
+        self.dropdown_viewpoint.setMaximumWidth(100)
+        query_options.addWidget(self.dropdown_viewpoint)
+
+
         query_options.addStretch()
         query_layout.addLayout(query_options)
+
+
+
 
         # Query Image
         self.query_image = ImageWidget()
@@ -223,7 +233,7 @@ class DisplayCompare(QWidget):
         match_label = QLabel("Match")
         match_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         match_layout.addWidget(match_label)
-        # Options
+        # OptionsVIEWPOINT_DICT
         match_options = QHBoxLayout()
         match_options.addStretch()
         # # Match Number
@@ -368,7 +378,6 @@ class DisplayCompare(QWidget):
             self.button_match.setStyleSheet(MATCH_STYLE)
         else:
             self.button_match.setStyleSheet("")
-            
 
     def confirm_match(self):
         """
@@ -409,7 +418,6 @@ class DisplayCompare(QWidget):
         self.load_match()
 
     # LOAD FUNCTIONS -----------------------------------------------------------
-
     def change_query(self, n):
         self.QueryContainer.set_query(n)
         # update text
@@ -488,11 +496,14 @@ class DisplayCompare(QWidget):
         # set new threshold value
         # Must recalculate neighbors to activate
         self.threshold = self.threshold_slider.value()
-        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() * (self.threshold - self.threshold_slider.minimum()) //
-                                                                          (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
+        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() * 
+                                                                         (self.threshold - self.threshold_slider.minimum()) //
+                                                                         (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
         QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
     def recalculate(self):
+        self.QueryContainer = QueryContainer(self)
+        self.QueryContainer.load_data()
         self.QueryContainer.calculate_neighbors()
         self.change_query(0)
 
@@ -615,21 +626,39 @@ class DisplayCompare(QWidget):
         key = event.key()
         key_text = event.text()
 
-        # Right Arrow
-        if key == 16777236:
-            self.set_query(self.current_query + 1)
         # Left Arrow
-        elif key == 16777234:
-            self.set_query(self.current_query - 1)
+        if key == 16777234:
+            self.change_match(self.QueryContainer.current_match - 1)
+        # Right Arrow
+        elif key == 16777236:
+            self.change_match(self.QueryContainer.current_match + 1)
         # Up Arrow
         elif key == 16777235:
-            self.set_match(self.current_match - 1)
+            self.change_query(self.QueryContainer.current_query - 1)
         # Down Arrow
         elif key == 16777237:
-            self.set_match(self.current_match + 1)
+            self.change_query(self.QueryContainer.current_query + 1)
 
+        # Space - Match
+        elif key == 32:
+            self.button_match.click()
         # M - Match
         elif key == 77:
             self.button_match.click()
+
+        # V - Viewpoint
+        elif key == 86:
+            n = self.dropdown_viewpoint.currentIndex()
+            # wrap around
+            if n < 0:
+                n = self.dropdown_viewpoint.count() - 1
+            if n > self.dropdown_viewpoint.count() - 1:
+                n = 0
+            self.dropdown_viewpoint.setCurrentIndex(n+1)
+
+        # Escape - Home
+        elif key == 16777216:
+            self.home()
+
         else:
             print(f"Key pressed: {key_text} (Qt key code: {key})")
