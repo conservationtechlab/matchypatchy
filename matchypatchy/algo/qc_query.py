@@ -2,12 +2,8 @@
 Class Definition for Query Object
 """
 
-import pandas as pd
-
 import matchypatchy.database.media as db_roi
-
 from matchypatchy.algo.models import load
-from matchypatchy.gui.popup_alert import ProgressPopup
 
 
 class QC_QueryContainer():
@@ -147,8 +143,8 @@ class QC_QueryContainer():
         # get all matches for query
         self.current_match_rois = self.individuals[self.current_sequence_id]
 
-        # set to top of matches
-        self.set_match(0)
+        # set to top of matches, skip the first one which will be on the query side
+        self.set_match(1)
 
     def set_match(self, n):
         """
@@ -203,7 +199,11 @@ class QC_QueryContainer():
             self.current_match_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
             self.set_within_query_sequence(0)
 
-    # RETURN INFO ---------------------------------------------------------------
+    # RETURN INFO --------------------------------------------------------------
+    def is_existing_match(self):
+        return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
+            self.data.loc[self.current_query_rid, "individual_id"] is not None
+
     def get_query_info(self, column=None):
         if column is None:  # return whole row
             return self.data.loc[self.current_query_rid]
@@ -230,11 +230,6 @@ class QC_QueryContainer():
         return 0
 
     # MATCH FUNCTIONS ----------------------------------------------------------
-
-    def is_existing_match(self):
-        # All are matches
-        return True
-
     def new_iid(self, individual_id):
         """
         Update records for roi after confirming a match
@@ -243,3 +238,7 @@ class QC_QueryContainer():
             self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
 
         self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
+
+    def unmatch(self):
+        # Set current match id to none
+        self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': None}, quiet=False)
