@@ -208,7 +208,9 @@ class DisplayCompare(QWidget):
         self.button_match = QPushButton("Match")
         self.button_match.setCheckable(True)
         self.button_match.setChecked(False)
+        self.button_match.blockSignals(True)
         self.button_match.pressed.connect(self.press_match_button)
+        self.button_match.blockSignals(False)
         self.button_match.setFixedHeight(50)
         self.button_match.setMaximumWidth(50)
         middle_column.addWidget(self.button_match,
@@ -343,14 +345,14 @@ class DisplayCompare(QWidget):
 
     # MATCHING PROCESS ---------------------------------------------------------
     def press_match_button(self):
-        self.button_match.setChecked(not self.button_match.isChecked())
-        # check button, create match
-        if self.button_match.isChecked():
-            self.confirm_match()
-        # uncheck button, undo match
+        # already a match
+        if self.QueryContainer.is_existing_match():
+            print("unmatch")
+            self.unmatch()
+        # new match
         else:
-            self.undo_match()
-        self.toggle_match_button()
+            print("match")
+            self.confirm_match()
 
     def toggle_match_button(self):
         """
@@ -358,11 +360,15 @@ class DisplayCompare(QWidget):
         normal button when not
         """
         if self.QueryContainer.is_existing_match():
-            self.button_match.setStyleSheet(MATCH_STYLE)
             self.button_match.setChecked(True)
         else:
-            self.button_match.setStyleSheet("")
             self.button_match.setChecked(False)
+
+        if self.button_match.isChecked():
+            self.button_match.setStyleSheet(MATCH_STYLE)
+        else:
+            self.button_match.setStyleSheet("")
+            
 
     def confirm_match(self):
         """
@@ -381,26 +387,26 @@ class DisplayCompare(QWidget):
                 self.QueryContainer.new_iid(individual_id)
             del dialog
 
-            # update data
-            self.QueryContainer.load_data()
-            self.QueryContainer.filter(reset=False)
-            self.load_query()
-            self.load_match()
-            self.toggle_match_button()
-
         # Match has a name
         else:
             self.QueryContainer.merge()
             # update data
-            self.QueryContainer.load_data()
-            self.QueryContainer.filter(reset=False)
-            self.load_query()
-            self.load_match()
-            self.toggle_match_button()
+        self.QueryContainer.load_data()
+        self.QueryContainer.filter(reset=False)
+        self.load_query()
+        self.load_match()
 
-    def undo_match(self):
-        # TODO: Undoable Match stack
-        pass
+    def unmatch(self):
+        name = self.QueryContainer.get_match_info('name')
+        dialog = AlertPopup(self, prompt=f"This will remove Match from individual '{name}'")
+        if dialog.exec():
+            self.QueryContainer.unmatch()
+            del dialog
+
+        self.QueryContainer.load_data()
+        self.QueryContainer.filter(reset=False)
+        self.load_query()
+        self.load_match()
 
     # LOAD FUNCTIONS -----------------------------------------------------------
 
@@ -420,7 +426,6 @@ class DisplayCompare(QWidget):
         # load new images
         self.load_query()
         self.load_match()
-        self.toggle_match_button()
 
     def change_query_in_sequence(self, n):
         self.QueryContainer.set_within_query_sequence(n)
@@ -432,7 +437,6 @@ class DisplayCompare(QWidget):
         self.QueryContainer.set_match(n)
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.load_match()
-        self.toggle_match_button()
 
     def load_query(self):
         """
@@ -441,6 +445,7 @@ class DisplayCompare(QWidget):
         self.query_image.load(self.QueryContainer.get_query_info("filepath"),
                               bbox=self.QueryContainer.get_query_info('bbox'))
         self.query_info.setText(self.QueryContainer.get_query_info("metadata"))
+        self.toggle_match_button()
 
     def load_match(self):
         """
@@ -452,6 +457,7 @@ class DisplayCompare(QWidget):
         self.match_image.load(self.QueryContainer.get_match_info("filepath"),
                               bbox=self.QueryContainer.get_match_info("bbox"))
         self.match_info.setText(self.QueryContainer.get_match_info("metadata"))
+        self.toggle_match_button()
 
     def toggle_viewpoint(self):
         """

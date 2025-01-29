@@ -375,3 +375,7 @@ class QueryContainer():
 
         for i in to_merge.index:
             self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
+
+    def unmatch(self):
+        # Set current match id to none
+        self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': None}, quiet=False)
