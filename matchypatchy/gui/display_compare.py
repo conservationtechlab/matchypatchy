@@ -19,7 +19,7 @@ from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
-
+FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
 
 class DisplayCompare(QWidget):
     def __init__(self, parent):
@@ -193,12 +193,11 @@ class DisplayCompare(QWidget):
         button_query_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_query_rid))
         query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # favorite
-        button_query_favorite = QPushButton("♥")
-        button_query_favorite.setFixedWidth(30)
-        button_query_favorite.clicked.connect(lambda: self.favorite(self.QueryContainer.current_query_rid))
-        query_image_buttons.addWidget(button_query_favorite)
-        button_query_favorite.setCheckable(True)
-        button_query_favorite.setChecked(False)
+        self.button_query_favorite = QPushButton("♥")
+        self.button_query_favorite.setFixedWidth(30)
+        self.button_query_favorite.clicked.connect(lambda: self.press_favorite_button(self.QueryContainer.current_query_rid))
+        query_image_buttons.addWidget(self.button_query_favorite)
+        self.button_query_favorite.setCheckable(True)
 
         query_image_buttons.addStretch()
         query_layout.addLayout(query_image_buttons)
@@ -300,12 +299,11 @@ class DisplayCompare(QWidget):
         button_match_image_open.clicked.connect(lambda: self.open_image(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(button_match_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Favorite
-        button_match_favorite = QPushButton("♥")
-        button_match_favorite.setFixedWidth(30)
-        button_match_favorite.clicked.connect(lambda: self.favorite(self.QueryContainer.current_match_rid))
-        match_image_buttons.addWidget(button_match_favorite)
-        button_match_favorite.setCheckable(True)
-        button_match_favorite.setChecked(False)
+        self.button_match_favorite = QPushButton("♥")
+        self.button_match_favorite.setFixedWidth(30)
+        self.button_match_favorite.clicked.connect(lambda: self.press_favorite_button(self.QueryContainer.current_match_rid))
+        match_image_buttons.addWidget(self.button_match_favorite)
+        self.button_match_favorite.setCheckable(True)
 
         match_image_buttons.addStretch()
         match_layout.addLayout(match_image_buttons)
@@ -392,7 +390,6 @@ class DisplayCompare(QWidget):
                                                          dialog.get_name(),
                                                          dialog.get_sex())
                 # update query and match
-                # TODO: add stack to undo
                 self.QueryContainer.new_iid(individual_id)
             del dialog
 
@@ -450,10 +447,11 @@ class DisplayCompare(QWidget):
         """
         Load Images for Current Query ROI
         """
-        self.query_image.load(self.QueryContainer.get_query_info("filepath"),
-                              bbox=self.QueryContainer.get_query_info('bbox'))
-        self.query_info.setText(self.QueryContainer.get_query_info("metadata"))
+        self.query_image.load(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "filepath"),
+                              bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid,'bbox'))
+        self.query_info.setText(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata"))
         self.toggle_match_button()
+        self.toggle_query_favorite_button()
 
     def load_match(self):
         """
@@ -462,10 +460,11 @@ class DisplayCompare(QWidget):
         distance = self.QueryContainer.current_distance()
         self.match_distance.setText(f"Distance: {distance:.2f}")
 
-        self.match_image.load(self.QueryContainer.get_match_info("filepath"),
-                              bbox=self.QueryContainer.get_match_info("bbox"))
-        self.match_info.setText(self.QueryContainer.get_match_info("metadata"))
+        self.match_image.load(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "filepath"),
+                              bbox=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "bbox"))
+        self.match_info.setText(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "metadata"))
         self.toggle_match_button()
+        self.toggle_match_favorite_button()
 
     def toggle_viewpoint(self):
         """
@@ -614,12 +613,63 @@ class DisplayCompare(QWidget):
 
         Currently only supports one image at a time
         """
-        img = Image.open(self.QueryContainer.data.loc[rid, "filepath"])
+        img = Image.open(self.QueryContainer.get_info(rid, "filepath"))
         img.show()
 
+    # FAVORITE -----------------------------------------------------------------
+    def press_favorite_button(self, rid):
+        if self.QueryContainer.get_info(rid, "favorite"):
+            self.unfavorite(rid)
+        else:
+            self.favorite(rid)
+
     def favorite(self, rid):
-        # TODO
-        pass
+        media_id = self.QueryContainer.get_info(rid, "media_id")
+        self.mpDB.edit_row('media', media_id, {"favorite": 1})
+        # reload database
+        self.QueryContainer.load_data()
+        self.QueryContainer.filter(reset=False)
+        self.load_query()
+        self.load_match()
+
+    def unfavorite(self, rid):
+        media_id = self.QueryContainer.get_info(rid, "media_id")
+        self.mpDB.edit_row('media', media_id, {"favorite": 0})
+        # reload database
+        self.QueryContainer.load_data()
+        self.QueryContainer.filter(reset=False)
+        self.load_query()
+        self.load_match()
+
+    def toggle_query_favorite_button(self):
+        """
+        Change Match button to Green when query and match are same iid,
+        normal button when not
+        """
+        if self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "favorite"):
+            self.button_query_favorite.setChecked(True)
+        else:
+            self.button_query_favorite.setChecked(False)
+
+        if self.button_query_favorite.isChecked():
+            self.button_query_favorite.setStyleSheet(FAVORITE_STYLE)
+        else:
+            self.button_query_favorite.setStyleSheet("")
+
+    def toggle_match_favorite_button(self):
+        """
+        Change Match button to Green when query and match are same iid,
+        normal button when not
+        """
+        if self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "favorite"):
+            self.button_match_favorite.setChecked(True)
+        else:
+            self.button_match_favorite.setChecked(False)
+
+        if self.button_match_favorite.isChecked():
+            self.button_match_favorite.setStyleSheet(FAVORITE_STYLE)
+        else:
+            self.button_match_favorite.setStyleSheet("")
 
     # Keyboard Handler ---------------------------------------------------------
     def keyPressEvent(self, event):
