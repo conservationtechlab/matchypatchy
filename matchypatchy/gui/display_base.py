@@ -152,21 +152,21 @@ class DisplayBase(QWidget):
         # ML models
         button_configuration = QPushButton("Configuration")
         button_download_ml = QPushButton("Download Models")
-        button_ph1 = QPushButton("")
-        button_ph1.setEnabled(False)
-        button_ph2 = QPushButton("Validate Database")
+        button_help = QPushButton("Help")
+        button_help.setEnabled(False)
+        button_validate_db = QPushButton("Validate Database")
         button_clear_data = QPushButton("Clear Data")
 
         other_layer.addWidget(button_configuration)
         other_layer.addWidget(button_download_ml)
-        other_layer.addWidget(button_ph1)
-        other_layer.addWidget(button_ph2)
+        other_layer.addWidget(button_help)
+        other_layer.addWidget(button_validate_db)
         other_layer.addWidget(button_clear_data)
 
         button_configuration.clicked.connect(self.edit_config)
         button_download_ml.clicked.connect(self.download_ml)
-        button_download_ml.clicked.connect(self.download_ml)
-        button_ph2.clicked.connect(self.validate_db)
+        button_help.clicked.connect(self.help)
+        button_validate_db.clicked.connect(self.validate_db)
         button_clear_data.clicked.connect(self.clear_data)
 
         border_other.setLayout(other_layer)
@@ -336,8 +336,12 @@ class DisplayBase(QWidget):
         if dialog.exec():
             del dialog
 
+    def help(self):
+        # TODO
+        pass
+
     def validate_db(self):
-        self.mpDB.info()
+        self.mpDB.validate()
 
     def clear_data(self):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
