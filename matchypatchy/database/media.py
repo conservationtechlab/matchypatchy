@@ -74,6 +74,7 @@ def roi_metadata(roi, spacing=1.5):
     Display relevant metadata in comparison label box
     """
     roi = roi.rename(index={"name": "Name",
+                            "sex": "Sex",
                             "filepath": "File Path",
                             "comment": "Comment",
                             "timestamp": "Timestamp",
@@ -81,7 +82,7 @@ def roi_metadata(roi, spacing=1.5):
                             "sequence_id": "Sequence ID",
                             "viewpoint": "Viewpoint"})
 
-    info_dict = roi[['Name', 'File Path', 'Timestamp', 'Station',
+    info_dict = roi[['Name', 'Sex', 'File Path', 'Timestamp', 'Station',
                      'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
     # convert viewpoint to human-readable (0=Left, 1=Right)

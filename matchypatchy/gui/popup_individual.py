@@ -136,15 +136,12 @@ class IndividualFillPopup(QDialog):
 
         # sex
         layout.addWidget(QLabel('Sex'))
-        self.sex = QLineEdit()
-        self.sex.setText(sex)
+        self.sex = QComboBox()
+        self.sex.addItems(['Unknown', 'Male', 'Female'])
         layout.addWidget(self.sex)
 
         self.name.textChanged.connect(self.checkInput)
-        self.sex.textChanged.connect(self.checkInput)
-
-        self.name.returnPressed.connect(lambda: self.sex.setFocus())
-        self.sex.returnPressed.connect(self.accept_verify)
+        self.sex.currentIndexChanged.connect(self.checkInput)
 
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
@@ -172,7 +169,7 @@ class IndividualFillPopup(QDialog):
         return self.name.text()
 
     def get_sex(self):
-        return self.sex.text()
+        return self.sex.currentText()
 
     def get_species_id(self):
         # return id only
