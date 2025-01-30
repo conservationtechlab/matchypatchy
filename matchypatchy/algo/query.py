@@ -334,6 +334,8 @@ class QueryContainer():
     def merge(self):
         """
         Merge two individuals after match
+
+        TODO: Add option to select which name to keep
         """
         query = self.data.loc[self.current_query_rid]
         match = self.data.loc[self.current_match_rid]

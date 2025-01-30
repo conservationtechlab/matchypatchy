@@ -448,7 +448,7 @@ class DisplayCompare(QWidget):
         Load Images for Current Query ROI
         """
         self.query_image.load(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "filepath"),
-                              bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid,'bbox'))
+                              bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid,'bbox'), crop=True)
         self.query_info.setText(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata"))
         self.toggle_match_button()
         self.toggle_query_favorite_button()
@@ -461,7 +461,7 @@ class DisplayCompare(QWidget):
         self.match_distance.setText(f"Distance: {distance:.2f}")
 
         self.match_image.load(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "filepath"),
-                              bbox=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "bbox"))
+                              bbox=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "bbox"), crop=True)
         self.match_info.setText(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "metadata"))
         self.toggle_match_button()
         self.toggle_match_favorite_button()
@@ -602,6 +602,8 @@ class DisplayCompare(QWidget):
     def edit_image(self, rid):
         """
         Open Image in MatchyPatchy Single Image Popup
+
+        NOTE: Redraws query and match
         """
         dialog = ImagePopup(self, rid)
         if dialog.exec():
