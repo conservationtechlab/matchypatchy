@@ -28,12 +28,15 @@ class MatchyPatchyDB():
         logging.info(tables)
         cursor.execute("SELECT COUNT(id) FROM media")
         media = cursor.fetchone()[0]
+        print(f"Media: {media}")
         logging.info(f"Media: {media}")
         cursor.execute("SELECT COUNT(id) FROM roi;")
         roi = cursor.fetchone()[0]
+        print(f"ROI: {roi}")
         logging.info(f"ROI: {roi}")
         cursor.execute("SELECT COUNT(rowid) FROM roi_emb")
         emb = cursor.fetchone()[0]
+        print(f"Emb: {emb}")
         logging.info(f"Emb: {emb}")
         db.close()
 
@@ -45,6 +48,14 @@ class MatchyPatchyDB():
         cursor = db.cursor()
         for row in cursor.execute("pragma table_info('sqlite_master')").fetchall():
             print(row)
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+        table_check = tables == [('sqlite_sequence',), ('region',), ('survey',), ('station',), 
+                         ('media',), ('roi',), ('species',), ('individual',), ('sequence',), 
+                         ('roi_emb',), ('roi_emb_chunks',), ('roi_emb_rowids',), ('roi_emb_vector_chunks00',), ('thumbnails',)]
+        print(table_check)
+        
 
     def _command(self, command):
         """
