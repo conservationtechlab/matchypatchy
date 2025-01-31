@@ -5,10 +5,6 @@ Widget for displaying list of Media
 'station_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
 
-# TODO: DISPLAY ALL MEDIA VS ALL ROIS VS BOTH
-# TODO: keep track of thumbnails
-
-
 import pandas as pd
 
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel, QHeaderView, QAbstractItemView

@@ -10,8 +10,6 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
 
-# TODO: SAVE THUMBNAIL TO TABLE
-
 class LoadThumbnailThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     loaded_image = pyqtSignal(int, str)
