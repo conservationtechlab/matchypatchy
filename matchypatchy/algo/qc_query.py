@@ -43,7 +43,7 @@ class QC_QueryContainer():
         if self.data_raw.empty:
             self.parent.home(warn=True)
             return False
-        
+
         self.individuals = db_roi.individual_roi_dict(self.data_raw)
         self.individuals.pop(None, None)
 
@@ -89,13 +89,12 @@ class QC_QueryContainer():
         else:
             self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
             return False
-        
+
     def rank(self):
         # Rank by number of rois for each iid
         self.ranked_sequences = sorted(self.individuals.items(), key=lambda x: len(x[1]), reverse=True)
         # set number of queries to validate
         self.n_queries = len(self.ranked_sequences)
-
 
     def set_query(self, n):
         """
@@ -163,10 +162,10 @@ class QC_QueryContainer():
     def compute_viewpoints(self):
         self.viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
         for iid, rois in self.individuals.items():
-            for key,value in self.VIEWPOINT_DICT.items():
+            for key, value in self.VIEWPOINT_DICT.items():
                 if key == "Any":
                     self.viewpoints[value][iid] = rois
-                else: 
+                else:
                     try:
                         self.viewpoints[value][iid] = [rid for rid in rois if str(self.data.loc[rid, 'viewpoint']) == key]
                     except KeyError:
@@ -188,7 +187,7 @@ class QC_QueryContainer():
             self.current_match_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
         else:
             self.current_query_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
-            self.current_match_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])        
+            self.current_match_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
 
         if self.current_query_rois:
             self.set_within_query_sequence(0)
@@ -211,12 +210,46 @@ class QC_QueryContainer():
             # Return the bbox coordinates for current query
             return db_roi.get_bbox(self.data.loc[rid])
         elif column == 'metadata':
-            return db_roi.roi_metadata(self.data.loc[rid])
+            return self.roi_metadata(self.data.loc[rid])
         else:
             return self.data.loc[rid, column]
 
     def current_distance(self):
         return 0
+
+    def roi_metadata(self, roi, spacing=1.5):
+        """
+        Display relevant metadata in comparison label box
+
+        # TODO: change to have access to station and species names
+        """
+        roi = roi.rename(index={"name": "Name",
+                                "species_id": "Species",
+                                "sex": "Sex",
+                                "filepath": "File Path",
+                                "comment": "Comment",
+                                "timestamp": "Timestamp",
+                                "station_id": "Station",
+                                "sequence_id": "Sequence ID",
+                                "viewpoint": "Viewpoint"})
+
+        info_dict = roi[['Name', 'Species', 'Sex', 'File Path', 'Timestamp', 'Station',
+                        'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+
+        # convert viewpoint to human-readable (0=Left, 1=Right)
+        VIEWPOINT = load('VIEWPOINTS')
+        if info_dict['Viewpoint'] is None:
+            info_dict['Viewpoint'] = 'None'
+        else:  # BUG: Typecasting issue, why is viewpoint returning a float?
+            info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
+
+        info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
+
+        html_text = f"""<div style="line-height: {spacing};">
+                            {info_label}
+                        </div>
+                    """
+        return html_text
 
     # MATCH FUNCTIONS ----------------------------------------------------------
     def new_iid(self, individual_id):

@@ -16,15 +16,14 @@ def update_model_yml():
     """
     Downloads the most recent version of the models.yml file from SDZWA server and updates internal file
     """
-    # download current version 
+    # download current version
     try:
         urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", "models.yml")
-        print("Updated models.yml")
         return True
     except urllib.error.URLError:
         logging.error("Unable to connect to server.")
-        print("Unable to connect to server.")
         return False
+
 
 def load(key=None):
     # load the yaml file
@@ -34,7 +33,8 @@ def load(key=None):
             return cfg[key]
         else:
             return cfg
-        
+
+
 def get_path(key):
     ML_DIR = Path(config.load("ML_DIR"))
     MODELS = load('MODELS')
@@ -45,6 +45,7 @@ def get_path(key):
         return path
     else:
         return None
+
 
 def get_class_path(key):
     ML_DIR = Path(config.load("ML_DIR"))
@@ -57,6 +58,7 @@ def get_class_path(key):
     else:
         return None
 
+
 def get_config_path(key):
     ML_DIR = Path(config.load("ML_DIR"))
     CONFIG_FILES = load('CONFIG_FILES')
@@ -67,29 +69,30 @@ def get_config_path(key):
         return path
     else:
         return None
-        
+
+
 def download(key):
     # read model directory
     ML_DIR = Path(config.load("ML_DIR"))
-    
-    
+
     with open('models.yml', 'r') as cfg_file:
         ml_cfg = yaml.safe_load(cfg_file)
-        models = ml_cfg['MODELS']        
+        models = ml_cfg['MODELS']
         name = models[key][0]
         url = models[key][1]
-    
+
         path = ML_DIR / Path(name)
 
         if not path.exists():  # check to see if it already exists first
             try:
-                urllib.request.urlretrieve(ml_cfg['MODELS'][key][1], path)
+                urllib.request.urlretrieve(url, path)
+                return True
             except urllib.error.URLError:
                 logging.error("Unable to connect to server.")
-
+                return False
         if path.exists():  # validate that it downloaded
             # if key is a classifier, get class list and config
-            if key in ml_cfg['CLASSIFIER_MODELS']: 
+            if key in ml_cfg['CLASSIFIER_MODELS']:
                 class_path = ML_DIR / ml_cfg['CLASS_FILES'][key][0]
                 config_path = ML_DIR / ml_cfg['CONFIG_FILES'][key][0]
                 if not class_path.exists():
@@ -105,15 +108,8 @@ def download(key):
                 if class_path.exists() and config_path.exists():
                     # validate download
                     return True
-                else: 
-                    # download failed
+                else:
                     return False
-            else:
-                # model downloaded, not a classifier
-                return True
-        else:
-            # download failed
-            return False
 
 
 class DownloadMLThread(QThread):

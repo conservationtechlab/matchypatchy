@@ -130,14 +130,14 @@ class QueryContainer():
         else:
             self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
             return False
-        
+
     def rank(self):
         """
         Ranking Function
             Prioritizes previously IDd individuals and number of matches,
             then ranks matchs by distances
         """
-        # get sequences with IDs 
+        # get sequences with IDs
         ided_sequences = self.data[~self.data["individual_id"].isna()]["sequence_id"].unique().tolist()
         if ided_sequences:
             # rank sequences by number of matches
@@ -145,7 +145,7 @@ class QueryContainer():
 
             # prioritize already id'd sequences
             self.ranked_sequences = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
-       
+
         # if no ids, rank by distance
         else:
             self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
@@ -219,7 +219,7 @@ class QueryContainer():
         self.viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
 
         for sequence_id, rois in self.sequences.items():
-            for key,value in self.VIEWPOINT_DICT.items():
+            for key, value in self.VIEWPOINT_DICT.items():
                 if key == "Any":
                     self.viewpoints[value][sequence_id] = rois
                 else:
@@ -233,7 +233,7 @@ class QueryContainer():
 
         for sequence_id, matches in self.neighbor_dict.items():
             all_matches = [x[0] for x in matches]
-            for key,value in self.VIEWPOINT_DICT.items():
+            for key, value in self.VIEWPOINT_DICT.items():
                 if key == "Any":
                     self.match_viewpoints[value][sequence_id] = all_matches
                 else:
@@ -281,9 +281,9 @@ class QueryContainer():
         else:
             self.current_match_rois = self.match_viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
 
-        if self.current_match_rois and self.empty_query == False:
+        if self.current_match_rois and self.empty_query is False:
             self.set_match(0)
-        elif not self.current_match_rois and self.empty_query == False:  # need to update query image to all viewpoints
+        elif not self.current_match_rois and self.empty_query is False:  # need to update query image to all viewpoints
             self.empty_match = True
             self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
             self.set_match(0)
@@ -317,9 +317,43 @@ class QueryContainer():
             # Return the bbox coordinates for current query
             return db_roi.get_bbox(self.data.loc[rid])
         elif column == 'metadata':
-            return db_roi.roi_metadata(self.data.loc[rid])
+            return self.roi_metadata(self.data.loc[rid])
         else:
             return self.data.loc[rid, column]
+
+    def roi_metadata(self, roi, spacing=1.5):
+        """
+        Display relevant metadata in comparison label box
+
+        # TODO: change to have access to station and species names
+        """
+        roi = roi.rename(index={"name": "Name",
+                                "species_id": "Species",
+                                "sex": "Sex",
+                                "filepath": "File Path",
+                                "comment": "Comment",
+                                "timestamp": "Timestamp",
+                                "station_id": "Station",
+                                "sequence_id": "Sequence ID",
+                                "viewpoint": "Viewpoint"})
+
+        info_dict = roi[['Name', 'Species', 'Sex', 'File Path', 'Timestamp', 'Station',
+                        'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+
+        # convert viewpoint to human-readable (0=Left, 1=Right)
+        VIEWPOINT = load('VIEWPOINTS')
+        if info_dict['Viewpoint'] is None:
+            info_dict['Viewpoint'] = 'None'
+        else:  # BUG: Typecasting issue, why is viewpoint returning a float?
+            info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
+
+        info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
+
+        html_text = f"""<div style="line-height: {spacing};">
+                            {info_label}
+                        </div>
+                    """
+        return html_text
 
     # MATCH FUNCTIONS ----------------------------------------------------------
     def new_iid(self, individual_id):
