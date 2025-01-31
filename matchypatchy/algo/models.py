@@ -3,6 +3,7 @@ Functions for managing ML models
 
 """
 import yaml
+import logging
 import urllib.request
 from pathlib import Path
 
@@ -15,10 +16,15 @@ def update_model_yml():
     """
     Downloads the most recent version of the models.yml file from SDZWA server and updates internal file
     """
-    # download current version
-    urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", "models.yml")
-    print("Updated models.yml")
-
+    # download current version 
+    try:
+        urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", "models.yml")
+        print("Updated models.yml")
+        return True
+    except urllib.error.URLError:
+        logging.error("Unable to connect to server.")
+        print("Unable to connect to server.")
+        return False
 
 def load(key=None):
     # load the yaml file
@@ -76,7 +82,10 @@ def download(key):
         path = ML_DIR / Path(name)
 
         if not path.exists():  # check to see if it already exists first
-            urllib.request.urlretrieve(ml_cfg['MODELS'][key][1], path)
+            try:
+                urllib.request.urlretrieve(ml_cfg['MODELS'][key][1], path)
+            except urllib.error.URLError:
+                logging.error("Unable to connect to server.")
 
         if path.exists():  # validate that it downloaded
             # if key is a classifier, get class list and config
@@ -84,9 +93,15 @@ def download(key):
                 class_path = ML_DIR / ml_cfg['CLASS_FILES'][key][0]
                 config_path = ML_DIR / ml_cfg['CONFIG_FILES'][key][0]
                 if not class_path.exists():
-                    urllib.request.urlretrieve(ml_cfg['CLASS_FILES'][key][1], path)
+                    try:
+                        urllib.request.urlretrieve(ml_cfg['CLASS_FILES'][key][1], path)
+                    except urllib.error.URLError:
+                        logging.error("Unable to connect to server.")
                 if not config_path.exists():
-                    urllib.request.urlretrieve(ml_cfg['CONFIG_FILES'][key][1], path)
+                    try:
+                        urllib.request.urlretrieve(ml_cfg['CONFIG_FILES'][key][1], path)
+                    except urllib.error.URLError:
+                        logging.error("Unable to connect to server.")
                 if class_path.exists() and config_path.exists():
                     # validate download
                     return True
