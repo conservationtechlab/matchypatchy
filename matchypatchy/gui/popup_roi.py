@@ -15,7 +15,7 @@ from matchypatchy.gui.widget_image import ImageWidget
 
 from matchypatchy.algo.models import load
 import matchypatchy.database.media as db_roi
-from matchypatchy.database.survey import fetch_station_names_from_id
+from matchypatchy.database.location import fetch_station_names_from_id
 
 class ROIPopup(QDialog):
     def __init__(self, parent, rid, crop=False):

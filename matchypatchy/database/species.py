@@ -13,9 +13,7 @@ def fetch_species(mpDB):
     Returns
         - dataframe of species table
     """
-
     species = mpDB.select("species")
-
     if species:
         return pd.DataFrame(species, columns=["id", "binomen", "common"])
     else:  # return empty
