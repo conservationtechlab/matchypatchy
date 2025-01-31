@@ -98,8 +98,8 @@ The pageview will display the images and associated metadata.
 
 _View Options_\
 Adjustments can be made to the **Maximum Number of Matches** shown for each image (within a sequence) and to the maximum distance
-threshold between the two images to qualify as a match. The Euclidean distance of the Match from the Query is displayed above the 
-match image. You must select **"Recalculate Matches"** if changes are made to either option
+threshold between the two images to qualify as a match. The **Cosine** or **L2** distance of the Match from the Query is displayed above the 
+match image. Select which distance metric to use in the dropdown. You must select **"Recalculate Matches"** if changes are made to either option
 in order to display those changes.\
 After matches are validated, you can **"Query by Individual"** to do quality control and ensure all images associated with
 an individual are indeed valid.\

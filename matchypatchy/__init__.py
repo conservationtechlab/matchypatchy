@@ -4,7 +4,6 @@ from matchypatchy import config
 from matchypatchy import database
 from matchypatchy import gui
 from matchypatchy import sqlite_vec
-from matchypatchy import utils
 
 from matchypatchy.MatchyPatchy import (backend_factory, main,)
 from matchypatchy.algo import (AnimlThread, BuildManifestThread,
@@ -45,7 +44,6 @@ from matchypatchy.gui import (AboutPopup, AlertPopup, ConfigPopup, DisplayBase,
                               popup_survey, widget_image,)
 from matchypatchy.sqlite_vec import (load, loadable_path, register_numpy,
                                      serialize_float32, serialize_int8,)
-from matchypatchy.utils import (is_unique, swap_keyvalue,)
 
 __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'COLUMNS', 'CSVImportThread', 'ConfigPopup', 'DisplayBase',
@@ -75,6 +73,6 @@ __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'popup_species', 'popup_station', 'popup_survey', 'qc_query',
            'query', 'register_numpy', 'reid_thread', 'sequence_roi_dict',
            'sequence_thread', 'serialize_float32', 'serialize_int8', 'setup',
-           'setup_database', 'species', 'sqlite_vec', 'swap_keyvalue',
+           'setup_database', 'species', 'sqlite_vec',
            'thumbnail_thread', 'update', 'update_model_yml', 'utils',
            'widget_image']

@@ -3,7 +3,6 @@ Popup to add or edit species
 '''
 import os
 import logging
-import sqlite3
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)

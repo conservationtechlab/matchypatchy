@@ -96,7 +96,7 @@ class SurveyPopup(QDialog):
         dialog = SurveyFillPopup(self, name=name, region_name=region_name, year_start=year_start, year_end=year_end)
 
         if dialog.exec() and dialog.accepted:
-            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'", quiet=False)
+            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'")
             if not region_id:
                 region_id = self.mpDB.add_region(dialog.get_region())
             else:

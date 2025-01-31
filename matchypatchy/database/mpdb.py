@@ -41,6 +41,7 @@ class MatchyPatchyDB():
         db.close()
 
     def validate(self):
+        # TODO
         db = sqlite3.connect(self.filepath)
         db.enable_load_extension(True)
         sqlite_vec.load(db)
@@ -51,12 +52,6 @@ class MatchyPatchyDB():
 
         for name, obj_type, sql in schema:
             print(f"{obj_type.upper()}: {name}\n{sql}\n")
-
-        #table_check = tables == [('sqlite_sequence',), ('region',), ('survey',), ('station',), 
-        #                 ('media',), ('roi',), ('species',), ('individual',), ('sequence',), 
-        #                 ('roi_emb',), ('roi_emb_chunks',), ('roi_emb_rowids',), ('roi_emb_vector_chunks00',), ('thumbnails',)]
-        #print(table_check)
-        
 
     def _command(self, command):
         """
@@ -80,6 +75,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
+    # INSERT -------------------------------------------------------------------
     def add_survey(self, name: str, region_id: int, year_start: int, year_end: int):
         """
         Add a survey with
@@ -126,7 +122,6 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
-
 
     def add_station(self, name: str, lat: float, long: float, survey_id: int):
         """
@@ -318,15 +313,15 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
+    # EDIT ---------------------------------------------------------------------
     def edit_row(self, table: str, id: int, replace: dict, allow_none=False, quiet=True):
         """
         Edit a row in place 
-        
+
         Args
             - table (str):
             - id (int):
             - replace (dict): column:value captures to update
-
         """
         try:
             db = sqlite3.connect(self.filepath)
@@ -399,8 +394,8 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed, 
-                         roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp, 
+            columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
+                         roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp,
                          station_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
@@ -422,6 +417,24 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
+    def count(self, table):
+        """
+        Return the number of entries in a given table
+        """
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            row_count = cursor.fetchone()[0]
+            db.close()
+            return row_count
+        except sqlite3.Error as error:
+            logging.error(f"Failed to count for {table}:", error)
+            if db:
+                db.close()
+            return False
+
+    # DELETE -------------------------------------------------------------------
     def delete(self, table, cond):
         """
         Delete Entries From table Given condition
@@ -439,8 +452,8 @@ class MatchyPatchyDB():
             logging.error("Failed delete: ", error)
             if db:
                 db.close()
-            return False 
-        
+            return False
+
     def clear(self, table):
         """
         Clear a table without dropping it
@@ -457,8 +470,8 @@ class MatchyPatchyDB():
             logging.error(f"Failed to clear {table}: ", error)
             if db:
                 db.close()
-            return False 
-        
+            return False
+
     def clear_emb(self):
         """
         Clear vector database and rebuild (no way to delete)
@@ -479,28 +492,11 @@ class MatchyPatchyDB():
             db.close()
             return True
         except sqlite3.Error as error:
-            logging.error(f"Failed to clear roi_emb: ", error)
+            logging.error("Failed to clear roi_emb: ", error)
             if db:
                 db.close()
-            return False 
-        
-    def count(self, table):
-        """
-        Return the number of entries in a given table
-        """
-        try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
-            cursor.execute(f"SELECT COUNT(*) FROM {table}")
-            row_count = cursor.fetchone()[0]
-            db.close()
-            return row_count
-        except sqlite3.Error as error:
-            logging.error(f"Failed to count for {table}:", error)
-            if db:
-                db.close()
-            return False 
-        
+            return False
+
     # KNN ======================================================================
     def knn(self, query, k=3, metric='cosine'):
         """
@@ -513,7 +509,7 @@ class MatchyPatchyDB():
             db.enable_load_extension(False)
             cursor = db.cursor()
             if metric == 'Cosine':
-                command = f"""SELECT
+                command = """SELECT
                                 rowid,
                                 vec_distance_cosine(embedding, ?) as dist_cos
                                 FROM roi_emb
@@ -521,14 +517,14 @@ class MatchyPatchyDB():
                                 LIMIT ?;
                             """
             elif metric == 'L2':
-                command = f"""SELECT
+                command = """SELECT
                                 rowid,
                                 vec_distance_L2(embedding, ?) as dist_L2
                                 FROM roi_emb
                                 ORDER by dist_L2
                                 LIMIT ?;
                             """
-            else: 
+            else:
                 print('Distance Metric not recognized.')
                 return
             data_tuple = (query, k+1)
@@ -540,4 +536,4 @@ class MatchyPatchyDB():
             logging.error("Failed to get knn for ROI", error)
             if db:
                 db.close()
-            return False 
+            return False
