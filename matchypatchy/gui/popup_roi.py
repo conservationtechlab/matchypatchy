@@ -15,6 +15,7 @@ from matchypatchy.gui.widget_image import ImageWidget
 
 from matchypatchy.algo.models import load
 import matchypatchy.database.media as db_roi
+from matchypatchy.database.survey import fetch_station_names_from_id
 
 class ROIPopup(QDialog):
     def __init__(self, parent, rid, crop=False):
@@ -26,16 +27,23 @@ class ROIPopup(QDialog):
         self.crop = crop
         # load data
         self.roi_data = self.load()
+        self.individuals = []
+        self.species_list = []
 
         # Layout ---------------------------------------------------------------
         container_layout = QVBoxLayout()
         # Title
-        label = QLabel(self.roi_data.at[0,"filepath"])
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        container_layout.addWidget(label)
+        top = QHBoxLayout()
+        top.addWidget(QLabel(self.roi_data.at[0,"filepath"]), 1, alignment=Qt.AlignmentFlag.AlignCenter)
+        # Favorite
+        self.button_favorite = QPushButton("♥")
+        self.button_favorite.setFixedWidth(30)
+        self.button_favorite.setCheckable(True)
+        self.button_favorite.clicked.connect(self.favorite)
+        top.addWidget(self.button_favorite, 0, alignment=Qt.AlignmentFlag.AlignRight)
+        container_layout.addLayout(top)
 
         layout = QHBoxLayout()
-
         # Image
         self.image = ImageWidget()
         self.image.setStyleSheet("border: 1px solid black;")
@@ -50,7 +58,7 @@ class ROIPopup(QDialog):
         border_widget.setStyleSheet("""#borderWidget { border: 1px solid black; }""")
         info_layout = QVBoxLayout()
 
-        horizontal_gap = 120
+        horizontal_gap = 80
         vertical_gap = 8
 
         # Timestamp 
@@ -62,7 +70,6 @@ class ROIPopup(QDialog):
         timestamp.addWidget(self.timestamp_data,  1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(timestamp)
         info_layout.addSpacing(vertical_gap)
-
         # Station
         station = QHBoxLayout()
         station_label = QLabel("Station: ")
@@ -72,7 +79,6 @@ class ROIPopup(QDialog):
         station.addWidget(self.station_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(station)
         info_layout.addSpacing(vertical_gap)
-
         # Survey
         survey = QHBoxLayout()
         survey_label = QLabel("Survey: ")
@@ -82,7 +88,6 @@ class ROIPopup(QDialog):
         survey.addWidget(self.survey_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(survey)
         info_layout.addSpacing(vertical_gap)
-
         # Region
         region = QHBoxLayout()
         region_label = QLabel("Region: ")
@@ -92,7 +97,6 @@ class ROIPopup(QDialog):
         region.addWidget(self.region_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(region)
         info_layout.addSpacing(vertical_gap)
-
         # Sequence ID
         sequence = QHBoxLayout()
         sequence_label = QLabel("Sequence ID: ")
@@ -102,7 +106,6 @@ class ROIPopup(QDialog):
         sequence.addWidget(self.sequence_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(sequence)
         info_layout.addSpacing(vertical_gap)
-
         # External ID
         external = QHBoxLayout()
         external_label = QLabel("External ID: ")
@@ -112,63 +115,67 @@ class ROIPopup(QDialog):
         external.addWidget(self.external_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
         info_layout.addLayout(external)
         info_layout.addSpacing(int(vertical_gap/2))
-
+         
         line = QFrame()
         line.setFrameStyle(QFrame.Shape.HLine | QFrame.Shadow.Raised)
         line.setLineWidth(2)
         info_layout.addWidget(line)
         info_layout.addSpacing(int(vertical_gap/2))
 
+        # EDITABLE -------------------------------------------------------------
         # Name - EDITABLE
-        name = QHBoxLayout()
+        name_layout = QHBoxLayout()
         name_label = QLabel("Name: ")
         name_label.setFixedWidth(horizontal_gap)
-        name.addWidget(name_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        name_layout.addWidget(name_label, alignment=Qt.AlignmentFlag.AlignLeft)
         self.name = QComboBox()
-        self.name.addItems(['Unknown'])
-        #self.species.setText(str(self.roi_data.at[0,"common"]))
-        name.addWidget(self.name, stretch=1)
+        self.refresh_names()
+        self.name.currentIndexChanged.connect(self.change_name)
+        name_layout.addWidget(self.name, stretch=1)
         add_individual = QPushButton("+")
         add_individual.pressed.connect(self.new_individual)
-        name.addWidget(add_individual)
-        info_layout.addLayout(name)
+        name_layout.addWidget(add_individual)
+        info_layout.addLayout(name_layout)
         info_layout.addSpacing(vertical_gap)
 
         # Sex - EDITABLE
-        sex = QHBoxLayout()
+        sex_layout = QHBoxLayout()
         sex_label = QLabel("Sex: ")
         sex_label.setFixedWidth(horizontal_gap)
-        sex.addWidget(sex_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        sex_layout.addWidget(sex_label, alignment=Qt.AlignmentFlag.AlignLeft)
         self.sex = QComboBox()
         self.sex.addItems(['Unknown', 'Male', 'Female'])
-        sex.addWidget(self.sex, stretch=1)
-        info_layout.addLayout(sex)
+        self.sex.currentIndexChanged.connect(self.change_sex)
+        sex_layout.addWidget(self.sex, stretch=1)
+        info_layout.addLayout(sex_layout)
         info_layout.addSpacing(vertical_gap)
 
         # Species - EDITABLE
-        species = QHBoxLayout()
+        species_layout = QHBoxLayout()
         species_label = QLabel("Species: ")
         species_label.setFixedWidth(horizontal_gap)
-        species.addWidget(species_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        species_layout.addWidget(species_label, alignment=Qt.AlignmentFlag.AlignLeft)
         self.species = QComboBox()
-        # get species 
-        self.species.addItems(['Unknown'])
-        species.addWidget(self.species, stretch=1)
-        add_species = QPushButton("+")
-        species.addWidget(add_species)
-        info_layout.addLayout(species)
+        self.refresh_species()
+        self.species.currentIndexChanged.connect(self.change_species)
+        species_layout.addWidget(self.species, stretch=1)
+        button_add_species = QPushButton("+")
+        button_add_species.pressed.connect(self.new_species)
+        species_layout.addWidget(button_add_species)
+        info_layout.addLayout(species_layout)
         info_layout.addSpacing(vertical_gap)
-
+        
         # Viewpoint - EDITABLE
-        viewpoint = QHBoxLayout()
+        viewpoint_layout = QHBoxLayout()
         viewpoint_label = QLabel("Viewpoint: ")
         viewpoint_label.setFixedWidth(horizontal_gap)
-        viewpoint.addWidget(viewpoint_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        viewpoint_layout.addWidget(viewpoint_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.VIEWPOINTS = load('VIEWPOINTS')
         self.viewpoint = QComboBox()
         self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])  # skip 'any'
-        viewpoint.addWidget(self.viewpoint, 1)
-        info_layout.addLayout(viewpoint)
+        self.viewpoint.currentIndexChanged.connect(self.change_viewpoint)
+        viewpoint_layout.addWidget(self.viewpoint, 1)
+        info_layout.addLayout(viewpoint_layout)
         info_layout.addSpacing(vertical_gap)
 
         # Comment - EDITABLE
@@ -177,18 +184,19 @@ class ROIPopup(QDialog):
         comment_label.setFixedWidth(horizontal_gap)
         comment.addWidget(comment_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.comment = QTextEdit()
-        self.comment.setFixedHeight(100)
+        self.comment.setFixedHeight(60)
         comment.addWidget(self.comment, 1)
         comment.addStretch()
         info_layout.addLayout(comment)
+        info_layout.addStretch()
 
         border_widget.setLayout(info_layout)
         layout.addWidget(border_widget, 1)
         container_layout.addLayout(layout)
 
-        # OK/Cancel Buttons
+        # Bottom Buttons
         button_layout = QHBoxLayout()
-                # Ok/Cancel Buttons
+        # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
@@ -199,6 +207,22 @@ class ROIPopup(QDialog):
         # display data
         self.refresh_values()
 
+    def refresh_names(self):
+        self.name.blockSignals(True)
+        self.name.clear()
+        individuals = self.mpDB.select("individual", "id, name, sex")
+        self.individuals = [(0,'Unknown','Unknown')] + individuals
+        self.name.addItems([el[1] for el in self.individuals])
+        self.name.blockSignals(False)
+
+    def refresh_species(self):
+        self.species.blockSignals(True)
+        self.species.clear()
+        species = self.mpDB.select("species", "id, common")
+        self.species_list = [(0,'Unknown')] + species
+        self.species.addItems([el[1] for el in self.species_list])
+        self.species.blockSignals(False)
+
     def load(self):
         data, column_names = self.mpDB.all_media(row_cond=f"roi.id={self.rid}")
         return pd.DataFrame(data, columns=column_names).replace({float('nan'): None}).reset_index(drop=True)
@@ -206,33 +230,30 @@ class ROIPopup(QDialog):
     def refresh_values(self):
         # disable comboboxes
         self.blockSignals(True)
-                # MetaData
-        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                    'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
-                    'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
-                    'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
         
         self.timestamp_data.setText(str(self.roi_data.at[0,"timestamp"]))
-        # TODO: Convert to name, get survey and region
-        self.station_data.setText(str(self.roi_data.at[0,"station_id"]))
-        #self.survey_data.setText(str(self.roi_data.at[0,"station_id"]))
-        #self.region_data.setText(str(self.roi_data.at[0,"station_id"]))
+        survey_info = fetch_station_names_from_id(self.mpDB, self.roi_data.at[0,"station_id"])
+        self.station_data.setText(str(survey_info['station_name']))
+        self.survey_data.setText(str(survey_info["survey_name"]))
+        self.region_data.setText(str(survey_info["region_name"]))
         self.sequence_data.setText(str(self.roi_data.at[0,"sequence_id"]))
         self.external_data.setText(str(self.roi_data.at[0,"external_id"]))
 
-        # Editable
+        # Editable -------------------------------------------------------------
         # Name
-        iid = self.roi_data.at[0,"individual_id"]
-        if iid is None:
+        self.iid = self.roi_data.at[0,"individual_id"]
+        if self.iid is None:
             self.name.setCurrentIndex(0)
+            self.sex.setDisabled(True)
         else:
-            self.name.setCurrentIndex(iid)
+            self.name.setCurrentIndex(self.iid)
+            self.sex.setDisabled(False)
         # Sex
-        sex = self.roi_data.at[0,"sex"]
-        if sex is None:
+        current_sex = self.roi_data.at[0,"sex"]
+        if current_sex is None:
             self.sex.setCurrentIndex(0)
         else:
-            self.sex.setCurrentIndex(self.sex.findText(str()))
+            self.sex.setCurrentIndex(self.sex.findText(str(current_sex)))
         # Species
         current_species = self.roi_data.at[0,"common"]
         if current_species is None:
@@ -240,33 +261,52 @@ class ROIPopup(QDialog):
         else:
             self.species.setCurrentIndex(self.species.findText(str(current_species)))
         # Viewpoint
-        current_viewpoint = self.roi_data.at[0,"viewpoint"]
-        if current_viewpoint is None:
+        current_viewpoint = self.VIEWPOINTS[str(self.roi_data.at[0,"viewpoint"])]
+        if current_viewpoint == 'None':
             self.viewpoint.setCurrentIndex(0)
         else:
-            self.viewpoint.setCurrentIndex(self.species.findText(self.VIEWPOINTS[int(current_viewpoint)]))
-
+            self.viewpoint.setCurrentIndex(self.viewpoint.findText(current_viewpoint))
+        # Comment
         self.comment.setText(str(self.roi_data.at[0,"comment"]))
         # renable comboboxes
         self.blockSignals(False)
 
     # Edits --------------------------------------------------------------------
     def change_name(self):
-        iid = self.roi_data.at[0,"individual_id"]
-        #self.mpDB.edit_row('roi', self.rid, {"individual_id": X})
-        pass
+        selected_individual = self.individuals[self.name.currentIndex()]
+        if selected_individual[0] > 0:
+            self.mpDB.edit_row('roi', self.rid, {"individual_id": selected_individual[0]})
+            self.sex.setCurrentIndex(self.sex.findText(str(self.individuals[self.name.currentIndex()][2])))
+            self.sex.setDisabled(False)
+        else:
+            self.sex.setCurrentIndex(0)
+            self.sex.setDisabled(True)
 
     def change_sex(self):
-        iid = self.roi_data.at[0,"individual_id"]
-        #self.mpDB.edit_row('individual', self.rid, {"sex": })
+        iid = self.individuals[self.name.currentIndex()][0]
+        self.mpDB.edit_row('individual', iid, {"sex": f"'{self.sex.currentText()}'"})
 
     def change_species(self):
-        #self.mpDB.edit_row('roi', self.rid, {"viewpoint": 1})
-        pass
+        selected_species = self.species_list[self.species.currentIndex()]
+        if selected_species[0] > 0:
+            self.mpDB.edit_row('roi', self.rid, {"species_id":  f"'{selected_species[0]}'"})
 
     def change_viewpoint(self):
         viewpoint_keys = list(self.VIEWPOINTS.keys())
-        self.mpDB.edit_row('roi', self.rid, {"viewpoint": viewpoint_keys[self.viewpoint.currentIndex()]})
+        selected_vewpoint = viewpoint_keys[self.viewpoint.currentIndex()+1]
+        if selected_vewpoint=='None':
+            self.mpDB.edit_row('roi', self.rid, {"viewpoint": None}, quiet=False)
+        else:
+            self.mpDB.edit_row('roi', self.rid, {"viewpoint": int(selected_vewpoint)})
+
+    def favorite(self):
+        media_id = self.roi_data.at[0,"media_id"]
+        if self.button_favorite.isChecked():
+            self.button_favorite.setStyleSheet(""" QPushButton { background-color: #b51b32; color: white; }""")
+            self.mpDB.edit_row('media', media_id, {"favorite": 1})
+        else:
+            self.button_favorite.setStyleSheet("")
+            self.mpDB.edit_row('media', media_id, {"favorite": 0})
 
     def new_individual(self):
         dialog = IndividualFillPopup(self)
@@ -274,7 +314,9 @@ class ROIPopup(QDialog):
             individual_id = self.mpDB.add_individual(dialog.get_species_id(),
                                                      dialog.get_name(),
                                                      dialog.get_sex())
+            self.mpDB.edit_row('roi', self.rid, {"individual_id": individual_id})
         #reload data
+        self.refresh_names()
         self.roi_data = self.load()
         self.refresh_values()
 
@@ -282,8 +324,11 @@ class ROIPopup(QDialog):
     def new_species(self):
         dialog = SpeciesFillPopup(self)
         if dialog.exec():
-            individual_id = self.mpDB.add_individual(dialog.get_binomen(),
-                                                     dialog.get_common())
+            species_id = self.mpDB.add_species(dialog.get_binomen(),
+                                               dialog.get_common())
+            self.mpDB.edit_row('roi', self.rid, {"species_id": species_id})
+        #reload data
+        self.refresh_species()
         self.roi_data = self.load()
         self.refresh_values()
 

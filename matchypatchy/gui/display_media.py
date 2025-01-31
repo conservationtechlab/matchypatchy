@@ -39,6 +39,7 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.show_type = QComboBox()
         self.show_type.addItems(["Full Images", "Crops Only"])
+        self.show_type.setCurrentIndex(self.data_type)
         self.show_type.currentIndexChanged.connect(self.change_type)
         first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Save
@@ -347,7 +348,11 @@ class DisplayMedia(QWidget):
 
     def select_survey(self):
         self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
-        self.filter_stations(survey_ids=[self.filters['active_survey']])
+        if self.survey_select.currentIndex() == 0:
+            self.filter_stations()
+        else:
+            self.filter_stations(survey_ids=[self.filters['active_survey']])
+
         self.filter_table()
 
     def select_station(self):
@@ -382,6 +387,7 @@ class DisplayMedia(QWidget):
         # block signals while updating combobox
         self.station_select.blockSignals(True)
         self.station_select.clear()
+        print(survey_ids)
         if survey_ids:
             survey_list = ",".join([str(s[0]) for s in survey_ids])
             selection = f'survey_id IN ({survey_list})'

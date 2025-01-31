@@ -72,8 +72,11 @@ def fetch_roi_media(mpDB, reset_index=True):
 def roi_metadata(roi, spacing=1.5):
     """
     Display relevant metadata in comparison label box
+
+    # TODO: change to have access to station and species names
     """
     roi = roi.rename(index={"name": "Name",
+                            "species_id": "Species",
                             "sex": "Sex",
                             "filepath": "File Path",
                             "comment": "Comment",
@@ -82,12 +85,15 @@ def roi_metadata(roi, spacing=1.5):
                             "sequence_id": "Sequence ID",
                             "viewpoint": "Viewpoint"})
 
-    info_dict = roi[['Name', 'Sex', 'File Path', 'Timestamp', 'Station',
+    info_dict = roi[['Name', 'Species', 'Sex', 'File Path', 'Timestamp', 'Station',
                      'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
     # convert viewpoint to human-readable (0=Left, 1=Right)
     VIEWPOINT = models.load('VIEWPOINTS')
-    info_dict['Viewpoint'] = VIEWPOINT[str(info_dict['Viewpoint'])]
+    if info_dict['Viewpoint'] is None:
+        info_dict['Viewpoint'] = 'None'
+    else: # BUG: Typecasting issue, why is viewpoint returning a float?
+        info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
 
     info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
 

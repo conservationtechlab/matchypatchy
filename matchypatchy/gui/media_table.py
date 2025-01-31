@@ -138,6 +138,9 @@ class MediaTable(QWidget):
         filters = self.parent.filters
         valid_stations = self.parent.valid_stations
 
+        print(filters)
+        print(valid_stations)
+
         # Region Filter (depends on prefilterd stations from MediaDisplay)
         if 'region_filter' in filters.keys() and valid_stations:
             self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(valid_stations.keys()))]

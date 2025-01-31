@@ -301,10 +301,10 @@ class DisplayCompare(QWidget):
         # Favorite
         self.button_match_favorite = QPushButton("♥")
         self.button_match_favorite.setFixedWidth(30)
+        self.button_match_favorite.setCheckable(True)
         self.button_match_favorite.clicked.connect(lambda: self.press_favorite_button(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(self.button_match_favorite)
-        self.button_match_favorite.setCheckable(True)
-
+        
         match_image_buttons.addStretch()
         match_layout.addLayout(match_image_buttons)
 
@@ -608,6 +608,11 @@ class DisplayCompare(QWidget):
         dialog = ROIPopup(self, rid)
         if dialog.exec():
             del dialog
+            # reload data
+            self.QueryContainer.load_data()
+            self.QueryContainer.filter(reset=False)
+            self.load_query()
+            self.load_match()
 
     def open_image(self, rid):
         """

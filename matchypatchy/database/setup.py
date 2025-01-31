@@ -25,7 +25,7 @@ def setup_database(filepath='matchypatchy.db'):
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL,
-                        region_id INTEGER,
+                        region_id INTEGER NOT NULL,
                         year_start INTEGER,
                         year_end INTEGER,
                         FOREIGN KEY (region_id) REFERENCES region (id) );''')
@@ -90,6 +90,10 @@ def setup_database(filepath='matchypatchy.db'):
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
     
+    # VIEWPOINT
+    cursor.execute('''CREATE TABLE IF NOT EXISTS viewpoint (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT);''')
 
     # THUMBNAILS
     cursor.execute('''DROP TABLE IF EXISTS media_thumbnails;''')
