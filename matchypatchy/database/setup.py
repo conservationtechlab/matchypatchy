@@ -15,12 +15,6 @@ def setup_database(filepath='matchypatchy.db'):
     db.enable_load_extension(False)
     cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
 
-    cursor.execute('''CREATE TABLE IF NOT EXISTS info (
-                        id INTEGER PRIMARY KEY,
-                        version TEXT UNIQUE NOT NULL );''')
-
-    cursor.execute("""INSERT INTO info (version) VALUES ('0.1.0');""")
-
     # REGION
     # Corresponds to "Site" in CameraBase
     cursor.execute('''CREATE TABLE IF NOT EXISTS region (
