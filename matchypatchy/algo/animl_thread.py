@@ -35,7 +35,6 @@ class AnimlThread(QThread):
         super().__init__()
         self.mpDB = mpDB
 
-
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
@@ -89,8 +88,6 @@ class AnimlThread(QThread):
         if self.classifier_filepath is None:
             # user opted to skip classification
             return
-        
-        #print(self.classifier_filepath, self.class_filepath)
 
         classes = pd.read_csv(self.class_filepath).set_index(label_col)
 

@@ -8,7 +8,9 @@ import tempfile
 from PyQt6.QtGui import QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
+# TODO
 THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
+
 
 class LoadThumbnailThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
@@ -20,19 +22,19 @@ class LoadThumbnailThread(QThread):
         self.data = data
         self.data_type = data_type
         self.size = 99
-    
+
     def run(self):
         for i, roi in self.data.iterrows():
-            # check if thumbnail exists 
+            # check if thumbnail exists
             id = str(roi['id'])
             if self.data_type == 1:
                 existing_filepath = self.mpDB.select("roi_thumbnails", "filepath", row_cond=f"fid={id}")
             else:
                 existing_filepath = self.mpDB.select("media_thumbnails", "filepath", row_cond=f"fid={id}")
-            
+
             if existing_filepath:
-               existing_filepath = existing_filepath[0][0]  # unlist
-               if Path(existing_filepath).is_file():
+                existing_filepath = existing_filepath[0][0]  # unlist
+                if Path(existing_filepath).is_file():
                     self.loaded_image.emit(i, existing_filepath)
                     self.progress_update.emit(int((i + 1) / len(self.data) * 100))
             # new thumbnail
@@ -56,12 +58,12 @@ class LoadThumbnailThread(QThread):
                         self.image = self.original.copy()
                 # scale it to 99x99
                 scaled_image = self.image.scaled(self.size, self.size,
-                                                Qt.AspectRatioMode.KeepAspectRatio, 
-                                                Qt.TransformationMode.SmoothTransformation)
-                
+                                                 Qt.AspectRatioMode.KeepAspectRatio,
+                                                 Qt.TransformationMode.SmoothTransformation)
+
                 # create a temporary file to hold thumbnail
                 with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
-                    temp_file_path = temp_file.name 
+                    temp_file_path = temp_file.name
                 # save the image
                 scaled_image.save(temp_file_path, format="JPG")
 
@@ -74,5 +76,3 @@ class LoadThumbnailThread(QThread):
                 # emit thumbnail_path and progress update
                 self.loaded_image.emit(i, temp_file_path)
                 self.progress_update.emit(int((i + 1) / len(self.data) * 100))
-            
-

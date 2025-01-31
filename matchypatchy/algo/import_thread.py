@@ -7,6 +7,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 # TODO: add dtype checks
 
+
 class CSVImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
@@ -95,7 +96,7 @@ class CSVImportThread(QThread):
         except IndexError:
             survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
         return survey_id
-    
+
     def station(self, exemplar, survey_id):
         # get or create station
         station_name = exemplar[self.selected_columns["station"]].item()
@@ -127,9 +128,9 @@ class CSVImportThread(QThread):
         else:  # no individual id, need review
             individual_id = None
         return individual_id
-    
-# FOLDER IMPORT ================================================================
 
+
+# FOLDER IMPORT ================================================================
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
