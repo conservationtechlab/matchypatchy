@@ -70,19 +70,19 @@ class MainWindow(QMainWindow):
 
         # FILE IMPORT
         file_import = QMenu("Import", self)
-        file.addMenu(file_import)
+        #file.addMenu(file_import)
 
-        file_import_station = QAction("Stations", self)
-        file_import_station.triggered.connect(lambda: self.import_popup('station'))
-        file_import.addAction(file_import_station)
+        #file_import_station = QAction("Stations", self)
+        #file_import_station.triggered.connect(lambda: self.import_popup('station'))
+        #file_import.addAction(file_import_station)
 
-        file_import_species = QAction("Species", self)
-        file_import_species.triggered.connect(lambda: self.import_popup('species'))
-        file_import.addAction(file_import_species)
+        #file_import_species = QAction("Species", self)
+        #file_import_species.triggered.connect(lambda: self.import_popup('species'))
+        #file_import.addAction(file_import_species)
 
-        file_import_media = QAction("Media", self)
-        file_import_media.triggered.connect(lambda: self.import_popup('media'))
-        file_import.addAction(file_import_media)
+        #file_import_media = QAction("Media", self)
+        #file_import_media.triggered.connect(lambda: self.import_popup('media'))
+        #file_import.addAction(file_import_media)
 
         # EDIT
         edit_preferences = QAction("Preferences", self)
@@ -91,11 +91,11 @@ class MainWindow(QMainWindow):
         edit_species = QAction("Species", self)
         edit_media = QAction("Media", self)
 
-        edit.addAction(edit_preferences)
-        edit.addAction(edit_survey)
-        edit.addAction(edit_station)
-        edit.addAction(edit_species)
-        edit.addAction(edit_media)
+        #edit.addAction(edit_preferences)
+        #edit.addAction(edit_survey)
+        #edit.addAction(edit_station)
+        #edit.addAction(edit_species)
+        #edit.addAction(edit_media)
 
         # VIEW
 
@@ -132,34 +132,19 @@ class MainWindow(QMainWindow):
         if emb_exist:
             self.Compare.QueryContainer.calculate_neighbors()
 
+    # FILE =====================================================================
+    def new(self):
+        pass
 
     def import_popup(self, table):
         """
         Launch file browser
         """
-        # SPECIES
-        if table == "species":
-            file_path = QFileDialog.getOpenFileName(self, "Open File",
-                                                    os.path.expanduser('~'),
-                                                    ("CSV Files (*.csv)"))[0]
+        pass
 
-        else:
-            # select survey first
-            dialog = DropdownPopup(self, 'survey', 'name')
-            if dialog.exec():
-                survey_id = dialog.get_selection()[0]
-                print(survey_id)
-            del dialog
-            file_path = QFileDialog.getOpenFileName(self, "Open File",
-                                                    os.path.expanduser('~'),
-                                                    ("CSV Files (*.csv)"))[0]
-            # station
-            if table == "station":
-                location.import_stations(self.mpDB, file_path, survey_id=survey_id)
-
+    # EDIT =====================================================================
 
     # VIEW =====================================================================
-    # TODO
         
     # HELP =====================================================================
     def about(self):

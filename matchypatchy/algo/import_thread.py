@@ -5,8 +5,6 @@ QThreads for Importing Data
 import os
 from PyQt6.QtCore import QThread, pyqtSignal
 
-# TODO: add dtype checks
-
 
 class CSVImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar

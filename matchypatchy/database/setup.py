@@ -15,6 +15,12 @@ def setup_database(filepath='matchypatchy.db'):
     db.enable_load_extension(False)
     cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
 
+    cursor.execute('''CREATE TABLE IF NOT EXISTS info (
+                        id INTEGER PRIMARY KEY,
+                        version TEXT UNIQUE NOT NULL );''')
+
+    cursor.execute("""INSERT INTO info (version) VALUES ('0.1.0');""")
+
     # REGION
     # Corresponds to "Site" in CameraBase
     cursor.execute('''CREATE TABLE IF NOT EXISTS region (
@@ -89,7 +95,7 @@ def setup_database(filepath='matchypatchy.db'):
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
-    
+
     # VIEWPOINT
     cursor.execute('''CREATE TABLE IF NOT EXISTS viewpoint (
                         id INTEGER PRIMARY KEY,
@@ -102,15 +108,13 @@ def setup_database(filepath='matchypatchy.db'):
                         fid INTEGER NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES media (id));''')
-    
+
     cursor.execute('''DROP TABLE IF EXISTS roi_thumbnails;''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi_thumbnails (
                         id INTEGER PRIMARY KEY,
                         fid INTEGER NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES roi (id));''')
-
-
 
     # Commit changes and close connection
     db.commit()

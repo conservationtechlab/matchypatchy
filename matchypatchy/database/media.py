@@ -3,14 +3,11 @@ Functions for Manipulating and Processing ROIs
 """
 import pandas as pd
 
-from matchypatchy.algo import models
-
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.avi', '.mp4', '.wmv', '.mov']
 
-COLUMNS = ["filepath", "timestamp", "station_id", "sequence_id", "external_id", 
+COLUMNS = ["filepath", "timestamp", "station_id", "sequence_id", "external_id",
            "comment", "viewpoint", "species_id", "individual_id"]
-
 
 
 def fetch_media(mpDB):
@@ -30,7 +27,7 @@ def fetch_media(mpDB):
                                              'sequence_id', "external_id", 'comment', 'favorite'])
         media = media.replace({float('nan'): None})
         return media
-    else: 
+    else:
         return pd.DataFrame()
 
 
@@ -67,41 +64,6 @@ def fetch_roi_media(mpDB, reset_index=True):
     if reset_index:
         rois = rois.set_index("id")
     return rois
-
-
-def roi_metadata(roi, spacing=1.5):
-    """
-    Display relevant metadata in comparison label box
-
-    # TODO: change to have access to station and species names
-    """
-    roi = roi.rename(index={"name": "Name",
-                            "species_id": "Species",
-                            "sex": "Sex",
-                            "filepath": "File Path",
-                            "comment": "Comment",
-                            "timestamp": "Timestamp",
-                            "station_id": "Station",
-                            "sequence_id": "Sequence ID",
-                            "viewpoint": "Viewpoint"})
-
-    info_dict = roi[['Name', 'Species', 'Sex', 'File Path', 'Timestamp', 'Station',
-                     'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
-
-    # convert viewpoint to human-readable (0=Left, 1=Right)
-    VIEWPOINT = models.load('VIEWPOINTS')
-    if info_dict['Viewpoint'] is None:
-        info_dict['Viewpoint'] = 'None'
-    else: # BUG: Typecasting issue, why is viewpoint returning a float?
-        info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
-
-    info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
-
-    html_text = f"""<div style="line-height: {spacing};">
-                        {info_label}
-                    </div>
-                """
-    return html_text
 
 
 def get_bbox(roi):
@@ -149,3 +111,12 @@ def individual_roi_dict(roi_media):
         individual = roi_media[roi_media['individual_id'] == iid]
         individual_dict[iid] = individual.index.to_list()
     return individual_dict
+
+
+def media_count(mpDB, survey_id):
+    """
+    Get number of media files associated with a given survey_id
+    """
+    # TODO
+    #mpDB.select_join()
+    return 0

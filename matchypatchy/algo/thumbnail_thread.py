@@ -1,15 +1,15 @@
 """
 QThread for saving thumbnails to temp dir for media table
 """
-
+import os
 from pathlib import Path
 import tempfile
 
 from PyQt6.QtGui import QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
-# TODO
-THUMBNAIL_NOTFOUND = '/home/kyra/matchypatchy/matchypatchy/gui/assets/thumbnail_notfound.png'
+THUMBNAIL_NOTFOUND = QImage(os.path.join(os.path.dirname(__file__), "assets/thumbnail_notfound.png"))
+# TODO THUMBNAIL_NOTFOUND = QImage(os.path.normpath("assets/logo.png"))
 
 
 class LoadThumbnailThread(QThread):
