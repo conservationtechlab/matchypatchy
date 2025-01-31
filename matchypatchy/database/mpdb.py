@@ -116,7 +116,6 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO region (name) VALUES (?);"""
             data_tuple = (name,)
-            print(data_tuple)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -502,7 +501,8 @@ class MatchyPatchyDB():
                 db.close()
             return False 
         
-    def knn(self, query, k=3):
+    # KNN ======================================================================
+    def knn(self, query, k=3, metric='cosine'):
         """
         Return the knn for a query embedding
         """
@@ -512,14 +512,25 @@ class MatchyPatchyDB():
             sqlite_vec.load(db)
             db.enable_load_extension(False)
             cursor = db.cursor()
-            command = f"""SELECT
-                            rowid,
-                            distance
-                        FROM roi_emb
-                        WHERE embedding MATCH ?
-                        ORDER BY distance
-                        LIMIT ?
-                        """
+            if metric == 'Cosine':
+                command = f"""SELECT
+                                rowid,
+                                vec_distance_cosine(embedding, ?) as dist_cos
+                                FROM roi_emb
+                                ORDER by dist_cos
+                                LIMIT ?;
+                            """
+            elif metric == 'L2':
+                command = f"""SELECT
+                                rowid,
+                                vec_distance_L2(embedding, ?) as dist_L2
+                                FROM roi_emb
+                                ORDER by dist_L2
+                                LIMIT ?;
+                            """
+            else: 
+                print('Distance Metric not recognized.')
+                return
             data_tuple = (query, k+1)
             cursor.execute(command, data_tuple)
             results = cursor.fetchall()

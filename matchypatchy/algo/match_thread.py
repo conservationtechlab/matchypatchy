@@ -14,13 +14,17 @@ class MatchEmbeddingThread(QThread):
     neighbor_dict_return = pyqtSignal(dict)
     nearest_dict_return = pyqtSignal(dict)
 
-    def __init__(self, mpDB, rois, sequences, k=3, threshold=100):
+    def __init__(self, mpDB, rois, sequences, k=3, metric='Cosine', threshold=100):
         super().__init__()
         self.mpDB = mpDB
         self.rois = rois
         self.sequences = sequences
         self.k = k
-        self.threshold = threshold
+        self.metric = metric
+        if self.metric == 'Cosine':
+            self.threshold = threshold/100
+        else:
+            self.threshold = threshold
 
     def run(self):
         """
@@ -62,7 +66,8 @@ class MatchEmbeddingThread(QThread):
         Calcualtes knn for single roi embedding
         """
         query = self.mpDB.select("roi_emb", columns="embedding", row_cond=f'rowid={emb_id}')[0][0]
-        return self.mpDB.knn(query, k=self.k)
+        # return self.mpDB.knn(query, k=self.k)
+        return self.mpDB.knn(query, k=self.k, metric=self.metric)
 
     def filter(self, sequence_rois, neighbors):
         """

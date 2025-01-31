@@ -21,13 +21,16 @@ from matchypatchy.algo.qc_query import QC_QueryContainer
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
 FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
 
+
 class DisplayCompare(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.mpDB = parent.mpDB
         self.k = 3  # default knn
-        self.threshold = 80
+        self.distance_metric = 'Cosine'
+        self.threshold = 50
+        
         self.current_viewpoint = 'Any'
 
         # CREATE QUERY CONTAINER ==============================================
@@ -50,9 +53,15 @@ class DisplayCompare(QWidget):
         self.knn_number.setMaximumWidth(50)
         first_layer.addWidget(self.knn_number, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        first_layer.addWidget(QLabel("Distance Metric:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.option_distance_metric = QComboBox()
+        self.option_distance_metric.addItems(['Cosine', 'L2'])
+        self.option_distance_metric.currentIndexChanged.connect(self.change_metric)
+        first_layer.addWidget(self.option_distance_metric, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         first_layer.addWidget(QLabel("Distance Threshold:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
-        self.threshold_slider.setRange(1, 100)  # Set range from 1 to 100
+        self.threshold_slider.setRange(0, 100)  # Set range from 1 to 100
         self.threshold_slider.setValue(self.threshold)  # Set initial value
         self.threshold_slider.valueChanged.connect(self.change_threshold)
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -332,8 +341,9 @@ class DisplayCompare(QWidget):
         self.setLayout(layout)
         # ======================================================================
 
-    # GUI ----------------------------------------------------------------------
-
+    # ==========================================================================
+    # GUI
+    # ==========================================================================
     # RETURN HOME
     def home(self, warn=False):
         if warn:
@@ -346,12 +356,50 @@ class DisplayCompare(QWidget):
     def validate(self):
         self.parent._set_media_view()
 
+    # Alert Popup
     def warn(self, prompt):
         dialog = AlertPopup(self, prompt=prompt)
         if dialog.exec():
             del dialog
 
-    # MATCHING PROCESS ---------------------------------------------------------
+    def change_k(self):
+        # Set new k value
+        # Must recalculate neighbors to activate
+        if self.knn_number.text() != '':
+            self.k = int(self.knn_number.text())
+
+    def change_metric(self):
+        self.distance_metric = self.option_distance_metric.currentText()
+
+    def change_threshold(self):
+        # set new threshold value
+        # Must recalculate neighbors to activate
+        self.threshold = self.threshold_slider.value()
+        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() * 
+                                                                         (self.threshold - self.threshold_slider.minimum()) //
+                                                                         (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
+        if self.distance_metric == 'Cosine':
+            QToolTip.showText(slider_handle_position, f"{self.threshold/100}", self.threshold_slider)
+        else:
+            QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
+
+    def recalculate(self):
+        self.QueryContainer = QueryContainer(self)
+        self.QueryContainer.load_data()
+        self.QueryContainer.calculate_neighbors()
+        self.change_query(0)
+
+    def recalculate_by_individual(self):
+        #self.refresh_filters()
+        self.QueryContainer = QC_QueryContainer(self)
+        self.QueryContainer.load_data()
+        self.QueryContainer.filter()
+        self.change_query(0)
+
+
+    # ==========================================================================
+    # MATCHING PROCESS
+    # ==========================================================================
     def press_match_button(self):
         # already a match
         if self.QueryContainer.is_existing_match():
@@ -414,7 +462,9 @@ class DisplayCompare(QWidget):
         self.load_query()
         self.load_match()
 
-    # LOAD FUNCTIONS -----------------------------------------------------------
+    # ==========================================================================
+    # LOAD FUNCTIONS
+    # ==========================================================================
     def change_query(self, n):
         self.QueryContainer.set_query(n)
         # update text
@@ -484,36 +534,9 @@ class DisplayCompare(QWidget):
         self.load_query()
         self.load_match()
 
-    # GUI HANDLERS =============================================================
-    def change_k(self):
-        # Set new k value
-        # Must recalculate neighbors to activate
-        if self.knn_number.text() != '':
-            self.k = int(self.knn_number.text())
-
-    def change_threshold(self):
-        # set new threshold value
-        # Must recalculate neighbors to activate
-        self.threshold = self.threshold_slider.value()
-        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() * 
-                                                                         (self.threshold - self.threshold_slider.minimum()) //
-                                                                         (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
-        QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
-
-    def recalculate(self):
-        self.QueryContainer = QueryContainer(self)
-        self.QueryContainer.load_data()
-        self.QueryContainer.calculate_neighbors()
-        self.change_query(0)
-
-    def recalculate_by_individual(self):
-        #self.refresh_filters()
-        self.QueryContainer = QC_QueryContainer(self)
-        self.QueryContainer.load_data()
-        self.QueryContainer.filter()
-        self.change_query(0)
-
-    # FILTERS ------------------------------------------------------------------
+    # ==========================================================================
+    # FILTERS
+    # ==========================================================================
     def refresh_filters(self):
         """
         Clear and Refresh Filters on Re-entry
@@ -586,7 +609,9 @@ class DisplayCompare(QWidget):
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
         self.station_select.blockSignals(False)
 
-    # IMAGE MANIPULATION -------------------------------------------------------
+    # ==========================================================================
+    # IMAGE MANIPULATION
+    # ==========================================================================
     def query_image_reset(self):
         self.query_image.reset()
         self.slider_query_brightness.setValue(50)
@@ -623,7 +648,9 @@ class DisplayCompare(QWidget):
         img = Image.open(self.QueryContainer.get_info(rid, "filepath"))
         img.show()
 
-    # FAVORITE -----------------------------------------------------------------
+    # ==========================================================================
+    # FAVORITE
+    # ==========================================================================
     def press_favorite_button(self, rid):
         if self.QueryContainer.get_info(rid, "favorite"):
             self.unfavorite(rid)
@@ -678,7 +705,9 @@ class DisplayCompare(QWidget):
         else:
             self.button_match_favorite.setStyleSheet("")
 
-    # Keyboard Handler ---------------------------------------------------------
+    # ==========================================================================
+    # KEYBOARD HANDLER
+    # ==========================================================================
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()
