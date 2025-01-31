@@ -23,9 +23,7 @@ from matchypatchy.gui.display_compare import DisplayCompare
 from matchypatchy.gui.display_single import DisplaySingle
 from matchypatchy.gui.popup_dropdown import DropdownPopup
 
-from matchypatchy.database import station
-from matchypatchy.database import species
-
+from matchypatchy.database import location
 
 class MainWindow(QMainWindow):
     def __init__(self, mpDB):
@@ -135,7 +133,6 @@ class MainWindow(QMainWindow):
             file_path = QFileDialog.getOpenFileName(self, "Open File",
                                                     os.path.expanduser('~'),
                                                     ("CSV Files (*.csv)"))[0]
-            station.import_csv(self.mpDB, file_path)
 
         else:
             # select survey first
@@ -149,7 +146,7 @@ class MainWindow(QMainWindow):
                                                     ("CSV Files (*.csv)"))[0]
             # station
             if table == "station":
-                station.import_csv(self.mpDB, file_path, survey_id=survey_id)
+                location.import_stations(self.mpDB, file_path, survey_id=survey_id)
 
 
 def main_display(mpDB):
