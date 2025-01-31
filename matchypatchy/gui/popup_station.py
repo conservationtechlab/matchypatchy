@@ -41,7 +41,7 @@ class StationPopup(QDialog):
         button_layout.addWidget(self.button_del)
 
         # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
@@ -70,7 +70,7 @@ class StationPopup(QDialog):
         dialog = StationFillPopup(self)
         if dialog.exec():
             self.mpDB.add_station(dialog.get_name(), dialog.get_lat(),
-                               dialog.get_long(), self.survey_id[0])
+                                  dialog.get_long(), self.survey_id[0])
         del dialog
         self.stations = self.update()
 
@@ -126,7 +126,7 @@ class StationFillPopup(QDialog):
         layout.addWidget(self.long)
 
         # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)

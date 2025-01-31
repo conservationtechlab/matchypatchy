@@ -78,7 +78,7 @@ class ImportCSVPopup(QDialog):
 
         # station
         station_layout = QHBoxLayout()
-        station_layout.addWidget(QLabel("station:"))
+        station_layout.addWidget(QLabel("Station:"))
         asterisk = QLabel("*")
         asterisk.setStyleSheet("QLabel { color : red; }")
         station_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)

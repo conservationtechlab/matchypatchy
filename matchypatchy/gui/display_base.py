@@ -22,6 +22,7 @@ from matchypatchy.gui.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.popup_ml import MLDownloadPopup, MLOptionsPopup
 from matchypatchy.gui.popup_config import ConfigPopup
+from matchypatchy.gui.popup_readme import READMEPopup
 
 from matchypatchy.algo.sequence_thread import SequenceThread
 from matchypatchy.algo.animl_thread import AnimlThread
@@ -38,7 +39,6 @@ class DisplayBase(QWidget):
 
         container = QWidget()
         container.setObjectName("mainBorderWidget")
-        
         layout = QVBoxLayout()
 
         self.label = QLabel("Welcome To MatchyPatchy")
@@ -52,19 +52,16 @@ class DisplayBase(QWidget):
         self.logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
         self.logo.setFixedSize(600, 400)
         self.logo.setObjectName("borderWidget")
-        # TODO: change before packaging
         logo_img = QImage(os.path.join(os.path.dirname(__file__), "assets/logo.png"))
-        #logo_img = QImage(os.path.normpath("logo.png"))
+        # TODO logo_img = QImage(os.path.normpath("logo.png"))
         self.logo.setPixmap(QPixmap.fromImage(logo_img))
         layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
-
-       #layout.addSpacing(100)
         layout.addStretch()
 
         column_layout = QHBoxLayout()
-        column_layout.addSpacing(100)  # add spacing to left side
+        column_layout.addSpacing(100)  # add padding to left side
 
-        # DB MANAGEMENT ========================================================
+        # DB MANAGEMENT --------------------------------------------------------
         border_db = QWidget()
         border_db.setObjectName("borderWidget")
         border_db.setStyleSheet("#borderWidget { border: 1px solid gray; }")
@@ -104,7 +101,7 @@ class DisplayBase(QWidget):
         column_layout.addWidget(border_db, 1)
         column_layout.addSpacing(20)  # gap between sections
 
-        # MAIN PROCESS =========================================================
+        # MAIN PROCESS ---------------------------------------------------------
         border_import = QWidget()
         border_import.setObjectName("borderWidget")
         border_import.setStyleSheet("#borderWidget { border: 1px solid gray; }")
@@ -140,7 +137,7 @@ class DisplayBase(QWidget):
         column_layout.addWidget(border_import, 1)
         column_layout.addSpacing(20)
 
-        # OTHER ================================================================
+        # OTHER ----------------------------------------------------------------
         border_other = QWidget()
         border_other.setObjectName("borderWidget")
         border_other.setStyleSheet("#borderWidget { border: 1px solid gray; }")
@@ -153,7 +150,6 @@ class DisplayBase(QWidget):
         button_configuration = QPushButton("Configuration")
         button_download_ml = QPushButton("Download Models")
         button_help = QPushButton("Help")
-        button_help.setEnabled(False)
         button_validate_db = QPushButton("Validate Database")
         button_clear_data = QPushButton("Clear Data")
 
@@ -185,7 +181,9 @@ class DisplayBase(QWidget):
 
         self.update_survey()
 
-    # Database Management ------------------------------------------------------
+    # ==========================================================================
+    # Database Management Functions
+    # ==========================================================================
     def update_survey(self):
         self.survey_select.clear()
         survey_names = self.mpDB.select('survey', columns='id, name')
@@ -227,7 +225,9 @@ class DisplayBase(QWidget):
     def set_filtered_view(self, filters):
         self.parent._set_media_view(filters=filters)
 
-    # MAIN PROCESS -------------------------------------------------------------
+    # ==========================================================================
+    # MAIN PROCESS
+    # ==========================================================================
     # STEP 1: Import from CSV
     def import_csv(self):
         self.select_survey()
@@ -320,12 +320,14 @@ class DisplayBase(QWidget):
             # add csv if user didnt enter
             if not file_path.endswith(".csv"):
                 file_path += ".csv"
-            
+
             with open(file_path, 'w') as file:
                 data.to_csv(file)
             logging.info(f"Data exported to: {file_path}")
 
-    # OTHER OPTIONS ------------------------------------------------------------
+    # ==========================================================================
+    # OTHER OPTIONS
+    # ==========================================================================
     def edit_config(self):
         dialog = ConfigPopup(self)
         if dialog.exec():
@@ -337,15 +339,16 @@ class DisplayBase(QWidget):
             del dialog
 
     def help(self):
-        # TODO
-        pass
+        dialog = READMEPopup(self)
+        if dialog.exec():
+            del dialog
 
     def validate_db(self):
         self.mpDB.validate()
 
     def clear_data(self):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
-        if dialog.exec(): 
+        if dialog.exec():
             self.mpDB.info()
             logging.warning("DELETING DATA")
             self.mpDB.clear("media")

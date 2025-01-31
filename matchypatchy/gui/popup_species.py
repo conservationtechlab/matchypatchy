@@ -29,7 +29,6 @@ class SpeciesPopup(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-
         button_new = QPushButton("New")
         self.button_edit = QPushButton("Edit")
         self.button_del = QPushButton("Delete")
@@ -47,7 +46,7 @@ class SpeciesPopup(QDialog):
         button_layout.addWidget(self.button_del)
 
         # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
@@ -123,7 +122,7 @@ class SpeciesFillPopup(QDialog):
         self.common.setText(str(common))
         layout.addWidget(self.common)
 
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)

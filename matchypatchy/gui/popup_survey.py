@@ -7,6 +7,7 @@ from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtGui import QIntValidator
 
 from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.database.media import media_count
 
 
 class SurveyPopup(QDialog):
@@ -44,7 +45,7 @@ class SurveyPopup(QDialog):
         button_layout.addWidget(self.button_del)
 
         # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
@@ -100,7 +101,7 @@ class SurveyPopup(QDialog):
                 region_id = self.mpDB.add_region(dialog.get_region())
             else:
                 region_id = region_id[0][0]
-            
+
             replace_dict = {"name": f"'{dialog.get_name()}'",
                             "region_id": region_id,
                             "year_start": dialog.get_year_start(),
@@ -110,9 +111,8 @@ class SurveyPopup(QDialog):
         self.surveys = self.update()
 
     def delete(self):
-        # TODO: check if there are images attached first
         selected = self.list.currentItem().text()
-        n = 0
+        n = media_count(self.mpDB, self.survey_list_ordered[selected][0])
         dialog = AlertPopup(self, f'Are you sure you want to delete {selected}? This will remove {n} images.')
         if dialog.exec():
             row = self.survey_list_ordered[self.list.currentRow()][0]
@@ -158,7 +158,7 @@ class SurveyFillPopup(QDialog):
         self.year_end.setText(str(year_end))
         layout.addWidget(self.year_end)
 
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)
