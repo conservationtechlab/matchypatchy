@@ -11,7 +11,7 @@ from matchypatchy.gui import popup_import_csv
 from matchypatchy.gui import popup_import_folder
 from matchypatchy.gui import popup_individual
 from matchypatchy.gui import popup_ml
-from matchypatchy.gui import popup_single_image
+from matchypatchy.gui import popup_roi
 from matchypatchy.gui import popup_species
 from matchypatchy.gui import popup_station
 from matchypatchy.gui import popup_survey
@@ -34,7 +34,7 @@ from matchypatchy.gui.popup_import_folder import (BuildManifestThread,
 from matchypatchy.gui.popup_individual import (IndividualFillPopup,
                                                IndividualPopup,)
 from matchypatchy.gui.popup_ml import (MLDownloadPopup, MLOptionsPopup,)
-from matchypatchy.gui.popup_single_image import (ImagePopup,)
+from matchypatchy.gui.popup_roi import (ROIPopup,)
 from matchypatchy.gui.popup_species import (SpeciesFillPopup, SpeciesPopup,)
 from matchypatchy.gui.popup_station import (StationFillPopup, StationPopup,)
 from matchypatchy.gui.popup_survey import (SurveyFillPopup, SurveyPopup,)
@@ -43,7 +43,7 @@ from matchypatchy.gui.widget_image import (ImageWidget,)
 __all__ = ['AlertPopup', 'BuildManifestThread', 'CSVImportThread',
            'ConfigPopup', 'DisplayBase', 'DisplayCompare', 'DisplayMedia',
            'DisplaySingle', 'DropdownPopup', 'FolderImportThread',
-           'ImagePopup', 'ImageWidget', 'ImportCSVPopup', 'ImportFolderPopup',
+           'ROIPopup', 'ImageWidget', 'ImportCSVPopup', 'ImportFolderPopup',
            'IndividualFillPopup', 'IndividualPopup', 'MATCH_STYLE',
            'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow', 'MediaTable',
            'ProgressPopup', 'SpeciesFillPopup', 'SpeciesPopup',
@@ -52,5 +52,5 @@ __all__ = ['AlertPopup', 'BuildManifestThread', 'CSVImportThread',
            'display_single', 'main_display', 'main_gui', 'media_table',
            'popup_alert', 'popup_config', 'popup_dropdown', 'popup_import_csv',
            'popup_import_folder', 'popup_individual', 'popup_ml',
-           'popup_single_image', 'popup_species', 'popup_station',
+           'popup_roi', 'popup_species', 'popup_station',
            'popup_survey', 'widget_image']
