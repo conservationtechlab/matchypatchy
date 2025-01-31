@@ -46,15 +46,16 @@ class MatchyPatchyDB():
         sqlite_vec.load(db)
         db.enable_load_extension(False)
         cursor = db.cursor()
-        for row in cursor.execute("pragma table_info('sqlite_master')").fetchall():
-            print(row)
+        cursor.execute("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger')")
+        schema = cursor.fetchall()
 
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        table_check = tables == [('sqlite_sequence',), ('region',), ('survey',), ('station',), 
-                         ('media',), ('roi',), ('species',), ('individual',), ('sequence',), 
-                         ('roi_emb',), ('roi_emb_chunks',), ('roi_emb_rowids',), ('roi_emb_vector_chunks00',), ('thumbnails',)]
-        print(table_check)
+        for name, obj_type, sql in schema:
+            print(f"{obj_type.upper()}: {name}\n{sql}\n")
+
+        #table_check = tables == [('sqlite_sequence',), ('region',), ('survey',), ('station',), 
+        #                 ('media',), ('roi',), ('species',), ('individual',), ('sequence',), 
+        #                 ('roi_emb',), ('roi_emb_chunks',), ('roi_emb_rowids',), ('roi_emb_vector_chunks00',), ('thumbnails',)]
+        #print(table_check)
         
 
     def _command(self, command):
@@ -290,6 +291,24 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO sequence DEFAULT VALUES;"""
             cursor.execute(command)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            logging.error("Failed to add sequence: ", error)
+            if db:
+                db.close()
+            return False
+        
+    def add_thumbnail(self, table, fid, filepath):
+        # Note difference in variable order, foreign keys
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = f"""INSERT INTO {table}_thumbnails (fid, filepath) VALUES (?, ?);"""
+            data_tuple = (fid, filepath)
+            cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
             db.close()

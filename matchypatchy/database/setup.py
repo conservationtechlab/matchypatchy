@@ -92,12 +92,20 @@ def setup_database(filepath='matchypatchy.db'):
     
 
     # THUMBNAILS
-    cursor.execute('''DROP TABLE IF EXISTS thumbnails;''')
-    cursor.execute('''CREATE TABLE IF NOT EXISTS thumbnails (
+    cursor.execute('''DROP TABLE IF EXISTS media_thumbnails;''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        roi INTEGER NOT NULL,
+                        fid INTEGER NOT NULL,
                         filepath TEXT NOT NULL,
-                        FOREIGN KEY(roi) REFERENCES roi (id));''')
+                        FOREIGN KEY(fid) REFERENCES media (id));''')
+    
+    cursor.execute('''DROP TABLE IF EXISTS roi_thumbnails;''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS roi_thumbnails (
+                        id INTEGER PRIMARY KEY,
+                        fid INTEGER NOT NULL,
+                        filepath TEXT NOT NULL,
+                        FOREIGN KEY(fid) REFERENCES roi (id));''')
+
 
 
     # Commit changes and close connection
