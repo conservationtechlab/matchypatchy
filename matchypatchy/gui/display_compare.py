@@ -12,7 +12,7 @@ from PyQt6.QtGui import QKeyEvent, QIntValidator
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
-from matchypatchy.gui.popup_single_image import ImagePopup
+from matchypatchy.gui.popup_roi import ROIPopup
 
 from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
@@ -605,7 +605,7 @@ class DisplayCompare(QWidget):
 
         NOTE: Redraws query and match
         """
-        dialog = ImagePopup(self, rid)
+        dialog = ROIPopup(self, rid)
         if dialog.exec():
             del dialog
 
