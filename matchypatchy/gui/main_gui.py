@@ -4,10 +4,9 @@ MAIN GUI
 Functions for MenuBar
 
 Display Pages:
-    1. DisplayBase
-    2. DisplayMedia
-    3. DisplayCompare
-    4. DisplaySingle
+    0. DisplayBase
+    1. DisplayMedia
+    2. DisplayCompare
 """
 import sys
 import os
@@ -20,8 +19,9 @@ from PyQt6.QtGui import QAction, QGuiApplication
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
 from matchypatchy.gui.display_compare import DisplayCompare
-from matchypatchy.gui.display_single import DisplaySingle
 from matchypatchy.gui.popup_dropdown import DropdownPopup
+
+from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
 
 from matchypatchy.database import location
 
@@ -46,18 +46,17 @@ class MainWindow(QMainWindow):
         self.Intro = DisplayBase(self)
         self.Media = DisplayMedia(self)
         self.Compare = DisplayCompare(self)
-        self.Single = DisplaySingle(self)
         self.pages = QStackedLayout()
         self.pages.addWidget(self.Intro)
         self.pages.addWidget(self.Media)
         self.pages.addWidget(self.Compare)
-        self.pages.addWidget(self.Single)
 
         # Set the layout for the window
         container.setLayout(self.pages)
         self._set_base_view()
         self.setCentralWidget(container)
 
+    # MENU BAR -----------------------------------------------------------------
     def _createMenuBar(self):
         menuBar = QMenuBar(self)
         self.setMenuBar(menuBar)
@@ -65,7 +64,7 @@ class MainWindow(QMainWindow):
         file = menuBar.addMenu("File")
         edit = menuBar.addMenu("Edit")
         view = menuBar.addMenu("View")
-        Help = menuBar.addMenu("Help")
+        help = menuBar.addMenu("Help")
 
         file.addAction("New")
 
@@ -73,7 +72,7 @@ class MainWindow(QMainWindow):
         file_import = QMenu("Import", self)
         file.addMenu(file_import)
 
-        file_import_station = QAction("stations", self)
+        file_import_station = QAction("Stations", self)
         file_import_station.triggered.connect(lambda: self.import_popup('station'))
         file_import.addAction(file_import_station)
 
@@ -98,6 +97,21 @@ class MainWindow(QMainWindow):
         edit.addAction(edit_species)
         edit.addAction(edit_media)
 
+        # VIEW
+
+        # HELP
+        help_about = QAction("About", self)
+        help_about.triggered.connect(self.about)
+        help_readme = QAction("View README", self)
+        help_readme.triggered.connect(self.help)
+        help_license = QAction("View License", self)
+        help_license.triggered.connect(self.license)
+
+        help.addAction(help_about)
+        help.addAction(help_readme)
+        help.addAction(help_license)
+
+    # PAGE VIEWS ---------------------------------------------------------------
     def _set_base_view(self):
         self.pages.setCurrentIndex(0)
         self.Intro.setFocus()
@@ -117,11 +131,6 @@ class MainWindow(QMainWindow):
         emb_exist = self.Compare.QueryContainer.load_data()
         if emb_exist:
             self.Compare.QueryContainer.calculate_neighbors()
-
-    def _set_single_view(self, media_id):
-        self.pages.setCurrentIndex(3)
-        self.Single.setFocus()
-        self.Single.select(media_id)
 
 
     def import_popup(self, table):
@@ -149,6 +158,29 @@ class MainWindow(QMainWindow):
                 location.import_stations(self.mpDB, file_path, survey_id=survey_id)
 
 
+    # VIEW =====================================================================
+    # TODO
+        
+    # HELP =====================================================================
+    def about(self):
+        dialog = AboutPopup(self)
+        if dialog.exec():
+            del dialog
+
+    def help(self):
+        dialog = READMEPopup(self)
+        if dialog.exec():
+            del dialog
+
+    def license(self):
+        dialog = LicensePopup(self)
+        if dialog.exec():
+            del dialog
+
+
+# ==============================================================================
+# MAIN FUNCTION 
+# ==============================================================================
 def main_display(mpDB):
     """
     Launch GUI
