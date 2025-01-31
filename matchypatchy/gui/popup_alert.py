@@ -10,7 +10,7 @@ class AlertPopup(QDialog):
     def __init__(self, parent, prompt, title="Alert", progressbar=False):
         super().__init__(parent)
         self.setWindowTitle(title)
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout()
         self.prompt = QLabel(prompt, objectName='title',
                              alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.prompt)
@@ -23,9 +23,11 @@ class AlertPopup(QDialog):
 
         # buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
+        layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        self.setLayout(layout)
 
     def update(self, prompt):
         self.prompt.setText(prompt)
@@ -35,7 +37,7 @@ class ProgressPopup(QDialog):
     def __init__(self, parent, prompt):
         super().__init__(parent)
         self.setWindowTitle("Progress")
-        self.layout = QVBoxLayout()
+        layout = QVBoxLayout()
 
         self.counter = 0
         self.min = 0
@@ -45,10 +47,10 @@ class ProgressPopup(QDialog):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(self.min, self.max)
 
-        self.layout.addWidget(self.label)
-        self.layout.addWidget(self.progress_bar)
+        layout.addWidget(self.label)
+        layout.addWidget(self.progress_bar)
 
-        self.setLayout(self.layout)
+        self.setLayout(layout)
 
     def update_progress(self):
         """Update the progress bar based on the counter value."""
