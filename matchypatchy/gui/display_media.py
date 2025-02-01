@@ -11,6 +11,9 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 
 
+# TODO: disable undo after save 
+# Viewpoint, Species, Sex need to be dropdowns when double-clicked
+
 class DisplayMedia(QWidget):
     def __init__(self, parent, data_type=1):
         super().__init__()
@@ -38,7 +41,7 @@ class DisplayMedia(QWidget):
         #Show Type
         first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.show_type = QComboBox()
-        self.show_type.addItems(["Full Images", "Crops Only"])
+        self.show_type.addItems(["Full Images", "ROIs Only"])
         self.show_type.setCurrentIndex(self.data_type)
         self.show_type.currentIndexChanged.connect(self.change_type)
         first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -227,15 +230,10 @@ class DisplayMedia(QWidget):
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only}
 
-        print(prefilter)
         if prefilter:
             if 'individual_id' in prefilter.keys():
                 self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
                 self.individual_select.setCurrentIndex(prefilter['individual_id'])
-            
-            # TODO: update dropdowns
-
-        print(self.filters)
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
@@ -276,17 +274,24 @@ class DisplayMedia(QWidget):
         # Undo last edit
         self.media_table.undo()
 
-    def edit_row(self, rid, crop):
-        if crop:
+    def check_undo_button(self):
+        pass
+
+    def edit_row(self, rid):
+        if self.data_type:
             dialog = ROIPopup(self, rid)
             if dialog.exec():
                 del dialog
-        # media popup
+                # reload data
+                data_available = self.load_table()
+                if data_available:
+                    self.load_thumbnails()
         else:
-            print('Media Edit not available')
+            # TODO
             pass
 
     def edit_row_multiple(self):
+        # TODO
         pass
 
 
@@ -299,7 +304,7 @@ class DisplayMedia(QWidget):
         print("Selected rows:", self.selected_rows)
         if len(self.selected_rows) > 0:
             self.button_edit.setEnabled(True)
-            self.button_duplicate.setEnabled(True)
+            #self.button_duplicate.setEnabled(True)
             self.button_delete.setEnabled(True)
         else:
             self.button_edit.setEnabled(False)
@@ -310,14 +315,24 @@ class DisplayMedia(QWidget):
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"Are you sure you want to duplicate {len(self.selected_rows)} files?", title="Warning")
             if dialog.exec():
-                # TODO
+                for row in self.selected_rows:
+                    if self.data_type == 1:
+                        id = int(self.media_table.data_filtered.at[row, "media_id"])
+                    else:
+                        id = int(self.media_table.data_filtered.at[row, "id"])
+                    self.mpDB.copy("media", id)
                 del dialog
      
     def delete(self):
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"""Are you sure you want to delete {len(self.selected_rows)} files? This cannot be undone.""", title="Warning")
             if dialog.exec():
-                # TODO
+                for row in self.selected_rows:
+                    if self.data_type == 1:
+                        id = int(self.media_table.data_filtered.at[row, "media_id"])
+                    else:
+                        id = int(self.media_table.data_filtered.at[row, "id"])
+                    self.mpDB.delete('media', f'id={id}')
                 del dialog
 
     # Filters ------------------------------------------------------------------
@@ -326,7 +341,6 @@ class DisplayMedia(QWidget):
         Filter the media table based on the selected options
         Run after any setting is changed
         """
-        print("filter table")
         self.media_table.filter()
 
     def select_unidentified(self):
@@ -340,7 +354,6 @@ class DisplayMedia(QWidget):
         self.filter_table()
 
     def select_region(self):
-        print("select region")
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
         self.filter_surveys()
         self.filter_stations(survey_ids=list(self.valid_surveys.items()))
@@ -387,7 +400,6 @@ class DisplayMedia(QWidget):
         # block signals while updating combobox
         self.station_select.blockSignals(True)
         self.station_select.clear()
-        print(survey_ids)
         if survey_ids:
             survey_list = ",".join([str(s[0]) for s in survey_ids])
             selection = f'survey_id IN ({survey_list})'
@@ -399,4 +411,3 @@ class DisplayMedia(QWidget):
         self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
         self.station_select.blockSignals(False)        
-

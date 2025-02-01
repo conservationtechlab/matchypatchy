@@ -138,9 +138,6 @@ class MediaTable(QWidget):
         filters = self.parent.filters
         valid_stations = self.parent.valid_stations
 
-        print(filters)
-        print(valid_stations)
-
         # Region Filter (depends on prefilterd stations from MediaDisplay)
         if 'region_filter' in filters.keys() and valid_stations:
             self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(valid_stations.keys()))]
@@ -366,8 +363,6 @@ class MediaTable(QWidget):
                 selected_rows.append(row)
         return selected_rows
 
-     # TODO
     def edit_row(self, row):
-        print('edit')
         rid = int(self.data_filtered.at[row, "id"])
-        self.parent.edit_row(rid, self.data_type)
+        self.parent.edit_row(rid)

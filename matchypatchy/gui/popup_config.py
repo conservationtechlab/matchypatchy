@@ -11,7 +11,7 @@ from PyQt6.QtGui import QIcon
 from matchypatchy import config
 from matchypatchy.gui.popup_alert import AlertPopup
 
-
+# TODO: Change asset path
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):
@@ -72,7 +72,7 @@ class ConfigPopup(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
@@ -87,6 +87,7 @@ class ConfigPopup(QDialog):
         if new_db:
             self.ml_path.setText(new_db)
             # TODO: verify db
+            # remake mpDB object
             # Update config
             self.cfg['DB_PATH'] = str(new_db)
             config.update(self.cfg)

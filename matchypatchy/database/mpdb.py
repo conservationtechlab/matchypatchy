@@ -312,6 +312,22 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return False
+        
+    def copy(self, table, id):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = f"""INSERT INTO {table} SELECT * FROM table WHERE id={id};"""
+            cursor.execute(command)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            logging.error("Failed to copy row: ", error)
+            if db:
+                db.close()
+            return False
 
     # EDIT ---------------------------------------------------------------------
     def edit_row(self, table: str, id: int, replace: dict, allow_none=False, quiet=True):
@@ -525,7 +541,6 @@ class MatchyPatchyDB():
                                 LIMIT ?;
                             """
             else:
-                print('Distance Metric not recognized.')
                 return
             data_tuple = (query, k+1)
             cursor.execute(command, data_tuple)

@@ -53,7 +53,7 @@ class DisplayBase(QWidget):
         self.logo.setFixedSize(600, 400)
         self.logo.setObjectName("borderWidget")
         logo_img = QImage(os.path.join(os.path.dirname(__file__), "assets/logo.png"))
-        # TODO logo_img = QImage(os.path.normpath("logo.png"))
+        # TODO logo_img = QImage(os.path.normpath("assets/logo.png"))
         self.logo.setPixmap(QPixmap.fromImage(logo_img))
         layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addStretch()

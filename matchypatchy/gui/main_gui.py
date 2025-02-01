@@ -130,8 +130,8 @@ class MainWindow(QMainWindow):
         self.Compare.refresh_filters()
         emb_exist = self.Compare.QueryContainer.load_data()
         if emb_exist:
-            self.Compare.QueryContainer.calculate_neighbors()
-
+            self.Compare.calculate_neighbors()
+ 
     # FILE =====================================================================
     def new(self):
         pass

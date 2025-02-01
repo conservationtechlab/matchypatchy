@@ -32,6 +32,7 @@ class DisplayCompare(QWidget):
         self.distance_metric = 'Cosine'
         self.threshold = 50
         self.current_viewpoint = 'Any'
+        self.progress = ProgressPopup(self, "Matching embeddings...")
 
         # CREATE QUERY CONTAINER ==============================================
         self.QueryContainer = QueryContainer(self)
@@ -378,11 +379,10 @@ class DisplayCompare(QWidget):
             QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
     def calculate_neighbors(self):
-        self.progress = ProgressPopup(self.parent, "Matching embeddings...")
         self.progress.set_max(self.QueryContainer.n_queries)
         self.progress.show()
-        self.QueryContainer.calculate_neighbors()
 
+        self.QueryContainer.calculate_neighbors()
 
     def recalculate(self):
         self.QueryContainer = QueryContainer(self)
