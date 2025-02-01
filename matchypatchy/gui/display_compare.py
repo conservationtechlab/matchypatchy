@@ -7,12 +7,13 @@ from PIL import Image
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QKeyEvent, QIntValidator
+from PyQt6.QtGui import QIntValidator
 
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_roi import ROIPopup
+from matchypatchy.gui.popup_alert import ProgressPopup
 
 from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
@@ -30,7 +31,6 @@ class DisplayCompare(QWidget):
         self.k = 3  # default knn
         self.distance_metric = 'Cosine'
         self.threshold = 50
-        
         self.current_viewpoint = 'Any'
 
         # CREATE QUERY CONTAINER ==============================================
@@ -144,7 +144,6 @@ class DisplayCompare(QWidget):
 
         # Viewpoint Toggle
         query_options.addSpacing(20)
-        
         query_options.addWidget(QLabel("Viewpoint:"))
         self.dropdown_viewpoint = QComboBox()
         VIEWPOINT_DICT = load('VIEWPOINTS')
@@ -154,13 +153,8 @@ class DisplayCompare(QWidget):
         self.dropdown_viewpoint.setMaximumWidth(100)
         query_options.addWidget(self.dropdown_viewpoint)
 
-
         query_options.addStretch()
         query_layout.addLayout(query_options)
-
-
-
-
         # Query Image
         self.query_image = ImageWidget()
         self.query_image.setStyleSheet("border: 1px solid black;")
@@ -313,7 +307,7 @@ class DisplayCompare(QWidget):
         self.button_match_favorite.setCheckable(True)
         self.button_match_favorite.clicked.connect(lambda: self.press_favorite_button(self.QueryContainer.current_match_rid))
         match_image_buttons.addWidget(self.button_match_favorite)
-        
+
         match_image_buttons.addStretch()
         match_layout.addLayout(match_image_buttons)
 
@@ -375,27 +369,32 @@ class DisplayCompare(QWidget):
         # set new threshold value
         # Must recalculate neighbors to activate
         self.threshold = self.threshold_slider.value()
-        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() * 
+        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() *
                                                                          (self.threshold - self.threshold_slider.minimum()) //
                                                                          (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
         if self.distance_metric == 'Cosine':
-            QToolTip.showText(slider_handle_position, f"{self.threshold/100}", self.threshold_slider)
+            QToolTip.showText(slider_handle_position, f"{self.threshold / 100}", self.threshold_slider)
         else:
             QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
+
+    def calculate_neighbors(self):
+        self.progress = ProgressPopup(self.parent, "Matching embeddings...")
+        self.progress.set_max(self.QueryContainer.n_queries)
+        self.progress.show()
+        self.QueryContainer.calculate_neighbors()
+
 
     def recalculate(self):
         self.QueryContainer = QueryContainer(self)
         self.QueryContainer.load_data()
-        self.QueryContainer.calculate_neighbors()
+        self.calculate_neighbors()
         self.change_query(0)
 
     def recalculate_by_individual(self):
-        #self.refresh_filters()
         self.QueryContainer = QC_QueryContainer(self)
         self.QueryContainer.load_data()
         self.QueryContainer.filter()
         self.change_query(0)
-
 
     # ==========================================================================
     # MATCHING PROCESS
@@ -403,11 +402,9 @@ class DisplayCompare(QWidget):
     def press_match_button(self):
         # already a match
         if self.QueryContainer.is_existing_match():
-            print("unmatch")
             self.unmatch()
         # new match
         else:
-            print("match")
             self.confirm_match()
 
     def toggle_match_button(self):
@@ -498,7 +495,7 @@ class DisplayCompare(QWidget):
         Load Images for Current Query ROI
         """
         self.query_image.load(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "filepath"),
-                              bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid,'bbox'), crop=True)
+                              bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid, 'bbox'), crop=True)
         self.query_info.setText(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata"))
         self.toggle_match_button()
         self.toggle_query_favorite_button()
@@ -524,7 +521,7 @@ class DisplayCompare(QWidget):
         self.current_viewpoint = selected_viewpoint
         self.QueryContainer.toggle_viewpoint(selected_viewpoint)
         # either query or match has no examples with selected viewpoint, defaults to all viewpoints
-        if (self.QueryContainer.empty_query == True or self.QueryContainer.empty_match == True):
+        if (self.QueryContainer.empty_query is True or self.QueryContainer.empty_match is True):
             self.warn(f'No query image with {selected_viewpoint} viewpoint in the current sequence.')
             self.dropdown_viewpoint.setCurrentIndex(0)
         self.query_sequence_n.setText('/' + str(len(self.QueryContainer.current_query_rois)))
@@ -712,39 +709,40 @@ class DisplayCompare(QWidget):
         key = event.key()
         key_text = event.text()
 
-        # Left Arrow
-        if key == 16777234:
-            self.change_match(self.QueryContainer.current_match - 1)
-        # Right Arrow
-        elif key == 16777236:
-            self.change_match(self.QueryContainer.current_match + 1)
-        # Up Arrow
-        elif key == 16777235:
-            self.change_query(self.QueryContainer.current_query - 1)
-        # Down Arrow
-        elif key == 16777237:
-            self.change_query(self.QueryContainer.current_query + 1)
+        match key:
+            # Left Arrow
+            case 16777234:
+                self.change_match(self.QueryContainer.current_match - 1)
+            # Right Arrow
+            case 16777236:
+                self.change_match(self.QueryContainer.current_match + 1)
+            # Up Arrow
+            case 16777235:
+                self.change_query(self.QueryContainer.current_query - 1)
+            # Down Arrow
+            case 16777237:
+                self.change_query(self.QueryContainer.current_query + 1)
 
-        # Space - Match
-        elif key == 32:
-            self.button_match.click()
-        # M - Match
-        elif key == 77:
-            self.button_match.click()
+            # Space - Match
+            case 32:
+                self.button_match.click()
+            # M - Match
+            case 77:
+                self.button_match.click()
 
-        # V - Viewpoint
-        elif key == 86:
-            n = self.dropdown_viewpoint.currentIndex()
-            # wrap around
-            if n < 0:
-                n = self.dropdown_viewpoint.count() - 1
-            if n > self.dropdown_viewpoint.count() - 1:
-                n = 0
-            self.dropdown_viewpoint.setCurrentIndex(n+1)
+            # V - Viewpoint
+            case 86:
+                n = self.dropdown_viewpoint.currentIndex()
+                # wrap around
+                if n < 0:
+                    n = self.dropdown_viewpoint.count() - 1
+                if n > self.dropdown_viewpoint.count() - 1:
+                    n = 0
+                self.dropdown_viewpoint.setCurrentIndex(n + 1)
 
-        # Escape - Home
-        elif key == 16777216:
-            self.home()
+            # Escape - Home
+            case 16777216:
+                self.home()
 
-        else:
-            print(f"Key pressed: {key_text} (Qt key code: {key})")
+            case _:
+                print(f"Key pressed: {key_text} (Qt key code: {key})")

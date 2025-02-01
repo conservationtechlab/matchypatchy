@@ -2,8 +2,9 @@
 Main Function
 
 '''
-# GET CWD 
-import sys, os
+# GET CWD
+import os
+import sys
 if getattr(sys, 'frozen', False):
     application_path = os.path.dirname(sys.executable)
     os.chdir(application_path)
@@ -23,7 +24,7 @@ configure_http_backend(backend_factory=backend_factory)
 from matchypatchy.gui import main_gui
 from matchypatchy.database import mpdb
 from matchypatchy import config
-from matchypatchy import models
+from matchypatchy.algo import models
 
 def main():
     cfg = config.initiate()

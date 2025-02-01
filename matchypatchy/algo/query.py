@@ -8,7 +8,6 @@ import matchypatchy.database.media as db_roi
 
 from matchypatchy.algo.models import load
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
-from matchypatchy.gui.popup_alert import ProgressPopup
 
 
 class QueryContainer():
@@ -62,13 +61,9 @@ class QueryContainer():
 
     # RUN ON ENTRY IF LOAD_DATA
     def calculate_neighbors(self):
-        dialog = ProgressPopup(self.parent, "Matching embeddings...")
-        dialog.set_max(len(self.sequences))
-        dialog.show()
-
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.rois, self.sequences,
                                                  k=self.parent.k, threshold=self.parent.threshold)
-        self.match_thread.progress_update.connect(dialog.set_counter)
+        self.match_thread.progress_update.connect(self.parent.progress.set_counter)
         self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
         self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
         self.match_thread.finished.connect(self.filter)  # do not continue until finished
