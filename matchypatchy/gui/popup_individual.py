@@ -9,7 +9,8 @@ individual (id INTEGER PRIMARY KEY,
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem,
                              QLabel, QLineEdit, QDialogButtonBox, QPushButton)
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtWidgets
+
 
 class IndividualPopup(QDialog):
     def __init__(self, parent):
@@ -33,22 +34,17 @@ class IndividualPopup(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-
         self.button_edit = QPushButton("Edit")
         self.button_view = QPushButton("View")
-
         self.button_edit.clicked.connect(self.edit)
         self.button_view.clicked.connect(self.view)
-
         # not enabled until station is selected
         self.button_edit.setEnabled(False)
         self.button_view.setEnabled(False)
-
-
         button_layout.addWidget(self.button_edit)
         button_layout.addWidget(self.button_view)
         # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
@@ -64,9 +60,6 @@ class IndividualPopup(QDialog):
         self.button_view.setEnabled(flag)
 
     def update(self):
-        print(self.mpDB.count('individual'))
-
-
         self.individuals = self.mpDB._command("""SELECT individual.name, roi.individual_id, COUNT(roi.individual_id) AS count
                                                  FROM individual LEFT JOIN roi ON roi.individual_id = individual.id
                                                  GROUP BY roi.individual_id;""")
@@ -85,27 +78,26 @@ class IndividualPopup(QDialog):
         # cannot edit unidentified
         if self.list.currentRow() == 0:
             return
-        
+
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
 
         id, species_id, name, sex = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
 
         dialog = IndividualFillPopup(self, species_id=species_id, name=name, sex=sex)
         if dialog.exec():
-            replace_dict = {"name": f"'{dialog.get_name()}'", 
-                            "sex": f"'{dialog.get_sex()}'", 
+            replace_dict = {"name": f"'{dialog.get_name()}'",
+                            "sex": f"'{dialog.get_sex()}'",
                             "species_id": f"'{dialog.get_species_id()}'", }
             self.mpDB.edit_row("individual", id, replace_dict)
         del dialog
         # refetch data
         self.stations = self.update()
-        
 
     def view(self):
         # set to media view filtered by individual
         if self.list.currentRow() == 0:
             filters = {"individual_id": 0}
-        
+
         else:
             self.selected_ind = self.individuals[self.list.currentRow() - 1]
             filters = {"individual_id": self.selected_ind[1]}
@@ -118,9 +110,7 @@ class IndividualFillPopup(QDialog):
         super().__init__(parent)
         self.species_id = species_id
         self.mpDB = parent.mpDB
-
         self.setWindowTitle("Edit Individual")
-
         layout = QVBoxLayout()
 
         # species
@@ -144,7 +134,7 @@ class IndividualFillPopup(QDialog):
         self.sex.currentIndexChanged.connect(self.checkInput)
 
         # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept_verify)
         buttonBox.rejected.connect(self.reject)

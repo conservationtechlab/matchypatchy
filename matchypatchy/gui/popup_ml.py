@@ -2,7 +2,7 @@
 Popup for Selection within a list, ie Survey selection
 
 """
-from pathlib import Path 
+from pathlib import Path
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
 from PyQt6.QtCore import Qt
@@ -37,7 +37,7 @@ class MLDownloadPopup(QDialog):
 
         # Add OK and Cancel buttons
         layout.addSpacing(20)
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -50,7 +50,7 @@ class MLDownloadPopup(QDialog):
 
         # check already downloaded models
         self.set_checkboxes()
-    
+
     def discover_models(self):
         models_dict = dict()
         for m in self.models.keys():
@@ -140,7 +140,7 @@ class MLOptionsPopup(QDialog):
 
         # Ok/Cancel
         layout.addSpacing(20)
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -155,7 +155,7 @@ class MLOptionsPopup(QDialog):
                 models_dict[m] = path
         # if looking for a particular model, give back path
         return models_dict
-    
+
     def get_subset(self, subset):
         # GET THE AVAILABLE MODELS OF SUBSET TYPE
         models_dict = dict()
@@ -191,4 +191,3 @@ class MLOptionsPopup(QDialog):
         else:
             self.selected_viewpoint_key = self.available_viewpoints[self.viewpoint.currentIndex()]
             return self.selected_viewpoint_key
-        
