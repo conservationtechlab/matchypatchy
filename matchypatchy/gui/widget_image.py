@@ -39,34 +39,28 @@ class ImageWidget(QLabel):
         """
         if self.image_path is None or image_path != self.image_path:
             self.image_path = image_path
-        
+
         self.rel_bbox = bbox
         self.crop_to_bbox = crop
 
         self.pil_image = Image.open(self.image_path)
         self.adjust()
 
-
     def adjust(self):
         """
         Adjust image values, convert to qimage, crop, display
         """
-        # Adjust brightness
         enhancer = ImageEnhance.Brightness(self.pil_image)
         self.pil_image = enhancer.enhance(self.brightness_factor)
-
         enhancer = ImageEnhance.Contrast(self.pil_image)
         self.pil_image = enhancer.enhance(self.contrast_factor)
-
         enhancer = ImageEnhance.Sharpness(self.pil_image)
         self.pil_image = enhancer.enhance(self.sharpness_factor)
 
         # Convert to QImage
         self.qimage = self.to_qimage()
-
         # Get BBOX
         self.bbox = self.get_bbox()
-
         # crop image
         if self.bbox is not None and self.crop_to_bbox:
             self.qimage = self.qimage.copy(self.bbox)
@@ -82,10 +76,10 @@ class ImageWidget(QLabel):
         self.pil_image = self.pil_image.convert('RGBA')
         image_data = self.pil_image.tobytes("raw", 'RGBA')
         width, height = self.pil_image.size
-        
+
         # Create a QImage from the image data
         return QImage(image_data, width, height, QImage.Format.Format_RGBA8888)
-    
+
     def get_bbox(self):
         """
         Crop to bbox before painting
@@ -97,9 +91,9 @@ class ImageWidget(QLabel):
             bottom = self.qimage.height() * self.rel_bbox['bbox_h']
             return QRect(int(left), int(top), int(right), int(bottom))
         else:
-            return None 
+            return None
 
-    # ---- IMAGE ADJUSTMENTS ----
+    # IMAGE ADJUSTMENTS ========================================================
     def adjust_brightness(self, value):
         """
         QImage needs to be reconverted each time
@@ -118,7 +112,6 @@ class ImageWidget(QLabel):
         """
         QImage needs to be reconverted each time
         """
-        print(value/50)
         self.sharpness_factor = value / 50
         self.adjust()
 
@@ -128,12 +121,11 @@ class ImageWidget(QLabel):
         self.contrast_factor = 1.0
         self.sharpness_factor = 1.0
         self.zoom_factor = 1.0
-        self.image_offset = QPointF(0, 0)  
+        self.image_offset = QPointF(0, 0)
         # reload image
         self.load(image_path=self.image_path, bbox=self.bbox)
 
-    # ---- EVENTS ----
-
+    # EVENTS ===================================================================
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
@@ -163,7 +155,6 @@ class ImageWidget(QLabel):
                 painter.setPen(QPen(Qt.GlobalColor.green, 3))
                 painter.drawRect(scaled_bbox)
 
-
     def wheelEvent(self, event):
         """
         Zoom in or out based on the scroll wheel movement.
@@ -186,7 +177,6 @@ class ImageWidget(QLabel):
         # Update zoom factor
         self.zoom_factor = new_zoom_factor
         self.update()
-
 
     def mousePressEvent(self, event):
         """

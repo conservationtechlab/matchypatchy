@@ -7,6 +7,7 @@ import tempfile
 import logging 
 import yaml
 
+
 def initiate():
     cfg_path = Path('config.yml')
 
@@ -50,6 +51,7 @@ def load(key=None):
             return cfg[key]
         else:
             return cfg
+
 
 def update(new_cfg):
     # Update the yaml with new values

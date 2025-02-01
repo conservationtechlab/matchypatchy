@@ -1,11 +1,9 @@
-from matchypatchy import MatchyPatchy
 from matchypatchy import algo
 from matchypatchy import config
 from matchypatchy import database
 from matchypatchy import gui
 from matchypatchy import sqlite_vec
 
-from matchypatchy.MatchyPatchy import (backend_factory, main,)
 from matchypatchy.algo import (AnimlThread, BuildManifestThread,
                                CSVImportThread, DownloadMLThread,
                                FolderImportThread, LoadThumbnailThread,
@@ -22,9 +20,10 @@ from matchypatchy.database import (COLUMNS, IMAGE_EXT, MatchyPatchyDB,
                                    fetch_roi, fetch_roi_media, fetch_species,
                                    fetch_station_names_from_id, fetch_stations,
                                    fetch_surveys, get_bbox, get_sequence,
-                                   individual_roi_dict, location, media,
-                                   media_count, mpdb, sequence_roi_dict, setup,
-                                   setup_database, species,)
+                                   import_stations, individual_roi_dict,
+                                   location, media, media_count, mpdb,
+                                   sequence_roi_dict, setup, setup_database,
+                                   species,)
 from matchypatchy.gui import (AboutPopup, AlertPopup, ConfigPopup, DisplayBase,
                               DisplayCompare, DisplayMedia, DropdownPopup,
                               FAVORITE_STYLE, ImageWidget, ImportCSVPopup,
@@ -64,15 +63,15 @@ __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'fetch_regions', 'fetch_roi', 'fetch_roi_media', 'fetch_species',
            'fetch_station_names_from_id', 'fetch_stations', 'fetch_surveys',
            'get_bbox', 'get_class_path', 'get_config_path', 'get_path',
-           'get_sequence', 'gui', 'import_thread', 'individual_roi_dict', 'initiate', 'is_unique',
-           'load', 'loadable_path', 'location', 'main', 'main_display',
-           'main_gui', 'match_thread', 'media', 'media_count', 'media_table',
-           'models', 'mpdb', 'popup_alert', 'popup_config', 'popup_dropdown',
-           'popup_import_csv', 'popup_import_folder', 'popup_individual',
-           'popup_media_edit', 'popup_ml', 'popup_readme', 'popup_roi',
-           'popup_species', 'popup_station', 'popup_survey', 'qc_query',
-           'query', 'register_numpy', 'reid_thread', 'sequence_roi_dict',
+           'get_sequence', 'gui', 'import_stations', 'import_thread',
+           'individual_roi_dict', 'initiate', 'load', 'loadable_path',
+           'location', 'main', 'main_display', 'main_gui', 'match_thread',
+           'media', 'media_count', 'media_table', 'models', 'mpdb',
+           'popup_alert', 'popup_config', 'popup_dropdown', 'popup_import_csv',
+           'popup_import_folder', 'popup_individual', 'popup_media_edit',
+           'popup_ml', 'popup_readme', 'popup_roi', 'popup_species',
+           'popup_station', 'popup_survey', 'qc_query', 'query',
+           'register_numpy', 'reid_thread', 'sequence_roi_dict',
            'sequence_thread', 'serialize_float32', 'serialize_int8', 'setup',
-           'setup_database', 'species', 'sqlite_vec',
-           'thumbnail_thread', 'update', 'update_model_yml', 'utils',
-           'widget_image']
+           'setup_database', 'species', 'sqlite_vec', 'thumbnail_thread',
+           'update', 'update_model_yml', 'widget_image']

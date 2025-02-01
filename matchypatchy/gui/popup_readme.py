@@ -27,7 +27,7 @@ class AboutPopup(QDialog):
         except FileNotFoundError:
             self.text_edit.setText("ABOUT.md not found.")
         self.text_edit.setReadOnly(True)
-    
+
 
 class READMEPopup(QDialog):
     def __init__(self, parent):

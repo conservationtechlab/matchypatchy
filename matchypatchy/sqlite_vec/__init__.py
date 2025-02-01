@@ -1,23 +1,24 @@
 import os
 import sqlite3
+from typing import List
+from struct import pack
+from sqlite3 import Connection
+
 
 __version__ = "0.1.1"
 __version_info__ = tuple(__version__.split("."))
 
+
 def loadable_path():
-  """ Returns the full path to the sqlite-vec loadable SQLite extension bundled with this package """
-  loadable_path = os.path.join(os.path.dirname(__file__), "vec0")
-  return os.path.normpath(loadable_path)
-  #return os.path.normpath("vec0")
+    """ Returns the full path to the sqlite-vec loadable SQLite extension bundled with this package """
+    loadable_path = os.path.join(os.path.dirname(__file__), "vec0")
+    return os.path.normpath(loadable_path)
+    #return os.path.normpath("vec0")
 
-def load(conn: sqlite3.Connection)  -> None:
-  """ Load the sqlite-vec SQLite extension into the given database connection. """
 
-  conn.load_extension(loadable_path())
-
-from typing import List
-from struct import pack
-from sqlite3 import Connection
+def load(conn: sqlite3.Connection) -> None:
+    """ Load the sqlite-vec SQLite extension into the given database connection. """
+    conn.load_extension(loadable_path())
 
 
 def serialize_float32(vector: List[float]) -> bytes:
