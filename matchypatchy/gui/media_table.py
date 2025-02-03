@@ -4,21 +4,22 @@ Widget for displaying list of Media
 'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'timestamp', 
 'station_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
 """
-
 import pandas as pd
 
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QLabel, QHeaderView, QAbstractItemView
+from PyQt6.QtWidgets import (QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, 
+                             QComboBox, QLabel, QHeaderView, QStyledItemDelegate)
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.algo import models
 from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
 from matchypatchy.database.media import fetch_media, fetch_roi_media
+from matchypatchy.database.species import fetch_species
 from matchypatchy.gui.popup_alert import ProgressPopup
 
 
 class MediaTable(QWidget):
-    update_signal = pyqtSignal(int, int)
+    update_signal = pyqtSignal(list)
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -27,7 +28,8 @@ class MediaTable(QWidget):
         self.data = pd.DataFrame()
         self.thumbnails = dict()
         self.data_type = 1
-        self.VIEWPOINT = models.load('VIEWPOINTS')
+        self.VIEWPOINTS = models.load('VIEWPOINTS')
+        self.species_list = self.mpDB.select('species')
 
         self.edit_stack = []
 
@@ -82,10 +84,13 @@ class MediaTable(QWidget):
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
             # corresponding mpDB column names
-            self.columns = ["select", "thumbnail", "filepath", "timestamp",
-                            "station", "sequence_id", "external_id",
-                            "viewpoint", "binomen", "common", "individual_id", "sex", 
-                            "reviewed", "favorite", "comment"]
+            self.columns = {0: "select", 1:"thumbnail", 
+                            2:"filepath", 3:"timestamp",
+                            4:"station", 5:"sequence_id", 
+                            6:"external_id", 7:"viewpoint", 
+                            8:"binomen", 9:"common", 
+                            10:"individual_id", 11:"sex", 
+                            12:"reviewed", 13:"favorite", 14:"comment"}
             self.table.setColumnCount(15)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
                                                 "Station", "Sequence ID", "External ID", 
@@ -97,8 +102,10 @@ class MediaTable(QWidget):
         elif self.data_type == 0:
             self.data = fetch_media(self.mpDB)
             # corresponding mpDB column names
-            self.columns = ["select", "thumbnail", "filepath", "timestamp",
-                            "station", "sequence_id", "external_id", "favorite", "comment"]
+            self.columns = {0:"select", 1:"thumbnail", 
+                            2:"filepath", 3:"timestamp",
+                            4:"station", 5:"sequence_id", 
+                            6:"external_id", 7:"favorite", 8:"comment"}
             self.table.setColumnCount(9)  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels( ["Select","Thumbnail", "File Path", "Timestamp", "Station",
                                                    "Sequence ID", "External ID", "Favorite", "Comment"])
@@ -136,19 +143,19 @@ class MediaTable(QWidget):
         self.data_filtered = self.data.copy()
         # map 
         filters = self.parent.filters
-        valid_stations = self.parent.valid_stations
+        self.valid_stations = self.parent.valid_stations
 
         # Region Filter (depends on prefilterd stations from MediaDisplay)
-        if 'region_filter' in filters.keys() and valid_stations:
-            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(valid_stations.keys()))]
+        if 'region_filter' in filters.keys() and self.valid_stations:
+            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(self.valid_stations.keys()))]
         # Survey Filter (depends on prefilterd stations from MediaDisplay)
-        if 'survey_filter' in filters.keys() and valid_stations:
-            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(valid_stations.keys()))]
+        if 'survey_filter' in filters.keys() and self.valid_stations:
+            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(self.valid_stations.keys()))]
         # Single station Filter
-        if 'active_station' in filters.keys() and valid_stations:
+        if 'active_station' in filters.keys() and self.valid_stations:
             if filters['active_station'][0] > 0:
                 self.data_filtered = self.data_filtered[self.data_filtered['station_id'] == filters['active_station'][0]]
-            self.data_filtered['station'] = self.data_filtered['station_id'].map(valid_stations)
+            self.data_filtered['station'] = self.data_filtered['station_id'].map(self.valid_stations)
         else:
             # no valid stations, empty dataframe
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
@@ -204,67 +211,62 @@ class MediaTable(QWidget):
         roi = self.data_filtered.iloc[i]
         self.table.setRowHeight(i, 100)
         
-        column_counter=0
+        for column, data in self.columns.items():
+             # Edit Checkbox
+            if data == 'select':
+                edit = QTableWidgetItem()
+                edit.setFlags(edit.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                edit.setCheckState(Qt.CheckState.Unchecked)
+                self.table.setItem(i, column, edit) 
+            # Thumbnail
+            elif data == 'thumbnail':
+                thumbnail = QImage(roi['thumbnail_path'])
+                pixmap = QPixmap.fromImage(thumbnail)
+                label = QLabel()
+                label.setPixmap(pixmap)
+                self.table.setCellWidget(i, column, label)
+            # FilePath and Timestamp not editable
+            elif data == 'filepath' or data == 'timestamp':
+                noedit = QTableWidgetItem(roi[data])
+                noedit.setFlags(noedit.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self.table.setItem(i, column, noedit)  # File Path column
+            # Convert Viewpoint
+            elif data == 'viewpoint':
+                self.table.setItem(i, column, QTableWidgetItem(self.VIEWPOINTS[str(roi["viewpoint"])]))  # Viewpoint column
+            elif data == 'binomen' or data == 'common':
+                # TODO pull species from table dynamically
+                pass
+            # Reviewed and Favorite Checkbox
+            elif data == 'reviewed' or data == 'favorite':
+                qtw = QTableWidgetItem()
+                qtw.setFlags(qtw.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                qtw.setCheckState(self.set_checkstate(roi[data]))
+                self.table.setItem(i, column, qtw) 
+            else:
+                self.table.setItem(i, column, QTableWidgetItem(roi[data]))  # Date Time column
 
-        # Edit Checkbox
-        edit = QTableWidgetItem()
-        edit.setFlags(edit.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-        edit.setCheckState(Qt.CheckState.Unchecked)
-        self.table.setItem(i, column_counter, edit) 
-        column_counter+=1
-
-        # Thumbnail
-        thumbnail = QImage(roi['thumbnail_path'])
-        pixmap = QPixmap.fromImage(thumbnail)
-        label = QLabel()
-        label.setPixmap(pixmap)
-        self.table.setCellWidget(i, column_counter, label)
-        column_counter+=1
+        # STATION COMBOBOX
+        delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
+        delegate.itemSelected.connect(lambda row, col, idx: print(f"Row {row}, Col {col} → Index {idx}"))
+        self.table.setItemDelegateForColumn(4, delegate)
         
-        # Data
-        filepath = QTableWidgetItem(roi["filepath"])
-        filepath.setFlags(filepath.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        self.table.setItem(i, column_counter, filepath)  # File Path column
-        column_counter+=1
 
-        self.table.setItem(i, column_counter, QTableWidgetItem(roi["timestamp"]))  # Date Time column
-        column_counter+=1
-        self.table.setItem(i, column_counter, QTableWidgetItem(roi["station"]))   # station column
-        column_counter+=1
-        self.table.setItem(i, column_counter, QTableWidgetItem(str(roi["sequence_id"])))  # Sequence ID column
-        column_counter+=1
-        self.table.setItem(i, column_counter, QTableWidgetItem(str(roi["external_id"])))  # External ID column
-        column_counter+=1
+        if self.data_type == 1:
+            # VIEWPOINT COMBOBOX
+            combo_items = list(self.VIEWPOINTS.values())[1:]
+            self.table.setItemDelegateForColumn(7, ComboBoxDelegate(combo_items, self))
 
-        if self.data_type: # ADD ROI COLUMNS
-            self.table.setItem(i, column_counter, QTableWidgetItem(self.VIEWPOINT[str(roi["viewpoint"])]))  # Viewpoint column
-            column_counter+=1
-            self.table.setItem(i, column_counter, QTableWidgetItem(roi["binomen"]))   # Taxon column
-            column_counter+=1
-            self.table.setItem(i, column_counter, QTableWidgetItem(roi["common"]))  # Species column
-            column_counter+=1
-            self.table.setItem(i, column_counter, QTableWidgetItem(roi["name"]))  # Individual ID column
-            column_counter+=1
-            self.table.setItem(i, column_counter, QTableWidgetItem(roi["sex"]))  # Sex column
-            column_counter+=1
+            # SPECIES COMBOBOX
+            combo_items = [None] + [x[1].capitalize() for x in self.species_list]
+            self.table.setItemDelegateForColumn(8, ComboBoxDelegate(combo_items, self))
+            combo_items = [None] + [x[2].capitalize() for x in self.species_list]
+            self.table.setItemDelegateForColumn(9, ComboBoxDelegate(combo_items, self))
 
-            reviewed = QTableWidgetItem()
-            reviewed.setFlags(reviewed.flags() & Qt.ItemFlag.ItemIsUserCheckable)
-            reviewed.setCheckState(self.set_check_state(roi["reviewed"]))
-            self.table.setItem(i, column_counter, reviewed) 
-            column_counter+=1
-          
-        # Favorite Checkbox
-        favorite = QTableWidgetItem()
-        favorite.setFlags(favorite.flags() & Qt.ItemFlag.ItemIsUserCheckable)
-        favorite.setCheckState(self.set_check_state(roi["favorite"]))
-        self.table.setItem(i, column_counter, favorite)  
-        column_counter+=1
+            # SEX COMBOBOX
+            combo_items = ['Unknown', 'Male', 'Female']
+            self.table.setItemDelegateForColumn(11, ComboBoxDelegate(combo_items, self))
 
-        # Comment
-        self.table.setItem(i, column_counter, QTableWidgetItem(roi["comment"]))  # Favorite column
-
-    def set_check_state(self, item):
+    def set_checkstate(self, item):
         """
         Set the checkbox of reviewed and favorite columns
         when adding rows
@@ -273,6 +275,12 @@ class MediaTable(QWidget):
             return Qt.CheckState.Checked
         else:
             return Qt.CheckState.Unchecked
+        
+    def get_checkstate_int(self, item):
+        if (item == Qt.CheckState.Checked):
+            return 1
+        else:
+            return 0
         
     def invert_checkstate(self, item):
         if item.checkState() == Qt.CheckState.Checked:
@@ -290,10 +298,12 @@ class MediaTable(QWidget):
         """
         Applies all previous edits to the current data_filter if the row is present
         """
+        #print(self.edit_stack)
         for edit in self.edit_stack:
-            if not self.data_filtered.empty and self.data_filtered[self.id_col].isin([edit[0]]).any():
-                self.data_filtered.loc[self.data_filtered[self.id_col] == edit[0], edit[1]] = edit[3]
+            if not self.data_filtered.empty and self.data_filtered['id'].isin([edit['id']]).any():
+                self.data_filtered.loc[edit['row'], edit['reference']] = edit['new_value']
 
+    # UPDATE CELL ENTRY
     def update_entry(self, row, column): 
         """
         Allows user to edit entry in table 
@@ -303,26 +313,44 @@ class MediaTable(QWidget):
         """
         reference = self.columns[column]
         rid = int(self.data_filtered.at[row, "id"])
-        # tell parent
-        self.update_signal.emit(row, column)
 
         if reference == 'select':
             return
-        
         # checked items
         elif reference == 'reviewed' or reference == 'favorite':
-            print(self.table.item(row, column).checkState())
-            previous_value = self.set_check_state(self.data_filtered.at[row, reference])
-            new_value = self.table.item(row, column).checkState()
-
+            previous_value = int(self.data_filtered.at[row, reference])
+            new_value = self.get_checkstate_int(self.table.item(row, column).checkState())
+        # viewpoint
+        elif reference == 'viewpoint':
+            previous_value = self.data_filtered.at[row, reference]
+            # i hate this
+            key = [k for k, v in self.VIEWPOINTS.items() if v == self.table.item(row, column).text()][0]
+            if key == 'None':
+                new_value = None
+            else:
+                new_value = int(key)
+        # species
+        elif reference == 'common' or reference ==  'binomen':
+            previous_value = self.data_filtered.at[row, 'species_id']
+            # update other value
+            print(self.table.item(row, column).text())
         # everything else
         else:
             previous_value = self.data_filtered.at[row, reference]
             new_value = self.table.item(row, column).text()
             
         # add edit to stack
-        edit = [rid, reference, previous_value, new_value]
+        edit = {'row': row,
+                'column': column,
+                'id': rid,
+                'reference': reference,
+                'previous_value': previous_value,
+                'new_value': new_value}
         self.edit_stack.append(edit)
+        print(edit)
+        self.update_signal.emit([row, column])
+        self.refresh_table()
+
 
     def undo(self):
         """
@@ -330,15 +358,15 @@ class MediaTable(QWidget):
         """
         if len(self.edit_stack) > 0:
             last = self.edit_stack.pop()
-            self.data_filtered.at[last[0], last[1]] = last[2]
+            self.data_filtered.loc[last['row'], last['reference']] = last['previous_value']
             self.refresh_table()
 
     # TODO
     def save_changes(self):
         # commit all changes in self.edit_stack to database
         for edit in self.edit_stack:
-            id = edit[0]
-            replace_dict = {edit[1]: edit[3]}
+            id = edit['id']
+            replace_dict = {edit['reference']: edit['new_value']}
             if self.data_type == 1:
                 #self.mpDB.edit_row("roi", edit[0], replace_dict, allow_none=False, quiet=True)
                 pass
@@ -366,3 +394,35 @@ class MediaTable(QWidget):
     def edit_row(self, row):
         rid = int(self.data_filtered.at[row, "id"])
         self.parent.edit_row(rid)
+
+
+# COMBOBOX FOR VIEWPOINT, SPECIES, SEX
+class ComboBoxDelegate(QStyledItemDelegate):
+    """Custom delegate to use QComboBox for editing"""
+    itemSelected = pyqtSignal(int, int, int)
+
+    def __init__(self, items, parent=None):
+        super().__init__(parent)
+        self.items = items  # ComboBox items
+
+    def createEditor(self, parent, option, index):
+        """Create and return the ComboBox editor"""
+        combo = QComboBox(parent)
+        combo.addItems(self.items)
+        return combo
+
+    def setEditorData(self, editor, index):
+        """Set the current value in the editor"""
+        current_text = index.data()
+        combo_index = editor.findText(current_text)  # Find matching index
+        if combo_index >= 0:
+            editor.setCurrentIndex(combo_index)
+
+    def setModelData(self, editor, model, index):
+        """Save the selected value to the model"""
+        selected_text = editor.currentText()
+        selected_index = editor.currentIndex()  # 🔥 Get the current index
+        self.itemSelected.emit(index.row(), index.column(), selected_index)
+
+        # Save selected text in table model
+        model.setData(index, selected_text)

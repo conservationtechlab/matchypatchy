@@ -11,9 +11,6 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 
 
-# TODO: disable undo after save 
-# Viewpoint, Species, Sex need to be dropdowns when double-clicked
-
 class DisplayMedia(QWidget):
     def __init__(self, parent, data_type=1):
         super().__init__()
@@ -51,10 +48,11 @@ class DisplayMedia(QWidget):
         button_save.setFixedWidth(100)
         first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Undo
-        button_undo = QPushButton("Undo")
-        button_undo.clicked.connect(self.undo)
-        button_undo.setFixedWidth(100)
-        first_layer.addWidget(button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.button_undo = QPushButton("Undo")
+        self.button_undo.clicked.connect(self.undo)
+        self.button_undo.setFixedWidth(100)
+        self.button_undo.setEnabled(False)
+        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Divider
         line = QFrame()
@@ -165,7 +163,11 @@ class DisplayMedia(QWidget):
 
     # Return Home Button
     def home(self):
-        self.parent._set_base_view()
+        if len(self.media_table.edit_stack) > 0:
+            dialog = AlertPopup(self, prompt="There are unsaved changes. Are you sure you want to return home?")
+            if dialog.exec():
+                self.parent._set_base_view()
+                del dialog
 
     # 1. RUN ON ENTRY
     def load_table(self):
@@ -259,26 +261,34 @@ class DisplayMedia(QWidget):
         if data_available:
             self.load_thumbnails()
 
-    def handle_table_change(self, row, column):
+    def handle_table_change(self, edit):
         """Slot to receive updates from QTableWidget"""
+        row = edit[0]
+        column = edit[1]
         item = self.media_table.table.item(row, column)
         if column == 0:
             self.check_selected_rows()
-        print(row, column)
+        self.check_undo_button()
 
     def save(self):
         # Undo last edit
         self.media_table.save_changes()
+        self.check_undo_button()
 
     def undo(self):
         # Undo last edit
         self.media_table.undo()
+        self.check_undo_button()
 
     def check_undo_button(self):
-        pass
+        if len(self.media_table.edit_stack) > 0:
+            self.button_undo.setEnabled(True)
+        else:
+            self.button_undo.setEnabled(False)
 
     def edit_row(self, rid):
-        if self.data_type:
+        # EDIT ROI
+        if self.data_type == 1:
             dialog = ROIPopup(self, rid)
             if dialog.exec():
                 del dialog
@@ -286,6 +296,7 @@ class DisplayMedia(QWidget):
                 data_available = self.load_table()
                 if data_available:
                     self.load_thumbnails()
+        # EDIT MEDIA
         else:
             # TODO
             pass

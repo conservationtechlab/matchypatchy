@@ -84,12 +84,13 @@ class AnimlThread(QThread):
                               species_id, viewpoint=viewpoint, reviewed=0,
                               individual_id=individual_id, emb_id=0)
 
-    def get_species(self, label_col="Code"):
+    def get_species(self, label_col="code", binomen_col='species'):
         if self.classifier_filepath is None:
             # user opted to skip classification
             return
 
         classes = pd.read_csv(self.class_filepath).set_index(label_col)
+        self.add_species_list(classes, binomen_col)
 
         info = "roi.id, media_id, filepath, frame, species_id, bbox_x, bbox_y, bbox_w, bbox_h"
         rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
@@ -106,7 +107,14 @@ class AnimlThread(QThread):
                 try:
                     species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{prediction}"')[0][0]
                 except IndexError:
-                    binomen = classes.loc[prediction, 'species']   # FIXME: Hardcoded column name
+                    binomen = classes.loc[prediction, binomen_col]
                     species_id = self.mpDB.add_species(binomen, prediction)
                 # update species_id
                 self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})
+
+    def add_species_list(self, classes, binomen_col):
+        for common, cl in classes.iterrows():
+            binomen = cl[common, binomen_col]
+            species_id = self.mpDB.add_species(binomen, common)
+            
+

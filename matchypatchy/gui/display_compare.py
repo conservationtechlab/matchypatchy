@@ -382,7 +382,7 @@ class DisplayCompare(QWidget):
             QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
     def calculate_neighbors(self):
-        self.progress.show()
+        #self.progress.show()
         self.QueryContainer = QueryContainer(self)
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
