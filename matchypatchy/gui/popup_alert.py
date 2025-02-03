@@ -55,7 +55,6 @@ class ProgressPopup(QDialog):
     def update_progress(self):
         """Update the progress bar based on the counter value."""
         self.counter += 1
-        print(self.counter)
         self.progress_bar.setValue(self.counter)  # Update progress bar value
 
         if self.counter >= self.max:  # Stop the timer when progress reaches 100

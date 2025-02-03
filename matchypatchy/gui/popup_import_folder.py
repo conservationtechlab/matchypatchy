@@ -2,6 +2,7 @@
 Popup for Importing a Manifest
 """
 import os
+import logging
 from pathlib import Path
 import pandas as pd
 
@@ -96,6 +97,7 @@ class ImportFolderPopup(QDialog):
         station_level = 0 if self.station.currentIndex() == 0 else self.station.currentIndex() - 1
 
         print(f"Adding {len(self.data)} files to Database")
+        logging.info(f"Adding {len(self.data)} files to Database")
 
         self.import_thread = FolderImportThread(self.mpDB, self.active_survey, self.data, station_level)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)

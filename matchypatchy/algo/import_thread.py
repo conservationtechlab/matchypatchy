@@ -3,6 +3,7 @@ QThreads for Importing Data
 
 """
 import os
+import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
@@ -20,7 +21,7 @@ class CSVImportThread(QThread):
         for filepath, group in self.unique_images:
             # check to see if file exists
             if not os.path.exists(filepath):
-                print(f"Warning, file {filepath} does not exist")
+                logging.warning(f"File {filepath} does not exist")
                 continue
 
             # get file extension
@@ -150,7 +151,7 @@ class FolderImportThread(QThread):
 
             # check to see if file exists
             if not os.path.exists(filepath):
-                print(f"Warning, file {filepath} does not exist")
+                logging.warning(f"File {filepath} does not exist")
                 continue
 
             # get file extension
