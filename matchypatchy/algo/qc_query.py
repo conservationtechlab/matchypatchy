@@ -3,6 +3,7 @@ Class Definition for Query Object
 """
 
 import matchypatchy.database.media as db_roi
+from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.algo.models import load
 
 
@@ -217,12 +218,16 @@ class QC_QueryContainer():
     def current_distance(self):
         return 0
 
-    def roi_metadata(self, roi, spacing=1.5):
+    def roi_metadata(self, roi):
         """
         Display relevant metadata in comparison label box
-
-        # TODO: change to have access to station and species names
         """
+        location = fetch_station_names_from_id(self.mpDB, roi['station_id'])
+        if roi['species_id'] is not None:
+            binomen, common = self.mpDB.select("station", "binomen, common", row_cond=f"id={roi['species_id']}")[0]
+        else:
+            common = 'Not Specified'
+
         roi = roi.rename(index={"name": "Name",
                                 "species_id": "Species",
                                 "sex": "Sex",
@@ -235,6 +240,11 @@ class QC_QueryContainer():
 
         info_dict = roi[['Name', 'Species', 'Sex', 'File Path', 'Timestamp', 'Station',
                         'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+                
+        info_dict['Station'] = location['station_name']
+        info_dict['Survey'] = location['survey_name']
+        info_dict['Region'] = location['region_name']
+        info_dict['Species'] = common
 
         # convert viewpoint to human-readable (0=Left, 1=Right)
         VIEWPOINT = load('VIEWPOINTS')
@@ -243,13 +253,7 @@ class QC_QueryContainer():
         else:  # BUG: Typecasting issue, why is viewpoint returning a float?
             info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
 
-        info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
-
-        html_text = f"""<div style="line-height: {spacing};">
-                            {info_label}
-                        </div>
-                    """
-        return html_text
+        return info_dict
 
     # MATCH FUNCTIONS ----------------------------------------------------------
     def new_iid(self, individual_id):

@@ -5,6 +5,7 @@ Class Definition for Query Object
 import pandas as pd
 
 import matchypatchy.database.media as db_roi
+from matchypatchy.database.location import fetch_station_names_from_id
 
 from matchypatchy.algo.models import load
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
@@ -60,13 +61,15 @@ class QueryContainer():
             return False
 
     # RUN ON ENTRY IF LOAD_DATA
-    def calculate_neighbors(self):
+    def calculate_neighbors(self, reset=True):
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.rois, self.sequences,
-                                                 k=self.parent.k, threshold=self.parent.threshold)
+                                                 k=self.parent.k, 
+                                                 metric=self.parent.distance_metric,
+                                                 threshold=self.parent.threshold)
         self.match_thread.progress_update.connect(self.parent.progress.set_counter)
         self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
         self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
-        self.match_thread.finished.connect(self.filter)  # do not continue until finished
+        self.match_thread.finished.connect(lambda: self.filter(reset=reset))  # do not continue until finished
         self.match_thread.start()
 
     def capture_neighbor_dict(self, neighbor_dict):
@@ -316,12 +319,16 @@ class QueryContainer():
         else:
             return self.data.loc[rid, column]
 
-    def roi_metadata(self, roi, spacing=1.5):
+    def roi_metadata(self, roi):
         """
         Display relevant metadata in comparison label box
-
-        # TODO: change to have access to station and species names
         """
+        location = fetch_station_names_from_id(self.mpDB, roi['station_id'])
+        if roi['species_id'] is not None:
+            binomen, common = self.mpDB.select("station", "binomen, common", row_cond=f"id={roi['species_id']}")[0]
+        else:
+            common = 'Not Specified'
+
         roi = roi.rename(index={"name": "Name",
                                 "species_id": "Species",
                                 "sex": "Sex",
@@ -334,6 +341,11 @@ class QueryContainer():
 
         info_dict = roi[['Name', 'Species', 'Sex', 'File Path', 'Timestamp', 'Station',
                         'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+                
+        info_dict['Station'] = location['station_name']
+        info_dict['Survey'] = location['survey_name']
+        info_dict['Region'] = location['region_name']
+        info_dict['Species'] = common
 
         # convert viewpoint to human-readable (0=Left, 1=Right)
         VIEWPOINT = load('VIEWPOINTS')
@@ -342,13 +354,7 @@ class QueryContainer():
         else:  # BUG: Typecasting issue, why is viewpoint returning a float?
             info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
 
-        info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
-
-        html_text = f"""<div style="line-height: {spacing};">
-                            {info_label}
-                        </div>
-                    """
-        return html_text
+        return info_dict
 
     # MATCH FUNCTIONS ----------------------------------------------------------
     def new_iid(self, individual_id):

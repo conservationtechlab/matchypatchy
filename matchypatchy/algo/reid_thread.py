@@ -47,7 +47,7 @@ class ReIDThread(QThread):
         for roi_id, v in viewpoints.iterrows():
             # TODO: Utilize probability for captures/sequences
             # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
-            self.mpDB.edit_row("roi", roi_id, {"viewpoint": v['value']})
+            self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(v['value'])})
 
         # Match Button
     def get_embeddings(self):

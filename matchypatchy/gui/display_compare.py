@@ -30,9 +30,10 @@ class DisplayCompare(QWidget):
         self.mpDB = parent.mpDB
         self.k = 3  # default knn
         self.distance_metric = 'Cosine'
-        self.threshold = 50
+        self.threshold = 70
         self.current_viewpoint = 'Any'
         self.progress = ProgressPopup(self, "Matching embeddings...")
+        self.progress.set_max(0)
 
         # CREATE QUERY CONTAINER ==============================================
         self.QueryContainer = QueryContainer(self)
@@ -68,7 +69,7 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         button_recalc = QPushButton("Recalculate Matches")
-        button_recalc.clicked.connect(self.recalculate)
+        button_recalc.clicked.connect(self.calculate_neighbors)
         first_layer.addWidget(button_recalc)
 
         button_recalc = QPushButton("Query by Individual")
@@ -365,6 +366,8 @@ class DisplayCompare(QWidget):
 
     def change_metric(self):
         self.distance_metric = self.option_distance_metric.currentText()
+        if self.distance_metric == 'L2':
+            self.threshold_slider.setValue(70)
 
     def change_threshold(self):
         # set new threshold value
@@ -379,16 +382,11 @@ class DisplayCompare(QWidget):
             QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
     def calculate_neighbors(self):
-        self.progress.set_max(self.QueryContainer.n_queries)
         self.progress.show()
-
-        self.QueryContainer.calculate_neighbors()
-
-    def recalculate(self):
         self.QueryContainer = QueryContainer(self)
-        self.QueryContainer.load_data()
-        self.calculate_neighbors()
-        self.change_query(0)
+        emb_exist = self.QueryContainer.load_data()
+        if emb_exist:
+            self.QueryContainer.calculate_neighbors(reset=True)
 
     def recalculate_by_individual(self):
         self.QueryContainer = QC_QueryContainer(self)
@@ -496,7 +494,9 @@ class DisplayCompare(QWidget):
         """
         self.query_image.load(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "filepath"),
                               bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid, 'bbox'), crop=True)
-        self.query_info.setText(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata"))
+        
+        metadata = self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata")
+        self.query_info.setText(self.format_metadata(metadata))
         self.toggle_match_button()
         self.toggle_query_favorite_button()
 
@@ -509,7 +509,9 @@ class DisplayCompare(QWidget):
 
         self.match_image.load(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "filepath"),
                               bbox=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "bbox"), crop=True)
-        self.match_info.setText(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "metadata"))
+
+        metadata = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "metadata")
+        self.match_info.setText(self.format_metadata(metadata))
         self.toggle_match_button()
         self.toggle_match_favorite_button()
 
@@ -530,6 +532,16 @@ class DisplayCompare(QWidget):
         self.match_number.setText('1')
         self.load_query()
         self.load_match()
+
+    def format_metadata(self, info_dict, spacing=1):
+         # TODO: REORGANIZE
+        info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
+
+        html_text = f"""<div style="line-height: {spacing};">
+                            {info_label}
+                        </div>
+                    """
+        return html_text
 
     # ==========================================================================
     # FILTERS
@@ -708,41 +720,39 @@ class DisplayCompare(QWidget):
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()
+        # Left Arrow
+        if key == 16777234:
+            self.change_match(self.QueryContainer.current_match - 1)
+        # Right Arrow
+        elif key == 16777236:
+            self.change_match(self.QueryContainer.current_match + 1)
+        # Up Arrow
+        elif key == 16777235:
+            self.change_query(self.QueryContainer.current_query - 1)
+        # Down Arrow
+        elif key == 16777237:
+            self.change_query(self.QueryContainer.current_query + 1)
 
-        match key:
-            # Left Arrow
-            case 16777234:
-                self.change_match(self.QueryContainer.current_match - 1)
-            # Right Arrow
-            case 16777236:
-                self.change_match(self.QueryContainer.current_match + 1)
-            # Up Arrow
-            case 16777235:
-                self.change_query(self.QueryContainer.current_query - 1)
-            # Down Arrow
-            case 16777237:
-                self.change_query(self.QueryContainer.current_query + 1)
+        # Space - Match
+        elif key == 32:
+            self.button_match.click()
+        # M - Match
+        elif key == 77:
+            self.button_match.click()
 
-            # Space - Match
-            case 32:
-                self.button_match.click()
-            # M - Match
-            case 77:
-                self.button_match.click()
+        # V - Viewpoint
+        elif key == 86:
+            n = self.dropdown_viewpoint.currentIndex()
+            # wrap around
+            if n < 0:
+                n = self.dropdown_viewpoint.count() - 1
+            if n > self.dropdown_viewpoint.count() - 1:
+                n = 0
+            self.dropdown_viewpoint.setCurrentIndex(n + 1)
 
-            # V - Viewpoint
-            case 86:
-                n = self.dropdown_viewpoint.currentIndex()
-                # wrap around
-                if n < 0:
-                    n = self.dropdown_viewpoint.count() - 1
-                if n > self.dropdown_viewpoint.count() - 1:
-                    n = 0
-                self.dropdown_viewpoint.setCurrentIndex(n + 1)
+        # Escape - Home
+        elif key ==16777216:
+            self.home()
 
-            # Escape - Home
-            case 16777216:
-                self.home()
-
-            case _:
-                print(f"Key pressed: {key_text} (Qt key code: {key})")
+        else:
+            print(f"Key pressed: {key_text} (Qt key code: {key})")

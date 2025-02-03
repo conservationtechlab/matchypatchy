@@ -533,13 +533,14 @@ class MatchyPatchyDB():
                                 LIMIT ?;
                             """
             elif metric == 'L2':
-                command = """SELECT
-                                rowid,
-                                vec_distance_L2(embedding, ?) as dist_L2
-                                FROM roi_emb
-                                ORDER by dist_L2
-                                LIMIT ?;
-                            """
+                command = f"""SELECT
+                            rowid,
+                            distance
+                        FROM roi_emb
+                        WHERE embedding MATCH ?
+                        ORDER BY distance
+                        LIMIT ?
+                        """
             else:
                 return
             data_tuple = (query, k+1)
