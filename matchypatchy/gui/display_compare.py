@@ -446,7 +446,7 @@ class DisplayCompare(QWidget):
         self.load_match()
 
     def unmatch(self):
-        name = self.QueryContainer.get_match_info('name')
+        name = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, 'name')
         dialog = AlertPopup(self, prompt=f"This will remove Match from individual '{name}'")
         if dialog.exec():
             self.QueryContainer.unmatch()

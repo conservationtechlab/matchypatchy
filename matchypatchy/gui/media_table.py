@@ -14,9 +14,11 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from matchypatchy.algo import models
 from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
 from matchypatchy.database.media import fetch_media, fetch_roi_media
-from matchypatchy.database.species import fetch_species
+from matchypatchy.database.species import fetch_species, fetch_individual
 from matchypatchy.gui.popup_alert import ProgressPopup
 
+
+#TODO: Fix individual ID display
 
 class MediaTable(QWidget):
     update_signal = pyqtSignal(list)
@@ -27,6 +29,7 @@ class MediaTable(QWidget):
         self.parent = parent
         self.data = pd.DataFrame()
         self.species_list = pd.DataFrame()
+        self.individual_list = pd.DataFrame()
         self.thumbnails = dict()
         self.data_type = 1
         self.VIEWPOINTS = models.load('VIEWPOINTS')
@@ -82,6 +85,7 @@ class MediaTable(QWidget):
         Select all media, store in dataframe
         """
         self.species_list = fetch_species(self.mpDB)
+        self.individual_list = fetch_individual(self.mpDB)
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
@@ -91,7 +95,7 @@ class MediaTable(QWidget):
                             4:"station", 5:"sequence_id", 
                             6:"external_id", 7:"viewpoint", 
                             8:"binomen", 9:"common", 
-                            10:"individual_id", 11:"sex", 
+                            10:"individual", 11:"sex", 
                             12:"reviewed", 13:"favorite", 14:"comment"}
             self.table.setColumnCount(15)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
@@ -268,6 +272,13 @@ class MediaTable(QWidget):
                     else:
                         self.table.setItem(i, column, QTableWidgetItem(None))
 
+            elif data == "individual" or data == "sex":
+                if roi['individual_id'] is not None:
+                    individual = self.species_list[self.individual_list['id'] == roi['individual_id']]
+                    self.table.setItem(i, column, QTableWidgetItem(individual[data][0]))
+                else:
+                    self.table.setItem(i, column, QTableWidgetItem(None))
+
             # Reviewed and Favorite Checkbox
             elif data == 'reviewed' or data == 'favorite':
                 qtw = QTableWidgetItem()
@@ -339,7 +350,7 @@ class MediaTable(QWidget):
         # station
         elif reference == 'station':
             reference = 'station_id'
-            previous_value = int(self.data_filtered.at[row, 'station_id'])
+            previous_value = int(self.data_filtered.at[row, reference])
             new_value = [k for k, v in self.valid_stations.items() if v == self.table.item(row, column).text()][0]
         # viewpoint
         elif reference == 'viewpoint':
@@ -353,7 +364,7 @@ class MediaTable(QWidget):
         # species
         elif reference == 'common':
             reference = 'species_id'
-            previous_value = self.data_filtered.at[row, 'species_id']
+            previous_value = self.data_filtered.at[row, reference]
             new = self.table.item(row, column).text()
             if new is None:
                 new_value = None
@@ -362,13 +373,13 @@ class MediaTable(QWidget):
 
         elif reference ==  'binomen':
             reference = 'species_id'
-            previous_value = self.data_filtered.at[row, 'species_id']
+            previous_value = self.data_filtered.at[row, reference]
             new = self.table.item(row, column).text()
             if new is None:
                 new_value = None
             else:
                 new_value = self.species_list.loc[self.species_list['binomen'] == new, 'id'][0]
-
+    
         # everything else
         else:
             previous_value = self.data_filtered.at[row, reference]
@@ -382,7 +393,6 @@ class MediaTable(QWidget):
                 'previous_value': previous_value,
                 'new_value': new_value}
         self.edit_stack.append(edit)
-        print(edit)
         self.update_signal.emit([row, column])
         self.apply_edits()
         self.refresh_table()
@@ -397,17 +407,16 @@ class MediaTable(QWidget):
             self.data_filtered.loc[last['row'], last['reference']] = last['previous_value']
             self.refresh_table()
 
-    # TODO
     def save_changes(self):
         # commit all changes in self.edit_stack to database
         for edit in self.edit_stack:
+            print(edit)
             id = edit['id']
             replace_dict = {edit['reference']: edit['new_value']}
             if self.data_type == 1:
-                #self.mpDB.edit_row("roi", edit[0], replace_dict, allow_none=False, quiet=True)
-                pass
-            else:
-                #self.mpDB.edit_row("media", edit[0], replace_dict, allow_none=False, quiet=True)
+                self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
+            else:    
+                self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
                 pass
 
     def select_row(self, row, overwrite=None):
