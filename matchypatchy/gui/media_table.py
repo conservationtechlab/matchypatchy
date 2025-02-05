@@ -26,10 +26,10 @@ class MediaTable(QWidget):
         self.mpDB = parent.mpDB
         self.parent = parent
         self.data = pd.DataFrame()
+        self.species_list = pd.DataFrame()
         self.thumbnails = dict()
         self.data_type = 1
         self.VIEWPOINTS = models.load('VIEWPOINTS')
-        self.species_list = self.mpDB.select('species')
 
         self.edit_stack = []
 
@@ -40,17 +40,17 @@ class MediaTable(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(15)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp", 
+                                              "Station", "Sequence ID", "External ID",
                                               "Viewpoint", "Species", "Common", "Individual", "Sex", 
-                                              "Station", "Sequence ID", "External ID", "Reviewed", "Favorite", "Comment"])
-        self.table.resizeColumnsToContents()
-        self.table.setColumnWidth(1, 100)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self.table.setSortingEnabled(True)
+                                              "Reviewed", "Favorite", "Comment"])
+        #self.table.setSortingEnabled(True)  # NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.table.verticalHeader().sectionClicked.connect(self.select_row)
         self.table.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.table.cellChanged.connect(self.update_entry)  # allow user editing
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
+        
         # Add table to the layout
         layout.addWidget(self.table)
         self.setLayout(layout)
@@ -65,6 +65,7 @@ class MediaTable(QWidget):
         Fetch table, load images and save as thumbnails to TEMP_DIR
         """
         # clear old view
+
         self.data_type = data_type
         self.table.clearContents() 
         # fetch data
@@ -80,6 +81,7 @@ class MediaTable(QWidget):
         """
         Select all media, store in dataframe
         """
+        self.species_list = fetch_species(self.mpDB)
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
@@ -96,8 +98,27 @@ class MediaTable(QWidget):
                                                 "Station", "Sequence ID", "External ID", 
                                                 "Viewpoint", "Species", "Common", "Individual", "Sex",  
                                                 "Reviewed", "Favorite", "Comment"])
+            # adjust widths
             self.table.resizeColumnsToContents()
+            for col in range(self.table.columnCount()):
+                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 50))
             self.table.setColumnWidth(1, 100)
+
+            # VIEWPOINT COMBOS
+            combo_items = list(self.VIEWPOINTS.values())[1:]
+            self.table.setItemDelegateForColumn(7, ComboBoxDelegate(combo_items, self))
+
+            # SPECIES COMBOBOX
+            if not self.species_list.empty:
+                combo_items = [None] + self.species_list['binomen'].str.capitalize().to_list()
+                self.table.setItemDelegateForColumn(8, ComboBoxDelegate(combo_items, self))
+                combo_items = [None] + self.species_list['common'].str.capitalize().to_list()
+                self.table.setItemDelegateForColumn(9, ComboBoxDelegate(combo_items, self))
+
+            # SEX COMBOBOX
+            combo_items = ['Unknown', 'Male', 'Female']
+            self.table.setItemDelegateForColumn(11, ComboBoxDelegate(combo_items, self))
+
         # MEDIA
         elif self.data_type == 0:
             self.data = fetch_media(self.mpDB)
@@ -109,8 +130,13 @@ class MediaTable(QWidget):
             self.table.setColumnCount(9)  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels( ["Select","Thumbnail", "File Path", "Timestamp", "Station",
                                                    "Sequence ID", "External ID", "Favorite", "Comment"])
+            
+            # adjust widths
             self.table.resizeColumnsToContents()
+            for col in range(self.table.columnCount()):
+                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 50))
             self.table.setColumnWidth(1, 100)
+            
         else:
             # return empty
             self.data = pd.DataFrame()
@@ -141,18 +167,16 @@ class MediaTable(QWidget):
         """
         # create new copy of full dataset
         self.data_filtered = self.data.copy()
+        # include user edits to current data_filtered:
+        self.apply_edits()
         # map 
         filters = self.parent.filters
         self.valid_stations = self.parent.valid_stations
 
-        # Region Filter (depends on prefilterd stations from MediaDisplay)
-        if 'region_filter' in filters.keys() and self.valid_stations:
+        # Location Filter (depends on prefilterd stations from MediaDisplay)
+        if self.valid_stations:
             self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(self.valid_stations.keys()))]
-        # Survey Filter (depends on prefilterd stations from MediaDisplay)
-        if 'survey_filter' in filters.keys() and self.valid_stations:
-            self.data_filtered = self.data_filtered[self.data_filtered['station_id'].isin(list(self.valid_stations.keys()))]
-        # Single station Filter
-        if 'active_station' in filters.keys() and self.valid_stations:
+            # Single station Filter
             if filters['active_station'][0] > 0:
                 self.data_filtered = self.data_filtered[self.data_filtered['station_id'] == filters['active_station'][0]]
             self.data_filtered['station'] = self.data_filtered['station_id'].map(self.valid_stations)
@@ -161,28 +185,24 @@ class MediaTable(QWidget):
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
         # Species Filter
-        if 'active_species' in filters.keys():
-            if filters['active_species'][0] > 0:
-                self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == filters['active_species'][0]]
-            elif filters['active_species'][0] is None: 
-                self.data_filtered = self.data_filtered[self.data_filtered['species_id'].isna()]
+        if filters['active_species'][0] > 0:
+            self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == filters['active_species'][0]]
+        elif filters['active_species'][0] is None: 
+            self.data_filtered = self.data_filtered[self.data_filtered['species_id'].isna()]
 
         # Individual Filter
-        if 'active_individual' in filters.keys():
-            if filters['active_individual'][0] > 0:
-                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == filters['active_individual'][0]]
-            elif filters['active_individual'][0] is None: 
-                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
+        if filters['active_individual'][0] > 0:
+            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == filters['active_individual'][0]]
+        elif filters['active_individual'][0] is None: 
+            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
         # Unidentified Filter
-        if 'unidentified_only' in filters.keys():
-            if filters['unidentified_only']:
-                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
+        if filters['unidentified_only']:
+            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
         # Favorites Filter
-        if 'favorites_only' in filters.keys():
-            if filters['favorites_only']:
-                self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
+        if filters['favorites_only']:
+            self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
         # refresh table contents
         self.refresh_table()
@@ -195,8 +215,6 @@ class MediaTable(QWidget):
         self.table.clearContents()
         # disconnect edit function while refreshing to prevent needless calls
         self.table.blockSignals(True) 
-        # include user edits to current data_filtered:
-        self.apply_edits()
         # display data
         self.table.setRowCount(self.data_filtered.shape[0])
         for i in range(self.data_filtered.shape[0]):
@@ -229,42 +247,40 @@ class MediaTable(QWidget):
             elif data == 'filepath' or data == 'timestamp':
                 noedit = QTableWidgetItem(roi[data])
                 noedit.setFlags(noedit.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.table.setItem(i, column, noedit)  # File Path column
-            # Convert Viewpoint
+                self.table.setItem(i, column, noedit)
+            # Station
+            elif data == 'station':
+                self.table.setItem(i, column, QTableWidgetItem(self.valid_stations[roi["station_id"]]))
+            # Viewpoint
             elif data == 'viewpoint':
-                self.table.setItem(i, column, QTableWidgetItem(self.VIEWPOINTS[str(roi["viewpoint"])]))  # Viewpoint column
+                self.table.setItem(i, column, QTableWidgetItem(self.VIEWPOINTS[str(roi["viewpoint"])]))
+            # Species ID
             elif data == 'binomen' or data == 'common':
-                # TODO pull species from table dynamically
-                pass
+                if self.species_list.empty:
+                    # can't edit if no species in table
+                    noedit = QTableWidgetItem()
+                    noedit.setFlags(noedit.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    self.table.setItem(i, column, noedit)
+                else:
+                    if roi['species_id'] is not None:
+                        species = self.species_list[self.species_list['id'] == roi['species_id']]
+                        self.table.setItem(i, column, QTableWidgetItem(species[data][0]))
+                    else:
+                        self.table.setItem(i, column, QTableWidgetItem(None))
+
             # Reviewed and Favorite Checkbox
             elif data == 'reviewed' or data == 'favorite':
                 qtw = QTableWidgetItem()
-                qtw.setFlags(qtw.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                qtw.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
                 qtw.setCheckState(self.set_checkstate(roi[data]))
                 self.table.setItem(i, column, qtw) 
             else:
-                self.table.setItem(i, column, QTableWidgetItem(roi[data]))  # Date Time column
+                self.table.setItem(i, column, QTableWidgetItem(str(roi[data]))) 
 
-        # STATION COMBOBOX
+        # combo delegates
         delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
-        delegate.itemSelected.connect(lambda row, col, idx: print(f"Row {row}, Col {col} → Index {idx}"))
         self.table.setItemDelegateForColumn(4, delegate)
-        
 
-        if self.data_type == 1:
-            # VIEWPOINT COMBOBOX
-            combo_items = list(self.VIEWPOINTS.values())[1:]
-            self.table.setItemDelegateForColumn(7, ComboBoxDelegate(combo_items, self))
-
-            # SPECIES COMBOBOX
-            combo_items = [None] + [x[1].capitalize() for x in self.species_list]
-            self.table.setItemDelegateForColumn(8, ComboBoxDelegate(combo_items, self))
-            combo_items = [None] + [x[2].capitalize() for x in self.species_list]
-            self.table.setItemDelegateForColumn(9, ComboBoxDelegate(combo_items, self))
-
-            # SEX COMBOBOX
-            combo_items = ['Unknown', 'Male', 'Female']
-            self.table.setItemDelegateForColumn(11, ComboBoxDelegate(combo_items, self))
 
     def set_checkstate(self, item):
         """
@@ -320,6 +336,11 @@ class MediaTable(QWidget):
         elif reference == 'reviewed' or reference == 'favorite':
             previous_value = int(self.data_filtered.at[row, reference])
             new_value = self.get_checkstate_int(self.table.item(row, column).checkState())
+        # station
+        elif reference == 'station':
+            reference = 'station_id'
+            previous_value = int(self.data_filtered.at[row, 'station_id'])
+            new_value = [k for k, v in self.valid_stations.items() if v == self.table.item(row, column).text()][0]
         # viewpoint
         elif reference == 'viewpoint':
             previous_value = self.data_filtered.at[row, reference]
@@ -330,10 +351,24 @@ class MediaTable(QWidget):
             else:
                 new_value = int(key)
         # species
-        elif reference == 'common' or reference ==  'binomen':
+        elif reference == 'common':
+            reference = 'species_id'
             previous_value = self.data_filtered.at[row, 'species_id']
-            # update other value
-            print(self.table.item(row, column).text())
+            new = self.table.item(row, column).text()
+            if new is None:
+                new_value = None
+            else:
+                new_value = self.species_list.loc[self.species_list['common'] == new, 'id'][0]
+
+        elif reference ==  'binomen':
+            reference = 'species_id'
+            previous_value = self.data_filtered.at[row, 'species_id']
+            new = self.table.item(row, column).text()
+            if new is None:
+                new_value = None
+            else:
+                new_value = self.species_list.loc[self.species_list['binomen'] == new, 'id'][0]
+
         # everything else
         else:
             previous_value = self.data_filtered.at[row, reference]
@@ -349,6 +384,7 @@ class MediaTable(QWidget):
         self.edit_stack.append(edit)
         print(edit)
         self.update_signal.emit([row, column])
+        self.apply_edits()
         self.refresh_table()
 
 

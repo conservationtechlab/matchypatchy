@@ -35,13 +35,7 @@ class DisplayMedia(QWidget):
         line.setLineWidth(0)
         first_layer.addWidget(line)
 
-        #Show Type
-        first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.show_type = QComboBox()
-        self.show_type.addItems(["Full Images", "ROIs Only"])
-        self.show_type.setCurrentIndex(self.data_type)
-        self.show_type.currentIndexChanged.connect(self.change_type)
-        first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         # Save
         button_save = QPushButton("Save")
         button_save.clicked.connect(self.save)
@@ -53,6 +47,13 @@ class DisplayMedia(QWidget):
         self.button_undo.setFixedWidth(100)
         self.button_undo.setEnabled(False)
         first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        #Show Type
+        first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.show_type = QComboBox()
+        self.show_type.addItems(["Full Images", "ROIs Only"])
+        self.show_type.setCurrentIndex(self.data_type)
+        self.show_type.currentIndexChanged.connect(self.change_type)
+        first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Divider
         line = QFrame()
@@ -168,6 +169,8 @@ class DisplayMedia(QWidget):
             if dialog.exec():
                 self.parent._set_base_view()
                 del dialog
+        else:
+            self.parent._set_base_view()
 
     # 1. RUN ON ENTRY
     def load_table(self):
@@ -361,7 +364,7 @@ class DisplayMedia(QWidget):
 
     def select_favorites(self):
         self.favorites_only = not self.favorites_only
-        self.filters['favorites_only'] = self.unidentified_only
+        self.filters['favorites_only'] = self.favorites_only
         self.filter_table()
 
     def select_region(self):
