@@ -91,8 +91,10 @@ def setup_database(filepath='matchypatchy.db'):
                         id INTEGER PRIMARY KEY);''')
 
     # VIEWPOINT
+    cursor.execute('''DROP TABLE IF EXISTS viewpoint;''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS viewpoint (
                         id INTEGER PRIMARY KEY,
+                        value TEXT
                         name TEXT);''')
 
     # THUMBNAILS
