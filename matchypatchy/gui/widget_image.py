@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QLabel
 from PyQt6.QtGui import QPixmap, QPainter, QImage, QPen
 from PyQt6.QtCore import Qt, QRect, QPointF, QRectF
 
+# TODO: FIX IMAGE ADJUSTMENTS
 
 class ImageWidget(QLabel):
     def __init__(self, image_path=None, width=600, height=400):
@@ -123,7 +124,7 @@ class ImageWidget(QLabel):
         self.zoom_factor = 1.0
         self.image_offset = QPointF(0, 0)
         # reload image
-        self.load(image_path=self.image_path, bbox=self.bbox)
+        self.load(image_path=self.image_path, bbox=self.rel_bbox, crop=self.crop_to_bbox)
 
     # EVENTS ===================================================================
     def paintEvent(self, event):
