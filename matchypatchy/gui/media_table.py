@@ -95,7 +95,7 @@ class MediaTable(QWidget):
                             4:"station", 5:"sequence_id", 
                             6:"external_id", 7:"viewpoint", 
                             8:"binomen", 9:"common", 
-                            10:"individual", 11:"sex", 
+                            10:"name", 11:"sex", 
                             12:"reviewed", 13:"favorite", 14:"comment"}
             self.table.setColumnCount(15)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
@@ -272,9 +272,9 @@ class MediaTable(QWidget):
                     else:
                         self.table.setItem(i, column, QTableWidgetItem(None))
 
-            elif data == "individual" or data == "sex":
+            elif data == "name" or data == "sex":
                 if roi['individual_id'] is not None:
-                    individual = self.species_list[self.individual_list['id'] == roi['individual_id']]
+                    individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
                     self.table.setItem(i, column, QTableWidgetItem(individual[data][0]))
                 else:
                     self.table.setItem(i, column, QTableWidgetItem(None))
