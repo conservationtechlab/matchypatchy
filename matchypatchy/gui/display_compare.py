@@ -84,17 +84,17 @@ class DisplayCompare(QWidget):
         self.region_select = QComboBox()
         self.region_select.setFixedWidth(200)
         self.region_select.currentIndexChanged.connect(self.select_region)
-        first_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(self.region_select, alignment=Qt.AlignmentFlag.AlignLeft)
         # Survey
         self.survey_select = QComboBox()
         self.survey_select.setFixedWidth(200)
         self.survey_select.currentIndexChanged.connect(self.select_survey)
-        first_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(self.survey_select, alignment=Qt.AlignmentFlag.AlignLeft)
         # station
         self.station_select = QComboBox()
         self.station_select.setFixedWidth(200)
         self.station_select.currentIndexChanged.connect(self.select_station)
-        first_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(self.station_select, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addStretch()
         layout.addLayout(first_layer)
@@ -431,7 +431,8 @@ class DisplayCompare(QWidget):
             if dialog.exec():
                 individual_id = self.mpDB.add_individual(dialog.get_species_id(),
                                                          dialog.get_name(),
-                                                         dialog.get_sex())
+                                                         dialog.get_sex(),
+                                                         dialog.get_age())
                 # update query and match
                 self.QueryContainer.new_iid(individual_id)
             del dialog

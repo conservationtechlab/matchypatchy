@@ -56,7 +56,7 @@ def fetch_roi_media(mpDB, reset_index=True):
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
                 'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
-                'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+                'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age']
     """
     media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
