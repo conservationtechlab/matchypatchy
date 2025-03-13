@@ -31,6 +31,7 @@ class MainWindow(QMainWindow):
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
         screen_resolution = QGuiApplication.primaryScreen().geometry()
+        print(screen_resolution)
         self.setMinimumSize(1200, 900)
         # resize to full screen if small screen
         if screen_resolution.width() < 1600:

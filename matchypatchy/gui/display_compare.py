@@ -2,6 +2,7 @@
 GUI Window for Match Comparisons
 
 """
+import os
 from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
@@ -82,17 +83,17 @@ class DisplayCompare(QWidget):
 
         # Region
         self.region_select = QComboBox()
-        self.region_select.setFixedWidth(200)
+        self.region_select.setFixedWidth(140)
         self.region_select.currentIndexChanged.connect(self.select_region)
         first_layer.addWidget(self.region_select, alignment=Qt.AlignmentFlag.AlignLeft)
         # Survey
         self.survey_select = QComboBox()
-        self.survey_select.setFixedWidth(200)
+        self.survey_select.setFixedWidth(140)
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         first_layer.addWidget(self.survey_select, alignment=Qt.AlignmentFlag.AlignLeft)
         # station
         self.station_select = QComboBox()
-        self.station_select.setFixedWidth(200)
+        self.station_select.setFixedWidth(140)
         self.station_select.currentIndexChanged.connect(self.select_station)
         first_layer.addWidget(self.station_select, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -210,9 +211,9 @@ class DisplayCompare(QWidget):
         # MetaData
         self.query_info = QLabel("Image Metadata")
         self.query_info.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.query_info.setContentsMargins(10, 20, 10, 20)
+        self.query_info.setContentsMargins(5, 10, 5, 10)
         self.query_info.setMaximumHeight(200)
-        self.query_info.setStyleSheet("border: 1px solid black;")
+        self.query_info.setStyleSheet("border: 1px solid black; font-size: 16px;")
         query_layout.addWidget(self.query_info, 1)
         image_layout.addLayout(query_layout)
 
@@ -316,9 +317,9 @@ class DisplayCompare(QWidget):
         # MetaData
         self.match_info = QLabel("Image Metadata")
         self.match_info.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.match_info.setContentsMargins(10, 20, 10, 20)
+        self.match_info.setContentsMargins(5, 10, 5, 10)
         self.match_info.setMaximumHeight(200)
-        self.match_info.setStyleSheet("border: 1px solid black;")
+        self.match_info.setStyleSheet("border: 1px solid black; font-size: 16px;")
 
         match_layout.addWidget(self.match_info, 1)
         image_layout.addLayout(match_layout)
@@ -498,6 +499,7 @@ class DisplayCompare(QWidget):
         
         metadata = self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata")
         self.query_info.setText(self.format_metadata(metadata))
+        self.query_info.adjustSize()
         self.toggle_match_button()
         self.toggle_query_favorite_button()
 
@@ -535,11 +537,36 @@ class DisplayCompare(QWidget):
         self.load_match()
 
     def format_metadata(self, info_dict, spacing=1):
-         # TODO: REORGANIZE
-        info_label = "<br>".join(f"{key}: {value}" for key, value in info_dict.items())
-
-        html_text = f"""<div style="line-height: {spacing};">
-                            {info_label}
+        #TODO: Figure out how to display file name
+        spacer = "&nbsp;" * 20
+        html_text = f"""<div style="line-height: {spacing}; width: 100%; height: 100%;">
+                            <table cellspacing="5">
+                            <tr>
+                                <td>Name:</td><td>{info_dict['Name']}</td>
+                                <td>{spacer}</td>
+                                <td>File Name:</td><td>{os.path.basename(info_dict['File Path'])}</td>
+                            </tr><tr>
+                                <td>Species:</td><td>{info_dict['Species']}</td>
+                                <td>{spacer}</td>
+                                <td>Timestamp:</td><td>{info_dict['Timestamp']}</td>
+                            </tr><tr>
+                                <td>Sex:</td><td>{info_dict['Sex']}</td>
+                                <td>{spacer}</td>
+                                <td>Region:</td><td>{info_dict['Region']}</td>
+                            </tr><tr>
+                                <td>Age:</td><td>{info_dict['Age']}</td>
+                                <td>{spacer}</td>
+                                <td>Survey:</td><td>{info_dict['Survey']}</td>
+                            </tr><tr>                                
+                                <td>Viewpoint:</td><td>{info_dict['Viewpoint']}</td>
+                                <td>{spacer}</td>
+                                <td>Station:</td><td>{info_dict['Station']}</td>
+                            </tr><tr>
+                                <td>Sequence ID:</td><td>{info_dict['Sequence ID']}</td>
+                                <td>{spacer}</td>
+                                <td>Comment:</td><td>{info_dict['Comment']}</td>
+                            </tr>
+                            </table>
                         </div>
                     """
         return html_text
