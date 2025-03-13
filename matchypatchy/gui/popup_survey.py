@@ -111,8 +111,9 @@ class SurveyPopup(QDialog):
         self.surveys = self.update()
 
     def delete(self):
-        selected = self.list.currentItem().text()
-        n = media_count(self.mpDB, self.survey_list_ordered[selected][0])
+        selected_survey = self.list.currentRow()
+        id, selected = self.survey_list_ordered[selected_survey]
+        n = media_count(self.mpDB, id)
         dialog = AlertPopup(self, f'Are you sure you want to delete {selected}? This will remove {n} images.')
         if dialog.exec():
             row = self.survey_list_ordered[self.list.currentRow()][0]
