@@ -51,6 +51,9 @@ class MediaTable(QWidget):
         self.table.verticalHeader().sectionClicked.connect(self.select_row)
         self.table.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.table.cellChanged.connect(self.update_entry)  # allow user editing
+        
+        self.table.cellChanged.connect(self.handle_checkbox_change) #select change 
+
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
         
@@ -237,9 +240,10 @@ class MediaTable(QWidget):
              # Edit Checkbox
             if data == 'select':
                 edit = QTableWidgetItem()
-                edit.setFlags(edit.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                edit.setFlags(edit.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
                 edit.setCheckState(Qt.CheckState.Unchecked)
                 self.table.setItem(i, column, edit) 
+        
             # Thumbnail
             elif data == 'thumbnail':
                 thumbnail = QImage(roi['thumbnail_path'])
@@ -330,6 +334,17 @@ class MediaTable(QWidget):
             if not self.data_filtered.empty and self.data_filtered['id'].isin([edit['id']]).any():
                 self.data_filtered.loc[edit['row'], edit['reference']] = edit['new_value']
 
+    def handle_checkbox_change(self, row, column):
+        """ Detect when a checkbox is checked or unchecked """
+        if column == 0: 
+            item = self.table.item(row, column)
+            if item is not None:
+                checked = item.checkState() == Qt.CheckState.Checked
+                print(f"Checkbox at row {row} is {'checked' if checked else 'unchecked'}")
+                self.select_row(row, overwrite=checked)
+                self.parent.check_selected_rows()
+
+
     # UPDATE CELL ENTRY
     def update_entry(self, row, column): 
         """
@@ -345,8 +360,11 @@ class MediaTable(QWidget):
             return
         # checked items
         elif reference == 'reviewed' or reference == 'favorite':
+            print("DataFrame columns:", self.data_filtered.columns)
             previous_value = int(self.data_filtered.at[row, reference])
+            print(f'previous_value is {previous_value}')
             new_value = self.get_checkstate_int(self.table.item(row, column).checkState())
+            print(new_value)
         # station
         elif reference == 'station':
             reference = 'station_id'
@@ -421,6 +439,7 @@ class MediaTable(QWidget):
 
     def select_row(self, row, overwrite=None):
         select = self.table.item(row, 0)
+        print("select row")
         if overwrite is not None:
             if overwrite is True:
                 select.setCheckState(Qt.CheckState.Checked)
@@ -430,6 +449,7 @@ class MediaTable(QWidget):
             self.invert_checkstate(select)
 
     def selectedRows(self):
+        print("selectedRows called")
         selected_rows = []
         for row in range(self.table.rowCount()):
             if self.table.item(row, 0).checkState() == Qt.CheckState.Checked:

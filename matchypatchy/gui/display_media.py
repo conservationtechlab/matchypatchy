@@ -9,6 +9,8 @@ from PyQt6.QtCore import Qt
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_roi import ROIPopup
+from matchypatchy.gui.popup_media_edit import MediaEditPopup
+
 
 
 class DisplayMedia(QWidget):
@@ -269,6 +271,7 @@ class DisplayMedia(QWidget):
         row = edit[0]
         column = edit[1]
         item = self.media_table.table.item(row, column)
+        print(item, row, column)
         if column == 0:
             self.check_selected_rows()
         self.check_undo_button()
@@ -304,9 +307,14 @@ class DisplayMedia(QWidget):
             # TODO
             pass
 
-    def edit_row_multiple(self):
-        # TODO
-        pass
+    def edit_row_multiple(self, ids):
+        if self.selected_rows:
+            selected_ids = [int(self.media_table.data_filtered.at[row, "id"]) for row in self.selected_rows]
+            dialog = MediaEditPopup(self, selected_ids)
+            dialog.exec()
+
+
+
 
 
     def select_all(self):
