@@ -307,11 +307,21 @@ class DisplayMedia(QWidget):
             # TODO
             pass
 
-    def edit_row_multiple(self, ids):
-        if self.selected_rows:
+   
+    def edit_row_multiple(self):
+        self.selected_rows = self.media_table.selectedRows()
+        if len(self.selected_rows) > 0:
             selected_ids = [int(self.media_table.data_filtered.at[row, "id"]) for row in self.selected_rows]
-            dialog = MediaEditPopup(self, selected_ids)
-            dialog.exec()
+            dialog = MediaEditPopup(parent=self, ids=selected_ids)  # Ensure `parent=self`
+            if dialog.exec():
+                del dialog
+                 # reload data
+                data_available = self.load_table()
+                if data_available:
+                    self.load_thumbnails()
+
+
+
 
 
 

@@ -288,7 +288,10 @@ class ROIPopup(QDialog):
 
     def change_viewpoint(self):
         viewpoint_keys = list(self.VIEWPOINTS.keys())
+        print(viewpoint_keys)
         selected_vewpoint = viewpoint_keys[self.viewpoint.currentIndex() + 1]
+        print(self.viewpoint.currentIndex())
+        print(selected_vewpoint)
         if selected_vewpoint == 'None':
             self.mpDB.edit_row('roi', self.rid, {"viewpoint": None}, quiet=False)
         else:

@@ -223,6 +223,7 @@ class MediaTable(QWidget):
         # disconnect edit function while refreshing to prevent needless calls
         self.table.blockSignals(True) 
         # display data
+        #print(f"data filtered is {self.data_filtered['viewpoint']}")
         self.table.setRowCount(self.data_filtered.shape[0])
         for i in range(self.data_filtered.shape[0]):
             self.add_row(i)
@@ -261,7 +262,18 @@ class MediaTable(QWidget):
                 self.table.setItem(i, column, QTableWidgetItem(self.valid_stations[roi["station_id"]]))
             # Viewpoint
             elif data == 'viewpoint':
-                self.table.setItem(i, column, QTableWidgetItem(self.VIEWPOINTS[str(roi["viewpoint"])]))
+                vp_raw = roi["viewpoint"]
+                print(f"vp_raw is {vp_raw}")
+
+                if pd.isna(vp_raw) or vp_raw is None or str(vp_raw) == "None":
+                    vp_key = "None"
+                else:
+                    vp_key = str(int(vp_raw))  # convert float 1.0 → int 1 → str "1"
+
+                vp_value = self.VIEWPOINTS.get(vp_key, "None")
+                self.table.setItem(i, column, QTableWidgetItem(vp_value))
+
+
             # Species ID
             elif data == 'binomen' or data == 'common':
                 if self.species_list.empty:
