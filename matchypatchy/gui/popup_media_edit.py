@@ -39,23 +39,31 @@ class MediaEditPopup(QDialog):
         self.mpDB = parent.mpDB
 
         # --- DEBUG: print roi and media tables ---
-
         print("=== ROI TABLE ===")
-        roi_data = self.mpDB.select(table="roi", columns="*")
-        roi_df = pd.DataFrame(roi_data)
-        if hasattr(self.mpDB, "cursor") and hasattr(self.mpDB.cursor, "description"):
-            roi_df.columns = [col[0] for col in self.mpDB.cursor.description]
-        print(roi_df.head(10))  # or .to_string() for full output
-        print(roi_df.columns)
+        roi_data, roi_columns = self.mpDB.select_join(
+            table="roi",
+            join_table="media",  # dummy join just to reuse the function
+            join_cond="roi.media_id = media.id",
+            columns="roi.*",
+            row_cond=None,
+            quiet=True
+        )
+        roi_df = pd.DataFrame(roi_data, columns=roi_columns)
+        print(roi_df.head(10))
+        print("ROI Columns:", roi_df.columns.tolist())
 
         print("\n=== MEDIA TABLE ===")
-        media_data = self.mpDB.select(table="media", columns="*")
-        media_df = pd.DataFrame(media_data)
-        if hasattr(self.mpDB, "cursor") and hasattr(self.mpDB.cursor, "description"):
-            media_df.columns = [col[0] for col in self.mpDB.cursor.description]
+        media_data, media_columns = self.mpDB.select_join(
+            table="media",
+            join_table="roi",  # dummy join
+            join_cond="media.id = roi.media_id",
+            columns="media.*",
+            row_cond=None,
+            quiet=True
+        )
+        media_df = pd.DataFrame(media_data, columns=media_columns)
         print(media_df.head(10))
-        print(media_df.columns)
-
+        print("MEDIA Columns:", media_df.columns.tolist())
         # -----------------------------------------
 
         self.ids = ids  # List of ROI IDs
@@ -210,8 +218,12 @@ class MediaEditPopup(QDialog):
         # Show the first image
         self.update_image()
 
-        # Set the current viewpoint for selected ROIs
+        # Set the editable fields for selected ROIs
         self.refresh_viewpoint()
+        self.refresh_name()
+        self.refresh_sex()
+        self.refresh_species()
+        self.refresh_comment()
 
 
 
@@ -221,6 +233,7 @@ class MediaEditPopup(QDialog):
         """
         ids_str = ', '.join(map(str, self.ids))
         print(f"Selected ROI IDs: {ids_str}")
+        '''
 
         data, col_names = self.mpDB.select_join(
             table="roi",
@@ -243,6 +256,18 @@ class MediaEditPopup(QDialog):
         print(df[["bbox_x", "bbox_y", "bbox_w", "bbox_h"]].head(5))
 
         print("=== Merged ROI + MEDIA Table ===")
+        print(df.head(10).to_string())
+        print("Columns:", list(df.columns))
+        '''
+        # Use all_media to get a complete view of each ROI
+        data, col_names = self.mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
+
+        # Create DataFrame
+        df = pd.DataFrame(data, columns=col_names)
+        df = df.replace({float('nan'): None}).reset_index(drop=True)
+
+        # Debug prints
+        print("=== Loaded ROI + MEDIA + SPECIES + INDIVIDUAL Info ===")
         print(df.head(10).to_string())
         print("Columns:", list(df.columns))
 
@@ -332,27 +357,69 @@ class MediaEditPopup(QDialog):
 
     #name
     def refresh_name(self):
+
         names = self.data["name"].dropna().unique()
         most_common = names[0] if len(names) == 1 else "Multiple"
         self.name.setCurrentText(str(most_common))
-
-
+    
 
     def change_name(self):
-        pass
+        selected_name = self.name.currentText()
+        for i, row in self.data.iterrows():
+            roi_id = row["media_id"]
+            # Find individual_id from name
+            individual = next((ind for ind in self.individuals if ind[1] == selected_name), None)
+            if individual:
+                individual_id = individual[0]
+                self.mpDB.edit_row('roi', roi_id, {"individual_id": individual_id}, quiet=False)
+                self.data.at[i, "name"] = selected_name
+            
 
     #sex
+    def refresh_sex(self):
+        sexes = self.data["sex"].dropna().unique()
+        most_common = sexes[0] if len(sexes) == 1 else "Multiple"
+        self.sex.setCurrentText(str(most_common))
 
     def change_sex(self):
-        pass
+        selected_sex = self.sex.currentText()
+        for i, row in self.data.iterrows():
+            iid = row["individual_id"]
+            if iid:
+                self.mpDB.edit_row('individual', iid, {"sex": f"'{selected_sex}'"}, quiet=False)
+                self.data.at[i, "sex"] = selected_sex
 
     #species
+    def refresh_species(self):
+        species = self.data["common"].dropna().unique()
+        most_common = species[0] if len(species) == 1 else "Multiple"
+        self.species.setCurrentText(str(most_common))
+
     def change_species(self):
-        pass
+        selected_species = self.species.currentText()
+        for i, row in self.data.iterrows():
+            roi_id = row["id"]
+            species_entry = next((sp for sp in self.species_list if sp[1] == selected_species), None)
+            if species_entry:
+                self.mpDB.edit_row('roi', roi_id, {"species_id": species_entry[0]}, quiet=False)
+                self.data.at[i, "common"] = selected_species
+
 
     #comment
+    def refresh_comment(self):
+        comments = self.data["comment"].dropna().unique()
+        if len(comments) == 1:
+            self.comment.setText(str(comments[0]))
+        else:
+            self.comment.setText("")
+
     def change_comment(self):
-        pass
+        user_comment = self.comment.toPlainText()
+        for i, row in self.data.iterrows():
+            roi_id = row["id"]
+            self.mpDB.edit_row('roi', roi_id, {"comment": f"'{user_comment}'"}, quiet=False)
+            self.data.at[i, "comment"] = user_comment
+
 
 
 
