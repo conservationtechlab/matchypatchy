@@ -56,7 +56,7 @@ def fetch_roi_media(mpDB, reset_index=True):
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
                 'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
-                'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+                'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age']
     """
     media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
@@ -117,6 +117,8 @@ def media_count(mpDB, survey_id):
     """
     Get number of media files associated with a given survey_id
     """
-    # TODO
-    #mpDB.select_join()
-    return 0
+
+    valid_stations = list(mpDB.select("station", columns="id", row_cond= f'survey_id={survey_id}', quiet=False)[0])
+    survey_list = ",".join([str(s) for s in valid_stations])
+    media = mpDB.select("media", columns="id", row_cond= f'station_id IN ({survey_list})', quiet=False)
+    return len(media)

@@ -84,6 +84,7 @@ def setup_database(filepath='matchypatchy.db'):
                         species_id INTEGER,
                         name TEXT NOT NULL,
                         sex TEXT,
+                        age TEXT,
                         FOREIGN KEY(species_id) REFERENCES species (id));''')
 
     # SEQUENCE

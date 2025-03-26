@@ -2,7 +2,7 @@
 Widget for displaying list of Media
 ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 'reviewed', 
 'media_id', 'species_id', 'individual_id', 'emb_id', 'filepath', 'ext', 'timestamp', 
-'station_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex']
+'station_id', 'sequence_id', 'external_id', 'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age']
 """
 import pandas as pd
 
@@ -17,8 +17,6 @@ from matchypatchy.database.media import fetch_media, fetch_roi_media
 from matchypatchy.database.species import fetch_species, fetch_individual
 from matchypatchy.gui.popup_alert import ProgressPopup
 
-
-#TODO: Fix individual ID display
 
 class MediaTable(QWidget):
     update_signal = pyqtSignal(list)
@@ -44,7 +42,7 @@ class MediaTable(QWidget):
         self.table.setColumnCount(15)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp", 
                                               "Station", "Sequence ID", "External ID",
-                                              "Viewpoint", "Species", "Common", "Individual", "Sex", 
+                                              "Viewpoint", "Species", "Common", "Individual", "Sex", "Age"
                                               "Reviewed", "Favorite", "Comment"])
         #self.table.setSortingEnabled(True)  # NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
@@ -56,7 +54,6 @@ class MediaTable(QWidget):
 
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
-        
         # Add table to the layout
         layout.addWidget(self.table)
         self.setLayout(layout)
@@ -98,12 +95,12 @@ class MediaTable(QWidget):
                             4:"station", 5:"sequence_id", 
                             6:"external_id", 7:"viewpoint", 
                             8:"binomen", 9:"common", 
-                            10:"name", 11:"sex", 
-                            12:"reviewed", 13:"favorite", 14:"comment"}
+                            10:"name", 11:"sex", 12:"age",
+                            13:"reviewed", 14:"favorite", 15:"comment"}
             self.table.setColumnCount(15)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
                                                 "Station", "Sequence ID", "External ID", 
-                                                "Viewpoint", "Species", "Common", "Individual", "Sex",  
+                                                "Viewpoint", "Species", "Common", "Individual", "Sex", "Age",
                                                 "Reviewed", "Favorite", "Comment"])
             # adjust widths
             self.table.resizeColumnsToContents()
@@ -125,6 +122,10 @@ class MediaTable(QWidget):
             # SEX COMBOBOX
             combo_items = ['Unknown', 'Male', 'Female']
             self.table.setItemDelegateForColumn(11, ComboBoxDelegate(combo_items, self))
+
+            # AGE COMBOBOX
+            combo_items = ['Unknown', 'Juvenile', 'Subadult', 'Adult']
+            self.table.setItemDelegateForColumn(12, ComboBoxDelegate(combo_items, self))
 
         # MEDIA
         elif self.data_type == 0:
@@ -288,7 +289,7 @@ class MediaTable(QWidget):
                     else:
                         self.table.setItem(i, column, QTableWidgetItem(None))
 
-            elif data == "name" or data == "sex":
+            elif data == "name" or data == "sex" or data == 'age':
                 if roi['individual_id'] is not None:
                     individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
                     self.table.setItem(i, column, QTableWidgetItem(individual[data][0]))

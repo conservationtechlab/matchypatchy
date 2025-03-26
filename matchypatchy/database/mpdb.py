@@ -173,20 +173,22 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def add_individual(self, species_id: int, name: str, sex: Optional[str]=None):
+    def add_individual(self, species_id: int, name: str, 
+                       sex: Optional[str]=None, age: Optional[str]=None):
         """
         Add an individual with
             - species_id (int)
             - name (str)
             - sex (str)
+            - age (str)
         """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO individual
-                        (species_id, name, sex) 
-                        VALUES (?, ?, ?);"""
-            data_tuple = (species_id, name, sex)
+                        (species_id, name, sex, age) 
+                        VALUES (?, ?, ?, ?);"""
+            data_tuple = (species_id, name, sex, age)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -412,7 +414,7 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
                          roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp,
-                         station_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex"""
+                         station_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex, age"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
                                             LEFT JOIN species ON roi.species_id = species.id

@@ -5,6 +5,7 @@ individual (id INTEGER PRIMARY KEY,
             species_id INTEGER,
             name TEXT NOT NULL,
             sex TEXT,
+            age TEXT,
             FOREIGN KEY(species_id) REFERENCES species (id));'''
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem,
@@ -81,12 +82,13 @@ class IndividualPopup(QDialog):
 
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
 
-        id, species_id, name, sex = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
+        id, species_id, name, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
 
-        dialog = IndividualFillPopup(self, species_id=species_id, name=name, sex=sex)
+        dialog = IndividualFillPopup(self, species_id=species_id, name=name, sex=sex, age=age)
         if dialog.exec():
             replace_dict = {"name": f"'{dialog.get_name()}'",
                             "sex": f"'{dialog.get_sex()}'",
+                            "age": f"'{dialog.get_age()}'",
                             "species_id": f"'{dialog.get_species_id()}'", }
             self.mpDB.edit_row("individual", id, replace_dict)
         del dialog
@@ -106,7 +108,7 @@ class IndividualPopup(QDialog):
 
 
 class IndividualFillPopup(QDialog):
-    def __init__(self, parent, species_id=None, name=None, sex=None):
+    def __init__(self, parent, species_id=None, name=None, sex=None, age=None):
         super().__init__(parent)
         self.species_id = species_id
         self.mpDB = parent.mpDB
@@ -130,8 +132,16 @@ class IndividualFillPopup(QDialog):
         self.sex.addItems(['Unknown', 'Male', 'Female'])
         layout.addWidget(self.sex)
 
+        # Age
+        layout.addWidget(QLabel('Age'))
+        self.age = QComboBox()
+        self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
+        layout.addWidget(self.age)
+
+
         self.name.textChanged.connect(self.checkInput)
         self.sex.currentIndexChanged.connect(self.checkInput)
+        self.age.currentIndexChanged.connect(self.checkInput)
 
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -160,6 +170,9 @@ class IndividualFillPopup(QDialog):
 
     def get_sex(self):
         return self.sex.currentText()
+    
+    def get_age(self):
+        return self.age.currentText()
 
     def get_species_id(self):
         # return id only
