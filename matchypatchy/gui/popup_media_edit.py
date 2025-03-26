@@ -1,6 +1,6 @@
 import pandas as pd
 from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboBox,
-                             QLabel, QDialogButtonBox)
+                             QLabel, QDialogButtonBox, QFrame, QTextEdit)
 from PyQt6.QtCore import Qt
 from matchypatchy.algo.models import load
 
@@ -89,7 +89,9 @@ class MediaEditPopup(QDialog):
         self.image.setStyleSheet("border: 1px solid black;")
         self.image.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.image.setFixedHeight(400)
-        content_layout.addWidget(self.image, 2)
+        self.image.setFixedWidth(550)  # Adjusted width to make image smaller
+
+        content_layout.addWidget(self.image, 3)
 
         # Metadata panel
         metadata_container = QWidget()
@@ -122,10 +124,51 @@ class MediaEditPopup(QDialog):
         main_layout.addLayout(content_layout)
 
 
-        #editable fields
+        #Editable fields
+        self.name = QComboBox()
+        self.sex = QComboBox()
+        self.sex.addItems(['Unknown', 'Male', 'Female'])
+        self.species = QComboBox()
+        self.comment = QTextEdit()
+        self.comment.setFixedHeight(60)
+        self.viewpoint = QComboBox()
+        self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])
+
+        self.name.currentIndexChanged.connect(self.change_name)
+        self.sex.currentIndexChanged.connect(self.change_sex)
+        self.species.currentIndexChanged.connect(self.change_species)
+        self.comment.textChanged.connect(self.change_comment)
+        self.viewpoint.currentIndexChanged.connect(self.change_viewpoint)
 
 
+        line = QFrame()
+        line.setFrameStyle(QFrame.Shape.HLine | QFrame.Shadow.Raised)
+        line.setLineWidth(2)
+        metadata_layout.addWidget(line)
 
+        for label_txt, widget in [
+            ("Name: ", self.name),
+            ("Sex: ", self.sex),
+            ("Species: ", self.species),
+            ("Viewpoint: ", self.viewpoint)
+        ]:
+            row = QHBoxLayout()
+            label = QLabel(label_txt)
+            label.setFixedWidth(horizontal_gap)
+            row.addWidget(label)
+            row.addWidget(widget)
+            metadata_layout.addLayout(row)
+            metadata_layout.addSpacing(vertical_gap)
+
+        comment_row = QHBoxLayout()
+        comment_label = QLabel("Comment: ")
+        comment_label.setFixedWidth(horizontal_gap)
+        comment_row.addWidget(comment_label)
+        comment_row.addWidget(self.comment)
+        metadata_layout.addLayout(comment_row)
+
+
+        '''
         # Viewpoint Selection
         viewpoint_layout = QHBoxLayout()
         viewpoint_label = QLabel("Viewpoint: ")
@@ -138,6 +181,7 @@ class MediaEditPopup(QDialog):
         viewpoint_layout.addWidget(self.viewpoint)
 
         main_layout.addLayout(viewpoint_layout)
+        '''
 
 
  
@@ -165,6 +209,7 @@ class MediaEditPopup(QDialog):
 
         # Show the first image
         self.update_image()
+
         # Set the current viewpoint for selected ROIs
         self.refresh_viewpoint()
 
@@ -237,8 +282,10 @@ class MediaEditPopup(QDialog):
         if self.current_image_index > 0:
             self.current_image_index -= 1
             self.update_image()
+    
+    #Editable fields
 
-
+    #Viewpoint
     def refresh_viewpoint(self):
         """
         Set the dropdown to the most common viewpoint among selected ROIs.
@@ -282,6 +329,34 @@ class MediaEditPopup(QDialog):
 
         self.parent.media_table.refresh_table()  # Refresh UI
 
+
+    #name
+    def refresh_name(self):
+        names = self.data["name"].dropna().unique()
+        most_common = names[0] if len(names) == 1 else "Multiple"
+        self.name.setCurrentText(str(most_common))
+
+
+
+    def change_name(self):
+        pass
+
+    #sex
+
+    def change_sex(self):
+        pass
+
+    #species
+    def change_species(self):
+        pass
+
+    #comment
+    def change_comment(self):
+        pass
+
+
+
+
 #TO DO:
-#edit other fields: name, sex, species,comment, fav
+#edit other fields: name, sex, species,comment, fav 
     
