@@ -9,7 +9,26 @@ from PyQt6.QtGui import QPixmap
 import matchypatchy.database.media as db_roi
 from matchypatchy.gui.widget_image import ImageWidget
 
+'''
+QVBoxLayout (main_layout)
+│
+├── QLabel: filepath
+├── QHBoxLayout (content_layout)
+│   ├── ImageWidget (left side)
+│   └── QWidget (metadata_container)
+│       └── QVBoxLayout (metadata_layout)
+│           ├── Non-editable labels (timestamp, station, etc.)
+│           ├── QFrame separator (horizontal line)
+│           ├── Editable fields: (added in a loop)
+│           │   ├── Name (QComboBox)
+│           │   ├── Sex (QComboBox)
+│           │   ├── Species (QComboBox)
+│           │   └── Viewpoint (QComboBox)
+│           └── Comment (QTextEdit)
+├── QHBoxLayout (Previous / Next buttons)
+└── QDialogButtonBox (OK / Cancel)
 
+'''
 
 class MediaEditPopup(QDialog):
     def __init__(self, parent, ids):
@@ -48,29 +67,64 @@ class MediaEditPopup(QDialog):
         self.VIEWPOINTS = load('VIEWPOINTS')
 
         # Layout
-        layout = QVBoxLayout()
+        main_layout = QVBoxLayout()
 
+        '''
         # Title
         title = QLabel("Batch Edit ROI Viewpoint")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
+        '''
 
-        # Image with bounding box
+        # Top: filepath
+        self.filepath_label = QLabel()
+        self.filepath_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(self.filepath_label)
+
+        # Image + metadata horizontal layout
+        content_layout = QHBoxLayout()
+
+        # Image
         self.image = ImageWidget()
         self.image.setStyleSheet("border: 1px solid black;")
         self.image.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.image.setFixedHeight(400)
-        layout.addWidget(self.image, 1)
+        content_layout.addWidget(self.image, 2)
 
-        # Navigation Buttons
-        img_nav_layout = QHBoxLayout()
-        self.prev_btn = QPushButton("Previous")
-        self.next_btn = QPushButton("Next")
-        self.prev_btn.clicked.connect(self.show_previous_image)
-        self.next_btn.clicked.connect(self.show_next_image)
-        img_nav_layout.addWidget(self.prev_btn)
-        img_nav_layout.addWidget(self.next_btn)
-        layout.addLayout(img_nav_layout)
+        # Metadata panel
+        metadata_container = QWidget()
+        metadata_container.setObjectName("borderWidget")
+        metadata_container.setStyleSheet("""#borderWidget { border: 1px solid black; }""")
+        metadata_layout = QVBoxLayout()
+
+        horizontal_gap = 80
+        vertical_gap = 8
+
+        def add_row(label_txt):
+            row = QHBoxLayout()
+            label = QLabel(label_txt)
+            label.setFixedWidth(horizontal_gap)
+            val = QLabel()
+            row.addWidget(label)
+            row.addWidget(val)
+            metadata_layout.addLayout(row)
+            metadata_layout.addSpacing(vertical_gap)
+            return val
+
+        self.timestamp_label = add_row("Timestamp: ")
+        self.station_label = add_row("Station: ")
+        self.survey_label = add_row("Survey: ")
+        self.region_label = add_row("Region: ")
+        self.sequence_id_label = add_row("Sequence ID: ")
+        self.external_id_label = add_row("External ID: ")
+        metadata_container.setLayout(metadata_layout)
+        content_layout.addWidget(metadata_container, 1)
+        main_layout.addLayout(content_layout)
+
+
+        #editable fields
+
+
 
         # Viewpoint Selection
         viewpoint_layout = QHBoxLayout()
@@ -83,17 +137,31 @@ class MediaEditPopup(QDialog):
         self.viewpoint.currentIndexChanged.connect(self.change_viewpoint)
         viewpoint_layout.addWidget(self.viewpoint)
 
-        layout.addLayout(viewpoint_layout)
+        main_layout.addLayout(viewpoint_layout)
 
-        # Buttons
+
+ 
+
+        # Navigation Buttons
+        img_nav_layout = QHBoxLayout()
+        self.prev_btn = QPushButton("Previous")
+        self.next_btn = QPushButton("Next")
+        self.prev_btn.clicked.connect(self.show_previous_image)
+        self.next_btn.clicked.connect(self.show_next_image)
+        img_nav_layout.addWidget(self.prev_btn)
+        img_nav_layout.addWidget(self.next_btn)
+        main_layout.addLayout(img_nav_layout)
+
+
+        # OK/cancel buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
-        layout.addWidget(buttonBox)
+        main_layout.addWidget(buttonBox)
 
 
 
-        self.setLayout(layout)
+        self.setLayout(main_layout)
 
         # Show the first image
         self.update_image()
@@ -142,6 +210,17 @@ class MediaEditPopup(QDialog):
             self.image.load(image_path=filepath,
                             bbox=db_roi.get_bbox(roi_row),
                             crop=False)
+            # Update filepath label
+            self.filepath_label.setText(filepath)
+            
+            # Update metadata labels
+            self.timestamp_label.setText(str(roi_row.get("timestamp", "N/A")))
+            self.station_label.setText(str(roi_row.get("station_id", "N/A")))
+            self.survey_label.setText(str(roi_row.get("survey", "N/A")))
+            self.region_label.setText(str(roi_row.get("region", "N/A")))
+            self.sequence_id_label.setText(str(roi_row.get("sequence_id", "N/A")))
+            self.external_id_label.setText(str(roi_row.get("external_id", "N/A")))
+                
         else:
             self.image.setText("No image selected.")
 
@@ -204,7 +283,5 @@ class MediaEditPopup(QDialog):
         self.parent.media_table.refresh_table()  # Refresh UI
 
 #TO DO:
-#show bounding boxes of the selected images fix load_selected_media 
-#edit other fields 
-#show meta data 
+#edit other fields: name, sex, species,comment, fav
     
