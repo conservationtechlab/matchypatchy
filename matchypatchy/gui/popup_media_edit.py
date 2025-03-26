@@ -6,6 +6,8 @@ from matchypatchy.algo.models import load
 
 from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtGui import QPixmap
+import matchypatchy.database.media as db_roi
+from matchypatchy.gui.widget_image import ImageWidget
 
 
 
@@ -16,6 +18,27 @@ class MediaEditPopup(QDialog):
         self.setWindowTitle("Batch Edit ROI Viewpoint")
         self.setFixedSize(900, 600)
         self.mpDB = parent.mpDB
+
+        # --- DEBUG: print roi and media tables ---
+
+        print("=== ROI TABLE ===")
+        roi_data = self.mpDB.select(table="roi", columns="*")
+        roi_df = pd.DataFrame(roi_data)
+        if hasattr(self.mpDB, "cursor") and hasattr(self.mpDB.cursor, "description"):
+            roi_df.columns = [col[0] for col in self.mpDB.cursor.description]
+        print(roi_df.head(10))  # or .to_string() for full output
+        print(roi_df.columns)
+
+        print("\n=== MEDIA TABLE ===")
+        media_data = self.mpDB.select(table="media", columns="*")
+        media_df = pd.DataFrame(media_data)
+        if hasattr(self.mpDB, "cursor") and hasattr(self.mpDB.cursor, "description"):
+            media_df.columns = [col[0] for col in self.mpDB.cursor.description]
+        print(media_df.head(10))
+        print(media_df.columns)
+
+        # -----------------------------------------
+
         self.ids = ids  # List of ROI IDs
         self.data = self.load_selected_media()
         self.current_image_index = 0
@@ -32,11 +55,12 @@ class MediaEditPopup(QDialog):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        # Image Display
-        self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setFixedHeight(400)  # Adjust height as needed
-        layout.addWidget(self.image_label)
+        # Image with bounding box
+        self.image = ImageWidget()
+        self.image.setStyleSheet("border: 1px solid black;")
+        self.image.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.image.setFixedHeight(400)
+        layout.addWidget(self.image, 1)
 
         # Navigation Buttons
         img_nav_layout = QHBoxLayout()
@@ -47,9 +71,6 @@ class MediaEditPopup(QDialog):
         img_nav_layout.addWidget(self.prev_btn)
         img_nav_layout.addWidget(self.next_btn)
         layout.addLayout(img_nav_layout)
-
-        # Show the first image
-        self.update_image()
 
         # Viewpoint Selection
         viewpoint_layout = QHBoxLayout()
@@ -70,42 +91,60 @@ class MediaEditPopup(QDialog):
         buttonBox.rejected.connect(self.reject)
         layout.addWidget(buttonBox)
 
+
+
         self.setLayout(layout)
 
+        # Show the first image
+        self.update_image()
         # Set the current viewpoint for selected ROIs
         self.refresh_viewpoint()
 
+
+
     def load_selected_media(self):
         """
-        Fetch `roi` data for the selected ROI IDs.
+        Fetch all columns from both `roi` and `media` tables for the selected ROI IDs.
         """
-        ids_str = ', '.join(map(str, self.ids))  # Convert list of IDs to a comma-separated string
+        ids_str = ', '.join(map(str, self.ids))
+        print(f"Selected ROI IDs: {ids_str}")
 
-        # Query `roi` table and join with `media` to get file paths
-        data = self.mpDB.select(
-            table="roi JOIN media ON roi.media_id = media.id",
-            columns="roi.id AS roi_id, media.filepath, roi.viewpoint",
-            row_cond=f"roi.id IN ({ids_str})"
+        data, col_names = self.mpDB.select_join(
+            table="roi",
+            join_table="media",
+            join_cond="roi.media_id = media.id",
+            columns="roi.*, media.*",
+            row_cond=f"roi.id IN ({ids_str})",
+            quiet=False
         )
+        print(f"Query returned {len(data)} rows with {len(col_names)} columns")
+        if data:
+            print(col_names)
 
-        # Convert to DataFrame
-        df = pd.DataFrame(data, columns=["roi_id", "filepath", "viewpoint"]).replace({float('nan'): None}).reset_index(drop=True)
-        print(df)
-        print(df.columns)
+        df = pd.DataFrame(data, columns=col_names)
+        df = df.replace({float('nan'): None}).reset_index(drop=True)
+        print("Filepaths from media table:")
+        print(df["filepath"].head(5).to_list())
+
+        print("Bounding box columns from roi:")
+        print(df[["bbox_x", "bbox_y", "bbox_w", "bbox_h"]].head(5))
+
+        print("=== Merged ROI + MEDIA Table ===")
+        print(df.head(10).to_string())
+        print("Columns:", list(df.columns))
+
         return df
-    
+
     def update_image(self):
         if not self.data.empty:
             filepath = self.data.iloc[self.current_image_index]["filepath"]
-            pixmap = QPixmap(filepath)
-            if not pixmap.isNull():
-                scaled = pixmap.scaledToHeight(400, Qt.TransformationMode.SmoothTransformation)
-                self.image_label.setPixmap(scaled)
-            else:
-                self.image_label.setText(f"Could not load image: {filepath}")
+            roi_row = self.data.iloc[self.current_image_index]
+            self.image.load(image_path=filepath,
+                            bbox=db_roi.get_bbox(roi_row),
+                            crop=False)
         else:
-            self.image_label.setText("No image selected.")
-        #Enable/disable buttons based on current index
+            self.image.setText("No image selected.")
+
         self.prev_btn.setEnabled(self.current_image_index > 0)
         self.next_btn.setEnabled(self.current_image_index < len(self.data) - 1)
 
@@ -146,7 +185,7 @@ class MediaEditPopup(QDialog):
         selected_viewpoint_key = viewpoint_keys[self.viewpoint.currentIndex() + 1]  # Adjust for 'any' skipping
 
         for _, row in self.data.iterrows():
-            roi_id = row["roi_id"]
+            roi_id = row["media_id"]
             if selected_viewpoint_key == 'None':
                 self.mpDB.edit_row('roi', roi_id, {"viewpoint": "NULL"}, quiet=False)
                 new_viewpoint = None
@@ -163,3 +202,9 @@ class MediaEditPopup(QDialog):
 
 
         self.parent.media_table.refresh_table()  # Refresh UI
+
+#TO DO:
+#show bounding boxes of the selected images fix load_selected_media 
+#edit other fields 
+#show meta data 
+    
