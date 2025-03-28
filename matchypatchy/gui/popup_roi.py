@@ -236,13 +236,18 @@ class ROIPopup(QDialog):
 
         # Editable -------------------------------------------------------------
         # Name
+    
         self.iid = self.roi_data.at[0, "individual_id"]
+        print(self.individuals)
+        print(f"self.roi_data is {self.roi_data.columns}")
         if self.iid is None:
+            print("self.iid is none")
             self.name.setCurrentIndex(0)
             self.sex.setDisabled(True)
         else:
             self.name.setCurrentIndex(self.iid)
             self.sex.setDisabled(False)
+
         # Sex
         current_sex = self.roi_data.at[0, "sex"]
         if current_sex is None:

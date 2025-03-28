@@ -306,6 +306,10 @@ class DisplayMedia(QWidget):
         else:
             # TODO
             pass
+    def update_buttons(self):
+        has_selection = len(self.media_table.selectedRows()) > 0
+        self.button_edit.setEnabled(has_selection)
+        self.button_delete.setEnabled(has_selection)
 
    
     def edit_row_multiple(self):
@@ -319,6 +323,9 @@ class DisplayMedia(QWidget):
                 data_available = self.load_table()
                 if data_available:
                     self.load_thumbnails()
+                self.media_table.table.clearSelection()
+
+                self.update_buttons() 
 
 
 

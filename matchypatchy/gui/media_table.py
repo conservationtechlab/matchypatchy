@@ -284,10 +284,29 @@ class MediaTable(QWidget):
                     self.table.setItem(i, column, noedit)
                 else:
                     if roi['species_id'] is not None:
+                        print(f"species_id is {roi['species_id']}")
+                        print("species_list is\n", self.species_list)
+
                         species = self.species_list[self.species_list['id'] == roi['species_id']]
+                        print("filtered species is\n", species)
+
+                        if not species.empty:
+                            self.table.setItem(i, column, QTableWidgetItem(str(species[data].values[0])))
+                        else:
+                            print("Species not found — setting to 'Unknown'")
+                            self.table.setItem(i, column, QTableWidgetItem("Unknown"))
+                    else:
+                        self.table.setItem(i, column, QTableWidgetItem("Unknown"))
+
+                    '''
+                    if roi['species_id'] is not None:
+                        print(f"species list is {self.species_list}")
+                        species = self.species_list[self.species_list['id'] == roi['species_id']]
+                        print(f"species is {species}")
                         self.table.setItem(i, column, QTableWidgetItem(species[data][0]))
                     else:
                         self.table.setItem(i, column, QTableWidgetItem(None))
+                    '''
 
             elif data == "name" or data == "sex" or data == 'age':
                 if roi['individual_id'] is not None:
@@ -465,7 +484,8 @@ class MediaTable(QWidget):
         print("selectedRows called")
         selected_rows = []
         for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).checkState() == Qt.CheckState.Checked:
+            item = self.table.item(row, 0)
+            if item is not None and item.checkState() == Qt.CheckState.Checked:
                 selected_rows.append(row)
         return selected_rows
 

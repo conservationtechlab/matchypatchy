@@ -137,15 +137,15 @@ class MediaEditPopup(QDialog):
         self.sex = QComboBox()
         self.sex.addItems(['Unknown', 'Male', 'Female'])
         self.species = QComboBox()
-        self.comment = QTextEdit()
-        self.comment.setFixedHeight(60)
+        #self.comment = QTextEdit()
+        #self.comment.setFixedHeight(60)
         self.viewpoint = QComboBox()
         self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])
 
         self.name.currentIndexChanged.connect(self.change_name)
         self.sex.currentIndexChanged.connect(self.change_sex)
         self.species.currentIndexChanged.connect(self.change_species)
-        self.comment.textChanged.connect(self.change_comment)
+        #self.comment.textChanged.connect(self.change_comment)
         self.viewpoint.currentIndexChanged.connect(self.change_viewpoint)
 
 
@@ -168,12 +168,12 @@ class MediaEditPopup(QDialog):
             metadata_layout.addLayout(row)
             metadata_layout.addSpacing(vertical_gap)
 
-        comment_row = QHBoxLayout()
-        comment_label = QLabel("Comment: ")
-        comment_label.setFixedWidth(horizontal_gap)
-        comment_row.addWidget(comment_label)
-        comment_row.addWidget(self.comment)
-        metadata_layout.addLayout(comment_row)
+        #comment_row = QHBoxLayout()
+        #comment_label = QLabel("Comment: ")
+        #comment_label.setFixedWidth(horizontal_gap)
+        #comment_row.addWidget(comment_label)
+        #comment_row.addWidget(self.comment)
+        #metadata_layout.addLayout(comment_row)
 
 
         '''
@@ -219,11 +219,13 @@ class MediaEditPopup(QDialog):
         self.update_image()
 
         # Set the editable fields for selected ROIs
+        self.load_species_options()
+
         self.refresh_viewpoint()
         self.refresh_name()
         self.refresh_sex()
         self.refresh_species()
-        self.refresh_comment()
+        #self.refresh_comment()
 
 
 
@@ -390,8 +392,15 @@ class MediaEditPopup(QDialog):
                 self.data.at[i, "sex"] = selected_sex
 
     #species
+    def load_species_options(self):
+        species = self.mpDB.select("species", "id, common")
+        self.species_list = [(0, 'Unknown')] + species
+        self.species.clear()
+        self.species.addItems([s[1] for s in self.species_list])
+
     def refresh_species(self):
         species = self.data["common"].dropna().unique()
+        print(f"species is {species}")
         most_common = species[0] if len(species) == 1 else "Multiple"
         self.species.setCurrentText(str(most_common))
 
@@ -404,7 +413,7 @@ class MediaEditPopup(QDialog):
                 self.mpDB.edit_row('roi', roi_id, {"species_id": species_entry[0]}, quiet=False)
                 self.data.at[i, "common"] = selected_species
 
-
+'''
     #comment
     def refresh_comment(self):
         comments = self.data["comment"].dropna().unique()
@@ -419,11 +428,18 @@ class MediaEditPopup(QDialog):
             roi_id = row["id"]
             self.mpDB.edit_row('roi', roi_id, {"comment": f"'{user_comment}'"}, quiet=False)
             self.data.at[i, "comment"] = user_comment
+'''
 
 
 
 
 
 #TO DO:
-#edit other fields: name, sex, species,comment, fav 
+#edit other fields: name, species,comment, fav 
     
+#popup_media_edit
+#editable fields? 
+
+#popup_roi 
+#cannot edit on media table 
+#can onlny assign sex after name is assigned 
