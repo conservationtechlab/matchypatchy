@@ -18,6 +18,7 @@ def initiate():
            'DB_PATH': str(Path.cwd() / 'matchypatchy.db'),
            'ML_DIR': str(Path.cwd() / 'Models'),
            'FRAME_DIR': str(Path(tempfile.gettempdir()) / "Frames"),  # frame dir only temporary while processing for animl
+           'VIDEO_FRAMES': 1
     }
 
     # check if cfg exists, load

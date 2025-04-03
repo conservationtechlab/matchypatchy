@@ -54,11 +54,12 @@ class AnimlThread(QThread):
             self.get_frames()
             self.progress_update.emit("Calculating bounding box...")
             self.get_bbox()
-        self.progress_update.emit("Predicting species...")
-        self.get_species()
+        #self.progress_update.emit("Predicting species...")
+        #self.get_species()
 
     def get_frames(self):
-        self.media = animl_mp.process_videos(self.media, config.load('FRAME_DIR'))
+        self.media = animl_mp.extract_frames(self.media, config.load('FRAME_DIR'), 
+                                             frames=int(config.load('VIDEO_FRAMES')), file_col="filepath")
 
     def get_bbox(self):
         # 1 RUN MED
@@ -74,14 +75,13 @@ class AnimlThread(QThread):
             bbox_w = roi['bbox3']
             bbox_h = roi['bbox4']
 
-            # species, viewpoint, individual TBD
-            species_id = None
+            # viewpoint, individual TBD
             viewpoint = None
             individual_id = None
 
             # do not add emb_id, to be determined later
             self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                              species_id, viewpoint=viewpoint, reviewed=0,
+                              viewpoint=viewpoint, reviewed=0,
                               individual_id=individual_id, emb_id=0)
 
     def get_species(self, label_col="code", binomen_col='species'):
