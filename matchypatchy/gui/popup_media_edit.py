@@ -118,12 +118,14 @@ class MediaEditPopup(QDialog):
         self.viewpoint = QComboBox()
         self.viewpoint.addItem("— Mixed —")  # Index 0
         self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])
+        self.favorite = QComboBox()
+        self.favorite.addItems(["— Mixed —", "Not Favorite", "Favorite"])
         # Connect signals to flags only
         self.name.currentIndexChanged.connect(lambda: self.mark_field_changed("name"))
         self.sex.currentIndexChanged.connect(lambda: self.mark_field_changed("sex"))
         self.species.currentIndexChanged.connect(lambda: self.mark_field_changed("species"))
         self.viewpoint.currentIndexChanged.connect(lambda: self.mark_field_changed("viewpoint"))
-        #self.favorite_btn.clicked.connect(lambda: self.mark_field_changed("favorite"))
+        self.favorite.currentIndexChanged.connect(lambda: self.mark_field_changed("favorite"))
 
 
         line = QFrame()
@@ -135,7 +137,8 @@ class MediaEditPopup(QDialog):
             ("Name: ", self.name),
             ("Sex: ", self.sex),
             ("Species: ", self.species),
-            ("Viewpoint: ", self.viewpoint)
+            ("Viewpoint: ", self.viewpoint),
+            ("Favorite: ", self.favorite),
         ]:
             row = QHBoxLayout()
             label = QLabel(label_txt)
@@ -168,12 +171,7 @@ class MediaEditPopup(QDialog):
 
         self.setLayout(main_layout)
         
-        # Favorite Button
-        self.favorite_btn = QPushButton("♥ Favorite")
-        self.favorite_btn.setCheckable(True)
-        self.favorite_btn.setFixedWidth(100)
-        self.favorite_btn.clicked.connect(self.toggle_favorite)
-        metadata_layout.addWidget(self.favorite_btn)
+    
 
 
         # Show the first image
@@ -223,6 +221,7 @@ class MediaEditPopup(QDialog):
             non_null_iids = self.data["individual_id"].dropna()
             self.sex.setDisabled(non_null_iids.empty)
             self.sex.blockSignals(False)
+        
 
 
 
@@ -240,6 +239,18 @@ class MediaEditPopup(QDialog):
                 print("[refresh_values] Viewpoint is mixed, setting to '— Mixed —'")
                 self.viewpoint.setCurrentIndex(0)  # '— Mixed —'
             self.viewpoint.blockSignals(False)
+        # --- Favorite ---
+        if not self.fields_changed["favorite"]:
+            unique_fav = self.data["favorite"].dropna().unique()
+            self.favorite.blockSignals(True)
+            if len(unique_fav) == 1:
+                index = 2 if unique_fav[0] == 1 else 1  # 1 = Not Favorite, 2 = Favorite
+                self.favorite.setCurrentIndex(index)
+            else:
+                self.favorite.setCurrentIndex(0)  # '— Mixed —'
+            self.favorite.blockSignals(False)
+
+        
 
 
     def load_selected_media(self):
@@ -293,13 +304,9 @@ class MediaEditPopup(QDialog):
             self.region_label.setText(str(roi_row.get("region", "N/A")))
             self.sequence_id_label.setText(str(roi_row.get("sequence_id", "N/A")))
             self.external_id_label.setText(str(roi_row.get("external_id", "N/A")))
-            # Determine if all selected images are favorited
-            
-            favorites = self.data["favorite"].dropna().unique()
-            is_all_favorited = len(favorites) == 1 and favorites[0] == 1
-            self.favorite_btn.setChecked(is_all_favorited)
-            self.toggle_favorite()  # to apply visual styling
-        
+            # Just refresh favorite (and other) dropdowns based on loaded data
+            #self.refresh_values()
+
 
                 
         else:
@@ -330,6 +337,10 @@ class MediaEditPopup(QDialog):
         if field == "sex" and self.sex.currentIndex() == 0:
             print(f"[mark_field_changed] Sex still mixed — not marking as changed.")
             return
+        if field == "favorite" and self.favorite.currentIndex() == 0:
+            print(f"[mark_field_changed] Favorite still mixed — not marking as changed.")
+            return
+
         print(f"[mark_field_changed] {field} is marked as changed.")
     
         self.fields_changed[field] = True
@@ -392,23 +403,25 @@ class MediaEditPopup(QDialog):
                 self.data.at[i, "sex"] = selected_sex
  
 
-    def toggle_favorite(self):
+    def apply_favorite(self):
+        if self.favorite.currentIndex() == 0:
+            print("[apply_favorite] Still showing '— Mixed —', skipping.")
+            return
 
+        new_val = 1 if self.favorite.currentIndex() == 2 else 0
+        print(f"[apply_favorite] Setting favorite = {new_val}")
 
-        favorited = self.favorite_btn.isChecked()
-        for i, row in self.data.iterrows():
+        updated_media_ids = set()
+
+        for idx, row in self.data.iterrows():
             media_id = row["media_id"]
-            self.mpDB.edit_row("media", media_id, {"favorite": 1 if favorited else 0}, quiet=False)
-            self.data.at[i, "favorite"] = 1 if favorited else 0
+            if media_id not in updated_media_ids:
+                self.mpDB.edit_row("media", media_id, {"favorite": new_val}, quiet=False)
+                updated_media_ids.add(media_id)
+            self.data.loc[idx, "favorite"] = new_val
 
-        # Optional: update table immediately
         self.parent.media_table.refresh_table()
 
-        # Change button style
-        if favorited:
-            self.favorite_btn.setStyleSheet("background-color: #b51b32; color: white;")
-        else:
-            self.favorite_btn.setStyleSheet("")
 
 
     def accept(self):
@@ -422,9 +435,10 @@ class MediaEditPopup(QDialog):
             self.apply_name()
         if self.fields_changed["sex"]:
             self.apply_sex()
-        #if self.fields_changed["favorite"]:
-            #self._apply_favorite()
+        if self.fields_changed["favorite"]:
+            self.apply_favorite()
 
         super().accept()
 
 
+#TO DO: favorite 
