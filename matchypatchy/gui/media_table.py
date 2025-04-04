@@ -97,6 +97,9 @@ class MediaTable(QWidget):
                             8:"binomen", 9:"common", 
                             10:"name", 11:"sex", 12:"age",
                             13:"reviewed", 14:"favorite", 15:"comment"}
+            print(f"[fetch] Column mapping: {self.columns}")
+            print(f"[fetch] Column count: {self.table.columnCount()}")
+
             self.table.setColumnCount(15)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
                                                 "Station", "Sequence ID", "External ID", 
@@ -264,7 +267,7 @@ class MediaTable(QWidget):
             # Viewpoint
             elif data == 'viewpoint':
                 vp_raw = roi["viewpoint"]
-                print(f"vp_raw is {vp_raw}")
+                #print(f"vp_raw is {vp_raw}")
 
                 if pd.isna(vp_raw) or vp_raw is None or str(vp_raw) == "None":
                     vp_key = "None"
@@ -307,13 +310,25 @@ class MediaTable(QWidget):
                     else:
                         self.table.setItem(i, column, QTableWidgetItem(None))
                     '''
-
+            
+            #elif data == "name" or data == "sex" or data == 'age':
+            #    if roi['individual_id'] is not None:
+            #        individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
+            #        self.table.setItem(i, column, QTableWidgetItem(str(individual[data].values[0])))
+            #    else:
+            #        self.table.setItem(i, column, QTableWidgetItem(None))
+        
             elif data == "name" or data == "sex" or data == 'age':
                 if roi['individual_id'] is not None:
                     individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
-                    self.table.setItem(i, column, QTableWidgetItem(individual[data][0]))
+                    if not individual.empty:
+                        self.table.setItem(i, column, QTableWidgetItem(str(individual[data].values[0])))
+                    else:
+                        print(f"Warning: individual_id {roi['individual_id']} not found in individual_list")
+                        self.table.setItem(i, column, QTableWidgetItem("Unknown"))
                 else:
-                    self.table.setItem(i, column, QTableWidgetItem(None))
+                    self.table.setItem(i, column, QTableWidgetItem("Unknown"))
+
 
             # Reviewed and Favorite Checkbox
             elif data == 'reviewed' or data == 'favorite':

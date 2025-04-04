@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtGui import QPixmap
 import matchypatchy.database.media as db_roi
 from matchypatchy.gui.widget_image import ImageWidget
+from matchypatchy.database.location import fetch_station_names_from_id
 
 '''
 QVBoxLayout (main_layout)
@@ -38,37 +39,16 @@ class MediaEditPopup(QDialog):
         self.setFixedSize(900, 600)
         self.mpDB = parent.mpDB
 
-        # --- DEBUG: print roi and media tables ---
-        print("=== ROI TABLE ===")
-        roi_data, roi_columns = self.mpDB.select_join(
-            table="roi",
-            join_table="media",  # dummy join just to reuse the function
-            join_cond="roi.media_id = media.id",
-            columns="roi.*",
-            row_cond=None,
-            quiet=True
-        )
-        roi_df = pd.DataFrame(roi_data, columns=roi_columns)
-        print(roi_df.head(10))
-        print("ROI Columns:", roi_df.columns.tolist())
-
-        print("\n=== MEDIA TABLE ===")
-        media_data, media_columns = self.mpDB.select_join(
-            table="media",
-            join_table="roi",  # dummy join
-            join_cond="media.id = roi.media_id",
-            columns="media.*",
-            row_cond=None,
-            quiet=True
-        )
-        media_df = pd.DataFrame(media_data, columns=media_columns)
-        print(media_df.head(10))
-        print("MEDIA Columns:", media_df.columns.tolist())
-        # -----------------------------------------
-
         self.ids = ids  # List of ROI IDs
         self.data = self.load_selected_media()
         self.current_image_index = 0
+        self.fields_changed = {
+            "name": False,
+            "sex": False,
+            #"species": False,
+            "viewpoint": False,
+            "favorite": False,
+        }
 
 
         # Load Viewpoint options
@@ -77,17 +57,13 @@ class MediaEditPopup(QDialog):
         # Layout
         main_layout = QVBoxLayout()
 
-        '''
-        # Title
-        title = QLabel("Batch Edit ROI Viewpoint")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
-        '''
-
         # Top: filepath
         self.filepath_label = QLabel()
         self.filepath_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.filepath_label.setStyleSheet("padding: 0px; margin: 0px; font-size: 10pt;")
+        self.filepath_label.setFixedHeight(20)  # 👈 Set max height explicitly
         main_layout.addWidget(self.filepath_label)
+
 
         # Image + metadata horizontal layout
         content_layout = QHBoxLayout()
@@ -135,18 +111,19 @@ class MediaEditPopup(QDialog):
         #Editable fields
         self.name = QComboBox()
         self.sex = QComboBox()
-        self.sex.addItems(['Unknown', 'Male', 'Female'])
+        self.sex.addItems(['— Mixed —','Unknown', 'Male', 'Female'])
         self.species = QComboBox()
         #self.comment = QTextEdit()
         #self.comment.setFixedHeight(60)
         self.viewpoint = QComboBox()
+        self.viewpoint.addItem("— Mixed —")  # Index 0
         self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])
-
-        self.name.currentIndexChanged.connect(self.change_name)
-        self.sex.currentIndexChanged.connect(self.change_sex)
-        self.species.currentIndexChanged.connect(self.change_species)
-        #self.comment.textChanged.connect(self.change_comment)
-        self.viewpoint.currentIndexChanged.connect(self.change_viewpoint)
+        # Connect signals to flags only
+        self.name.currentIndexChanged.connect(lambda: self.mark_field_changed("name"))
+        self.sex.currentIndexChanged.connect(lambda: self.mark_field_changed("sex"))
+        self.species.currentIndexChanged.connect(lambda: self.mark_field_changed("species"))
+        self.viewpoint.currentIndexChanged.connect(lambda: self.mark_field_changed("viewpoint"))
+        #self.favorite_btn.clicked.connect(lambda: self.mark_field_changed("favorite"))
 
 
         line = QFrame()
@@ -167,30 +144,6 @@ class MediaEditPopup(QDialog):
             row.addWidget(widget)
             metadata_layout.addLayout(row)
             metadata_layout.addSpacing(vertical_gap)
-
-        #comment_row = QHBoxLayout()
-        #comment_label = QLabel("Comment: ")
-        #comment_label.setFixedWidth(horizontal_gap)
-        #comment_row.addWidget(comment_label)
-        #comment_row.addWidget(self.comment)
-        #metadata_layout.addLayout(comment_row)
-
-
-        '''
-        # Viewpoint Selection
-        viewpoint_layout = QHBoxLayout()
-        viewpoint_label = QLabel("Viewpoint: ")
-        viewpoint_label.setFixedWidth(80)
-        viewpoint_layout.addWidget(viewpoint_label)
-
-        self.viewpoint = QComboBox()
-        self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])  # Skip 'any'
-        self.viewpoint.currentIndexChanged.connect(self.change_viewpoint)
-        viewpoint_layout.addWidget(self.viewpoint)
-
-        main_layout.addLayout(viewpoint_layout)
-        '''
-
 
  
 
@@ -214,19 +167,79 @@ class MediaEditPopup(QDialog):
 
 
         self.setLayout(main_layout)
+        
+        # Favorite Button
+        self.favorite_btn = QPushButton("♥ Favorite")
+        self.favorite_btn.setCheckable(True)
+        self.favorite_btn.setFixedWidth(100)
+        self.favorite_btn.clicked.connect(self.toggle_favorite)
+        metadata_layout.addWidget(self.favorite_btn)
+
 
         # Show the first image
         self.update_image()
+        self.load_individuals()
 
-        # Set the editable fields for selected ROIs
-        self.load_species_options()
+        self.refresh_values()
 
-        self.refresh_viewpoint()
-        self.refresh_name()
-        self.refresh_sex()
-        self.refresh_species()
-        #self.refresh_comment()
+    def refresh_values(self):
+        print("\n[refresh_values] Running refresh...")
 
+        # --- Name ---
+        if not self.fields_changed["name"]:
+            unique_ids = self.data["individual_id"].unique()
+            self.name.blockSignals(True)
+            # Convert None/NaN to a consistent value (e.g., 0 for 'Unknown')
+            cleaned_ids = [0 if pd.isna(uid) else int(uid) for uid in unique_ids]
+            print(f"[refresh_values] Cleaned individual_ids: {cleaned_ids}")
+
+            if len(set(cleaned_ids)) == 1:
+                iid = cleaned_ids[0]
+                index = next((i for i, (id, _, _) in enumerate(self.individuals) if id == iid), 1)
+                print(f"[refresh_values] Setting name to {self.individuals[index][1]}")
+                self.name.setCurrentIndex(index)
+                self.sex.setDisabled(iid == 0)
+            else:
+                print("[refresh_values] Name is mixed — setting to '— Mixed —'")
+                self.name.setCurrentIndex(0)  # Index 0 = "— Mixed —"
+                self.sex.setDisabled(True)
+
+            self.name.blockSignals(False)
+        # --- Sex ---
+        if not self.fields_changed["sex"]:
+            unique_sexes = self.data["sex"].dropna().unique()
+            print(f"[refresh_values] Unique sexes: {unique_sexes}")
+            self.sex.blockSignals(True)
+
+            if len(unique_sexes) == 1:
+                sex_text = unique_sexes[0]
+                index = self.sex.findText(str(sex_text))
+                print(f"[refresh_values] Setting sex to {sex_text}")
+                self.sex.setCurrentIndex(index)
+            else:
+                print("[refresh_values] Sex is mixed — setting to '— Mixed —'")
+                self.sex.setCurrentIndex(0)  # '— Mixed —'
+            # Only enable if there's at least one valid individual
+            non_null_iids = self.data["individual_id"].dropna()
+            self.sex.setDisabled(non_null_iids.empty)
+            self.sex.blockSignals(False)
+
+
+
+        # --- Viewpoint ---
+        if not self.fields_changed["viewpoint"]:
+            unique_viewpoints = self.data["viewpoint"].dropna().unique()
+            print(f"[refresh_values] Unique viewpoints: {unique_viewpoints}")
+            self.viewpoint.blockSignals(True)
+            if len(unique_viewpoints) == 1:
+                vp_text = self.VIEWPOINTS[str(unique_viewpoints[0])]
+                index = self.viewpoint.findText(vp_text)
+                print(f"[refresh_values] Setting viewpoint to {vp_text}")
+                self.viewpoint.setCurrentIndex(index)
+            else:
+                print("[refresh_values] Viewpoint is mixed, setting to '— Mixed —'")
+                self.viewpoint.setCurrentIndex(0)  # '— Mixed —'
+            self.viewpoint.blockSignals(False)
 
 
     def load_selected_media(self):
@@ -235,32 +248,7 @@ class MediaEditPopup(QDialog):
         """
         ids_str = ', '.join(map(str, self.ids))
         print(f"Selected ROI IDs: {ids_str}")
-        '''
-
-        data, col_names = self.mpDB.select_join(
-            table="roi",
-            join_table="media",
-            join_cond="roi.media_id = media.id",
-            columns="roi.*, media.*",
-            row_cond=f"roi.id IN ({ids_str})",
-            quiet=False
-        )
-        print(f"Query returned {len(data)} rows with {len(col_names)} columns")
-        if data:
-            print(col_names)
-
-        df = pd.DataFrame(data, columns=col_names)
-        df = df.replace({float('nan'): None}).reset_index(drop=True)
-        print("Filepaths from media table:")
-        print(df["filepath"].head(5).to_list())
-
-        print("Bounding box columns from roi:")
-        print(df[["bbox_x", "bbox_y", "bbox_w", "bbox_h"]].head(5))
-
-        print("=== Merged ROI + MEDIA Table ===")
-        print(df.head(10).to_string())
-        print("Columns:", list(df.columns))
-        '''
+    
         # Use all_media to get a complete view of each ROI
         data, col_names = self.mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
 
@@ -274,6 +262,19 @@ class MediaEditPopup(QDialog):
         print("Columns:", list(df.columns))
 
         return df
+
+    def load_individuals(self):
+        print("[load_individuals] Loading individual list...")
+        individuals = self.mpDB.select("individual", "id, name, sex")
+        
+        # Prepend special entries
+        self.individuals = [(-1, '— Mixed —', 'Unknown'), (0, 'Unknown', 'Unknown')] + individuals
+
+        self.name.blockSignals(True)
+        self.name.clear()
+        self.name.addItems([ind[1] for ind in self.individuals])
+        self.name.blockSignals(False)
+
 
     def update_image(self):
         if not self.data.empty:
@@ -292,6 +293,14 @@ class MediaEditPopup(QDialog):
             self.region_label.setText(str(roi_row.get("region", "N/A")))
             self.sequence_id_label.setText(str(roi_row.get("sequence_id", "N/A")))
             self.external_id_label.setText(str(roi_row.get("external_id", "N/A")))
+            # Determine if all selected images are favorited
+            
+            favorites = self.data["favorite"].dropna().unique()
+            is_all_favorited = len(favorites) == 1 and favorites[0] == 1
+            self.favorite_btn.setChecked(is_all_favorited)
+            self.toggle_favorite()  # to apply visual styling
+        
+
                 
         else:
             self.image.setText("No image selected.")
@@ -311,135 +320,111 @@ class MediaEditPopup(QDialog):
             self.update_image()
     
     #Editable fields
+    def mark_field_changed(self, field):
+        if field == "viewpoint" and self.viewpoint.currentIndex() == 0:
+            print(f"[mark_field_changed] Viewpoint still mixed — not marking as changed.")
+            return
+        if field == "name" and self.name.currentIndex() == 0:
+            print(f"[mark_field_changed] Name still mixed — not marking as changed.")
+            return
+        if field == "sex" and self.sex.currentIndex() == 0:
+            print(f"[mark_field_changed] Sex still mixed — not marking as changed.")
+            return
+        print(f"[mark_field_changed] {field} is marked as changed.")
+    
+        self.fields_changed[field] = True
 
     #Viewpoint
-    def refresh_viewpoint(self):
-        """
-        Set the dropdown to the most common viewpoint among selected ROIs.
-        """
-        viewpoints = self.data["viewpoint"].astype(str).unique()
-        most_common = viewpoints[0] if len(viewpoints) == 1 else "Multiple"
-        print(self.VIEWPOINTS)
-        '''
-        {'Any': 'Any', 'None': 'None', '0': 'Left', '1': 'Right'}
-        '''
-        
-         # If viewpoint is None, set index to 0 (default to 'None' in dropdown)
-        if most_common == "None" or most_common not in self.VIEWPOINTS:
-            self.viewpoint.setCurrentIndex(0)
-        else:
-            self.viewpoint.setCurrentIndex(self.viewpoint.findText(self.VIEWPOINTS.get(most_common, "None")))
 
-    def change_viewpoint(self):
+    def apply_viewpoint(self):
         """
         Update `viewpoint` for all selected ROIs.
         """
         viewpoint_keys = list(self.VIEWPOINTS.keys())
-        selected_viewpoint_key = viewpoint_keys[self.viewpoint.currentIndex() + 1]  # Adjust for 'any' skipping
-
+        if self.viewpoint.currentIndex() <= 0:  # 0 = '— Mixed —'
+            print("[apply_viewpoint] Skipping update — still mixed or invalid.")
+            return
+        selected_viewpoint_key = viewpoint_keys[self.viewpoint.currentIndex()]  # Adjust for 'any' skipping
+        print(f"[apply_viewpoint] Applying viewpoint: {selected_viewpoint_key}")
         for _, row in self.data.iterrows():
-            roi_id = row["media_id"]
+            roi_id = row["id"]
             if selected_viewpoint_key == 'None':
                 self.mpDB.edit_row('roi', roi_id, {"viewpoint": "NULL"}, quiet=False)
-                new_viewpoint = None
             else:
                 self.mpDB.edit_row('roi', roi_id, {"viewpoint": int(selected_viewpoint_key)}, quiet=False)
-                new_viewpoint = int(selected_viewpoint_key)
-            # Update UI data with a string key
-            #print(self.parent.media_table.data_filtered.at[row.name, "viewpoint"])
-            #print(str(new_viewpoint)
-
-            self.parent.media_table.data_filtered.at[row.name, "viewpoint"] = str(new_viewpoint) if new_viewpoint is not None else "None"
-
-        print(self.parent.media_table.data_filtered["viewpoint"])
+        self.refresh_values()
 
 
-        self.parent.media_table.refresh_table()  # Refresh UI
 
 
     #name
-    def refresh_name(self):
+    def apply_name(self):
+        if self.name.currentIndex() == 0:
+            print("[apply_name] Still showing '— Mixed —', skipping.")
+            return
 
-        names = self.data["name"].dropna().unique()
-        most_common = names[0] if len(names) == 1 else "Multiple"
-        self.name.setCurrentText(str(most_common))
-    
-
-    def change_name(self):
-        selected_name = self.name.currentText()
+        selected_individual = self.individuals[self.name.currentIndex()]
+        print(f"[apply_name] Applying individual_id = {selected_individual[0]}")
         for i, row in self.data.iterrows():
-            roi_id = row["media_id"]
-            # Find individual_id from name
-            individual = next((ind for ind in self.individuals if ind[1] == selected_name), None)
-            if individual:
-                individual_id = individual[0]
-                self.mpDB.edit_row('roi', roi_id, {"individual_id": individual_id}, quiet=False)
-                self.data.at[i, "name"] = selected_name
+            roi_id = row["id"]
+            if selected_individual[0] > 0:
+                self.mpDB.edit_row('roi', roi_id, {"individual_id": selected_individual[0]}, quiet=False)
+                self.data.at[i, "individual_id"] = selected_individual[0]
+            else:
+                self.mpDB.edit_row('roi', roi_id, {"individual_id": "NULL"}, quiet=False)
+                self.data.at[i, "individual_id"] = None
+
             
 
     #sex
-    def refresh_sex(self):
-        sexes = self.data["sex"].dropna().unique()
-        most_common = sexes[0] if len(sexes) == 1 else "Multiple"
-        self.sex.setCurrentText(str(most_common))
+    
+    def apply_sex(self):
+        if self.sex.currentIndex() == 0:
+            print("[apply_sex] Still showing '— Mixed —', skipping.")
+            return
 
-    def change_sex(self):
         selected_sex = self.sex.currentText()
+        print(f"[apply_sex] Applying sex: {selected_sex}")
         for i, row in self.data.iterrows():
             iid = row["individual_id"]
             if iid:
                 self.mpDB.edit_row('individual', iid, {"sex": f"'{selected_sex}'"}, quiet=False)
                 self.data.at[i, "sex"] = selected_sex
+ 
 
-    #species
-    def load_species_options(self):
-        species = self.mpDB.select("species", "id, common")
-        self.species_list = [(0, 'Unknown')] + species
-        self.species.clear()
-        self.species.addItems([s[1] for s in self.species_list])
+    def toggle_favorite(self):
 
-    def refresh_species(self):
-        species = self.data["common"].dropna().unique()
-        print(f"species is {species}")
-        most_common = species[0] if len(species) == 1 else "Multiple"
-        self.species.setCurrentText(str(most_common))
 
-    def change_species(self):
-        selected_species = self.species.currentText()
+        favorited = self.favorite_btn.isChecked()
         for i, row in self.data.iterrows():
-            roi_id = row["id"]
-            species_entry = next((sp for sp in self.species_list if sp[1] == selected_species), None)
-            if species_entry:
-                self.mpDB.edit_row('roi', roi_id, {"species_id": species_entry[0]}, quiet=False)
-                self.data.at[i, "common"] = selected_species
+            media_id = row["media_id"]
+            self.mpDB.edit_row("media", media_id, {"favorite": 1 if favorited else 0}, quiet=False)
+            self.data.at[i, "favorite"] = 1 if favorited else 0
 
-'''
-    #comment
-    def refresh_comment(self):
-        comments = self.data["comment"].dropna().unique()
-        if len(comments) == 1:
-            self.comment.setText(str(comments[0]))
+        # Optional: update table immediately
+        self.parent.media_table.refresh_table()
+
+        # Change button style
+        if favorited:
+            self.favorite_btn.setStyleSheet("background-color: #b51b32; color: white;")
         else:
-            self.comment.setText("")
-
-    def change_comment(self):
-        user_comment = self.comment.toPlainText()
-        for i, row in self.data.iterrows():
-            roi_id = row["id"]
-            self.mpDB.edit_row('roi', roi_id, {"comment": f"'{user_comment}'"}, quiet=False)
-            self.data.at[i, "comment"] = user_comment
-'''
+            self.favorite_btn.setStyleSheet("")
 
 
+    def accept(self):
+        print("\n=== ACCEPTING CHANGES ===")
+        for key, changed in self.fields_changed.items():
+            print(f"[accept] {key} changed? {changed}")
+
+        if self.fields_changed["viewpoint"]:
+            self.apply_viewpoint()
+        if self.fields_changed["name"]:
+            self.apply_name()
+        if self.fields_changed["sex"]:
+            self.apply_sex()
+        #if self.fields_changed["favorite"]:
+            #self._apply_favorite()
+
+        super().accept()
 
 
-
-#TO DO:
-#edit other fields: name, species,comment, fav 
-    
-#popup_media_edit
-#editable fields? 
-
-#popup_roi 
-#cannot edit on media table 
-#can onlny assign sex after name is assigned 
