@@ -344,7 +344,10 @@ class DisplayBase(QWidget):
             del dialog
 
     def validate_db(self):
-        self.mpDB.validate()
+        valid = self.mpDB.validate()
+        dialog = AlertPopup(self, f"Database is valid: {valid}")
+        if dialog.exec():
+            del dialog
 
     def clear_data(self):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")

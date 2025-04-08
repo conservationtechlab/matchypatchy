@@ -62,37 +62,38 @@ def setup_database(filepath='matchypatchy.db'):
                         bbox_y REAL NOT NULL,
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
+                        viewpoint_id INTEGER,
                         species_id INTEGER,
-                        viewpoint INTEGER,
                         reviewed INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb_id INTEGER,
                         FOREIGN KEY(media_id) REFERENCES media (id)
-                        FOREIGN KEY(species_id) REFERENCES species (id)
                         FOREIGN KEY(individual_id) REFERENCES individual (id)
+                        FOREIGN KEY(viewpoint_id) REFERENCES viewpoint (id)
+                        FOREIGN KEY(species_id) REFERENCES species (id)
                         FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) );''')
 
+    # INDIVIDUAL
+    cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        species_id INTEGER,
+                        sex TEXT,
+                        age TEXT,
+                        FOREIGN KEY(species_id) REFERENCES species (id));''')
+    
     # SPECIES
     cursor.execute('''CREATE TABLE IF NOT EXISTS species (
                         id INTEGER PRIMARY KEY,
                         binomen TEXT NOT NULL,
                         common TEXT NOT NULL );''')
 
-    # INDIVIDUAL
-    cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
-                        id INTEGER PRIMARY KEY,
-                        species_id INTEGER,
-                        name TEXT NOT NULL,
-                        sex TEXT,
-                        age TEXT,
-                        FOREIGN KEY(species_id) REFERENCES species (id));''')
-
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
 
     # VIEWPOINT
-    cursor.execute('''DROP TABLE IF EXISTS viewpoint;''')
+    #cursor.execute('''DROP TABLE IF EXISTS viewpoint;''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS viewpoint (
                         id INTEGER PRIMARY KEY,
                         value TEXT

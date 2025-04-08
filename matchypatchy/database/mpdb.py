@@ -50,8 +50,14 @@ class MatchyPatchyDB():
         cursor.execute("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger')")
         schema = cursor.fetchall()
 
+        s = ""
         for name, obj_type, sql in schema:
-            print(f"{obj_type.upper()}: {name}\n{sql}\n")
+            s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
+    
+        with open('schema', 'r') as file:
+            content = file.read()
+            
+        return content==s
 
     def _command(self, command):
         """
