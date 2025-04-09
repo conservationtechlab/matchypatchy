@@ -177,19 +177,22 @@ class DisplayMedia(QWidget):
         # check if there are rois first
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
-        if self.data_type == 1 and roi_n == 0:
-            self.data_type = 0
-            dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
-            if dialog.exec():
-                del dialog
-            self.show_type.setCurrentIndex(self.data_type)
-
-        if self.data_type == 0 and media_n == 0:
+        if media_n == 0:
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
                 self.home()
                 del dialog
             return False
+
+        else:
+            if self.data_type == 1 and roi_n == 0:
+                self.data_type = 0
+                dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
+                if dialog.exec():
+                    del dialog
+                self.show_type.setCurrentIndex(self.data_type)
+
+
         
         self.media_table.load_data(self.data_type)
         return True
