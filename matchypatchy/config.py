@@ -24,6 +24,7 @@ def initiate():
     # check if cfg exists, load
     if cfg_path.exists():
         cfg = load()
+        #TODO : CHECK IF ALL PARAMETERS ARE PRESENT
     # else save default
     else:
         with open(cfg_path, 'w') as cfg_file:

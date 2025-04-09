@@ -30,7 +30,6 @@ def main():
     cfg = config.initiate()
     models.update_model_yml()
     mpDB = mpdb.MatchyPatchyDB(cfg['DB_PATH'])
-    models.initiate_viewpoint_table(mpDB)
     main_gui.main_display(mpDB)
 
 if __name__ == "__main__":

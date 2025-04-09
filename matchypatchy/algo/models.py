@@ -23,10 +23,6 @@ def update_model_yml():
     except urllib.error.URLError:
         logging.error("Unable to connect to server.")
         return False
-    
-def initiate_viewpoint_table(mpDB):
-    VIEWPOINT = load('VIEWPOINT')
-    
 
 
 def load(key=None):
