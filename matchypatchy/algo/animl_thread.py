@@ -9,8 +9,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.algo import models
 from matchypatchy import config
 
-from animl.file_management import build_file_manifest
-from animl.api import matchypatchy as animl_mp
+import animl
 
 
 class BuildManifestThread(QThread):
@@ -24,7 +23,7 @@ class BuildManifestThread(QThread):
         self.directory = directory
 
     def run(self):
-        self.data = build_file_manifest(self.directory)
+        self.data = animl.build_file_manifest(self.directory)
         self.manifest.emit(self.data)
 
 
@@ -58,12 +57,12 @@ class AnimlThread(QThread):
         #self.get_species()
 
     def get_frames(self):
-        self.media = animl_mp.extract_frames(self.media, config.load('FRAME_DIR'), 
+        self.media = animl.extract_frames(self.media, config.load('FRAME_DIR'), 
                                              frames=int(config.load('VIDEO_FRAMES')), file_col="filepath")
 
     def get_bbox(self):
         # 1 RUN MED
-        detections = animl_mp.detect_mp(self.md_filepath, self.media)
+        detections = animl.detect_mp(self.md_filepath, self.media)
         # 2 GET BOXES
         for _, roi in detections.iterrows():
             media_id = roi['id']
@@ -100,7 +99,7 @@ class AnimlThread(QThread):
 
         # if there are unlabeled rois
         if not filtered_rois.empty:
-            filtered_rois = animl_mp.classify_mp(filtered_rois, self.config_filepath)
+            filtered_rois = animl.classify_mp(filtered_rois, self.config_filepath)
             for i, row in filtered_rois.iterrows():
                 prediction = row['prediction']
                 # get species_id for prediction
