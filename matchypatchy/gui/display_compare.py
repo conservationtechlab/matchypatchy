@@ -138,7 +138,7 @@ class DisplayCompare(QWidget):
         self.query_seq_number = QLineEdit(str(self.QueryContainer.current_query_sn + 1))
         self.query_seq_number.setMaximumWidth(100)
         query_options.addWidget(self.query_seq_number)
-        self.query_sequence_n = QLabel("/3")
+        self.query_sequence_n = QLabel("/ 3")
         query_options.addWidget(self.query_sequence_n)
         self.button_next_query_seq = QPushButton(">>")
         self.button_next_query_seq.setMaximumWidth(40)
@@ -250,7 +250,7 @@ class DisplayCompare(QWidget):
         self.match_number = QLineEdit(str(self.QueryContainer.current_match + 1))
         self.match_number.setMaximumWidth(100)
         match_options.addWidget(self.match_number)
-        self.match_n = QLabel("/9")
+        self.match_n = QLabel("/ 9")
         match_options.addWidget(self.match_n)
         self.button_next_match = QPushButton(">>")
         self.button_next_match.setMaximumWidth(40)
@@ -383,11 +383,13 @@ class DisplayCompare(QWidget):
             QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
     def calculate_neighbors(self):
-        #self.progress.show()
         self.QueryContainer = QueryContainer(self)
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
+            self.progress.show()
             self.QueryContainer.calculate_neighbors(reset=True)
+        else:
+            self.home(warn=True)
 
     def recalculate_by_individual(self):
         self.QueryContainer = QC_QueryContainer(self)
@@ -465,13 +467,13 @@ class DisplayCompare(QWidget):
     def change_query(self, n):
         self.QueryContainer.set_query(n)
         # update text
-        self.query_n.setText("/" + str(self.QueryContainer.n_queries))
+        self.query_n.setText("/ " + str(self.QueryContainer.n_queries))
         self.query_number.setText(str(self.QueryContainer.current_query + 1))
 
-        self.query_sequence_n.setText("/" + str(len(self.QueryContainer.current_query_rois)))
+        self.query_sequence_n.setText("/ " + str(len(self.QueryContainer.current_query_rois)))
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
 
-        self.match_n.setText("/" + str(len(self.QueryContainer.current_match_rois)))
+        self.match_n.setText("/ " + str(len(self.QueryContainer.current_match_rois)))
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
 
         self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
@@ -529,8 +531,8 @@ class DisplayCompare(QWidget):
         if (self.QueryContainer.empty_query is True or self.QueryContainer.empty_match is True):
             self.warn(f'No query image with {selected_viewpoint} viewpoint in the current sequence.')
             self.dropdown_viewpoint.setCurrentIndex(0)
-        self.query_sequence_n.setText('/' + str(len(self.QueryContainer.current_query_rois)))
-        self.match_n.setText('/' + str(len(self.QueryContainer.current_match_rois)))
+        self.query_sequence_n.setText('/ ' + str(len(self.QueryContainer.current_query_rois)))
+        self.match_n.setText('/ ' + str(len(self.QueryContainer.current_match_rois)))
         self.query_seq_number.setText('1')
         self.match_number.setText('1')
         self.load_query()

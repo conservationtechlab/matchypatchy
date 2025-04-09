@@ -43,11 +43,9 @@ class QueryContainer():
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
         # no data
         if self.data_raw.empty:
-            self.parent.home(warn=True)
-            return False
+            return False  
 
         self.sequences = db_roi.sequence_roi_dict(self.data_raw)
-
         # must have embeddings to continue
         if not (self.data_raw["emb_id"] == 0).all():
             # need sequence and capture ids from media to restrict comparisons shown to
@@ -57,7 +55,6 @@ class QueryContainer():
             return True
         # no embeddings
         else:
-            self.parent.home(warn=True)
             return False
 
     # RUN ON ENTRY IF LOAD_DATA

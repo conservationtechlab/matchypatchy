@@ -37,29 +37,30 @@ class MatchEmbeddingThread(QThread):
         nearest_dict = {}
 
         for i, s in enumerate(self.sequences):
-            sequence_rois = self.sequences[s]
-            emb_ids = self.rois.loc[self.rois['id'].isin(sequence_rois), "emb_id"].tolist()
+            if not self.isInterruptionRequested():
+                sequence_rois = self.sequences[s]
+                emb_ids = self.rois.loc[self.rois['id'].isin(sequence_rois), "emb_id"].tolist()
 
-            # skip rois with no emb_ids
-            emb_ids = [e for e in emb_ids if e > 0]
+                # skip rois with no emb_ids
+                emb_ids = [e for e in emb_ids if e > 0]
 
-            # get all neighbors for sequence
-            all_neighbors = []
-            for emb_id in emb_ids:
-                all_neighbors.extend(self.roi_knn(emb_id))
-            # remove impossible matches
-            all_neighbors = self.remove_duplicate_matches(all_neighbors)
-            filtered_neighbors = self.filter(sequence_rois, all_neighbors)
+                # get all neighbors for sequence
+                all_neighbors = []
+                for emb_id in emb_ids:
+                    all_neighbors.extend(self.roi_knn(emb_id))
+                # remove impossible matches
+                all_neighbors = self.remove_duplicate_matches(all_neighbors)
+                filtered_neighbors = self.filter(sequence_rois, all_neighbors)
 
-            # still have neighbors remaining after filtering, rank by difference
-            if filtered_neighbors:
-                filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
-                neighbor_dict[s] = filtered_neighbors
-                nearest_dict[s] = filtered_neighbors[0][1]
-            self.progress_update.emit(i + 1)
+                # still have neighbors remaining after filtering, rank by difference
+                if filtered_neighbors:
+                    filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
+                    neighbor_dict[s] = filtered_neighbors
+                    nearest_dict[s] = filtered_neighbors[0][1]
+                self.progress_update.emit(i + 1)
 
-        self.neighbor_dict_return.emit(neighbor_dict)
-        self.nearest_dict_return.emit(nearest_dict)
+            self.neighbor_dict_return.emit(neighbor_dict)
+            self.nearest_dict_return.emit(nearest_dict)
 
     def roi_knn(self, emb_id):
         """
