@@ -1,35 +1,14 @@
 import pandas as pd
 from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboBox,
-                             QLabel, QDialogButtonBox, QFrame, QTextEdit)
+                             QLabel, QDialogButtonBox, QFrame)
 from PyQt6.QtCore import Qt
 from matchypatchy.algo.models import load
 
 from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtGui import QPixmap
 import matchypatchy.database.media as db_roi
 from matchypatchy.gui.widget_image import ImageWidget
-from matchypatchy.database.location import fetch_station_names_from_id
+#from matchypatchy.database.location import fetch_station_names_from_id
 
-'''
-QVBoxLayout (main_layout)
-│
-├── QLabel: filepath
-├── QHBoxLayout (content_layout)
-│   ├── ImageWidget (left side)
-│   └── QWidget (metadata_container)
-│       └── QVBoxLayout (metadata_layout)
-│           ├── Non-editable labels (timestamp, station, etc.)
-│           ├── QFrame separator (horizontal line)
-│           ├── Editable fields: (added in a loop)
-│           │   ├── Name (QComboBox)
-│           │   ├── Sex (QComboBox)
-│           │   ├── Species (QComboBox)
-│           │   └── Viewpoint (QComboBox)
-│           └── Comment (QTextEdit)
-├── QHBoxLayout (Previous / Next buttons)
-└── QDialogButtonBox (OK / Cancel)
-
-'''
 
 class MediaEditPopup(QDialog):
     def __init__(self, parent, ids):
@@ -45,11 +24,10 @@ class MediaEditPopup(QDialog):
         self.fields_changed = {
             "name": False,
             "sex": False,
-            #"species": False,
+            # "species": False,
             "viewpoint": False,
             "favorite": False,
         }
-
 
         # Load Viewpoint options
         self.VIEWPOINTS = load('VIEWPOINTS')
@@ -63,7 +41,6 @@ class MediaEditPopup(QDialog):
         self.filepath_label.setStyleSheet("padding: 0px; margin: 0px; font-size: 10pt;")
         self.filepath_label.setFixedHeight(20)  # 👈 Set max height explicitly
         main_layout.addWidget(self.filepath_label)
-
 
         # Image + metadata horizontal layout
         content_layout = QHBoxLayout()
@@ -107,14 +84,11 @@ class MediaEditPopup(QDialog):
         content_layout.addWidget(metadata_container, 1)
         main_layout.addLayout(content_layout)
 
-
-        #Editable fields
+        # Editable fields
         self.name = QComboBox()
         self.sex = QComboBox()
-        self.sex.addItems(['— Mixed —','Unknown', 'Male', 'Female'])
+        self.sex.addItems(['— Mixed —', 'Unknown', 'Male', 'Female'])
         self.species = QComboBox()
-        #self.comment = QTextEdit()
-        #self.comment.setFixedHeight(60)
         self.viewpoint = QComboBox()
         self.viewpoint.addItem("— Mixed —")  # Index 0
         self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])
@@ -126,7 +100,6 @@ class MediaEditPopup(QDialog):
         self.species.currentIndexChanged.connect(lambda: self.mark_field_changed("species"))
         self.viewpoint.currentIndexChanged.connect(lambda: self.mark_field_changed("viewpoint"))
         self.favorite.currentIndexChanged.connect(lambda: self.mark_field_changed("favorite"))
-
 
         line = QFrame()
         line.setFrameStyle(QFrame.Shape.HLine | QFrame.Shadow.Raised)
@@ -148,8 +121,6 @@ class MediaEditPopup(QDialog):
             metadata_layout.addLayout(row)
             metadata_layout.addSpacing(vertical_gap)
 
- 
-
         # Navigation Buttons
         img_nav_layout = QHBoxLayout()
         self.prev_btn = QPushButton("Previous")
@@ -160,19 +131,12 @@ class MediaEditPopup(QDialog):
         img_nav_layout.addWidget(self.next_btn)
         main_layout.addLayout(img_nav_layout)
 
-
         # OK/cancel buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         main_layout.addWidget(buttonBox)
-
-
-
         self.setLayout(main_layout)
-        
-    
-
 
         # Show the first image
         self.update_image()
@@ -182,7 +146,6 @@ class MediaEditPopup(QDialog):
 
     def refresh_values(self):
         print("\n[refresh_values] Running refresh...")
-
         # --- Name ---
         if not self.fields_changed["name"]:
             unique_ids = self.data["individual_id"].unique()
@@ -221,9 +184,6 @@ class MediaEditPopup(QDialog):
             non_null_iids = self.data["individual_id"].dropna()
             self.sex.setDisabled(non_null_iids.empty)
             self.sex.blockSignals(False)
-        
-
-
 
         # --- Viewpoint ---
         if not self.fields_changed["viewpoint"]:
@@ -250,16 +210,12 @@ class MediaEditPopup(QDialog):
                 self.favorite.setCurrentIndex(0)  # '— Mixed —'
             self.favorite.blockSignals(False)
 
-        
-
-
     def load_selected_media(self):
         """
         Fetch all columns from both `roi` and `media` tables for the selected ROI IDs.
         """
         ids_str = ', '.join(map(str, self.ids))
-        print(f"Selected ROI IDs: {ids_str}")
-    
+
         # Use all_media to get a complete view of each ROI
         data, col_names = self.mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
 
@@ -267,25 +223,16 @@ class MediaEditPopup(QDialog):
         df = pd.DataFrame(data, columns=col_names)
         df = df.replace({float('nan'): None}).reset_index(drop=True)
 
-        # Debug prints
-        print("=== Loaded ROI + MEDIA + SPECIES + INDIVIDUAL Info ===")
-        print(df.head(10).to_string())
-        print("Columns:", list(df.columns))
-
         return df
 
     def load_individuals(self):
-        print("[load_individuals] Loading individual list...")
         individuals = self.mpDB.select("individual", "id, name, sex")
-        
         # Prepend special entries
         self.individuals = [(-1, '— Mixed —', 'Unknown'), (0, 'Unknown', 'Unknown')] + individuals
-
         self.name.blockSignals(True)
         self.name.clear()
         self.name.addItems([ind[1] for ind in self.individuals])
         self.name.blockSignals(False)
-
 
     def update_image(self):
         if not self.data.empty:
@@ -296,7 +243,6 @@ class MediaEditPopup(QDialog):
                             crop=False)
             # Update filepath label
             self.filepath_label.setText(filepath)
-            
             # Update metadata labels
             self.timestamp_label.setText(str(roi_row.get("timestamp", "N/A")))
             self.station_label.setText(str(roi_row.get("station_id", "N/A")))
@@ -304,17 +250,11 @@ class MediaEditPopup(QDialog):
             self.region_label.setText(str(roi_row.get("region", "N/A")))
             self.sequence_id_label.setText(str(roi_row.get("sequence_id", "N/A")))
             self.external_id_label.setText(str(roi_row.get("external_id", "N/A")))
-            # Just refresh favorite (and other) dropdowns based on loaded data
-            #self.refresh_values()
-
-
-                
         else:
             self.image.setText("No image selected.")
 
         self.prev_btn.setEnabled(self.current_image_index > 0)
         self.next_btn.setEnabled(self.current_image_index < len(self.data) - 1)
-
 
     def show_next_image(self):
         if self.current_image_index < len(self.data) - 1:
@@ -325,28 +265,25 @@ class MediaEditPopup(QDialog):
         if self.current_image_index > 0:
             self.current_image_index -= 1
             self.update_image()
-    
-    #Editable fields
+
     def mark_field_changed(self, field):
         if field == "viewpoint" and self.viewpoint.currentIndex() == 0:
-            print(f"[mark_field_changed] Viewpoint still mixed — not marking as changed.")
+            print("[mark_field_changed] Viewpoint still mixed — not marking as changed.")
             return
         if field == "name" and self.name.currentIndex() == 0:
-            print(f"[mark_field_changed] Name still mixed — not marking as changed.")
+            print("[mark_field_changed] Name still mixed — not marking as changed.")
             return
         if field == "sex" and self.sex.currentIndex() == 0:
-            print(f"[mark_field_changed] Sex still mixed — not marking as changed.")
+            print("[mark_field_changed] Sex still mixed — not marking as changed.")
             return
         if field == "favorite" and self.favorite.currentIndex() == 0:
-            print(f"[mark_field_changed] Favorite still mixed — not marking as changed.")
+            print("[mark_field_changed] Favorite still mixed — not marking as changed.")
             return
 
         print(f"[mark_field_changed] {field} is marked as changed.")
-    
         self.fields_changed[field] = True
 
-    #Viewpoint
-
+    # Viewpoint
     def apply_viewpoint(self):
         """
         Update `viewpoint` for all selected ROIs.
@@ -365,10 +302,7 @@ class MediaEditPopup(QDialog):
                 self.mpDB.edit_row('roi', roi_id, {"viewpoint": int(selected_viewpoint_key)}, quiet=False)
         self.refresh_values()
 
-
-
-
-    #name
+    # Name
     def apply_name(self):
         if self.name.currentIndex() == 0:
             print("[apply_name] Still showing '— Mixed —', skipping.")
@@ -385,10 +319,7 @@ class MediaEditPopup(QDialog):
                 self.mpDB.edit_row('roi', roi_id, {"individual_id": "NULL"}, quiet=False)
                 self.data.at[i, "individual_id"] = None
 
-            
-
-    #sex
-    
+    # Sex
     def apply_sex(self):
         if self.sex.currentIndex() == 0:
             print("[apply_sex] Still showing '— Mixed —', skipping.")
@@ -401,8 +332,8 @@ class MediaEditPopup(QDialog):
             if iid:
                 self.mpDB.edit_row('individual', iid, {"sex": f"'{selected_sex}'"}, quiet=False)
                 self.data.at[i, "sex"] = selected_sex
- 
 
+    # Favorite
     def apply_favorite(self):
         if self.favorite.currentIndex() == 0:
             print("[apply_favorite] Still showing '— Mixed —', skipping.")
@@ -422,8 +353,6 @@ class MediaEditPopup(QDialog):
 
         self.parent.media_table.refresh_table()
 
-
-
     def accept(self):
         print("\n=== ACCEPTING CHANGES ===")
         for key, changed in self.fields_changed.items():
@@ -437,8 +366,4 @@ class MediaEditPopup(QDialog):
             self.apply_sex()
         if self.fields_changed["favorite"]:
             self.apply_favorite()
-
         super().accept()
-
-
-#TO DO: favorite 
