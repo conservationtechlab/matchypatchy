@@ -28,7 +28,7 @@ from matchypatchy.algo.sequence_thread import SequenceThread
 from matchypatchy.algo.animl_thread import AnimlThread
 from matchypatchy.algo.reid_thread import ReIDThread
 
-from matchypatchy.database.media import fetch_roi_media
+from matchypatchy.database.media import export_data
 
 
 class DisplayBase(QWidget):
@@ -313,17 +313,21 @@ class DisplayBase(QWidget):
 
     # STEP 5: Export Button
     def export(self):
-        data = fetch_roi_media(self.mpDB)
+        data = export_data(self.mpDB)
+        if data is not None:
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
+            if file_path:
+              # add csv if user didnt enter
+                if not file_path.endswith(".csv"):
+                    file_path += ".csv"
 
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
-        if file_path:
-            # add csv if user didnt enter
-            if not file_path.endswith(".csv"):
-                file_path += ".csv"
-
-            with open(file_path, 'w') as file:
-                data.to_csv(file)
-            logging.info(f"Data exported to: {file_path}")
+                with open(file_path, 'w') as file:
+                    data.to_csv(file)
+                logging.info(f"Data exported to: {file_path}")
+        else:
+            dialog = AlertPopup(self, prompt="No data to export.")
+            if dialog.exec():
+                del dialog
 
     # ==========================================================================
     # OTHER OPTIONS

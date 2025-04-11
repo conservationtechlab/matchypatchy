@@ -9,6 +9,9 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
 from PyQt6.QtCore import Qt
 
 from matchypatchy.algo.import_thread import CSVImportThread
+from matchypatchy.gui.widget_combobox import ComboBoxSeparator
+
+# TODO: check if import 
 
 class ImportCSVPopup(QDialog):
     def __init__(self, parent, manifest):
@@ -21,7 +24,7 @@ class ImportCSVPopup(QDialog):
         self.selected_filepath = self.columns[0]
         self.selected_timestamp = self.columns[0]
         self.selected_station = self.columns[0]
-        self.selected_survey = self.columns[0]
+        self.selected_survey = self.survey_columns[0]
         self.selected_region = self.columns[0]
         self.selected_sequence_id = self.columns[0]
         self.selected_external_id = self.columns[0]
@@ -70,8 +73,10 @@ class ImportCSVPopup(QDialog):
         asterisk = QLabel("*")
         asterisk.setStyleSheet("QLabel { color : red; }")
         survey_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.survey = QComboBox()
-        self.survey.addItems(self.survey_columns)
+        self.survey = ComboBoxSeparator()
+        self.survey.addItem(str(parent.active_survey[1]))
+        self.survey.add_separator()
+        self.survey.addItems(self.columns)
         self.survey.currentTextChanged.connect(self.select_survey)
         survey_layout.addWidget(self.survey)
         layout.addLayout(survey_layout)
@@ -212,7 +217,6 @@ class ImportCSVPopup(QDialog):
     def select_region(self):
         try:
             self.selected_region = self.columns[self.region.currentIndex()]
-            self.check_ok_button()
             return True
         except IndexError:
             return False
@@ -292,7 +296,7 @@ class ImportCSVPopup(QDialog):
         self.progress_bar.show()
         selected_columns = self.collate_selections()
 
-        self.data.sort_values(by=["FilePath"])
+        self.data.sort_values(by=[selected_columns['filepath']])
 
         unique_images = self.data.groupby(selected_columns["filepath"])
 

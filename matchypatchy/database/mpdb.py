@@ -8,6 +8,7 @@ import sqlite3
 from matchypatchy.database.setup import setup_database
 from matchypatchy import sqlite_vec
 
+#TODO:  fix error return for functions returning multiple objects (cannot unpack error)
 
 class MatchyPatchyDB():
     def __init__(self, filepath='matchypatchy.db'):
@@ -41,7 +42,6 @@ class MatchyPatchyDB():
         db.close()
 
     def validate(self):
-        # TODO
         db = sqlite3.connect(self.filepath)
         db.enable_load_extension(True)
         sqlite_vec.load(db)
@@ -79,7 +79,7 @@ class MatchyPatchyDB():
             logging.error("Failed to execute fetch.", error)
             if db:
                 db.close()
-            return False
+            return None
 
     # INSERT -------------------------------------------------------------------
     def add_survey(self, name: str, region_id: int, year_start: int, year_end: int):
@@ -106,7 +106,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add survey: ", error)
             if db:
                 db.close()
-            return False
+            return None
         
     def add_region(self, name: str):
         """
@@ -127,7 +127,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add region: ", error)
             if db:
                 db.close()
-            return False
+            return None
 
     def add_station(self, name: str, lat: float, long: float, survey_id: int):
         """
@@ -153,7 +153,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add station: ", error)
             if db:
                 db.close()
-            return False
+            return None
 
     def add_species(self, binomen: str, common: str):
         """
@@ -177,7 +177,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add species: ", error)
             if db:
                 db.close()
-            return False
+            return None
 
     def add_individual(self, species_id: int, name: str, 
                        sex: Optional[str]=None, age: Optional[str]=None):
@@ -204,7 +204,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add individual: ", error)
             if db:
                 db.close()
-            return False
+            return None
 
     def add_media(self, filepath: str, ext: str, timestamp: str, station_id: int,
                   sequence_id: Optional[int]=None, external_id: Optional[int]=None, 
@@ -239,7 +239,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add media: ", error)
             if db:
                 db.close()
-            return False
+            return None
 
     def add_roi(self, media_id: int, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
                 species_id: Optional[int]=None, viewpoint: Optional[str]=None, reviewed: int=0, 
@@ -264,7 +264,7 @@ class MatchyPatchyDB():
             logging.error(f"Failed to add roi for media: {media_id}.", error)
             if db:
                 db.close()
-            return False
+            return None
 
     def add_emb(self, embedding):
         try:
@@ -284,7 +284,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add embedding: ", error)
             if db:
                 db.close()
-            return False
+            return None
 
     def add_sequence(self):
         # Note difference in variable order, foreign keys
@@ -301,7 +301,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add sequence: ", error)
             if db:
                 db.close()
-            return False
+            return None
         
     def add_thumbnail(self, table, fid, filepath):
         # Note difference in variable order, foreign keys
@@ -319,7 +319,7 @@ class MatchyPatchyDB():
             logging.error("Failed to add sequence: ", error)
             if db:
                 db.close()
-            return False
+            return None
         
     def copy(self, table, id):
         try:
@@ -335,7 +335,7 @@ class MatchyPatchyDB():
             logging.error("Failed to copy row: ", error)
             if db:
                 db.close()
-            return False
+            return None
 
     # EDIT ---------------------------------------------------------------------
     def edit_row(self, table: str, id: int, replace: dict, allow_none=False, quiet=True):
@@ -392,7 +392,7 @@ class MatchyPatchyDB():
             logging.error("Failed fetch: ", error)
             if db:
                 db.close()
-            return False
+            return None
     
     def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str]=None, quiet=True):
         try:
@@ -412,7 +412,7 @@ class MatchyPatchyDB():
             logging.error("Failed fetch: ", error)
             if db:
                 db.close()
-            return False
+            return None, None
 
     def all_media(self, row_cond: Optional[str]=None):
         try:
@@ -439,7 +439,30 @@ class MatchyPatchyDB():
             logging.error("Failed all_media fetch:", error)
             if db:
                 db.close()
-            return False
+            return None, None
+        
+    def stations(self, row_cond=None):
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            columns = """station.id, station.name, lat, long, station.survey_id, survey.name, region.name"""
+            if row_cond:
+                command = f"""SELECT {columns} FROM station LEFT JOIN survey ON station.survey_id = survey.id
+                                                LEFT JOIN region ON survey.region_id = region.id
+                                                WHERE {row_cond};"""
+            else:
+                command = f"""SELECT {columns} FROM station LEFT JOIN survey ON station.survey_id = survey.id
+                                                LEFT JOIN region ON survey.region_id = region.id;"""
+            cursor.execute(command)
+            column_names = columns.split(", ")
+            rows = cursor.fetchall()  # returns in tuple
+            db.close()
+            return rows, column_names
+        except sqlite3.Error as error:
+            logging.error("Failed all_media fetch:", error)
+            if db:
+                db.close()
+            return None, None
 
     def count(self, table):
         """
@@ -456,7 +479,7 @@ class MatchyPatchyDB():
             logging.error(f"Failed to count for {table}:", error)
             if db:
                 db.close()
-            return False
+            return None
 
     # DELETE -------------------------------------------------------------------
     def delete(self, table, cond):
@@ -560,4 +583,4 @@ class MatchyPatchyDB():
             logging.error("Failed to get knn for ROI", error)
             if db:
                 db.close()
-            return False
+            return None
