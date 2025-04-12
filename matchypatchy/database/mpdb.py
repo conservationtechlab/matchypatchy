@@ -235,6 +235,15 @@ class MatchyPatchyDB():
             db.commit()
             db.close()
             return id
+    
+        # filepath already exists
+        except sqlite3.IntegrityError as error:
+            if error.sqlite_errorname == "SQLITE_CONSTRAINT_UNIQUE":
+                logging.error("Failed to add media, already exists in database.")
+                if db:
+                    db.close()
+                return "duplicate_error"
+        
         except sqlite3.Error as error:
             logging.error("Failed to add media: ", error)
             if db:

@@ -15,6 +15,7 @@ class CSVImportThread(QThread):
         self.mpDB = mpDB
         self.unique_images = unique_images
         self.selected_columns = selected_columns
+        print(selected_columns)
 
     def run(self):
         roi_counter = 0  # progressbar counter
@@ -44,6 +45,9 @@ class CSVImportThread(QThread):
                                            sequence_id=sequence_id,
                                            external_id=external_id,
                                            comment=comment)
+            # image already added
+            if media_id == "duplicate_error":
+                media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{filepath}"')[0][0]
 
             for i, roi in group.iterrows():
                 # Frame number for videos, else 1 if image
@@ -87,13 +91,18 @@ class CSVImportThread(QThread):
         self.finished.emit()
 
     def survey(self, exemplar):
+        # get active survey
+        if len(self.selected_columns['survey']) > 1:
+            survey_name = self.selected_columns['survey'][1]
+            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"', quiet=False)[0][0]
         # get or create new survey
-        survey_name = exemplar[self.selected_columns["survey"]].item()
-        region_name = exemplar[self.selected_columns["region"]].item() if self.selected_columns["region"] != "None" else None
-        try:
-            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
-        except IndexError:
-            survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
+        else:
+            survey_name = exemplar[self.selected_columns["survey"]].item()
+            region_name = exemplar[self.selected_columns["region"]].item() if self.selected_columns["region"] != "None" else None
+            try:
+                survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
+            except IndexError:
+                survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
         return survey_id
 
     def station(self, exemplar, survey_id):

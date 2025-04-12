@@ -199,12 +199,16 @@ class ImportCSVPopup(QDialog):
             return False
 
     def select_survey(self):
-        try:
-            self.selected_survey = self.survey_columns[self.survey.currentIndex()]
-            self.check_ok_button()
+        if self.survey.currentIndex() == 0:
+            self.selected_survey = ["active_survey", self.survey_columns[self.survey.currentIndex()]]
             return True
-        except IndexError:
-            return False
+        else:
+            try:
+                self.selected_survey = self.survey_columns[self.survey.currentIndex()]
+                self.check_ok_button()
+                return True
+            except IndexError:
+                return False
 
     def select_station(self):
         try:
@@ -269,6 +273,7 @@ class ImportCSVPopup(QDialog):
 
         Must include filepath, timestamp, station
         """
+        self.select_survey()
         if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
            (self.selected_station != "None") and (self.selected_survey != "None"):
             self.okButton.setEnabled(True)
