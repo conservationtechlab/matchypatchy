@@ -66,6 +66,11 @@ class AnimlThread(QThread):
         # 1 RUN MED
         detector = animl.MegaDetector(self.md_filepath)
 
+        viewpoint = None
+        individual_id = None
+        species_id = None
+
+
         # 2 GET BOXES
         for i, image in self.media.iterrows():
             if not self.isInterruptionRequested():
@@ -84,12 +89,10 @@ class AnimlThread(QThread):
                     bbox_h = roi['bbox4']
 
                     # viewpoint, individual TBD
-                    viewpoint = None
-                    individual_id = None
 
                     # do not add emb_id, to be determined later
                     self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                                    viewpoint=viewpoint, reviewed=0,
+                                    viewpoint=viewpoint, reviewed=0, species_id=species_id,
                                     individual_id=individual_id, emb_id=0)
             self.progress_update.emit(round(100 * (i + 1) / len(self.media)))
 

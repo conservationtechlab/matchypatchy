@@ -284,14 +284,12 @@ class DisplayBase(QWidget):
             dialog.show()
 
             # 1. SEQUENCE
-            print("sequence")
             dialog.set_max(0)
             self.sequence_thread = SequenceThread(self.mpDB, mloptions['sequence_checked'])
             self.sequence_thread.prompt_update.connect(dialog.update_prompt)
             self.sequence_thread.start()
 
             # 2. ANIML (BBOX + SPECIES)
-            print("animl")
             dialog.set_max(100)
             dialog.set_counter(0)
             self.animl_thread = AnimlThread(self.mpDB, mloptions['detector_key'], mloptions['classifier_key'])
@@ -299,7 +297,6 @@ class DisplayBase(QWidget):
             self.animl_thread.progress_update.connect(dialog.set_value)
 
             # 3. REID AND VIEWPOINT
-            print("reid")
             self.miew_thread = ReIDThread(self.mpDB, mloptions['reid_key'], mloptions['viewpoint_key'])
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)
