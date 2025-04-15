@@ -24,7 +24,7 @@ from matchypatchy.gui.display_compare import (DisplayCompare, FAVORITE_STYLE,
 from matchypatchy.gui.display_media import (DisplayMedia,)
 from matchypatchy.gui.main_gui import (MainWindow, main_display,)
 from matchypatchy.gui.media_table import (MediaTable,)
-from matchypatchy.gui.popup_alert import (AlertPopup, ProgressPopup,)
+from matchypatchy.gui.popup_alert import (AlertPopup)
 from matchypatchy.gui.popup_config import (ConfigPopup,)
 from matchypatchy.gui.popup_dropdown import (DropdownPopup,)
 from matchypatchy.gui.popup_import_csv import (ImportCSVPopup,)
@@ -46,7 +46,7 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ConfigPopup', 'DisplayBase',
            'ImageWidget', 'ImportCSVPopup', 'ImportFolderPopup',
            'IndividualFillPopup', 'IndividualPopup', 'LicensePopup',
            'MATCH_STYLE', 'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow',
-           'MediaEditPopup', 'MediaTable', 'ProgressPopup', 'READMEPopup',
+           'MediaEditPopup', 'MediaTable', 'READMEPopup',
            'ROIPopup', 'SpeciesFillPopup', 'SpeciesPopup', 'StationFillPopup',
            'StationPopup', 'SurveyFillPopup', 'SurveyPopup', 'display_base',
            'display_compare', 'display_media', 'main_display', 'main_gui',

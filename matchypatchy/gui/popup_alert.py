@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt
 
 
 class AlertPopup(QDialog):
-    def __init__(self, parent, prompt, title="Alert", progressbar=False):
+    def __init__(self, parent, prompt, title="Alert", progressbar=False, cancel_only=False):
         super().__init__(parent)
         self.setWindowTitle(title)
         layout = QVBoxLayout()
@@ -16,8 +16,10 @@ class AlertPopup(QDialog):
         layout.addWidget(self.prompt)
 
         if progressbar:
+            self.counter = 0
+            self.min = 0
+            self.max = 100
             self.progress_bar = QProgressBar()
-            self.progress_bar.setTextVisible(False)
             self.progress_bar.setRange(0, 0)
             layout.addWidget(self.progress_bar)
 
@@ -25,40 +27,17 @@ class AlertPopup(QDialog):
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
+
+        if cancel_only:
+            ok_button = buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+            ok_button.setEnabled(False)  # Disable the OK button
+
         layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.setLayout(layout)
 
-    def update(self, prompt):
+    def update_prompt(self, prompt):
         self.prompt.setText(prompt)
-
-
-class ProgressPopup(QDialog):
-    def __init__(self, parent, prompt):
-        super().__init__(parent)
-        self.setWindowTitle("Progress")
-        layout = QVBoxLayout()
-
-        self.counter = 0
-        self.min = 0
-        self.max = 100
-
-        self.label = QLabel(prompt)
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(self.min, self.max)
-
-        layout.addWidget(self.label)
-        layout.addWidget(self.progress_bar)
-
-        self.setLayout(layout)
-
-    def update_progress(self):
-        """Update the progress bar based on the counter value."""
-        self.counter += 1
-        self.progress_bar.setValue(self.counter)  # Update progress bar value
-
-        if self.counter >= self.max:  # Stop the timer when progress reaches 100
-            self.close()
 
     def set_min(self, min):
         """Update the progress bar maximum value"""

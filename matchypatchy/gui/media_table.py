@@ -15,7 +15,7 @@ from matchypatchy.algo import models
 from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
 from matchypatchy.database.media import fetch_media, fetch_roi_media
 from matchypatchy.database.species import fetch_species, fetch_individual
-from matchypatchy.gui.popup_alert import ProgressPopup
+from matchypatchy.gui.popup_alert import AlertPopup
 
 
 class MediaTable(QWidget):
@@ -160,7 +160,7 @@ class MediaTable(QWidget):
         Load images if data is available
         Does not run if load_data returns false to MediaDisplay
         """
-        self.loading_bar = ProgressPopup(self, "Loading images...")
+        self.loading_bar = AlertPopup(self, "Loading images...", progressbar=True)
         self.loading_bar.show()
         self.image_loader_thread = LoadThumbnailThread(self.mpDB, self.data, self.data_type)
         self.image_loader_thread.progress_update.connect(self.loading_bar.set_counter)
