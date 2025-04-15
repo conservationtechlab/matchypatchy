@@ -9,11 +9,13 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.algo import models
 from matchypatchy.database.media import fetch_roi
 
-from animl.api import matchypatchy as animl_mp
+import animl
 
 
 class ReIDThread(QThread):
-    progress_update = pyqtSignal(str)  # Signal to update the progress bar
+    prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
+    progress_update = pyqtSignal(int)  # Signal to update the progress bar
+    done = pyqtSignal()
 
     def __init__(self, mpDB, reid_key, viewpoint_key):
         super().__init__()
@@ -28,11 +30,12 @@ class ReIDThread(QThread):
         self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "sequence_id"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
 
-        self.progress_update.emit("Calculating viewpoint...")
+        self.prompt_update.emit("Calculating viewpoint...")
         self.get_viewpoint()
-        self.progress_update.emit("Calculating embeddings...")
+        self.prompt_update.emit("Calculating embeddings...")
         self.get_embeddings()
-        self.progress_update.emit("Processing complete!")
+        self.prompt_update.emit("Processing complete!")
+        self.done.emit()
 
     def get_viewpoint(self):
         # user did not select a viewpoint model
@@ -40,23 +43,29 @@ class ReIDThread(QThread):
             return
 
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
+        if len(filtered_rois) > 0:
 
-        viewpoints = animl_mp.viewpoint_estimator(filtered_rois, self.image_paths, self.viewpoint_filepath)
-        viewpoints = viewpoints.set_index("id")
+            viewpoints = animl.viewpoint_estimator(filtered_rois, self.image_paths, self.viewpoint_filepath)
+            viewpoints = viewpoints.set_index("id")
 
-        for roi_id, v in viewpoints.iterrows():
-            # TODO: Utilize probability for captures/sequences
-            # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
-            self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(v['value'])})
+            for roi_id, v in viewpoints.iterrows():
+                if not self.isInterruptionRequested():
+                    # TODO: Utilize probability for captures/sequences
+                    # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
+                    self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(v['value'])})
 
-        # Match Button
     def get_embeddings(self):
         # Process only those that have not yet been processed
         filtered_rois = self.rois[self.rois['emb_id'] == 0]
+        if len(filtered_rois) > 0:
 
-        embs = animl_mp.miew_embedding(filtered_rois, self.image_paths, self.reid_filepath)
-        for e in embs:
-            roi_id = e[0]
-            emb = e[1]
-            emb_id = self.mpDB.add_emb(emb)
-            self.mpDB.edit_row("roi", roi_id, {"emb_id": emb_id})
+            model = animl.load_miew(self.reid_filepath)
+            dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
+
+            for i, img in enumerate(dataloader):
+                if not self.isInterruptionRequested():
+                    roi_id, emb = animl.miew_embedding(model, img)
+
+                    emb_id = self.mpDB.add_emb(emb)
+                    self.mpDB.edit_row("roi", roi_id, {"emb_id": emb_id})
+                    self.progress_update.emit(round(100 * i/len(filtered_rois)))

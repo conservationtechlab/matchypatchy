@@ -56,3 +56,16 @@ class AlertPopup(QDialog):
             self.progress_bar.setValue(self.counter)
         else:
             self.close()
+
+    def set_value(self, counter):
+        """Update the progress bar to specific"""
+        self.counter = counter
+        self.progress_bar.setValue(self.counter)
+
+    def no_counter(self):
+        """Update the progress bar to specific"""
+        self.progress_bar.setRange(0, 0)
+
+    def reset_counter(self):
+        """Update the progress bar to specific"""
+        self.set_value(0)

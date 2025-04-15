@@ -119,7 +119,7 @@ class DisplayBase(QWidget):
 
         button_load_csv.clicked.connect(self.import_csv)
         button_load_folder.clicked.connect(self.import_folder)
-        button_process.clicked.connect(self.process_images)
+        button_process.clicked.connect(self.select_models)
         button_validate.clicked.connect(self.validate)
         button_match.clicked.connect(self.match)
         button_export.clicked.connect(self.export)
@@ -261,47 +261,65 @@ class DisplayBase(QWidget):
                 del dialog
 
     # STEP 2: Process Button
-    def process_images(self):
+    def select_models(self):
         """
         Processes Sequence, MD, Animl, Viewpoint, Miew
         For any image/roi that doesn't have values for those already
         """
-        dialog = AlertPopup(self, "Processing Images", title="Processing images...", progressbar=True)
-        dialog.show()
-
         animl_options = MLOptionsPopup(self)
         result = animl_options.exec()
         if result == QDialog.DialogCode.Accepted:
+            mloptions = animl_options.return_selections()
+            del animl_options
+            self.process_images(mloptions)
 
-            sequence_checked = animl_options.select_sequence()
-            detector_key = animl_options.select_detector()
-            classifier_key = animl_options.select_classifier()
-            reid_key = animl_options.select_reid()
-            viewpoint_key = animl_options.select_viewpoint()
+        # processing rejected
+        else:
+            del animl_options
+
+    def process_images(self, mloptions):
+        if self.mpDB.count("media") > 0:
+            dialog = AlertPopup(self, "Processing Images...", title="Processing Images", 
+                                progressbar=True, cancel_only=True)
+            dialog.show()
 
             # 1. SEQUENCE
-            self.sequence_thread = SequenceThread(self.mpDB, sequence_checked)
-            self.sequence_thread.progress_update.connect(dialog.update)
+            print("sequence")
+            dialog.set_max(0)
+            self.sequence_thread = SequenceThread(self.mpDB, mloptions['sequence_checked'])
+            self.sequence_thread.prompt_update.connect(dialog.update_prompt)
             self.sequence_thread.start()
 
             # 2. ANIML (BBOX + SPECIES)
-            self.animl_thread = AnimlThread(self.mpDB, detector_key, classifier_key)
-            self.animl_thread.progress_update.connect(dialog.update)
+            print("animl")
+            dialog.set_max(100)
+            dialog.set_counter(0)
+            self.animl_thread = AnimlThread(self.mpDB, mloptions['detector_key'], mloptions['classifier_key'])
+            self.animl_thread.prompt_update.connect(dialog.update_prompt)
+            self.animl_thread.progress_update.connect(dialog.set_value)
 
             # 3. REID AND VIEWPOINT
-            self.miew_thread = ReIDThread(self.mpDB, reid_key, viewpoint_key)
-            self.miew_thread.progress_update.connect(dialog.update)
+            print("reid")
+            self.miew_thread = ReIDThread(self.mpDB, mloptions['reid_key'], mloptions['viewpoint_key'])
+            self.miew_thread.prompt_update.connect(dialog.update_prompt)
+            self.miew_thread.progress_update.connect(dialog.set_value)
 
             # chain threads
             self.animl_thread.finished.connect(self.miew_thread.start)
-            self.miew_thread.finished.connect(dialog.accept)
+            self.animl_thread.finished.connect(dialog.reset_counter)
+            self.miew_thread.done.connect(dialog.accept)
             self.animl_thread.start()
 
-        # processing canceled
+            dialog.rejected.connect(self.sequence_thread.requestInterruption)
+            dialog.rejected.connect(self.animl_thread.requestInterruption)
+            dialog.rejected.connect(self.miew_thread.requestInterruption)
         else:
-            del animl_options
-            dialog.reject()
+            dialog = AlertPopup(self, "No images to process.")
+            dialog.show()
+
+        if dialog.exec():
             del dialog
+
 
     # STEP 3: Validate/Manage Media Button
     def validate(self):

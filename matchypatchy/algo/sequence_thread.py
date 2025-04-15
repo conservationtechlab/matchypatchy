@@ -14,7 +14,8 @@ from matchypatchy.database.media import fetch_media
 
 
 class SequenceThread(QThread):
-    progress_update = pyqtSignal(str)  # Signal to update the progress bar
+    prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
+    done = pyqtSignal()
 
     def __init__(self, mpDB, flag, max_time=60, max_n=3):
         super().__init__()
@@ -29,35 +30,38 @@ class SequenceThread(QThread):
 
     def run(self):
         # if process sequence option is checked, will rewrite sequence_id
+
         if self.flag:
-            self.progress_update.emit("Processing sequences...")
+            self.prompt_update.emit("Processing sequences...")
 
             sequences = []
             current_sequence = []
             for _, image in self.media.iterrows():
-                if current_sequence:
-                    # station is the same, timestamp under threshold, n under threshold
-                    if (image['station_id'] == current_sequence[0]['station_id']) and \
-                       (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
-                       (len(current_sequence) < self.max_n):
-                        current_sequence.append(image)
+                if not self.isInterruptionRequested():
+                    if current_sequence:
+                        # station is the same, timestamp under threshold, n under threshold
+                        if (image['station_id'] == current_sequence[0]['station_id']) and \
+                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
+                        (len(current_sequence) < self.max_n):
+                            current_sequence.append(image)
+                        else:
+                            # bank the current sequence and start a new group
+                            sequences.append(current_sequence)
+                            current_sequence = [image]
                     else:
-                        # bank the current sequence and start a new group
-                        sequences.append(current_sequence)
                         current_sequence = [image]
-                else:
-                    current_sequence = [image]
 
-            # Append the last group
-            if current_sequence:
-                sequences.append(current_sequence)
+            if not self.isInterruptionRequested():
+                # Append the last group
+                if current_sequence:
+                    sequences.append(current_sequence)
 
-            # update media entries
-            for _, group in enumerate(sequences):
-                # create a sequence id
-                sequence_id = self.mpDB.add_sequence()
-                for image in group:
-                    self.mpDB.edit_row('media', image['id'], {"sequence_id": sequence_id})
+                # update media entries
+                for _, group in enumerate(sequences):
+                    # create a sequence id
+                    sequence_id = self.mpDB.add_sequence()
+                    for image in group:
+                        self.mpDB.edit_row('media', image['id'], {"sequence_id": sequence_id})
 
         # if not calculating sequence, each media entry gets own sequence_id
         else:
@@ -66,3 +70,6 @@ class SequenceThread(QThread):
             for _, image in self.media.iterrows():
                 sequence_id = self.mpDB.add_sequence()
                 self.mpDB.edit_row('media', image['id'], {"sequence_id": sequence_id})
+
+        if not self.isInterruptionRequested():
+            self.done.emit()

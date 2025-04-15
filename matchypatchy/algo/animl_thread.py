@@ -28,11 +28,13 @@ class BuildManifestThread(QThread):
 
 
 class AnimlThread(QThread):
-    progress_update = pyqtSignal(str)  # Signal to update the progress bar
+    prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
+    progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
     def __init__(self, mpDB, detector_key, classifier_key):
         super().__init__()
         self.mpDB = mpDB
+        self.confidence_threshold = 0.1
 
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
@@ -49,39 +51,48 @@ class AnimlThread(QThread):
 
     def run(self):
         if not self.media.empty:
-            self.progress_update.emit("Extracting frames from videos...")
+            self.prompt_update.emit("Extracting frames from videos...")
             self.get_frames()
-            self.progress_update.emit("Calculating bounding box...")
+            self.prompt_update.emit("Calculating bounding boxes...")
             self.get_bbox()
         #self.progress_update.emit("Predicting species...")
         #self.get_species()
 
     def get_frames(self):
         self.media = animl.extract_frames(self.media, config.load('FRAME_DIR'), 
-                                             frames=int(config.load('VIDEO_FRAMES')), file_col="filepath")
+                                          frames=int(config.load('VIDEO_FRAMES')), file_col="filepath")
 
     def get_bbox(self):
         # 1 RUN MED
-        detections = animl.detect_mp(self.md_filepath, self.media)
+        detector = animl.MegaDetector(self.md_filepath)
+
         # 2 GET BOXES
-        for _, roi in detections.iterrows():
-            media_id = roi['id']
+        for i, image in self.media.iterrows():
+            if not self.isInterruptionRequested():
+                media_id = image['id']
 
-            frame = roi['FrameNumber'] if 'FrameNumber' in roi.index else 1
+                detections = animl.process_image(image['filepath'], detector, self.confidence_threshold)
+                detections = animl.parse_MD([detections], manifest=image)
+                detections = animl.get_animals(detections)
 
-            bbox_x = roi['bbox1']
-            bbox_y = roi['bbox2']
-            bbox_w = roi['bbox3']
-            bbox_h = roi['bbox4']
+                for _, roi in detections.iterrows():
+                    frame = roi['FrameNumber'] if 'FrameNumber' in roi.index else 1
 
-            # viewpoint, individual TBD
-            viewpoint = None
-            individual_id = None
+                    bbox_x = roi['bbox1']
+                    bbox_y = roi['bbox2']
+                    bbox_w = roi['bbox3']
+                    bbox_h = roi['bbox4']
 
-            # do not add emb_id, to be determined later
-            self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                              viewpoint=viewpoint, reviewed=0,
-                              individual_id=individual_id, emb_id=0)
+                    # viewpoint, individual TBD
+                    viewpoint = None
+                    individual_id = None
+
+                    # do not add emb_id, to be determined later
+                    self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
+                                    viewpoint=viewpoint, reviewed=0,
+                                    individual_id=individual_id, emb_id=0)
+            self.progress_update.emit(round(100 * (i + 1) / len(self.media)))
+
 
     def get_species(self, label_col="code", binomen_col='species'):
         if self.classifier_filepath is None:
@@ -101,15 +112,16 @@ class AnimlThread(QThread):
         if not filtered_rois.empty:
             filtered_rois = animl.classify_mp(filtered_rois, self.config_filepath)
             for i, row in filtered_rois.iterrows():
-                prediction = row['prediction']
-                # get species_id for prediction
-                try:
-                    species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{prediction}"')[0][0]
-                except IndexError:
-                    binomen = classes.loc[prediction, binomen_col]
-                    species_id = self.mpDB.add_species(binomen, prediction)
-                # update species_id
-                self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})
+                if not self.isInterruptionRequested():
+                    prediction = row['prediction']
+                    # get species_id for prediction
+                    try:
+                        species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{prediction}"')[0][0]
+                    except IndexError:
+                        binomen = classes.loc[prediction, binomen_col]
+                        species_id = self.mpDB.add_species(binomen, prediction)
+                    # update species_id
+                    self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})
 
     def add_species_list(self, classes, binomen_col):
         for common, cl in classes.iterrows():
