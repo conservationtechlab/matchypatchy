@@ -1,17 +1,19 @@
 """
 Class Definition for Query Object
 """
+from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.algo.models import load
 
 
-class QC_QueryContainer():
+class QC_QueryContainer(QObject):
     """
     Alternate Query Container for QC Only
     """
     def __init__(self, parent):
+        super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
         self.filters = dict()
@@ -49,7 +51,7 @@ class QC_QueryContainer():
         self.individuals.pop(None, None)
 
     # STEP 2
-    def filter(self, filter_dict=None, valid_stations=None, reset=True):
+    def filter(self, filter_dict=None, valid_stations=None):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
         Triggered by calculate neighbors and change in filters
@@ -84,8 +86,6 @@ class QC_QueryContainer():
         # must have valid matches to continue
         if self.individuals:
             self.rank()
-            if reset:
-                self.parent.change_query(0)
         # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
             self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
