@@ -7,14 +7,14 @@ from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt, QPoint, QTimer
 from PyQt6.QtGui import QIntValidator
 
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_roi import ROIPopup
-from matchypatchy.gui.popup_alert import ProgressPopup
+
 
 from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
@@ -33,8 +33,7 @@ class DisplayCompare(QWidget):
         self.distance_metric = 'Cosine'
         self.threshold = 70
         self.current_viewpoint = 'Any'
-        self.progress = ProgressPopup(self, "Matching embeddings...")
-        self.progress.set_max(0)
+        self.progress = None
 
         # CREATE QUERY CONTAINER ==============================================
         self.QueryContainer = QueryContainer(self)
@@ -343,6 +342,8 @@ class DisplayCompare(QWidget):
     # ==========================================================================
     # RETURN HOME
     def home(self, warn=False):
+        if self.progress and self.progress.isVisible():
+            self.progress.close()
         if warn:
             dialog = AlertPopup(self, prompt="No data to match, process images first.")
             if dialog.exec():
@@ -358,6 +359,12 @@ class DisplayCompare(QWidget):
         dialog = AlertPopup(self, prompt=prompt)
         if dialog.exec():
             del dialog
+
+    # progress popup
+    def show_progress(self):
+        self.progress = AlertPopup(self, "Matching embeddings...", progressbar=True)
+        self.progress.set_max(100)
+        self.progress.show()
 
     def change_k(self):
         # Set new k value
@@ -382,14 +389,23 @@ class DisplayCompare(QWidget):
         else:
             QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
 
+    # ON ENTRY
     def calculate_neighbors(self):
-        self.QueryContainer = QueryContainer(self)
         emb_exist = self.QueryContainer.load_data()
+        print("sequences: ", emb_exist)
         if emb_exist:
-            self.progress.show()
-            self.QueryContainer.calculate_neighbors(reset=True)
+            self.show_progress()
+            self.QueryContainer.calculate_neighbors()
+            self.QueryContainer.thread_signal.connect(self.filter_neighbors)
         else:
-            self.home(warn=True)
+            self.home(warn=True)    
+
+    def filter_neighbors(self):
+        filtered = self.QueryContainer.filter()
+        if filtered:
+            self.change_query(0)
+        else:
+            self.warn(prompt="No data to compare, all available data from same sequence/capture.")
 
     def recalculate_by_individual(self):
         self.QueryContainer = QC_QueryContainer(self)
@@ -445,7 +461,7 @@ class DisplayCompare(QWidget):
             self.QueryContainer.merge()
             # update data
         self.QueryContainer.load_data()
-        self.QueryContainer.filter(reset=False)
+        self.QueryContainer.filter()
         self.load_query()
         self.load_match()
 
@@ -457,7 +473,7 @@ class DisplayCompare(QWidget):
             del dialog
 
         self.QueryContainer.load_data()
-        self.QueryContainer.filter(reset=False)
+        self.QueryContainer.filter()
         self.load_query()
         self.load_match()
 
@@ -674,7 +690,7 @@ class DisplayCompare(QWidget):
             del dialog
             # reload data
             self.QueryContainer.load_data()
-            self.QueryContainer.filter(reset=False)
+            self.QueryContainer.filter()
             self.load_query()
             self.load_match()
 
@@ -701,7 +717,7 @@ class DisplayCompare(QWidget):
         self.mpDB.edit_row('media', media_id, {"favorite": 1})
         # reload database
         self.QueryContainer.load_data()
-        self.QueryContainer.filter(reset=False)
+        self.QueryContainer.filter()
         self.load_query()
         self.load_match()
 
@@ -710,7 +726,7 @@ class DisplayCompare(QWidget):
         self.mpDB.edit_row('media', media_id, {"favorite": 0})
         # reload database
         self.QueryContainer.load_data()
-        self.QueryContainer.filter(reset=False)
+        self.QueryContainer.filter()
         self.load_query()
         self.load_match()
 
