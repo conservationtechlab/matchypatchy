@@ -21,6 +21,7 @@ class AlertPopup(QDialog):
             self.max = 100
             self.progress_bar = QProgressBar()
             self.progress_bar.setRange(self.min, self.max)
+            self.progress_bar.setValue(self.counter)
             layout.addWidget(self.progress_bar)
 
         # buttons

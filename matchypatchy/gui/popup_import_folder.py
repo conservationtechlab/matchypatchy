@@ -16,6 +16,8 @@ from matchypatchy.algo.animl_thread import BuildManifestThread
 from matchypatchy.algo.import_thread import FolderImportThread
 
 
+# TODO: disable ok while importing, cancel thread
+
 class ImportFolderPopup(QDialog):
     def __init__(self, parent, directory):
         super().__init__(parent)

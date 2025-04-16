@@ -71,6 +71,7 @@ class QueryContainer(QObject):
                                                  metric=self.parent.distance_metric,
                                                  threshold=self.parent.threshold)
         self.match_thread.progress_update.connect(self.parent.progress.set_counter)
+        self.match_thread.prompt_update.connect(self.parent.progress.update_prompt)
         self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
         self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
         self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished

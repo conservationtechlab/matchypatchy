@@ -33,10 +33,10 @@ class DisplayCompare(QWidget):
         self.distance_metric = 'Cosine'
         self.threshold = 70
         self.current_viewpoint = 'Any'
-        self.progress = None
-
+        
         # CREATE QUERY CONTAINER ==============================================
         self.QueryContainer = QueryContainer(self)
+        self.progress = None
 
         # FIRST LAYER ==========================================================
         layout = QVBoxLayout()
@@ -360,12 +360,6 @@ class DisplayCompare(QWidget):
         if dialog.exec():
             del dialog
 
-    # progress popup
-    def show_progress(self):
-        self.progress = AlertPopup(self, "Matching embeddings...", progressbar=True)
-        self.progress.set_max(100)
-        self.progress.show()
-
     def change_k(self):
         # Set new k value
         # Must recalculate neighbors to activate
@@ -396,9 +390,15 @@ class DisplayCompare(QWidget):
         if emb_exist:
             self.show_progress()
             self.QueryContainer.calculate_neighbors()
+            self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
             self.QueryContainer.thread_signal.connect(self.filter_neighbors)
         else:
             self.home(warn=True)    
+
+        # progress popup
+    def show_progress(self):
+        self.progress = AlertPopup(self, "Matching embeddings... calculating time remaining.\nThis may take a while.", progressbar=True, cancel_only=True)
+        self.progress.show()
 
     def filter_neighbors(self):
         filtered = self.QueryContainer.filter()

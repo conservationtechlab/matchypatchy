@@ -80,6 +80,9 @@ class ConfigPopup(QDialog):
 
         self.setLayout(layout)
 
+    def command(self, command):
+        self.mpDB._command(self)
+
     def set_db(self):
         new_db = QFileDialog.getOpenFileName(self, "Get Database",
                                               os.path.expanduser('~'),
@@ -118,3 +121,5 @@ class ConfigPopup(QDialog):
             # Log changes
             logging.info("ML_DIR CHANGED")
             logging.info('ML_DIR: ' + self.cfg['ML_DIR'])
+
+
