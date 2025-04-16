@@ -376,7 +376,6 @@ class DisplayMedia(QWidget):
                 # Clear selection and update UI
                 self.media_table.table.clearSelection()
                 self.update_buttons()
-
                 # Reload updated data and thumbnails
                 data_available = self.load_table()
                 if data_available:
