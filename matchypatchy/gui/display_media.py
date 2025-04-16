@@ -373,6 +373,15 @@ class DisplayMedia(QWidget):
                         id = int(self.media_table.data_filtered.at[row, "id"])
                     self.mpDB.delete('media', f'id={id}')
                 del dialog
+                # Clear selection and update UI
+                self.media_table.table.clearSelection()
+                self.update_buttons()
+
+                # Reload updated data and thumbnails
+                data_available = self.load_table()
+                if data_available:
+                    self.load_thumbnails()
+
 
     # Filters ------------------------------------------------------------------
     def filter_table(self):
