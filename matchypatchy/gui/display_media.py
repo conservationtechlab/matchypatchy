@@ -265,6 +265,10 @@ class DisplayMedia(QWidget):
         data_available = self.load_table()
         if data_available:
             self.load_thumbnails()
+        # Disable "Edit Rows" if not in ROI mode
+        print(f"[change type] type is {self.data_type} update buttons")
+        self.update_buttons()
+
 
     def handle_table_change(self, edit):
         """Slot to receive updates from QTableWidget"""
@@ -308,7 +312,8 @@ class DisplayMedia(QWidget):
             pass
     def update_buttons(self):
         has_selection = len(self.media_table.selectedRows()) > 0
-        self.button_edit.setEnabled(has_selection)
+        # Only allow edit in ROI mode
+        self.button_edit.setEnabled(self.data_type == 1 and has_selection)
         self.button_delete.setEnabled(has_selection)
 
    
@@ -325,13 +330,7 @@ class DisplayMedia(QWidget):
                     self.load_thumbnails()
                 self.media_table.table.clearSelection()
 
-                self.update_buttons() 
-
-
-
-
-
-
+                self.update_buttons()
 
 
     def select_all(self):
@@ -339,16 +338,28 @@ class DisplayMedia(QWidget):
             self.media_table.select_row(row, overwrite=self.button_select.isChecked())
 
     def check_selected_rows(self):
+
         self.selected_rows = self.media_table.selectedRows()
         print("Selected rows:", self.selected_rows)
-        if len(self.selected_rows) > 0:
-            self.button_edit.setEnabled(True)
-            #self.button_duplicate.setEnabled(True)
-            self.button_delete.setEnabled(True)
+        if(self.data_type == 1):
+            if len(self.selected_rows) > 0:
+                self.button_edit.setEnabled(True)
+                #self.button_duplicate.setEnabled(True)
+                self.button_delete.setEnabled(True)
+            else:
+                self.button_edit.setEnabled(False)
+                self.button_duplicate.setEnabled(False)
+                self.button_delete.setEnabled(False)
         else:
-            self.button_edit.setEnabled(False)
-            self.button_duplicate.setEnabled(False)
-            self.button_delete.setEnabled(False)
+            if len(self.selected_rows) > 0:
+                self.button_edit.setEnabled(False)
+                #self.button_duplicate.setEnabled(True)
+                self.button_delete.setEnabled(True)
+            else:
+                self.button_edit.setEnabled(False)
+                self.button_duplicate.setEnabled(False)
+                self.button_delete.setEnabled(False)
+
 
     def duplicate(self): 
         if len(self.selected_rows) > 0:
