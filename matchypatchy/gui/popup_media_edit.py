@@ -39,8 +39,15 @@ class MediaEditPopup(QDialog):
         self.filepath_label = QLabel()
         self.filepath_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.filepath_label.setStyleSheet("padding: 0px; margin: 0px; font-size: 10pt;")
-        self.filepath_label.setFixedHeight(20)  # 👈 Set max height explicitly
+        self.filepath_label.setFixedHeight(20)
         main_layout.addWidget(self.filepath_label)
+
+        # Image index label (e.g., "1/32")
+        self.image_counter_label = QLabel()
+        self.image_counter_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.image_counter_label.setStyleSheet("font-size: 9pt; color: gray;")
+        main_layout.addWidget(self.image_counter_label)
+
 
         # Image + metadata horizontal layout
         content_layout = QHBoxLayout()
@@ -225,6 +232,11 @@ class MediaEditPopup(QDialog):
 
         return df
 
+    def update_image_counter_label(self):
+        total = len(self.data)
+        current = self.current_image_index + 1
+        self.image_counter_label.setText(f"{current} / {total}")
+
     def load_individuals(self):
         individuals = self.mpDB.select("individual", "id, name, sex")
         # Prepend special entries
@@ -255,6 +267,8 @@ class MediaEditPopup(QDialog):
 
         self.prev_btn.setEnabled(self.current_image_index > 0)
         self.next_btn.setEnabled(self.current_image_index < len(self.data) - 1)
+        self.update_image_counter_label()
+
 
     def show_next_image(self):
         if self.current_image_index < len(self.data) - 1:
