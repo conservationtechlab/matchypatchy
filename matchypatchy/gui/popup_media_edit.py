@@ -8,8 +8,7 @@ from PyQt6.QtWidgets import QPushButton
 import matchypatchy.database.media as db_roi
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_individual import IndividualFillPopup
-
-#from matchypatchy.database.location import fetch_station_names_from_id
+from matchypatchy.gui.popup_species import SpeciesFillPopup
 
 
 class MediaEditPopup(QDialog):
@@ -50,7 +49,6 @@ class MediaEditPopup(QDialog):
         self.image_counter_label.setStyleSheet("font-size: 9pt; color: gray;")
         self.image_counter_label.setFixedHeight(20)
         main_layout.addWidget(self.image_counter_label)
-
 
         # Image + metadata horizontal layout
         content_layout = QHBoxLayout()
@@ -127,26 +125,42 @@ class MediaEditPopup(QDialog):
             label = QLabel(label_txt)
             label.setFixedWidth(horizontal_gap)
             row.addWidget(label)
-            row.addWidget(widget)
             if label_txt == "Name: ":
-                name_widget = QWidget()
                 name_layout = QHBoxLayout()
                 name_layout.setContentsMargins(0, 0, 0, 0)
                 name_layout.setSpacing(6)
 
-                name_layout.addWidget(widget)
+                name_layout.addWidget(widget, 1)
 
                 plus_btn = QPushButton("+")
                 plus_btn.setFixedWidth(24)
+                plus_btn.setToolTip("Add new individual")
                 plus_btn.clicked.connect(self.add_new_individual)
                 name_layout.addWidget(plus_btn)
 
-                name_layout.addStretch()  # Pushes + to the left if there's extra space
-                name_widget.setLayout(name_layout)
-                name_widget.setMaximumWidth(250)  # Prevents widget from stretching too wide
-                row.addWidget(name_widget)
+                name_container = QWidget()
+                name_container.setLayout(name_layout)
+                row.addWidget(name_container, 1)
+
+            elif label_txt == "Species: ":
+                species_layout = QHBoxLayout()
+                species_layout.setContentsMargins(0, 0, 0, 0)
+                species_layout.setSpacing(6)
+
+                species_layout.addWidget(widget, 1)
+
+                plus_btn = QPushButton("+")
+                plus_btn.setFixedWidth(24)
+                plus_btn.setToolTip("Add new species")
+                plus_btn.clicked.connect(self.add_new_species)
+                species_layout.addWidget(plus_btn)
+
+                species_container = QWidget()
+                species_container.setLayout(species_layout)
+                row.addWidget(species_container, 1)
+
             else:
-                row.addWidget(widget)
+                row.addWidget(widget, 1)
             metadata_layout.addLayout(row)
             metadata_layout.addSpacing(vertical_gap)
 
@@ -263,8 +277,8 @@ class MediaEditPopup(QDialog):
         dialog = IndividualFillPopup(self)
         if dialog.exec():
             individual_id = self.mpDB.add_individual(dialog.get_species_id(),
-                                                    dialog.get_name(),
-                                                    dialog.get_sex())
+                                                     dialog.get_name(),
+                                                     dialog.get_sex())
             print(f"[add_new_individual] Added individual_id = {individual_id}")
 
             # Update all selected ROIs with this new individual
@@ -281,8 +295,7 @@ class MediaEditPopup(QDialog):
             # Auto-select the new individual
             index = next((i for i, (id, _, _) in enumerate(self.individuals) if id == individual_id), 0)
             self.name.setCurrentIndex(index)
-            print(f"[add_new_individual] Auto-selected new individual in dropdown")
-
+            print("[add_new_individual] Auto-selected new individual in dropdown")
 
     def load_individuals(self):
         individuals = self.mpDB.select("individual", "id, name, sex")
@@ -315,7 +328,6 @@ class MediaEditPopup(QDialog):
         self.prev_btn.setEnabled(self.current_image_index > 0)
         self.next_btn.setEnabled(self.current_image_index < len(self.data) - 1)
         self.update_image_counter_label()
-
 
     def show_next_image(self):
         if self.current_image_index < len(self.data) - 1:
@@ -413,6 +425,22 @@ class MediaEditPopup(QDialog):
             self.data.loc[idx, "favorite"] = new_val
 
         self.parent.media_table.refresh_table()
+
+    def add_new_species(self):
+        dialog = SpeciesFillPopup(self)
+        if dialog.exec():
+            species_id = self.mpDB.add_species(dialog.get_binomen(),
+                                               dialog.get_common())
+            print(f"[add_new_species] Added species_id = {species_id}")
+
+            # Apply to all selected ROIs
+            for i, row in self.data.iterrows():
+                roi_id = row["id"]
+                self.mpDB.edit_row('roi', roi_id, {"species_id": species_id}, quiet=False)
+                self.data.at[i, "species_id"] = species_id
+            # Reload UI
+            # self.refresh_species()
+            self.refresh_values()
 
     def accept(self):
         print("\n=== ACCEPTING CHANGES ===")
