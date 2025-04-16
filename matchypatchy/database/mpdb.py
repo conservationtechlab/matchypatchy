@@ -4,8 +4,9 @@ Class Definition for MatchyPatchyDB
 import logging
 from typing import Optional
 import sqlite3
+import chromadb
 
-from matchypatchy.database.setup import setup_database
+from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy import sqlite_vec
 
 #TODO:  fix error return for functions returning multiple objects (cannot unpack error)
@@ -14,6 +15,7 @@ class MatchyPatchyDB():
     def __init__(self, filepath='matchypatchy.db'):
         self.filepath = filepath
         self.initiate = setup_database(self.filepath)
+        setup_chromadb()
 
     def info(self):
         """
@@ -275,26 +277,6 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_emb(self, embedding):
-        try:
-            db = sqlite3.connect(self.filepath)
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
-            cursor = db.cursor()
-            command = """INSERT INTO roi_emb (embedding)
-                        VALUES (?);"""
-            cursor.execute(command, [embedding])
-            id = cursor.lastrowid
-            db.commit()
-            db.close()
-            return id
-        except sqlite3.Error as error:
-            logging.error("Failed to add embedding: ", error)
-            if db:
-                db.close()
-            return None
-
     def add_sequence(self):
         # Note difference in variable order, foreign keys
         try:
@@ -528,32 +510,33 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def clear_emb(self):
-        """
-        Clear vector database and rebuild (no way to delete)
-        """
+    # EMBEDDINGS ===============================================================
+
+    def add_emb(self, embedding):
         try:
             db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
             db.enable_load_extension(True)
             sqlite_vec.load(db)
             db.enable_load_extension(False)
-            cursor.execute("DROP TABLE IF EXISTS roi_emb;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_chunks;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_rowids;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_vector_chunks00;")
-            db.commit()
-            cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
+            cursor = db.cursor()
+            command = """INSERT INTO roi_emb (embedding)
+                        VALUES (?);"""
+            cursor.execute(command, [embedding])
+            id = cursor.lastrowid
             db.commit()
             db.close()
-            return True
+            return id
         except sqlite3.Error as error:
-            logging.error("Failed to clear roi_emb: ", error)
+            logging.error("Failed to add embedding: ", error)
             if db:
                 db.close()
-            return False
+            return None
+        
+    def add_emb_chroma(self, id, embedding):
+        client = chromadb.PersistentClient(path="emb.db")
+        collection = client.get_collection(name="embedding_collection")
+        collection.add(embeddings=[embedding], ids=[id])
 
-    # KNN ======================================================================
     def knn(self, query, k=3, metric='cosine'):
         """
         Return the knn for a query embedding
@@ -593,3 +576,28 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return None
+
+    def clear_emb(self):
+        """
+        Clear vector database and rebuild (no way to delete)
+        """
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            db.enable_load_extension(True)
+            sqlite_vec.load(db)
+            db.enable_load_extension(False)
+            cursor.execute("DROP TABLE IF EXISTS roi_emb;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_chunks;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_rowids;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_vector_chunks00;")
+            db.commit()
+            cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.Error as error:
+            logging.error("Failed to clear roi_emb: ", error)
+            if db:
+                db.close()
+            return False

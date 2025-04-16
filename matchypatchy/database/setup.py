@@ -3,6 +3,8 @@ Set Up matchypatchy Database
 """
 import logging
 import sqlite3
+import chromadb
+from datetime import datetime
 from matchypatchy import sqlite_vec
 
 
@@ -114,5 +116,13 @@ def setup_database(filepath='matchypatchy.db'):
     return True
 
 
-if __name__ == "__main__":
-    setup_database()
+def setup_chromadb():
+    # TODO: package emb.db
+    client = chromadb.PersistentClient(path="emb.db")
+    client.create_collection(
+        name="embedding_collection",
+        metadata={
+            "description": "Embedding Collection",
+            "created": str(datetime.now())
+        }  
+    )
