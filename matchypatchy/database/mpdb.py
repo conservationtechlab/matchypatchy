@@ -5,6 +5,8 @@ import logging
 from typing import Optional
 import sqlite3
 import chromadb
+from pathlib import Path
+from random import randrange
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy import sqlite_vec
@@ -12,10 +14,33 @@ from matchypatchy import sqlite_vec
 #TODO:  fix error return for functions returning multiple objects (cannot unpack error)
 
 class MatchyPatchyDB():
-    def __init__(self, filepath='matchypatchy.db'):
-        self.filepath = filepath
-        self.initiate = setup_database(self.filepath)
-        setup_chromadb()
+    def __init__(self, DB_PATH):
+        self.filepath = Path(DB_PATH) / 'matchypatchy.db'
+        self.chroma_filepath = Path(DB_PATH) / 'emb.db'
+        if self.filepath.is_file() and self.chroma_filepath.is_dir():
+            validated = self.validate()
+            if validated:
+                self.key = validated
+            else:
+                # TODO
+                return
+        else:
+            self.key = '{:04}'.format(randrange(1, 10 ** 5))
+            setup_database(self.key, self.filepath)
+            setup_chromadb(self.key, self.chroma_filepath)
+
+    def retrieve_key(self):
+        db = sqlite3.connect(self.filepath)
+        cursor = db.cursor()
+        cursor.execute("SELECT key FROM metadata WHERE id=1;")
+        mpdb_key = cursor.fetchone()[0]
+        db.close()
+
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
+        collection = client.get_collection(name="embedding_collection")
+        chroma_key = collection.metadata['key']
+        
+        return mpdb_key, chroma_key
 
     def info(self):
         """
@@ -44,22 +69,26 @@ class MatchyPatchyDB():
         db.close()
 
     def validate(self):
+        # TODO: verify key
         db = sqlite3.connect(self.filepath)
-        db.enable_load_extension(True)
-        sqlite_vec.load(db)
-        db.enable_load_extension(False)
         cursor = db.cursor()
         cursor.execute("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger')")
         schema = cursor.fetchall()
+        db.close()
 
         s = ""
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
-    
+
         with open('schema', 'r') as file:
             content = file.read()
             
-        return content==s
+        match_schema = (content==s)
+        mpkey, chromakey = self.retrieve_key()
+        if match_schema and mpkey == chromakey:
+            return mpkey
+        else:
+            return False
 
     def _command(self, command):
         """
@@ -535,7 +564,14 @@ class MatchyPatchyDB():
     def add_emb_chroma(self, id, embedding):
         client = chromadb.PersistentClient(path="emb.db")
         collection = client.get_collection(name="embedding_collection")
-        collection.add(embeddings=[embedding], ids=[id])
+        collection.add(embeddings=[embedding], ids=[str(id)])
+
+    def knn_chroma(self, query_id, k=3):
+        client = chromadb.PersistentClient(path="emb.db")
+        collection = client.get_collection(name="embedding_collection")
+        query = collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
+        knn = collection.query(query_embeddings=query, n_results=k)
+        return knn
 
     def knn(self, query, k=3, metric='cosine'):
         """

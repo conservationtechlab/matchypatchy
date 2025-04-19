@@ -54,6 +54,7 @@ class MatchEmbeddingThread(QThread):
                 # skip rois with no emb_ids
                 emb_ids = [e for e in emb_ids if e > 0]
 
+
                 # get all neighbors for sequence
                 all_neighbors = []
                 for emb_id in emb_ids:
@@ -85,9 +86,11 @@ class MatchEmbeddingThread(QThread):
         """
         Calcualtes knn for single roi embedding
         """
-        query = self.mpDB.select("roi_emb", columns="embedding", row_cond=f'rowid={emb_id}')[0][0]
-        # return self.mpDB.knn(query, k=self.k)
-        return self.mpDB.knn(query, k=self.k, metric=self.metric)
+        neighbors = self.mpDB.knn_chroma(emb_id, k=self.k)
+        nns = dict(zip(neighbors['ids'], neighbors['distances']))
+        print(nns)
+
+        return nns
 
     def filter(self, sequence_rois, neighbors):
         """

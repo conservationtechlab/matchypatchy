@@ -5,17 +5,18 @@ import logging
 import sqlite3
 import chromadb
 from datetime import datetime
-from matchypatchy import sqlite_vec
 
 
-def setup_database(filepath='matchypatchy.db'):
+def setup_database(key, filepath):
     # Connect to SQLite database
     db = sqlite3.connect(filepath)
     cursor = db.cursor()
-    db.enable_load_extension(True)
-    sqlite_vec.load(db)
-    db.enable_load_extension(False)
-    cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
+
+    # add key to database
+    cursor.execute('''CREATE TABLE IF NOT EXISTS metadata (
+                        id INTEGER PRIMARY KEY,
+                        key TEXT UNIQUE NOT NULL );''')
+    cursor.execute(f"""INSERT INTO metadata (key) VALUES ({key});""")
 
     # REGION
     # Corresponds to "Site" in CameraBase
@@ -116,13 +117,13 @@ def setup_database(filepath='matchypatchy.db'):
     return True
 
 
-def setup_chromadb():
-    # TODO: package emb.db
-    client = chromadb.PersistentClient(path="emb.db")
+def setup_chromadb(key, filepath):
+    client = chromadb.PersistentClient(str(filepath))
     client.create_collection(
         name="embedding_collection",
         metadata={
             "description": "Embedding Collection",
-            "created": str(datetime.now())
+            "created": str(datetime.now()),
+            "key": key
         }  
     )

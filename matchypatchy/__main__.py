@@ -26,10 +26,14 @@ from matchypatchy.database import mpdb
 from matchypatchy import config
 from matchypatchy.algo import models
 
+
 def main():
     cfg = config.initiate()
     models.update_model_yml()
-    mpDB = mpdb.MatchyPatchyDB(cfg['DB_PATH'])
+    mpDB = mpdb.MatchyPatchyDB(cfg['DB_DIR'])
+    print(mpDB.key)
+    # add DB Key
+    config.add(cfg['CONFIG_PATH'], mpDB.key)
     main_gui.main_display(mpDB)
 
 if __name__ == "__main__":
