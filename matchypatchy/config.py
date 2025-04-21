@@ -27,7 +27,9 @@ def initiate():
     # check if cfg exists, load
     if Path(default_cfg['CONFIG_PATH']).exists():
         cfg = load(default_cfg['CONFIG_PATH'])
-        #TODO : CHECK IF ALL PARAMETERS ARE PRESENT
+        for key in default_cfg.keys():
+            if key not in cfg:
+                cfg[key] = default_cfg[key]
     # else save default
     else:
         with open(default_cfg['CONFIG_PATH'], 'w') as cfg_file:
@@ -56,19 +58,20 @@ def load(config_path, key=None):
             return cfg[key]
         else:
             return cfg
-        
-def add(config_path, key_dict):
+
+    
+def add(config_path, key_dict, quiet=False):
     # Load the config into a dict
-    print(key_dict)
     with open(config_path, 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
-        
-
-        #try cfg[key_dict.keys()]:
-
-        #else:
-            
-
+        for key in  key_dict.keys():
+            if key in cfg and not quiet:
+                print(f"Key '{key}' already exists. Value: {cfg[key]}")
+            else:
+                cfg[key] = key_dict[key]
+    # rewrite config
+    with open(config_path, 'w') as cfg_file:
+        yaml.dump(cfg, cfg_file)
 
 
 def update(new_cfg):

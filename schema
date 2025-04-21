@@ -1,14 +1,8 @@
-TABLE: roi_emb
-CREATE VIRTUAL TABLE roi_emb USING vec0 (embedding float[2152])
-TABLE: roi_emb_chunks
-CREATE TABLE "roi_emb_chunks"(chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,size INTEGER NOT NULL,validity BLOB NOT NULL,rowids BLOB NOT NULL)
-TABLE: sqlite_sequence
-CREATE TABLE sqlite_sequence(name,seq)
-TABLE: roi_emb_rowids
-CREATE TABLE "roi_emb_rowids"(rowid INTEGER PRIMARY KEY AUTOINCREMENT,id,chunk_id INTEGER,chunk_offset INTEGER)
-TABLE: roi_emb_vector_chunks00
-CREATE TABLE "roi_emb_vector_chunks00"(rowid PRIMARY KEY,vectors BLOB NOT NULL)
-INDEX: sqlite_autoindex_roi_emb_vector_chunks00_1
+TABLE: metadata
+CREATE TABLE metadata (
+                        id INTEGER PRIMARY KEY,
+                        key TEXT UNIQUE NOT NULL )
+INDEX: sqlite_autoindex_metadata_1
 None
 TABLE: region
 CREATE TABLE region (

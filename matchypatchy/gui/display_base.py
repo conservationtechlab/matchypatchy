@@ -36,6 +36,7 @@ class DisplayBase(QWidget):
         super().__init__()
         self.parent = parent
         self.mpDB = parent.mpDB
+        self.cfg_path = parent.cfg_path
 
         container = QWidget()
         container.setObjectName("mainBorderWidget")
@@ -364,7 +365,7 @@ class DisplayBase(QWidget):
 
     def validate_db(self):
         valid = self.mpDB.validate()
-        dialog = AlertPopup(self, f"Database is valid: {valid}")
+        dialog = AlertPopup(self, f"Database is valid, key: {valid}")
         if dialog.exec():
             del dialog
 

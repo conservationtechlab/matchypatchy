@@ -18,16 +18,29 @@ class MatchyPatchyDB():
         self.filepath = Path(DB_PATH) / 'matchypatchy.db'
         self.chroma_filepath = Path(DB_PATH) / 'emb.db'
         if self.filepath.is_file() and self.chroma_filepath.is_dir():
-            validated = self.validate()
-            if validated:
-                self.key = validated
-            else:
-                # TODO
-                return
+            self.key = self.validate()
         else:
-            self.key = '{:04}'.format(randrange(1, 10 ** 5))
+            self.key = '{:05}'.format(randrange(1, 10 ** 5))
             setup_database(self.key, self.filepath)
             setup_chromadb(self.key, self.chroma_filepath)
+
+    def update_paths(self, DB_PATH):
+        filepath = Path(DB_PATH) / 'matchypatchy.db'
+        chroma_filepath = Path(DB_PATH) / 'emb.db'
+        if filepath.is_file() and chroma_filepath.is_dir():
+            valid = self.validate()
+            if valid:
+                self.key = valid
+                self.filepath = filepath
+                self.chroma_filepath = chroma_filepath
+                return True
+            else:
+                return False
+        else:
+            self.key = '{:05}'.format(randrange(1, 10 ** 5))
+            setup_database(self.key, self.filepath)
+            setup_chromadb(self.key, self.chroma_filepath)
+            return True
 
     def retrieve_key(self):
         db = sqlite3.connect(self.filepath)
@@ -82,7 +95,7 @@ class MatchyPatchyDB():
 
         with open('schema', 'r') as file:
             content = file.read()
-            
+    
         match_schema = (content==s)
         mpkey, chromakey = self.retrieve_key()
         if match_schema and mpkey == chromakey:

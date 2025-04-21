@@ -19,16 +19,17 @@ from PyQt6.QtGui import QAction, QGuiApplication
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
 from matchypatchy.gui.display_compare import DisplayCompare
-from matchypatchy.gui.popup_dropdown import DropdownPopup
+from matchypatchy.gui.popup_alert import AlertPopup
 
 from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
 
 from matchypatchy.database import location
 
 class MainWindow(QMainWindow):
-    def __init__(self, mpDB):
+    def __init__(self, mpDB, cfg_path):
         super().__init__()
         self.mpDB = mpDB
+        self.cfg_path = cfg_path
         self.setWindowTitle("MatchyPatchy")
         screen_resolution = QGuiApplication.primaryScreen().geometry()
         print(screen_resolution)
@@ -165,7 +166,7 @@ class MainWindow(QMainWindow):
 # ==============================================================================
 # MAIN FUNCTION 
 # ==============================================================================
-def main_display(mpDB):
+def main_display(mpDB, cfg_path, warning=None):
     """
     Launch GUI
 
@@ -173,8 +174,14 @@ def main_display(mpDB):
         mpDB: matchypatchy database object
     """
     app = QApplication(sys.argv)
-    window = MainWindow(mpDB)
+    window = MainWindow(mpDB, cfg_path)
     window.show()
+    
+    if warning:
+        dialog = AlertPopup(window, prompt=warning)
+        if dialog.exec():
+            del dialog
+
     sys.exit(app.exec())
 
 
