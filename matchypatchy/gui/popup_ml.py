@@ -14,8 +14,7 @@ from matchypatchy import config
 class MLDownloadPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.parent = parent
-        self.ml_dir = Path(config.load(self.parent.cfg_path, 'ML_DIR'))
+        self.ml_dir = Path(config.load('ML_DIR'))
         self.ml_cfg = models.load()
         self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
@@ -88,8 +87,7 @@ class MLDownloadPopup(QDialog):
 class MLOptionsPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.parent = parent
-        self.ml_dir = Path(config.load(self.parent.cfg_path, 'ML_DIR'))
+        self.ml_dir = Path(config.load('ML_DIR'))
         self.ml_cfg = models.load()
         self.available_models = self.discover_models()
 

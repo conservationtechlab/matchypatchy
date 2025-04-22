@@ -19,7 +19,7 @@ class ConfigPopup(QDialog):
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
         self.mpDB = parent.mpDB
-        self.cfg = config.load(parent.cfg_path)
+        self.cfg = config.load()
 
         layout = QVBoxLayout()
 

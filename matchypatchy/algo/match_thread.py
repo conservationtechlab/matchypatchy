@@ -6,10 +6,8 @@ import time
 from datetime import timedelta
 import pandas as pd
 import warnings
-from functools import partial
 warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from PyQt6.QtCore import QThread, pyqtSignal
 
 

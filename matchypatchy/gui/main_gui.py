@@ -26,13 +26,12 @@ from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
 from matchypatchy.database import location
 
 class MainWindow(QMainWindow):
-    def __init__(self, mpDB, cfg_path):
+    def __init__(self, mpDB):
         super().__init__()
         self.mpDB = mpDB
-        self.cfg_path = cfg_path
         self.setWindowTitle("MatchyPatchy")
         screen_resolution = QGuiApplication.primaryScreen().geometry()
-        print(screen_resolution)
+        #print(screen_resolution)
         self.setMinimumSize(1200, 900)
         # resize to full screen if small screen
         if screen_resolution.width() < 1600:
@@ -166,7 +165,7 @@ class MainWindow(QMainWindow):
 # ==============================================================================
 # MAIN FUNCTION 
 # ==============================================================================
-def main_display(mpDB, cfg_path, warning=None):
+def main_display(mpDB, warning=None):
     """
     Launch GUI
 
@@ -174,7 +173,7 @@ def main_display(mpDB, cfg_path, warning=None):
         mpDB: matchypatchy database object
     """
     app = QApplication(sys.argv)
-    window = MainWindow(mpDB, cfg_path)
+    window = MainWindow(mpDB)
     window.show()
     
     if warning:

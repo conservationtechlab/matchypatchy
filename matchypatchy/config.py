@@ -18,21 +18,23 @@ def initiate():
     
     default_cfg = {'TEMP_DIR': str(Path(tempfile.gettempdir())),
            'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
-           'CONFIG_PATH': str(HOME_DIR / 'config.yml'),
            'DB_DIR': str(HOME_DIR / 'Database'),
            'ML_DIR': str(HOME_DIR / 'Models'),
+           'FRAME_DIR': str(Path(tempfile.gettempdir()) / 'Frames'),
            'VIDEO_FRAMES': 1
     }
 
     # check if cfg exists, load
-    if Path(default_cfg['CONFIG_PATH']).exists():
-        cfg = load(default_cfg['CONFIG_PATH'])
+    if Path('config.yml').exists():
+        cfg = load()
         for key in default_cfg.keys():
             if key not in cfg:
                 cfg[key] = default_cfg[key]
+        with open('config.yml', 'w') as cfg_file:
+            yaml.dump(cfg, cfg_file)
     # else save default
     else:
-        with open(default_cfg['CONFIG_PATH'], 'w') as cfg_file:
+        with open('config.yml', 'w') as cfg_file:
             yaml.dump(default_cfg, cfg_file)
         cfg = default_cfg
 
@@ -50,9 +52,9 @@ def initiate():
     return cfg
 
 
-def load(config_path, key=None):
+def load(key=None):
     # Load the config into a dict
-    with open(config_path, 'r') as cfg_file:
+    with open('config.yml', 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
         if key:
             return cfg[key]
@@ -60,9 +62,9 @@ def load(config_path, key=None):
             return cfg
 
     
-def add(config_path, key_dict, quiet=False):
+def add(key_dict, quiet=False):
     # Load the config into a dict
-    with open(config_path, 'r') as cfg_file:
+    with open('config.yml', 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
         for key in  key_dict.keys():
             if key in cfg and not quiet:
@@ -70,7 +72,7 @@ def add(config_path, key_dict, quiet=False):
             else:
                 cfg[key] = key_dict[key]
     # rewrite config
-    with open(config_path, 'w') as cfg_file:
+    with open('config.yml', 'w') as cfg_file:
         yaml.dump(cfg, cfg_file)
 
 
