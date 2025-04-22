@@ -18,7 +18,7 @@ class MatchEmbeddingThread(QThread):
     nearest_dict_return = pyqtSignal(dict)
     done = pyqtSignal()
 
-    def __init__(self, mpDB, rois, sequences, k=3, metric='Cosine', threshold=100):
+    def __init__(self, mpDB, rois, sequences, k=3, metric='Cosine', threshold=10000):
         super().__init__()
         self.mpDB = mpDB
         self.rois = rois
@@ -26,10 +26,10 @@ class MatchEmbeddingThread(QThread):
         self.n = len(sequences)
         self.k = k
         self.metric = metric
-        if self.metric == 'Cosine':
-            self.threshold = threshold/100
-        else:
-            self.threshold = threshold
+        #if self.metric == 'Cosine':
+        #    self.threshold = threshold/100
+        #else:
+        self.threshold = threshold
 
     def run(self):
         """
@@ -45,18 +45,12 @@ class MatchEmbeddingThread(QThread):
 
         for i, s in enumerate(self.sequences):
             if not self.isInterruptionRequested():
-                print(i)
                 sequence_rois = self.sequences[s]
-                emb_ids = self.rois.loc[self.rois['id'].isin(sequence_rois), "emb_id"].tolist()
-
-                # skip rois with no emb_ids
-                emb_ids = [e for e in emb_ids if e > 0]
-
 
                 # get all neighbors for sequence
                 all_neighbors = []
-                for emb_id in emb_ids:
-                    all_neighbors.extend(self.roi_knn(emb_id))
+                for roi_id in sequence_rois:
+                    all_neighbors.extend(self.roi_knn(roi_id))
 
                 all_neighbors = self.remove_duplicate_matches(all_neighbors)
                 filtered_neighbors = self.filter(sequence_rois, all_neighbors)
@@ -68,12 +62,12 @@ class MatchEmbeddingThread(QThread):
                 neighbor_dict[s] = filtered_neighbors
                 nearest_dict[s] = filtered_neighbors[0][1]
 
-                elapsed_time = time.perf_counter() - start_time
+                #elapsed_time = time.perf_counter() - start_time
                 completed_percentage = round(100 * (i + 1) / self.n)
 
-                if completed_percentage > 1:
-                    remaining_time = (elapsed_time / completed_percentage) - elapsed_time
-                    self.prompt_update.emit("Matching embeddings, remaining time: approx. {:0>8}".format(str(timedelta(seconds=remaining_time))))
+                #if completed_percentage > 1:
+                #    remaining_time = (elapsed_time / completed_percentage) - elapsed_time
+                #    self.prompt_update.emit("Matching embeddings, remaining time: approx. {:0>8}".format(str(timedelta(seconds=remaining_time))))
 
                 self.progress_update.emit(completed_percentage)
 
@@ -85,10 +79,8 @@ class MatchEmbeddingThread(QThread):
         Calcualtes knn for single roi embedding
         """
         neighbors = self.mpDB.knn_chroma(emb_id, k=self.k)
-        nns = dict(zip(neighbors['ids'], neighbors['distances']))
-        print(nns)
-
-        return nns
+        nns = list(zip([int(x) for x in neighbors['ids'][0]], neighbors['distances'][0]))
+        return nns[1:]  # skip self-match
 
     def filter(self, sequence_rois, neighbors):
         """
@@ -96,7 +88,7 @@ class MatchEmbeddingThread(QThread):
         """
         filtered = []
         query_rois = self.rois.loc[self.rois['id'].isin(sequence_rois)]
-        neighbors_df = self.rois[self.rois['emb_id'].isin([n[0] for n in neighbors])]
+        neighbors_df = self.rois.loc[self.rois['id'].isin([n[0] for n in neighbors])]
         neighbors_df["distance"] = [n[1] for n in neighbors]  # Add distances from KNN
 
         # Perform a cross-join using a Cartesian product
@@ -108,7 +100,8 @@ class MatchEmbeddingThread(QThread):
         filtered = merged[
             (merged["individual_id_query"].isna() | (merged["individual_id_query"] != merged["individual_id_neighbor"])) &
             (merged["sequence_id_query"].isna() | (merged["sequence_id_query"] != merged["sequence_id_neighbor"])) &
-            (merged["distance"] < self.threshold) & (merged["distance"] > 0)
+            #(merged["distance"] < self.threshold) & 
+            (merged["distance"] > 0)
         ]
         # Return filtered neighbors as tuples of (ROI ID, distance)
         return list(zip(filtered["id_neighbor"], filtered["distance"]))

@@ -29,13 +29,9 @@ from matchypatchy.algo import models
 
 def main():
     cfg = config.initiate()
-    key = cfg.get('KEY')
     models.update_model_yml()
     mpDB = mpdb.MatchyPatchyDB(cfg['DB_DIR'])
-    if key == None:
-        config.add({"KEY": mpDB.key})
-        main_gui.main_display(mpDB)
-    elif mpDB.key == key:
+    if mpDB.key:
         main_gui.main_display(mpDB)      
     else:
         main_gui.main_display(mpDB, warning='Existing database contains an error. Please select a valid database in the configuration settings.')

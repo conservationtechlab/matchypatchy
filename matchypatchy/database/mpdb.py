@@ -60,9 +60,6 @@ class MatchyPatchyDB():
         Validate All Tables Are Present
         """
         db = sqlite3.connect(self.filepath)
-        db.enable_load_extension(True)
-        sqlite_vec.load(db)
-        db.enable_load_extension(False)
         cursor = db.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
@@ -75,14 +72,9 @@ class MatchyPatchyDB():
         roi = cursor.fetchone()[0]
         print(f"ROI: {roi}")
         logging.info(f"ROI: {roi}")
-        cursor.execute("SELECT COUNT(rowid) FROM roi_emb")
-        emb = cursor.fetchone()[0]
-        print(f"Emb: {emb}")
-        logging.info(f"Emb: {emb}")
         db.close()
 
     def validate(self):
-        # TODO: verify key
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
         cursor.execute("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger')")
@@ -110,9 +102,6 @@ class MatchyPatchyDB():
         """
         try:
             db = sqlite3.connect(self.filepath)
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
             cursor = db.cursor()
             cursor.execute(command)
             rows = cursor.fetchall()
@@ -296,7 +285,7 @@ class MatchyPatchyDB():
 
     def add_roi(self, media_id: int, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
                 species_id: Optional[int]=None, viewpoint: Optional[str]=None, reviewed: int=0, 
-                individual_id: Optional[int]=None, emb_id: int=0):
+                individual_id: Optional[int]=None, emb: int=0):
         # Note difference in variable order, foreign keys
 
         try:
@@ -304,10 +293,10 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                         species_id, viewpoint, reviewed, individual_id, emb_id) 
+                         species_id, viewpoint, reviewed, individual_id, emb) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                          species_id, viewpoint, reviewed, individual_id, emb_id)
+                          species_id, viewpoint, reviewed, individual_id, emb)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -452,7 +441,7 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                         roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp,
+                         roi.media_id, roi.species_id, roi.individual_id, emb, filepath, ext, timestamp,
                          station_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex, age"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
@@ -557,9 +546,6 @@ class MatchyPatchyDB():
     def add_emb(self, embedding):
         try:
             db = sqlite3.connect(self.filepath)
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
             cursor = db.cursor()
             command = """INSERT INTO roi_emb (embedding)
                         VALUES (?);"""
@@ -575,15 +561,15 @@ class MatchyPatchyDB():
             return None
         
     def add_emb_chroma(self, id, embedding):
-        client = chromadb.PersistentClient(path="emb.db")
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         collection.add(embeddings=[embedding], ids=[str(id)])
 
     def knn_chroma(self, query_id, k=3):
-        client = chromadb.PersistentClient(path="emb.db")
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         query = collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
-        knn = collection.query(query_embeddings=query, n_results=k)
+        knn = collection.query(query_embeddings=query, n_results=k+1)
         return knn
 
     def knn(self, query, k=3, metric='cosine'):

@@ -69,11 +69,10 @@ def setup_database(key, filepath):
                         species_id INTEGER,
                         reviewed INTEGER NOT NULL,
                         individual_id INTEGER,
-                        emb_id INTEGER,
+                        emb INTEGER,
                         FOREIGN KEY(media_id) REFERENCES media (id)
                         FOREIGN KEY(individual_id) REFERENCES individual (id)
-                        FOREIGN KEY(species_id) REFERENCES species (id)
-                        FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) );''')
+                        FOREIGN KEY(species_id) REFERENCES species (id));''')
 
     # INDIVIDUAL
     cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
@@ -124,6 +123,7 @@ def setup_chromadb(key, filepath):
         metadata={
             "description": "Embedding Collection",
             "created": str(datetime.now()),
+            "hnsw:space": "cosine",
             "key": key
         }  
     )
