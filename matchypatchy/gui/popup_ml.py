@@ -15,7 +15,7 @@ class MLDownloadPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.ml_dir = Path(config.load('ML_DIR'))
+        self.ml_dir = Path(config.load(self.parent.cfg_path, 'ML_DIR'))
         self.ml_cfg = models.load()
         self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
@@ -80,7 +80,7 @@ class MLDownloadPopup(QDialog):
         # Start download thread
         self.progress_bar.setRange(0, 0)
         self.progress_bar.show()
-        self.build_thread = models.DownloadMLThread(self.checked_models)
+        self.build_thread = models.DownloadMLThread(self.ml_dir, self.checked_models)
         self.build_thread.finished.connect(self.progress_bar.hide)
         self.build_thread.start()
 
@@ -88,7 +88,8 @@ class MLDownloadPopup(QDialog):
 class MLOptionsPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.ml_dir = Path(config.load('ML_DIR'))
+        self.parent = parent
+        self.ml_dir = Path(config.load(self.parent.cfg_path, 'ML_DIR'))
         self.ml_cfg = models.load()
         self.available_models = self.discover_models()
 

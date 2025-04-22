@@ -115,10 +115,11 @@ class DownloadMLThread(QThread):
     """
     downloaded = pyqtSignal(str)
 
-    def __init__(self, checked_models):
+    def __init__(self, ml_dir, checked_models):
         super().__init__()
         self.checked_models = checked_models
+        self.ml_dir = ml_dir
 
     def run(self):
         for key in self.checked_models:
-            download(key)
+            download(self.ml_dir, key)
