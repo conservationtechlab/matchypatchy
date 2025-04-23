@@ -9,6 +9,8 @@ from PyQt6.QtCore import Qt
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_roi import ROIPopup
+from matchypatchy.gui.popup_media_edit import MediaEditPopup
+
 
 
 class DisplayMedia(QWidget):
@@ -273,6 +275,10 @@ class DisplayMedia(QWidget):
         data_available = self.load_table()
         if data_available:
             self.load_thumbnails()
+        # Disable "Edit Rows" if not in ROI mode
+        print(f"[change type] type is {self.data_type} update buttons")
+        self.update_buttons()
+
 
     def handle_table_change(self, edit):
         """Slot to receive updates from QTableWidget"""
@@ -313,10 +319,27 @@ class DisplayMedia(QWidget):
         else:
             # TODO
             pass
+    def update_buttons(self):
+        has_selection = len(self.media_table.selectedRows()) > 0
+        # Only allow edit in ROI mode
+        self.button_edit.setEnabled(self.data_type == 1 and has_selection)
+        self.button_delete.setEnabled(has_selection)
 
+   
     def edit_row_multiple(self):
-        # TODO
-        pass
+        self.selected_rows = self.media_table.selectedRows()
+        if len(self.selected_rows) > 0:
+            selected_ids = [int(self.media_table.data_filtered.at[row, "id"]) for row in self.selected_rows]
+            dialog = MediaEditPopup(parent=self, ids=selected_ids)  # Ensure `parent=self`
+            if dialog.exec():
+                del dialog
+                 # reload data
+                data_available = self.load_table()
+                if data_available:
+                    self.load_thumbnails()
+                self.media_table.table.clearSelection()
+
+                self.update_buttons()
 
 
     def select_all(self):
@@ -324,16 +347,28 @@ class DisplayMedia(QWidget):
             self.media_table.select_row(row, overwrite=self.button_select.isChecked())
 
     def check_selected_rows(self):
+
         self.selected_rows = self.media_table.selectedRows()
         print("Selected rows:", self.selected_rows)
-        if len(self.selected_rows) > 0:
-            self.button_edit.setEnabled(True)
-            #self.button_duplicate.setEnabled(True)
-            self.button_delete.setEnabled(True)
+        if(self.data_type == 1):
+            if len(self.selected_rows) > 0:
+                self.button_edit.setEnabled(True)
+                #self.button_duplicate.setEnabled(True)
+                self.button_delete.setEnabled(True)
+            else:
+                self.button_edit.setEnabled(False)
+                self.button_duplicate.setEnabled(False)
+                self.button_delete.setEnabled(False)
         else:
-            self.button_edit.setEnabled(False)
-            self.button_duplicate.setEnabled(False)
-            self.button_delete.setEnabled(False)
+            if len(self.selected_rows) > 0:
+                self.button_edit.setEnabled(False)
+                #self.button_duplicate.setEnabled(True)
+                self.button_delete.setEnabled(True)
+            else:
+                self.button_edit.setEnabled(False)
+                self.button_duplicate.setEnabled(False)
+                self.button_delete.setEnabled(False)
+
 
     def duplicate(self): 
         if len(self.selected_rows) > 0:
@@ -358,6 +393,14 @@ class DisplayMedia(QWidget):
                         id = int(self.media_table.data_filtered.at[row, "id"])
                     self.mpDB.delete('media', f'id={id}')
                 del dialog
+                # Clear selection and update UI
+                self.media_table.table.clearSelection()
+                self.update_buttons()
+                # Reload updated data and thumbnails
+                data_available = self.load_table()
+                if data_available:
+                    self.load_thumbnails()
+
 
     # Filters ------------------------------------------------------------------
     def filter_table(self):
