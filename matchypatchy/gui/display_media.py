@@ -275,7 +275,6 @@ class DisplayMedia(QWidget):
         row = edit[0]
         column = edit[1]
         item = self.media_table.table.item(row, column)
-        print(item, row, column)
         if column == 0:
             self.check_selected_rows()
         self.check_undo_button()
