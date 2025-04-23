@@ -207,6 +207,9 @@ class ROIPopup(QDialog):
         self.name.clear()
         individuals = self.mpDB.select("individual", "id, name, sex")
         self.individuals = [(0, 'Unknown', 'Unknown')] + individuals
+        print("=== Loaded individuals ===")
+        for ind in self.individuals:
+            print(f"id={ind[0]}, name={ind[1]}, sex={ind[2]}")
         self.name.addItems([el[1] for el in self.individuals])
         self.name.blockSignals(False)
 
@@ -236,13 +239,20 @@ class ROIPopup(QDialog):
 
         # Editable -------------------------------------------------------------
         # Name
+    
         self.iid = self.roi_data.at[0, "individual_id"]
+        print(f"\n=== REFRESHING VALUES ===")
+        print(f"individual_id in ROI: {self.iid}")
+        print(f"individuals list: {[ind[0] for ind in self.individuals]}")
+
         if self.iid is None:
+            print("self.iid is none")
             self.name.setCurrentIndex(0)
             self.sex.setDisabled(True)
         else:
             self.name.setCurrentIndex(self.iid)
             self.sex.setDisabled(False)
+
         # Sex
         current_sex = self.roi_data.at[0, "sex"]
         if current_sex is None:
@@ -269,16 +279,23 @@ class ROIPopup(QDialog):
     # Edits --------------------------------------------------------------------
     def change_name(self):
         selected_individual = self.individuals[self.name.currentIndex()]
+        print(f"\n=== CHANGING NAME ===")
+        print(f"Selected: {selected_individual}")
         if selected_individual[0] > 0:
+            print(f"→ Assigning individual_id={selected_individual[0]} to ROI {self.rid}")
             self.mpDB.edit_row('roi', self.rid, {"individual_id": selected_individual[0]})
             self.sex.setCurrentIndex(self.sex.findText(str(self.individuals[self.name.currentIndex()][2])))
             self.sex.setDisabled(False)
         else:
+            print("→ Setting to Unknown")
             self.sex.setCurrentIndex(0)
             self.sex.setDisabled(True)
 
     def change_sex(self):
         iid = self.individuals[self.name.currentIndex()][0]
+        sex_val = self.sex.currentText()
+        print(f"\n=== CHANGING SEX ===")
+        print(f"Setting sex of individual_id={iid} to '{sex_val}'")
         self.mpDB.edit_row('individual', iid, {"sex": f"'{self.sex.currentText()}'"})
 
     def change_species(self):
@@ -288,7 +305,10 @@ class ROIPopup(QDialog):
 
     def change_viewpoint(self):
         viewpoint_keys = list(self.VIEWPOINTS.keys())
+        print(viewpoint_keys)
         selected_vewpoint = viewpoint_keys[self.viewpoint.currentIndex() + 1]
+        print(self.viewpoint.currentIndex())
+        print(selected_vewpoint)
         if selected_vewpoint == 'None':
             self.mpDB.edit_row('roi', self.rid, {"viewpoint": None}, quiet=False)
         else:

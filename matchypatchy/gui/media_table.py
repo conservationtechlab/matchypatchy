@@ -50,6 +50,9 @@ class MediaTable(QWidget):
         self.table.verticalHeader().sectionClicked.connect(self.select_row)
         self.table.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.table.cellChanged.connect(self.update_entry)  # allow user editing
+        
+        self.table.cellChanged.connect(self.handle_checkbox_change) #select change 
+
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
         # Add table to the layout
@@ -108,6 +111,9 @@ class MediaTable(QWidget):
                             8:"binomen", 9:"common", 
                             10:"name", 11:"sex", 12:"age",
                             13:"reviewed", 14:"favorite", 15:"comment"}
+            print(f"[fetch] Column mapping: {self.columns}")
+            print(f"[fetch] Column count: {self.table.columnCount()}")
+
             self.table.setColumnCount(15)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
                                                 "Station", "Sequence ID", "External ID", 
@@ -229,6 +235,7 @@ class MediaTable(QWidget):
         # disconnect edit function while refreshing to prevent needless calls
         self.table.blockSignals(True) 
         # display data
+        #print(f"data filtered is {self.data_filtered['viewpoint']}")
         self.table.setRowCount(self.data_filtered.shape[0])
         for i in range(self.data_filtered.shape[0]):
             self.add_row(i)
@@ -246,9 +253,10 @@ class MediaTable(QWidget):
              # Edit Checkbox
             if data == 'select':
                 edit = QTableWidgetItem()
-                edit.setFlags(edit.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                edit.setFlags(edit.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
                 edit.setCheckState(Qt.CheckState.Unchecked)
                 self.table.setItem(i, column, edit) 
+        
             # Thumbnail
             #TODO: FIX ASSET PATH
             elif data == 'thumbnail':
@@ -270,7 +278,18 @@ class MediaTable(QWidget):
                 self.table.setItem(i, column, QTableWidgetItem(self.valid_stations[roi["station_id"]]))
             # Viewpoint
             elif data == 'viewpoint':
-                self.table.setItem(i, column, QTableWidgetItem(self.VIEWPOINTS[str(roi["viewpoint"])]))
+                vp_raw = roi["viewpoint"]
+                #print(f"vp_raw is {vp_raw}")
+
+                if pd.isna(vp_raw) or vp_raw is None or str(vp_raw) == "None":
+                    vp_key = "None"
+                else:
+                    vp_key = str(int(vp_raw))  # convert float 1.0 → int 1 → str "1"
+
+                vp_value = self.VIEWPOINTS.get(vp_key, "None")
+                self.table.setItem(i, column, QTableWidgetItem(vp_value))
+
+
             # Species ID
             elif data == 'binomen' or data == 'common':
                 if self.species_list.empty:
@@ -280,17 +299,48 @@ class MediaTable(QWidget):
                     self.table.setItem(i, column, noedit)
                 else:
                     if roi['species_id'] is not None:
+                        print(f"species_id is {roi['species_id']}")
+                        print("species_list is\n", self.species_list)
+
                         species = self.species_list[self.species_list['id'] == roi['species_id']]
+                        print("filtered species is\n", species)
+
+                        if not species.empty:
+                            self.table.setItem(i, column, QTableWidgetItem(str(species[data].values[0])))
+                        else:
+                            print("Species not found — setting to 'Unknown'")
+                            self.table.setItem(i, column, QTableWidgetItem("Unknown"))
+                    else:
+                        self.table.setItem(i, column, QTableWidgetItem("Unknown"))
+
+                    '''
+                    if roi['species_id'] is not None:
+                        print(f"species list is {self.species_list}")
+                        species = self.species_list[self.species_list['id'] == roi['species_id']]
+                        print(f"species is {species}")
                         self.table.setItem(i, column, QTableWidgetItem(species[data][0]))
                     else:
                         self.table.setItem(i, column, QTableWidgetItem(None))
-
+                    '''
+            
+            #elif data == "name" or data == "sex" or data == 'age':
+            #    if roi['individual_id'] is not None:
+            #        individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
+            #        self.table.setItem(i, column, QTableWidgetItem(str(individual[data].values[0])))
+            #    else:
+            #        self.table.setItem(i, column, QTableWidgetItem(None))
+        
             elif data == "name" or data == "sex" or data == 'age':
                 if roi['individual_id'] is not None:
                     individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
-                    self.table.setItem(i, column, QTableWidgetItem(individual[data][0]))
+                    if not individual.empty:
+                        self.table.setItem(i, column, QTableWidgetItem(str(individual[data].values[0])))
+                    else:
+                        print(f"Warning: individual_id {roi['individual_id']} not found in individual_list")
+                        self.table.setItem(i, column, QTableWidgetItem("Unknown"))
                 else:
-                    self.table.setItem(i, column, QTableWidgetItem(None))
+                    self.table.setItem(i, column, QTableWidgetItem("Unknown"))
+
 
             # Reviewed and Favorite Checkbox
             elif data == 'reviewed' or data == 'favorite':
@@ -343,6 +393,17 @@ class MediaTable(QWidget):
             if not self.data_filtered.empty and self.data_filtered['id'].isin([edit['id']]).any():
                 self.data_filtered.loc[edit['row'], edit['reference']] = edit['new_value']
 
+    def handle_checkbox_change(self, row, column):
+        """ Detect when a checkbox is checked or unchecked """
+        if column == 0: 
+            item = self.table.item(row, column)
+            if item is not None:
+                checked = item.checkState() == Qt.CheckState.Checked
+                print(f"Checkbox at row {row} is {'checked' if checked else 'unchecked'}")
+                self.select_row(row, overwrite=checked)
+                self.parent.check_selected_rows()
+
+
     # UPDATE CELL ENTRY
     def update_entry(self, row, column): 
         """
@@ -358,8 +419,11 @@ class MediaTable(QWidget):
             return
         # checked items
         elif reference == 'reviewed' or reference == 'favorite':
+            print("DataFrame columns:", self.data_filtered.columns)
             previous_value = int(self.data_filtered.at[row, reference])
+            print(f'previous_value is {previous_value}')
             new_value = self.get_checkstate_int(self.table.item(row, column).checkState())
+            print(new_value)
         # station
         elif reference == 'station':
             reference = 'station_id'
@@ -434,6 +498,7 @@ class MediaTable(QWidget):
 
     def select_row(self, row, overwrite=None):
         select = self.table.item(row, 0)
+        print("select row")
         if overwrite is not None:
             if overwrite is True:
                 select.setCheckState(Qt.CheckState.Checked)
@@ -443,9 +508,11 @@ class MediaTable(QWidget):
             self.invert_checkstate(select)
 
     def selectedRows(self):
+        print("selectedRows called")
         selected_rows = []
         for row in range(self.table.rowCount()):
-            if self.table.item(row, 0).checkState() == Qt.CheckState.Checked:
+            item = self.table.item(row, 0)
+            if item is not None and item.checkState() == Qt.CheckState.Checked:
                 selected_rows.append(row)
         return selected_rows
 
