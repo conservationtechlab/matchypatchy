@@ -2,6 +2,7 @@
 Thread Class for Processing BBox and Species Classification
 
 """
+from pathlib import Path
 import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -34,6 +35,7 @@ class AnimlThread(QThread):
     def __init__(self, mpDB, detector_key, classifier_key):
         super().__init__()
         self.mpDB = mpDB
+        self.ml_dir = Path(config.load('ML_DIR'))
         self.confidence_threshold = 0.1
 
         # select media that do not have rois
@@ -44,10 +46,10 @@ class AnimlThread(QThread):
                                                   "sequence_id", "external_id", "comment", "favorite"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 
-        self.md_filepath = models.get_path(detector_key)
-        self.classifier_filepath = models.get_path(classifier_key)
-        self.class_filepath = models.get_class_path(classifier_key)
-        self.config_filepath = models.get_config_path(classifier_key)
+        self.md_filepath = models.get_path(self.ml_dir, detector_key)
+        self.classifier_filepath = models.get_path(self.ml_dir, classifier_key)
+        self.class_filepath = models.get_class_path(self.ml_dir, classifier_key)
+        self.config_filepath = models.get_config_path(self.ml_dir, classifier_key)
 
     def run(self):
         if not self.media.empty:
@@ -93,7 +95,7 @@ class AnimlThread(QThread):
                     # do not add emb_id, to be determined later
                     self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
                                     viewpoint=viewpoint, reviewed=0, species_id=species_id,
-                                    individual_id=individual_id, emb_id=0)
+                                    individual_id=individual_id, emb=0)
             self.progress_update.emit(round(100 * (i + 1) / len(self.media)))
 
 

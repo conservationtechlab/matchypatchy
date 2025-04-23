@@ -19,7 +19,7 @@ from PyQt6.QtGui import QAction, QGuiApplication
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
 from matchypatchy.gui.display_compare import DisplayCompare
-from matchypatchy.gui.popup_dropdown import DropdownPopup
+from matchypatchy.gui.popup_alert import AlertPopup
 
 from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
 
@@ -31,7 +31,7 @@ class MainWindow(QMainWindow):
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
         screen_resolution = QGuiApplication.primaryScreen().geometry()
-        print(screen_resolution)
+        #print(screen_resolution)
         self.setMinimumSize(1200, 900)
         # resize to full screen if small screen
         if screen_resolution.width() < 1600:
@@ -165,7 +165,7 @@ class MainWindow(QMainWindow):
 # ==============================================================================
 # MAIN FUNCTION 
 # ==============================================================================
-def main_display(mpDB):
+def main_display(mpDB, warning=None):
     """
     Launch GUI
 
@@ -175,6 +175,12 @@ def main_display(mpDB):
     app = QApplication(sys.argv)
     window = MainWindow(mpDB)
     window.show()
+    
+    if warning:
+        dialog = AlertPopup(window, prompt=warning)
+        if dialog.exec():
+            del dialog
+
     sys.exit(app.exec())
 
 

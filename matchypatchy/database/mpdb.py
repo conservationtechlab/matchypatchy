@@ -4,25 +4,62 @@ Class Definition for MatchyPatchyDB
 import logging
 from typing import Optional
 import sqlite3
+import chromadb
+from pathlib import Path
+from random import randrange
 
-from matchypatchy.database.setup import setup_database
+from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy import sqlite_vec
 
 #TODO:  fix error return for functions returning multiple objects (cannot unpack error)
 
 class MatchyPatchyDB():
-    def __init__(self, filepath='matchypatchy.db'):
-        self.filepath = filepath
-        self.initiate = setup_database(self.filepath)
+    def __init__(self, DB_PATH):
+        self.filepath = Path(DB_PATH) / 'matchypatchy.db'
+        self.chroma_filepath = Path(DB_PATH) / 'emb.db'
+        if self.filepath.is_file() and self.chroma_filepath.is_dir():
+            self.key = self.validate()
+        else:
+            self.key = '{:05}'.format(randrange(1, 10 ** 5))
+            setup_database(self.key, self.filepath)
+            setup_chromadb(self.key, self.chroma_filepath)
+
+    def update_paths(self, DB_PATH):
+        filepath = Path(DB_PATH) / 'matchypatchy.db'
+        chroma_filepath = Path(DB_PATH) / 'emb.db'
+        if filepath.is_file() and chroma_filepath.is_dir():
+            valid = self.validate()
+            if valid:
+                self.key = valid
+                self.filepath = filepath
+                self.chroma_filepath = chroma_filepath
+                return True
+            else:
+                return False
+        else:
+            self.key = '{:05}'.format(randrange(1, 10 ** 5))
+            setup_database(self.key, self.filepath)
+            setup_chromadb(self.key, self.chroma_filepath)
+            return True
+
+    def retrieve_key(self):
+        db = sqlite3.connect(self.filepath)
+        cursor = db.cursor()
+        cursor.execute("SELECT key FROM metadata WHERE id=1;")
+        mpdb_key = cursor.fetchone()[0]
+        db.close()
+
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
+        collection = client.get_collection(name="embedding_collection")
+        chroma_key = collection.metadata['key']
+        
+        return mpdb_key, chroma_key
 
     def info(self):
         """
         Validate All Tables Are Present
         """
         db = sqlite3.connect(self.filepath)
-        db.enable_load_extension(True)
-        sqlite_vec.load(db)
-        db.enable_load_extension(False)
         cursor = db.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
@@ -35,29 +72,28 @@ class MatchyPatchyDB():
         roi = cursor.fetchone()[0]
         print(f"ROI: {roi}")
         logging.info(f"ROI: {roi}")
-        cursor.execute("SELECT COUNT(rowid) FROM roi_emb")
-        emb = cursor.fetchone()[0]
-        print(f"Emb: {emb}")
-        logging.info(f"Emb: {emb}")
         db.close()
 
     def validate(self):
         db = sqlite3.connect(self.filepath)
-        db.enable_load_extension(True)
-        sqlite_vec.load(db)
-        db.enable_load_extension(False)
         cursor = db.cursor()
         cursor.execute("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger')")
         schema = cursor.fetchall()
+        db.close()
 
         s = ""
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
-    
+
         with open('schema', 'r') as file:
             content = file.read()
-            
-        return content==s
+    
+        match_schema = (content==s)
+        mpkey, chromakey = self.retrieve_key()
+        if match_schema and mpkey == chromakey:
+            return mpkey
+        else:
+            return False
 
     def _command(self, command):
         """
@@ -66,9 +102,6 @@ class MatchyPatchyDB():
         """
         try:
             db = sqlite3.connect(self.filepath)
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
             cursor = db.cursor()
             cursor.execute(command)
             rows = cursor.fetchall()
@@ -252,7 +285,7 @@ class MatchyPatchyDB():
 
     def add_roi(self, media_id: int, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
                 species_id: Optional[int]=None, viewpoint: Optional[str]=None, reviewed: int=0, 
-                individual_id: Optional[int]=None, emb_id: int=0):
+                individual_id: Optional[int]=None, emb: int=0):
         # Note difference in variable order, foreign keys
 
         try:
@@ -260,10 +293,10 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                         species_id, viewpoint, reviewed, individual_id, emb_id) 
+                         species_id, viewpoint, reviewed, individual_id, emb) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                          species_id, viewpoint, reviewed, individual_id, emb_id)
+                          species_id, viewpoint, reviewed, individual_id, emb)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -271,26 +304,6 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             logging.error(f"Failed to add roi for media: {media_id}.", error)
-            if db:
-                db.close()
-            return None
-
-    def add_emb(self, embedding):
-        try:
-            db = sqlite3.connect(self.filepath)
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
-            cursor = db.cursor()
-            command = """INSERT INTO roi_emb (embedding)
-                        VALUES (?);"""
-            cursor.execute(command, [embedding])
-            id = cursor.lastrowid
-            db.commit()
-            db.close()
-            return id
-        except sqlite3.Error as error:
-            logging.error("Failed to add embedding: ", error)
             if db:
                 db.close()
             return None
@@ -428,7 +441,7 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                         roi.media_id, roi.species_id, roi.individual_id, emb_id, filepath, ext, timestamp,
+                         roi.media_id, roi.species_id, roi.individual_id, emb, filepath, ext, timestamp,
                          station_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex, age"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
@@ -528,32 +541,37 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def clear_emb(self):
-        """
-        Clear vector database and rebuild (no way to delete)
-        """
+    # EMBEDDINGS ===============================================================
+
+    def add_emb(self, embedding):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
-            cursor.execute("DROP TABLE IF EXISTS roi_emb;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_chunks;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_rowids;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_vector_chunks00;")
-            db.commit()
-            cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
+            command = """INSERT INTO roi_emb (embedding)
+                        VALUES (?);"""
+            cursor.execute(command, [embedding])
+            id = cursor.lastrowid
             db.commit()
             db.close()
-            return True
+            return id
         except sqlite3.Error as error:
-            logging.error("Failed to clear roi_emb: ", error)
+            logging.error("Failed to add embedding: ", error)
             if db:
                 db.close()
-            return False
+            return None
+        
+    def add_emb_chroma(self, id, embedding):
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
+        collection = client.get_collection(name="embedding_collection")
+        collection.add(embeddings=[embedding], ids=[str(id)])
 
-    # KNN ======================================================================
+    def knn_chroma(self, query_id, k=3):
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
+        collection = client.get_collection(name="embedding_collection")
+        query = collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
+        knn = collection.query(query_embeddings=query, n_results=k+1)
+        return knn
+
     def knn(self, query, k=3, metric='cosine'):
         """
         Return the knn for a query embedding
@@ -593,3 +611,28 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return None
+
+    def clear_emb(self):
+        """
+        Clear vector database and rebuild (no way to delete)
+        """
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            db.enable_load_extension(True)
+            sqlite_vec.load(db)
+            db.enable_load_extension(False)
+            cursor.execute("DROP TABLE IF EXISTS roi_emb;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_chunks;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_rowids;")
+            cursor.execute("DROP TABLE IF EXISTS roi_emb_vector_chunks00;")
+            db.commit()
+            cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
+            db.commit()
+            db.close()
+            return True
+        except sqlite3.Error as error:
+            logging.error("Failed to clear roi_emb: ", error)
+            if db:
+                db.close()
+            return False

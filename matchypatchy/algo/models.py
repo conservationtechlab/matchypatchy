@@ -12,6 +12,8 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy import config
 
 
+# TODO: PACKAGE models.yml 
+
 def update_model_yml():
     """
     Downloads the most recent version of the models.yml file from SDZWA server and updates internal file
@@ -35,8 +37,7 @@ def load(key=None):
             return cfg
 
 
-def get_path(key):
-    ML_DIR = Path(config.load("ML_DIR"))
+def get_path(ML_DIR, key):
     MODELS = load('MODELS')
     if key is None:
         return None
@@ -47,8 +48,7 @@ def get_path(key):
         return None
 
 
-def get_class_path(key):
-    ML_DIR = Path(config.load("ML_DIR"))
+def get_class_path(ML_DIR, key):
     CLASS_FILES = load('CLASS_FILES')
     if key is None:
         return None
@@ -59,8 +59,7 @@ def get_class_path(key):
         return None
 
 
-def get_config_path(key):
-    ML_DIR = Path(config.load("ML_DIR"))
+def get_config_path(ML_DIR, key):
     CONFIG_FILES = load('CONFIG_FILES')
     if key is None:
         return None
@@ -71,10 +70,8 @@ def get_config_path(key):
         return None
 
 
-def download(key):
+def download(ML_DIR, key):
     # read model directory
-    ML_DIR = Path(config.load("ML_DIR"))
-
     with open('models.yml', 'r') as cfg_file:
         ml_cfg = yaml.safe_load(cfg_file)
         models = ml_cfg['MODELS']
@@ -118,10 +115,11 @@ class DownloadMLThread(QThread):
     """
     downloaded = pyqtSignal(str)
 
-    def __init__(self, checked_models):
+    def __init__(self, ml_dir, checked_models):
         super().__init__()
         self.checked_models = checked_models
+        self.ml_dir = ml_dir
 
     def run(self):
         for key in self.checked_models:
-            download(key)
+            download(self.ml_dir, key)

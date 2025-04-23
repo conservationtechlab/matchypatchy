@@ -30,7 +30,6 @@ from matchypatchy.algo.reid_thread import ReIDThread
 
 from matchypatchy.database.media import export_data
 
-
 class DisplayBase(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -266,16 +265,16 @@ class DisplayBase(QWidget):
         Processes Sequence, MD, Animl, Viewpoint, Miew
         For any image/roi that doesn't have values for those already
         """
-        animl_options = MLOptionsPopup(self)
-        result = animl_options.exec()
+        ml_options_dialog = MLOptionsPopup(self)
+        result = ml_options_dialog.exec()
         if result == QDialog.DialogCode.Accepted:
-            mloptions = animl_options.return_selections()
-            del animl_options
+            mloptions = ml_options_dialog.return_selections()
+            del ml_options_dialog
             self.process_images(mloptions)
 
         # processing rejected
         else:
-            del animl_options
+            del ml_options_dialog
 
     def process_images(self, mloptions):
         if self.mpDB.count("media") > 0:
@@ -364,7 +363,7 @@ class DisplayBase(QWidget):
 
     def validate_db(self):
         valid = self.mpDB.validate()
-        dialog = AlertPopup(self, f"Database is valid: {valid}")
+        dialog = AlertPopup(self, f"Database is valid, key: {valid}")
         if dialog.exec():
             del dialog
 

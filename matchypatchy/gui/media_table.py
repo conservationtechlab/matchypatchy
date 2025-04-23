@@ -166,13 +166,19 @@ class MediaTable(QWidget):
         Load images if data is available
         Does not run if load_data returns false to MediaDisplay
         """
-        self.loading_bar = AlertPopup(self, "Loading images...", progressbar=True)
-        self.loading_bar.show()
+        loading_bar = AlertPopup(self, "Loading images...", progressbar=True, cancel_only=True)
+        loading_bar.show()
         self.image_loader_thread = LoadThumbnailThread(self.mpDB, self.data, self.data_type)
-        self.image_loader_thread.progress_update.connect(self.loading_bar.set_counter)
-        self.image_loader_thread.loaded_image.connect(self.add_thumbnail_path)
+        self.image_loader_thread.progress_update.connect(loading_bar.set_counter)
+        self.image_loader_thread.loaded_images.connect(self.add_thumbnail_paths)
         self.image_loader_thread.done.connect(self.filter)
+
+        loading_bar.rejected.connect(self.image_loader_thread.requestInterruption)
         self.image_loader_thread.start()
+
+        # captures emitted temp thumbnail path to data, saves to table
+    def add_thumbnail_paths(self, thumbnail_paths):
+        self.data = pd.merge(self.data, pd.DataFrame(thumbnail_paths, columns=["id", "thumbnail_path"]), on="id")
 
     # STEP 5 - Triggered by load_images() finishing
     def filter(self):
@@ -230,15 +236,21 @@ class MediaTable(QWidget):
         """
         Add rows to table
         """
+        n_rows = self.data_filtered.shape[0]
         # clear old contents and prep for filtered data
         self.table.clearContents()
         # disconnect edit function while refreshing to prevent needless calls
         self.table.blockSignals(True) 
+        
         # display data
-        #print(f"data filtered is {self.data_filtered['viewpoint']}")
-        self.table.setRowCount(self.data_filtered.shape[0])
-        for i in range(self.data_filtered.shape[0]):
-            self.add_row(i)
+        self.table.setRowCount(n_rows)
+        for row in range(n_rows):
+            self.table.setRowHeight(row, 100)
+            self.add_row(row)
+
+        delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
+        self.table.setItemDelegateForColumn(4, delegate)
+
         self.table.blockSignals(False)  # reconnect editing
         
     # Set Table Entries --------------------------------------------------------
@@ -247,7 +259,6 @@ class MediaTable(QWidget):
         Adds Row to Table with Items from self.data_filtered
         """
         roi = self.data_filtered.iloc[i]
-        self.table.setRowHeight(i, 100)
         
         for column, data in self.columns.items():
              # Edit Checkbox
@@ -351,9 +362,8 @@ class MediaTable(QWidget):
             else:
                 self.table.setItem(i, column, QTableWidgetItem(str(roi[data]))) 
 
-        # combo delegates
-        delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
-        self.table.setItemDelegateForColumn(4, delegate)
+    def set_cell(self, row, col, qtw):
+        self.table.setItem(row, col, qtw) 
 
 
     def set_checkstate(self, item):
@@ -377,11 +387,6 @@ class MediaTable(QWidget):
             item.setCheckState(Qt.CheckState.Unchecked)
         else:
             item.setCheckState(Qt.CheckState.Checked)
-
-    # captures emitted temp thumbnail path to data, saves to table
-    def add_thumbnail_path(self, i, thumbnail_path):
-        self.data.loc[i,'thumbnail_path'] = thumbnail_path
-
 
     # UPDATE ENTRIES -----------------------------------------------------------
     def apply_edits(self):

@@ -26,11 +26,15 @@ from matchypatchy.database import mpdb
 from matchypatchy import config
 from matchypatchy.algo import models
 
+
 def main():
     cfg = config.initiate()
     models.update_model_yml()
-    mpDB = mpdb.MatchyPatchyDB(cfg['DB_PATH'])
-    main_gui.main_display(mpDB)
+    mpDB = mpdb.MatchyPatchyDB(cfg['DB_DIR'])
+    if mpDB.key:
+        main_gui.main_display(mpDB)      
+    else:
+        main_gui.main_display(mpDB, warning='Existing database contains an error. Please select a valid database in the configuration settings.')
 
 if __name__ == "__main__":
     main()

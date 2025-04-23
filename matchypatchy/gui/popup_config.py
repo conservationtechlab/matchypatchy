@@ -27,14 +27,14 @@ class ConfigPopup(QDialog):
         path_layout = QHBoxLayout()
 
         titles_layout = QVBoxLayout()
-        titles_layout.addWidget(QLabel("Database:"))
+        titles_layout.addWidget(QLabel("Database Directory:"))
         titles_layout.addWidget(QLabel("Log File:"))
         titles_layout.addWidget(QLabel("Model Directory:"))
         path_layout.addLayout(titles_layout)
         
         insert_layout = QVBoxLayout()
         self.db_path = QLineEdit()
-        self.db_path.setText(str(self.cfg['DB_PATH']))
+        self.db_path.setText(str(self.cfg['DB_DIR']))
         insert_layout.addWidget(self.db_path)
         self.log_path = QLineEdit()
         self.log_path.setText(str(self.cfg['LOG_PATH']))
@@ -90,13 +90,18 @@ class ConfigPopup(QDialog):
         if new_db:
             self.ml_path.setText(new_db)
             # TODO: verify db
-            # remake mpDB object
+            valid = self.mpDB.update_paths(self, new_db)
+            if valid:
             # Update config
-            self.cfg['DB_PATH'] = str(new_db)
-            config.update(self.cfg)
-            # Log changes
-            logging.info("DB_PATH CHANGED")
-            logging.info('DB_PATH: ' + self.cfg['DB_PATH'])
+                self.cfg['DB_DIR'] = str(new_db)
+                config.update(self.cfg)
+                # Log changes
+                logging.info("DB_DIR CHANGED")
+                logging.info('DB_DIR: ' + self.cfg['DB_DIR'])
+            else:
+                dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
+                if dialog.exec():
+                    del dialog
 
     def set_log(self):
         new_log = QFileDialog.getSaveFileName(self, "New File",

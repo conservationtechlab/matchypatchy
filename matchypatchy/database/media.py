@@ -43,7 +43,7 @@ def fetch_roi(mpDB):
     manifest = mpDB.select("roi")
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
-                                               "species_id", "viewpoint", "reviewed", "individual_id", "emb_id"])
+                                               "species_id", "viewpoint", "reviewed", "individual_id", "emb"])
         rois = rois.replace({float('nan'): None})
         return rois
     else:
@@ -54,7 +54,7 @@ def fetch_roi_media(mpDB, reset_index=True):
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
+                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb',
                 'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age']
     """
@@ -70,7 +70,7 @@ def export_data(mpDB):
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
+                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb',
                 'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age',
                 'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
