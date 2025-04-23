@@ -38,30 +38,25 @@ class LoadThumbnailThread(QThread):
             futures = {executor.submit(self.process_image, roi): roi for _,roi in self.data.iterrows()}
 
             for i, future in enumerate(as_completed(futures)):
-                
                 result = future.result()
                 filepaths.append(result)
-
-            
                 self.progress_update.emit(int((i + 1) / len(self.data) * 100))
 
-        if not self.isInterruptionRequested():
-            self.loaded_images.emit(filepaths)
-            self.done.emit()
+        self.loaded_images.emit(filepaths)
+        self.done.emit()
 
 
     def process_image(self, roi):
-        if not self.isInterruptionRequested():
-            id = roi['id']
-            try:
-                filepath = self.existing_filepaths[id]
-                if not Path(filepath).is_file():
-                    filepath = self.save_image(roi)
-
-            except KeyError:
+        id = roi['id']
+        try:
+            filepath = self.existing_filepaths[id]
+            if not Path(filepath).is_file():
                 filepath = self.save_image(roi)
 
-            return id, filepath
+        except KeyError:
+            filepath = self.save_image(roi)
+
+        return id, filepath
 
 
     def save_image(self, roi):

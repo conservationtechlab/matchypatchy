@@ -111,8 +111,6 @@ class MediaTable(QWidget):
                             8:"binomen", 9:"common", 
                             10:"name", 11:"sex", 12:"age",
                             13:"reviewed", 14:"favorite", 15:"comment"}
-            print(f"[fetch] Column mapping: {self.columns}")
-            print(f"[fetch] Column count: {self.table.columnCount()}")
 
             self.table.setColumnCount(15)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
@@ -334,13 +332,6 @@ class MediaTable(QWidget):
                         self.table.setItem(i, column, QTableWidgetItem(None))
                     '''
             
-            #elif data == "name" or data == "sex" or data == 'age':
-            #    if roi['individual_id'] is not None:
-            #        individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
-            #        self.table.setItem(i, column, QTableWidgetItem(str(individual[data].values[0])))
-            #    else:
-            #        self.table.setItem(i, column, QTableWidgetItem(None))
-        
             elif data == "name" or data == "sex" or data == 'age':
                 if roi['individual_id'] is not None:
                     individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
@@ -361,9 +352,6 @@ class MediaTable(QWidget):
                 self.table.setItem(i, column, qtw) 
             else:
                 self.table.setItem(i, column, QTableWidgetItem(str(roi[data]))) 
-
-    def set_cell(self, row, col, qtw):
-        self.table.setItem(row, col, qtw) 
 
 
     def set_checkstate(self, item):

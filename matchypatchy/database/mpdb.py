@@ -616,23 +616,6 @@ class MatchyPatchyDB():
         """
         Clear vector database and rebuild (no way to delete)
         """
-        try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
-            cursor.execute("DROP TABLE IF EXISTS roi_emb;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_chunks;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_rowids;")
-            cursor.execute("DROP TABLE IF EXISTS roi_emb_vector_chunks00;")
-            db.commit()
-            cursor.execute('''CREATE VIRTUAL TABLE IF NOT EXISTS roi_emb USING vec0 (embedding float[2152]);''')
-            db.commit()
-            db.close()
-            return True
-        except sqlite3.Error as error:
-            logging.error("Failed to clear roi_emb: ", error)
-            if db:
-                db.close()
-            return False
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
+        client.delete_collection(name="embedding_collection")
+        setup_chromadb(self.key, self.chroma_filepath)
