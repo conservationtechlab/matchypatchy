@@ -129,9 +129,7 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
         self.Compare.refresh_filters()
-        emb_exist = self.Compare.QueryContainer.load_data()
-        if emb_exist:
-            self.Compare.calculate_neighbors()
+        self.Compare.calculate_neighbors()
  
     # FILE =====================================================================
     def new(self):

@@ -2,23 +2,30 @@
 QThread for Matching
 
 """
+import time
+from datetime import timedelta
 import pandas as pd
 import warnings
+from functools import partial
 warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
 class MatchEmbeddingThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
+    prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     neighbor_dict_return = pyqtSignal(dict)
     nearest_dict_return = pyqtSignal(dict)
+    done = pyqtSignal()
 
     def __init__(self, mpDB, rois, sequences, k=3, metric='Cosine', threshold=100):
         super().__init__()
         self.mpDB = mpDB
         self.rois = rois
         self.sequences = sequences
+        self.n = len(sequences)
         self.k = k
         self.metric = metric
         if self.metric == 'Cosine':
@@ -36,27 +43,40 @@ class MatchEmbeddingThread(QThread):
         neighbor_dict = {}
         nearest_dict = {}
 
+        start_time = time.perf_counter()
+
         for i, s in enumerate(self.sequences):
-            sequence_rois = self.sequences[s]
-            emb_ids = self.rois.loc[self.rois['id'].isin(sequence_rois), "emb_id"].tolist()
+            if not self.isInterruptionRequested():
+                print(i)
+                sequence_rois = self.sequences[s]
+                emb_ids = self.rois.loc[self.rois['id'].isin(sequence_rois), "emb_id"].tolist()
 
-            # skip rois with no emb_ids
-            emb_ids = [e for e in emb_ids if e > 0]
+                # skip rois with no emb_ids
+                emb_ids = [e for e in emb_ids if e > 0]
 
-            # get all neighbors for sequence
-            all_neighbors = []
-            for emb_id in emb_ids:
-                all_neighbors.extend(self.roi_knn(emb_id))
-            # remove impossible matches
-            all_neighbors = self.remove_duplicate_matches(all_neighbors)
-            filtered_neighbors = self.filter(sequence_rois, all_neighbors)
+                # get all neighbors for sequence
+                all_neighbors = []
+                for emb_id in emb_ids:
+                    all_neighbors.extend(self.roi_knn(emb_id))
 
-            # still have neighbors remaining after filtering, rank by difference
-            if filtered_neighbors:
-                filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
+                all_neighbors = self.remove_duplicate_matches(all_neighbors)
+                filtered_neighbors = self.filter(sequence_rois, all_neighbors)
+
+                # still have neighbors remaining after filtering, rank by difference
+                if filtered_neighbors:
+                    filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
+
                 neighbor_dict[s] = filtered_neighbors
                 nearest_dict[s] = filtered_neighbors[0][1]
-            self.progress_update.emit(i + 1)
+
+                elapsed_time = time.perf_counter() - start_time
+                completed_percentage = round(100 * (i + 1) / self.n)
+
+                if completed_percentage > 1:
+                    remaining_time = (elapsed_time / completed_percentage) - elapsed_time
+                    self.prompt_update.emit("Matching embeddings, remaining time: approx. {:0>8}".format(str(timedelta(seconds=remaining_time))))
+
+                self.progress_update.emit(completed_percentage)
 
         self.neighbor_dict_return.emit(neighbor_dict)
         self.nearest_dict_return.emit(nearest_dict)

@@ -66,6 +66,28 @@ def fetch_roi_media(mpDB, reset_index=True):
     return rois
 
 
+def export_data(mpDB):
+    """
+    Fetch Info for Media Table
+    columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb_id',
+                'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
+                'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age',
+                'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
+    """
+    media, column_names = mpDB.all_media()
+    rois = pd.DataFrame(media, columns=column_names)
+    rois = rois.replace({float('nan'): None})
+    stations, column_names = mpDB.stations()
+    stations = pd.DataFrame(stations, columns=column_names)
+    stations = stations.replace({float('nan'): None})
+    if not rois.empty:
+        export_data = pd.merge(rois, stations, left_on="station_id", right_on="station.id")
+        return export_data
+    else:
+        return None
+
+
 def get_bbox(roi):
     """
     Return the bbox coordinates for a given roi row

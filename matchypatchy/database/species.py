@@ -19,6 +19,7 @@ def fetch_species(mpDB):
     else:  # return empty
         return pd.DataFrame(columns=["id", "binomen", "common"])
 
+
 def fetch_individual(mpDB):
     """
     Fetches species Table, Converts to DataFrame

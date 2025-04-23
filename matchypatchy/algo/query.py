@@ -3,6 +3,7 @@ Class Definition for Query Object
 """
 
 import pandas as pd
+from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
@@ -11,11 +12,17 @@ from matchypatchy.algo.models import load
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
-class QueryContainer():
+class QueryContainer(QObject):
+    thread_signal = pyqtSignal()
+
     def __init__(self, parent):
+        super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
         self.filters = dict()
+
+        self.neighbor_dict_raw = None
+        self.nearest_dict_raw = None
         self.neighbor_dict = dict()
         self.nearest_dict = dict()
         self.ranked_sequences = []
@@ -43,33 +50,31 @@ class QueryContainer():
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
         # no data
         if self.data_raw.empty:
-            self.parent.home(warn=True)
-            return False
+            return 0  
 
         self.sequences = db_roi.sequence_roi_dict(self.data_raw)
-
         # must have embeddings to continue
         if not (self.data_raw["emb_id"] == 0).all():
             # need sequence and capture ids from media to restrict comparisons shown to
             info = "roi.id, media_id, reviewed, species_id, individual_id, emb_id, timestamp, station_id, sequence_id"
             rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
             self.rois = pd.DataFrame(rois, columns=columns)
-            return True
+            return len(self.sequences)
         # no embeddings
         else:
-            self.parent.home(warn=True)
-            return False
+            return 0
 
     # RUN ON ENTRY IF LOAD_DATA
-    def calculate_neighbors(self, reset=True):
+    def calculate_neighbors(self):
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.rois, self.sequences,
                                                  k=self.parent.k, 
                                                  metric=self.parent.distance_metric,
                                                  threshold=self.parent.threshold)
         self.match_thread.progress_update.connect(self.parent.progress.set_counter)
+        self.match_thread.prompt_update.connect(self.parent.progress.update_prompt)
         self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
         self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
-        self.match_thread.finished.connect(lambda: self.filter(reset=reset))  # do not continue until finished
+        self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished
         self.match_thread.start()
 
     def capture_neighbor_dict(self, neighbor_dict):
@@ -80,8 +85,12 @@ class QueryContainer():
         # capture neighbor_dict from MatchEmbeddingThread
         self.nearest_dict_raw = nearest_dict
 
+    def finish_calculating(self):
+        self.thread_signal.emit()
+        return True
+
     # STEP 2
-    def filter(self, filter_dict=None, valid_stations=None, reset=True):
+    def filter(self, filter_dict=None, valid_stations=None):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
         Triggered by calculate neighbors and change in filters
@@ -122,11 +131,9 @@ class QueryContainer():
         # must have valid matches to continue
         if self.neighbor_dict:
             self.rank()
-            if reset:
-                self.parent.change_query(0)
+            return True
         # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
-            self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
             return False
 
     def rank(self):

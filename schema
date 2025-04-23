@@ -1,26 +1,31 @@
+TABLE: roi_emb
+CREATE VIRTUAL TABLE roi_emb USING vec0 (embedding float[2152])
+TABLE: roi_emb_chunks
+CREATE TABLE "roi_emb_chunks"(chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,size INTEGER NOT NULL,validity BLOB NOT NULL,rowids BLOB NOT NULL)
 TABLE: sqlite_sequence
 CREATE TABLE sqlite_sequence(name,seq)
-
+TABLE: roi_emb_rowids
+CREATE TABLE "roi_emb_rowids"(rowid INTEGER PRIMARY KEY AUTOINCREMENT,id,chunk_id INTEGER,chunk_offset INTEGER)
+TABLE: roi_emb_vector_chunks00
+CREATE TABLE "roi_emb_vector_chunks00"(rowid PRIMARY KEY,vectors BLOB NOT NULL)
+INDEX: sqlite_autoindex_roi_emb_vector_chunks00_1
+None
 TABLE: region
 CREATE TABLE region (
-                        id INTEGER PRIMARY KEY,    
+                        id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL )
-
 INDEX: sqlite_autoindex_region_1
 None
-
 TABLE: survey
 CREATE TABLE survey (
                         id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL,
-                        region_id INTEGER,
+                        region_id INTEGER NOT NULL,
                         year_start INTEGER,
                         year_end INTEGER,
                         FOREIGN KEY (region_id) REFERENCES region (id) )
-
 INDEX: sqlite_autoindex_survey_1
 None
-
 TABLE: station
 CREATE TABLE station (
                         id INTEGER PRIMARY KEY,
@@ -29,7 +34,6 @@ CREATE TABLE station (
                         long REAL,
                         survey_id INTEGER NOT NULL,
                         FOREIGN KEY (survey_id) REFERENCES survey (id) )
-
 TABLE: media
 CREATE TABLE media (
                         id INTEGER PRIMARY KEY,
@@ -43,10 +47,8 @@ CREATE TABLE media (
                         favorite INTEGER NOT NULL,
                         FOREIGN KEY (station_id) REFERENCES station (id),
                         FOREIGN KEY (sequence_id) REFERENCES sequence (id) )
-
 INDEX: sqlite_autoindex_media_1
 None
-
 TABLE: roi
 CREATE TABLE roi (
                         id INTEGER PRIMARY KEY,
@@ -56,63 +58,37 @@ CREATE TABLE roi (
                         bbox_y REAL NOT NULL,
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
-                        species_id INTEGER,
                         viewpoint INTEGER,
+                        species_id INTEGER,
                         reviewed INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb_id INTEGER,
                         FOREIGN KEY(media_id) REFERENCES media (id)
-                        FOREIGN KEY(species_id) REFERENCES species (id)
                         FOREIGN KEY(individual_id) REFERENCES individual (id)
+                        FOREIGN KEY(species_id) REFERENCES species (id)
                         FOREIGN KEY(emb_id) REFERENCES roi_emb (rowid) )
-
+TABLE: individual
+CREATE TABLE individual (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        species_id INTEGER,
+                        sex TEXT,
+                        age TEXT,
+                        FOREIGN KEY(species_id) REFERENCES species (id))
 TABLE: species
 CREATE TABLE species (
                         id INTEGER PRIMARY KEY,
                         binomen TEXT NOT NULL,
                         common TEXT NOT NULL )
-
-TABLE: individual
-CREATE TABLE individual (
-                        id INTEGER PRIMARY KEY,
-                        species_id INTEGER,
-                        name TEXT NOT NULL,
-                        sex TEXT,
-                        FOREIGN KEY(species_id) REFERENCES species (id))
-
 TABLE: sequence
 CREATE TABLE sequence (
                         id INTEGER PRIMARY KEY)
-
-TABLE: roi_emb
-CREATE VIRTUAL TABLE roi_emb USING vec0 (embedding float[2152])
-
-TABLE: roi_emb_chunks
-CREATE TABLE "roi_emb_chunks"(chunk_id INTEGER PRIMARY KEY AUTOINCREMENT,size INTEGER NOT NULL,validity BLOB NOT NULL,rowids BLOB NOT NULL)
-
-TABLE: roi_emb_rowids
-CREATE TABLE "roi_emb_rowids"(rowid INTEGER PRIMARY KEY AUTOINCREMENT,id,chunk_id INTEGER,chunk_offset INTEGER)
-
-TABLE: roi_emb_vector_chunks00
-CREATE TABLE "roi_emb_vector_chunks00"(rowid PRIMARY KEY,vectors BLOB NOT NULL)
-
-INDEX: sqlite_autoindex_roi_emb_vector_chunks00_1
-None
-
-TABLE: thumbnails
-CREATE TABLE thumbnails (
-                        id INTEGER PRIMARY KEY,
-                        roi INTEGER NOT NULL,
-                        filepath TEXT NOT NULL,
-                        FOREIGN KEY(roi) REFERENCES roi (id))
-
 TABLE: media_thumbnails
 CREATE TABLE media_thumbnails (
                         id INTEGER PRIMARY KEY,
                         fid INTEGER NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES media (id))
-
 TABLE: roi_thumbnails
 CREATE TABLE roi_thumbnails (
                         id INTEGER PRIMARY KEY,

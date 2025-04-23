@@ -191,3 +191,15 @@ class MLOptionsPopup(QDialog):
         else:
             self.selected_viewpoint_key = self.available_viewpoints[self.viewpoint.currentIndex()]
             return self.selected_viewpoint_key
+        
+    def return_selections(self):
+        sequence_checked = self.select_sequence()
+        detector_key = self.select_detector()
+        classifier_key = self.select_classifier()
+        reid_key = self.select_reid()
+        viewpoint_key = self.select_viewpoint()
+        return {"sequence_checked":sequence_checked,
+                "detector_key":detector_key,
+                "classifier_key":classifier_key,
+                "reid_key":reid_key,
+                "viewpoint_key":viewpoint_key,}

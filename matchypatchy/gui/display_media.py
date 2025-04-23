@@ -171,6 +171,12 @@ class DisplayMedia(QWidget):
             if dialog.exec():
                 self.parent._set_base_view()
                 del dialog
+        # stop thumbnail loader thread and unlock db
+        if self.media_table.image_loader_thread is not None and self.media_table.image_loader_thread.isRunning():
+            self.media_table.image_loader_thread.requestInterruption()
+            self.media_table.image_loader_thread.wait()
+            self.media_table.loading_bar.close()
+            self.parent._set_base_view()
         else:
             self.parent._set_base_view()
 
@@ -179,22 +185,25 @@ class DisplayMedia(QWidget):
         # check if there are rois first
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
-        if self.data_type == 1 and roi_n == 0:
-            self.data_type = 0
-            dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
-            if dialog.exec():
-                del dialog
-            self.show_type.setCurrentIndex(self.data_type)
-
-        if self.data_type == 0 and media_n == 0:
+        if media_n == 0:
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
                 self.home()
                 del dialog
             return False
+
+        else:
+            if self.data_type == 1 and roi_n == 0:
+                self.data_type = 0
+                dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
+                if dialog.exec():
+                    del dialog
+                self.show_type.blockSignals(True)
+                self.show_type.setCurrentIndex(self.data_type)
+                self.show_type.blockSignals(False)
         
-        self.media_table.load_data(self.data_type)
-        return True
+            self.media_table.load_data(self.data_type)
+            return True
         
     def refresh_filters(self, prefilter=None):
         """

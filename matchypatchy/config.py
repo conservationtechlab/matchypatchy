@@ -18,11 +18,13 @@ def initiate():
            'DB_PATH': str(Path.cwd() / 'matchypatchy.db'),
            'ML_DIR': str(Path.cwd() / 'Models'),
            'FRAME_DIR': str(Path(tempfile.gettempdir()) / "Frames"),  # frame dir only temporary while processing for animl
+           'VIDEO_FRAMES': 1
     }
 
     # check if cfg exists, load
     if cfg_path.exists():
         cfg = load()
+        #TODO : CHECK IF ALL PARAMETERS ARE PRESENT
     # else save default
     else:
         with open(cfg_path, 'w') as cfg_file:

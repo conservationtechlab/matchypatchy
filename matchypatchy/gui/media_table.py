@@ -15,7 +15,7 @@ from matchypatchy.algo import models
 from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
 from matchypatchy.database.media import fetch_media, fetch_roi_media
 from matchypatchy.database.species import fetch_species, fetch_individual
-from matchypatchy.gui.popup_alert import ProgressPopup
+from matchypatchy.gui.popup_alert import AlertPopup
 
 
 class MediaTable(QWidget):
@@ -29,6 +29,7 @@ class MediaTable(QWidget):
         self.species_list = pd.DataFrame()
         self.individual_list = pd.DataFrame()
         self.thumbnails = dict()
+        self.image_loader_thread = None
         self.data_type = 1
         self.VIEWPOINTS = models.load('VIEWPOINTS')
 
@@ -73,6 +74,7 @@ class MediaTable(QWidget):
         self.table.clearContents() 
         # fetch data
         self.fetch()
+        self.format_table()
         if not self.data.empty:
             return True
         else: 
@@ -89,6 +91,18 @@ class MediaTable(QWidget):
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
+
+        # MEDIA
+        elif self.data_type == 0:
+            self.data = fetch_media(self.mpDB)
+        
+        # return empty
+        else:
+            self.data = pd.DataFrame()
+
+    # STEP 3 - CALLED BY load_data()
+    def format_table(self):
+        if self.data_type == 1:
             # corresponding mpDB column names
             self.columns = {0: "select", 1:"thumbnail", 
                             2:"filepath", 3:"timestamp",
@@ -132,7 +146,6 @@ class MediaTable(QWidget):
 
         # MEDIA
         elif self.data_type == 0:
-            self.data = fetch_media(self.mpDB)
             # corresponding mpDB column names
             self.columns = {0:"select", 1:"thumbnail", 
                             2:"filepath", 3:"timestamp",
@@ -141,32 +154,27 @@ class MediaTable(QWidget):
             self.table.setColumnCount(9)  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels( ["Select","Thumbnail", "File Path", "Timestamp", "Station",
                                                    "Sequence ID", "External ID", "Favorite", "Comment"])
-            
             # adjust widths
             self.table.resizeColumnsToContents()
             for col in range(self.table.columnCount()):
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 50))
             self.table.setColumnWidth(1, 100)
-            
-        else:
-            # return empty
-            self.data = pd.DataFrame()
-    
-    # STEP 3 - CALLED BY MAIN GUI IF DATA FOUND
+
+    # STEP 4 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
         """
         Load images if data is available
         Does not run if load_data returns false to MediaDisplay
         """
-        self.loading_bar = ProgressPopup(self, "Loading images...")
+        self.loading_bar = AlertPopup(self, "Loading images...", progressbar=True)
         self.loading_bar.show()
         self.image_loader_thread = LoadThumbnailThread(self.mpDB, self.data, self.data_type)
         self.image_loader_thread.progress_update.connect(self.loading_bar.set_counter)
         self.image_loader_thread.loaded_image.connect(self.add_thumbnail_path)
-        self.image_loader_thread.finished.connect(self.filter)
+        self.image_loader_thread.done.connect(self.filter)
         self.image_loader_thread.start()
 
-    # STEP 4 - Triggered by load_images() finishing
+    # STEP 5 - Triggered by load_images() finishing
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
@@ -250,8 +258,12 @@ class MediaTable(QWidget):
                 self.table.setItem(i, column, edit) 
         
             # Thumbnail
+            #TODO: FIX ASSET PATH
             elif data == 'thumbnail':
-                thumbnail = QImage(roi['thumbnail_path'])
+                thumbnail_path = roi['thumbnail_path']
+                if not thumbnail_path:
+                    thumbnail_path = "/matchypatchy/gui/assets/thumbnail_notfound.png"
+                thumbnail = QImage(thumbnail_path)
                 pixmap = QPixmap.fromImage(thumbnail)
                 label = QLabel()
                 label.setPixmap(pixmap)
