@@ -160,12 +160,14 @@ class MediaTable(QWidget):
         Load images if data is available
         Does not run if load_data returns false to MediaDisplay
         """
-        self.loading_bar = AlertPopup(self, "Loading images...", progressbar=True)
-        self.loading_bar.show()
+        loading_bar = AlertPopup(self, "Loading images...", progressbar=True, cancel_only=True)
+        loading_bar.show()
         self.image_loader_thread = LoadThumbnailThread(self.mpDB, self.data, self.data_type)
-        self.image_loader_thread.progress_update.connect(self.loading_bar.set_counter)
+        self.image_loader_thread.progress_update.connect(loading_bar.set_counter)
         self.image_loader_thread.loaded_images.connect(self.add_thumbnail_paths)
         self.image_loader_thread.done.connect(self.filter)
+
+        loading_bar.rejected.connect(self.image_loader_thread.requestInterruption)
         self.image_loader_thread.start()
 
         # captures emitted temp thumbnail path to data, saves to table
