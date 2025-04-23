@@ -226,7 +226,7 @@ class DisplayMedia(QWidget):
         self.station_select.clear()
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
         self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
-        self.station_select.addItems([el[1] for el in self.station_list_ordered])
+        self.station_select.addItems(sorted([el[1] for el in self.station_list_ordered]))
 
         self.species_select.clear()
         self.species_list_ordered = [(0, 'Species')] + list(self.mpDB.select('species', columns='id, common'))
@@ -264,6 +264,7 @@ class DisplayMedia(QWidget):
         self.media_table.load_images() will trigger a self filter
         and a self refresh upon completion
         """
+        
         self.media_table.load_images()
 
     def change_type(self):

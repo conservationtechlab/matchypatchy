@@ -16,7 +16,7 @@ def initiate():
      # temp dir
     tempfile.tempdir = tempfile.mkdtemp(prefix="MatchyPatchy_")
     
-    default_cfg = {'TEMP_DIR': str(Path(tempfile.gettempdir())),
+    default_cfg = {
            'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
            'DB_DIR': str(HOME_DIR / 'Database'),
            'ML_DIR': str(HOME_DIR / 'Models'),
@@ -27,6 +27,9 @@ def initiate():
     # check if cfg exists, load
     if Path('config.yml').exists():
         cfg = load()
+        # add new temp folder
+        cfg['TEMP_DIR'] = str(Path(tempfile.gettempdir()))
+        #check remaining
         for key in default_cfg.keys():
             if key not in cfg:
                 cfg[key] = default_cfg[key]
@@ -34,6 +37,7 @@ def initiate():
             yaml.dump(cfg, cfg_file)
     # else save default
     else:
+        default_cfg['TEMP_DIR'] = str(Path(tempfile.gettempdir()))
         with open('config.yml', 'w') as cfg_file:
             yaml.dump(default_cfg, cfg_file)
         cfg = default_cfg
