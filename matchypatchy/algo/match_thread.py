@@ -18,7 +18,7 @@ class MatchEmbeddingThread(QThread):
     nearest_dict_return = pyqtSignal(dict)
     done = pyqtSignal()
 
-    def __init__(self, mpDB, rois, sequences, k=3, metric='Cosine', threshold=10000):
+    def __init__(self, mpDB, rois, sequences, k=3, metric='Cosine', threshold=70):
         super().__init__()
         self.mpDB = mpDB
         self.rois = rois
@@ -26,10 +26,10 @@ class MatchEmbeddingThread(QThread):
         self.n = len(sequences)
         self.k = k
         self.metric = metric
-        #if self.metric == 'Cosine':
-        #    self.threshold = threshold/100
-        #else:
-        self.threshold = threshold
+        if self.metric == 'Cosine':
+            self.threshold = threshold/100
+        else:
+            self.threshold = threshold
 
     def run(self):
         """
@@ -59,8 +59,8 @@ class MatchEmbeddingThread(QThread):
                 if filtered_neighbors:
                     filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
 
-                neighbor_dict[s] = filtered_neighbors
-                nearest_dict[s] = filtered_neighbors[0][1]
+                    neighbor_dict[s] = filtered_neighbors
+                    nearest_dict[s] = filtered_neighbors[0][1]
 
                 #elapsed_time = time.perf_counter() - start_time
                 completed_percentage = round(100 * (i + 1) / self.n)
@@ -100,8 +100,8 @@ class MatchEmbeddingThread(QThread):
         filtered = merged[
             (merged["individual_id_query"].isna() | (merged["individual_id_query"] != merged["individual_id_neighbor"])) &
             (merged["sequence_id_query"].isna() | (merged["sequence_id_query"] != merged["sequence_id_neighbor"])) &
-            #(merged["distance"] < self.threshold) & 
-            (merged["distance"] > 0)
+            (merged["viewpoint_query"].isna() | (merged["viewpoint_query"] == merged["viewpoint_neighbor"])) &
+            (merged["distance"] < self.threshold) & (merged["distance"] > 0)
         ]
         # Return filtered neighbors as tuples of (ROI ID, distance)
         return list(zip(filtered["id_neighbor"], filtered["distance"]))

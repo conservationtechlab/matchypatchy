@@ -56,7 +56,7 @@ class QueryContainer(QObject):
         # must have embeddings to continue
         if not (self.data_raw["emb"] == 0).all():
             # need sequence and capture ids from media to restrict comparisons shown to
-            info = "roi.id, media_id, reviewed, species_id, individual_id, emb, timestamp, station_id, sequence_id"
+            info = "roi.id, media_id, reviewed, viewpoint, species_id, individual_id, emb, timestamp, station_id, sequence_id"
             rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
             self.rois = pd.DataFrame(rois, columns=columns)
             return len(self.sequences)
@@ -119,7 +119,7 @@ class QueryContainer(QObject):
             else:
                 self.parent.warn("No data to compare within filter.")
 
-        # filter neighbor dict and nearest dict
+        # filter neighbor dict and nearest dict by sequences present in filtered self.data
         self.neighbor_dict = {k: self.neighbor_dict_raw[k] for k in self.data['sequence_id'] if k in self.neighbor_dict_raw}
         self.nearest_dict = {k: self.nearest_dict_raw[k] for k in self.data['sequence_id'] if k in self.nearest_dict_raw}
 

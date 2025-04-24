@@ -397,7 +397,7 @@ class DisplayCompare(QWidget):
 
         # progress popup
     def show_progress(self):
-        self.progress = AlertPopup(self, "Matching embeddings... calculating time remaining.\nThis may take a while.", progressbar=True, cancel_only=True)
+        self.progress = AlertPopup(self, "Matching embeddings... This may take a while.", progressbar=True, cancel_only=True)
         self.progress.show()
 
     def filter_neighbors(self):
