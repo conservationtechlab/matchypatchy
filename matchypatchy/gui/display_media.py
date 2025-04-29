@@ -377,9 +377,10 @@ class DisplayMedia(QWidget):
                 for row in self.selected_rows:
                     if self.data_type == 1:
                         id = int(self.media_table.data_filtered.at[row, "media_id"])
+                        self.mpDB.copy("media", id)
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                    self.mpDB.copy("media", id)
+                        self.mpDB.copy("roi", id)
                 del dialog
      
     def delete(self):
@@ -389,9 +390,10 @@ class DisplayMedia(QWidget):
                 for row in self.selected_rows:
                     if self.data_type == 1:
                         id = int(self.media_table.data_filtered.at[row, "media_id"])
+                        self.mpDB.delete('media', f'id={id}')
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                    self.mpDB.delete('media', f'id={id}')
+                        self.mpDB.delete('roi', f'id={id}')
                 del dialog
                 # Clear selection and update UI
                 self.media_table.table.clearSelection()

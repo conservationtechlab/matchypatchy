@@ -13,6 +13,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.algo import models
 from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
+from matchypatchy.algo.table_thread import LoadTableThread
 from matchypatchy.database.media import fetch_media, fetch_roi_media
 from matchypatchy.database.species import fetch_species, fetch_individual
 from matchypatchy.gui.popup_alert import AlertPopup
@@ -238,131 +239,39 @@ class MediaTable(QWidget):
         # clear old contents and prep for filtered data
         self.table.clearContents()
         # disconnect edit function while refreshing to prevent needless calls
-        self.table.blockSignals(True) 
-        
-        # display data
         self.table.setRowCount(n_rows)
         for row in range(n_rows):
             self.table.setRowHeight(row, 100)
-            self.add_row(row)
 
-        delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
-        self.table.setItemDelegateForColumn(4, delegate)
+        # set station delegate post filter
+        station_delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
+        self.table.setItemDelegateForColumn(4, station_delegate)
 
-        self.table.blockSignals(False)  # reconnect editing
+        loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
+        loading_bar.set_max(n_rows)
+        loading_bar.show()
+
+        self.table_loader_thread = LoadTableThread(self)
+        self.table_loader_thread.progress_update.connect(loading_bar.set_counter)
+        self.table_loader_thread.loaded_cell.connect(self.add_cell)
+        self.table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
+
+        loading_bar.rejected.connect(self.table_loader_thread.requestInterruption)
+        self.table_loader_thread.start()
         
     # Set Table Entries --------------------------------------------------------
-    def add_row(self, i):
+    def add_cell(self, row, column, qtw):
         """
         Adds Row to Table with Items from self.data_filtered
         """
-        roi = self.data_filtered.iloc[i]
-        
-        for column, data in self.columns.items():
-             # Edit Checkbox
-            if data == 'select':
-                edit = QTableWidgetItem()
-                edit.setFlags(edit.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-                edit.setCheckState(Qt.CheckState.Unchecked)
-                self.table.setItem(i, column, edit) 
-        
-            # Thumbnail
-            #TODO: FIX ASSET PATH
-            elif data == 'thumbnail':
-                thumbnail_path = roi['thumbnail_path']
-                if not thumbnail_path:
-                    thumbnail_path = "/matchypatchy/gui/assets/thumbnail_notfound.png"
-                thumbnail = QImage(thumbnail_path)
-                pixmap = QPixmap.fromImage(thumbnail)
-                label = QLabel()
-                label.setPixmap(pixmap)
-                self.table.setCellWidget(i, column, label)
-            # FilePath and Timestamp not editable
-            elif data == 'filepath' or data == 'timestamp':
-                noedit = QTableWidgetItem(roi[data])
-                noedit.setFlags(noedit.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.table.setItem(i, column, noedit)
-            # Station
-            elif data == 'station':
-                self.table.setItem(i, column, QTableWidgetItem(self.valid_stations[roi["station_id"]]))
-            # Viewpoint
-            elif data == 'viewpoint':
-                vp_raw = roi["viewpoint"]
-                #print(f"vp_raw is {vp_raw}")
-
-                if pd.isna(vp_raw) or vp_raw is None or str(vp_raw) == "None":
-                    vp_key = "None"
-                else:
-                    vp_key = str(int(vp_raw))  # convert float 1.0 → int 1 → str "1"
-
-                vp_value = self.VIEWPOINTS.get(vp_key, "None")
-                self.table.setItem(i, column, QTableWidgetItem(vp_value))
-
-
-            # Species ID
-            elif data == 'binomen' or data == 'common':
-                if self.species_list.empty:
-                    # can't edit if no species in table
-                    noedit = QTableWidgetItem()
-                    noedit.setFlags(noedit.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.table.setItem(i, column, noedit)
-                else:
-                    if roi['species_id'] is not None:
-                        print(f"species_id is {roi['species_id']}")
-                        print("species_list is\n", self.species_list)
-
-                        species = self.species_list[self.species_list['id'] == roi['species_id']]
-                        print("filtered species is\n", species)
-
-                        if not species.empty:
-                            self.table.setItem(i, column, QTableWidgetItem(str(species[data].values[0])))
-                        else:
-                            print("Species not found — setting to 'Unknown'")
-                            self.table.setItem(i, column, QTableWidgetItem("Unknown"))
-                    else:
-                        self.table.setItem(i, column, QTableWidgetItem("Unknown"))
-
-                    '''
-                    if roi['species_id'] is not None:
-                        print(f"species list is {self.species_list}")
-                        species = self.species_list[self.species_list['id'] == roi['species_id']]
-                        print(f"species is {species}")
-                        self.table.setItem(i, column, QTableWidgetItem(species[data][0]))
-                    else:
-                        self.table.setItem(i, column, QTableWidgetItem(None))
-                    '''
-            
-            elif data == "name" or data == "sex" or data == 'age':
-                if roi['individual_id'] is not None:
-                    individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
-                    if not individual.empty:
-                        self.table.setItem(i, column, QTableWidgetItem(str(individual[data].values[0])))
-                    else:
-                        print(f"Warning: individual_id {roi['individual_id']} not found in individual_list")
-                        self.table.setItem(i, column, QTableWidgetItem("Unknown"))
-                else:
-                    self.table.setItem(i, column, QTableWidgetItem("Unknown"))
-
-
-            # Reviewed and Favorite Checkbox
-            elif data == 'reviewed' or data == 'favorite':
-                qtw = QTableWidgetItem()
-                qtw.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-                qtw.setCheckState(self.set_checkstate(roi[data]))
-                self.table.setItem(i, column, qtw) 
-            else:
-                self.table.setItem(i, column, QTableWidgetItem(str(roi[data]))) 
-
-
-    def set_checkstate(self, item):
-        """
-        Set the checkbox of reviewed and favorite columns
-        when adding rows
-        """
-        if item:
-            return Qt.CheckState.Checked
+        self.table.blockSignals(True) 
+        if column == 1:
+            pixmap = QPixmap.fromImage(qtw)
+            qtw = QLabel()
+            qtw.setPixmap(pixmap)
+            self.table.setCellWidget(row, column, qtw)
         else:
-            return Qt.CheckState.Unchecked
+            self.table.setItem(row, column, qtw) 
         
     def get_checkstate_int(self, item):
         if (item == Qt.CheckState.Checked):
