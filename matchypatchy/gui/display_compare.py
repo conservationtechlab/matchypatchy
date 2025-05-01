@@ -31,7 +31,7 @@ class DisplayCompare(QWidget):
         self.mpDB = parent.mpDB
         self.k = 3  # default knn
         self.distance_metric = 'Cosine'
-        self.threshold = 70
+        self.threshold = 50
         self.current_viewpoint = 'Any'
         
         # CREATE QUERY CONTAINER ==============================================
