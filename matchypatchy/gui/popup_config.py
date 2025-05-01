@@ -84,13 +84,12 @@ class ConfigPopup(QDialog):
         self.mpDB._command(self)
 
     def set_db(self):
-        new_db = QFileDialog.getOpenFileName(self, "Get Database",
-                                              os.path.expanduser('~'),
-                                              ("DB Files (*.db)"))[0]
+        new_db = QFileDialog.getExistingDirectory(self, "Get Database",
+                                                  os.path.expanduser('~'),)
         if new_db:
-            self.ml_path.setText(new_db)
+            self.db_path.setText(new_db)
             # TODO: verify db
-            valid = self.mpDB.update_paths(self, new_db)
+            valid = self.mpDB.update_paths(new_db)
             if valid:
             # Update config
                 self.cfg['DB_DIR'] = str(new_db)
