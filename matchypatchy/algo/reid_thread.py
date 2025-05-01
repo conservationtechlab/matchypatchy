@@ -48,14 +48,18 @@ class ReIDThread(QThread):
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
         if len(filtered_rois) > 0:
 
-            viewpoints = animl.viewpoint_estimator(filtered_rois, self.image_paths, self.viewpoint_filepath)
-            viewpoints = viewpoints.set_index("id")
+            model = animl.load_model(self.viewpoint_filepath, 2)
+            dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
 
-            for roi_id, v in viewpoints.iterrows():
+            for i, img in enumerate(dataloader):
                 if not self.isInterruptionRequested():
+                    roi_id, value, prob = animl.viewpoint_estimator(model, img)
+                    print(roi_id, value)
+
                     # TODO: Utilize probability for captures/sequences
                     # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
-                    self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(v['value'])})
+                    self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
+                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
 
     def get_embeddings(self):
         # Process only those that have not yet been processed

@@ -296,6 +296,8 @@ class DisplayBase(QWidget):
             self.animl_thread.progress_update.connect(dialog.set_value)
 
             # 3. REID AND VIEWPOINT
+            dialog.set_max(100)
+            dialog.set_counter(0)
             self.miew_thread = ReIDThread(self.mpDB, mloptions['reid_key'], mloptions['viewpoint_key'])
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)
