@@ -83,7 +83,7 @@ class CSVImportThread(QThread):
                 # do not add emb_id, to be determined later
                 roi_id = self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
                                            species_id, viewpoint=viewpoint, reviewed=reviewed,
-                                           individual_id=individual_id, emb_id=0)
+                                           individual_id=individual_id, emb=0)
                 roi_counter += 1
                 self.progress_update.emit(roi_counter)
 
