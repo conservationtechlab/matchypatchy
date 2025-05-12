@@ -11,7 +11,6 @@ from PyQt6.QtCore import Qt
 from matchypatchy.algo.import_thread import CSVImportThread
 from matchypatchy.gui.widget_combobox import ComboBoxSeparator
 
-# TODO: check if import 
 
 class ImportCSVPopup(QDialog):
     def __init__(self, parent, manifest):

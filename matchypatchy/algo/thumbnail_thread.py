@@ -32,18 +32,21 @@ class LoadThumbnailThread(QThread):
 
     def run(self):
         filepaths = []
+
         #TODO: break into chunks so thread can be interupted 
 
         with ThreadPoolExecutor() as executor:
             futures = {executor.submit(self.process_image, roi): roi for _,roi in self.data.iterrows()}
 
             for i, future in enumerate(as_completed(futures)):
-                result = future.result()
-                filepaths.append(result)
-                self.progress_update.emit(int((i + 1) / len(self.data) * 100))
+                if not self.isInterruptionRequested():
+                    result = future.result()
+                    filepaths.append(result)
+                    self.progress_update.emit(int((i + 1) / len(self.data) * 100))
 
         self.loaded_images.emit(filepaths)
-        self.done.emit()
+        if not self.isInterruptionRequested():
+            self.done.emit()
 
 
     def process_image(self, roi):

@@ -51,11 +51,10 @@ class LoadTableThread(QThread):
             qtw.setFlags(qtw.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
             qtw.setCheckState(Qt.CheckState.Unchecked)
         # Thumbnail
-        #TODO: FIX ASSET PATH
         elif column == 'thumbnail':
             thumbnail_path = roi['thumbnail_path']
             if not thumbnail_path:
-                thumbnail_path = "/matchypatchy/gui/assets/thumbnail_notfound.png"
+                thumbnail_path = THUMBNAIL_NOTFOUND
             qtw = QImage(thumbnail_path)
 
         # FilePath and Timestamp not editable

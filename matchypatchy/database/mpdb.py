@@ -11,7 +11,6 @@ from random import randrange
 from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy import sqlite_vec
 
-#TODO:  fix error return for functions returning multiple objects (cannot unpack error)
 
 class MatchyPatchyDB():
     def __init__(self, DB_PATH):

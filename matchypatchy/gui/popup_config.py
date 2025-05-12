@@ -11,7 +11,10 @@ from PyQt6.QtGui import QIcon
 from matchypatchy import config
 from matchypatchy.gui.popup_alert import AlertPopup
 
-# TODO: Change asset path
+
+ICON_PENCIL = "/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"
+# TODO ICON_PENCIL = os.path.normpath("assets/fluent_pencil_icon.png")
+
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):
@@ -49,16 +52,16 @@ class ConfigPopup(QDialog):
 
         button_db_path = QPushButton()
         button_db_path.setMaximumHeight(30)
-        button_db_path.setIcon(QIcon("/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"))
+        button_db_path.setIcon(QIcon(ICON_PENCIL))
         button_db_path.clicked.connect(self.set_db)
 
         button_log_path = QPushButton()
         button_log_path.setMaximumHeight(30)
-        button_log_path.setIcon(QIcon("/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"))
+        button_log_path.setIcon(QIcon(ICON_PENCIL))
         button_log_path.clicked.connect(self.set_log)
 
         button_ml_path = QPushButton()
-        button_ml_path.setIcon(QIcon("/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"))
+        button_ml_path.setIcon(QIcon(ICON_PENCIL))
         button_ml_path.setMaximumHeight(30)
         button_ml_path.clicked.connect(self.set_ml)
 
@@ -88,7 +91,6 @@ class ConfigPopup(QDialog):
                                                   os.path.expanduser('~'),)
         if new_db:
             self.db_path.setText(new_db)
-            # TODO: verify db
             valid = self.mpDB.update_paths(new_db)
             if valid:
             # Update config

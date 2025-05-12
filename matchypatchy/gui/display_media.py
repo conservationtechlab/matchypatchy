@@ -392,7 +392,8 @@ class DisplayMedia(QWidget):
                         id = int(self.media_table.data_filtered.at[row, "media_id"])
                         rois = self.media_table.data[self.media_table.data['media_id'] == id]
                         self.mpDB.delete('media', f'id={id}')
-                        # TODO: delete rois
+                        for i,row in rois.iterrows():
+                            self.mpDB.delete('roi', f'id={row['id']}')
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
                         self.mpDB.delete('roi', f'id={id}')
