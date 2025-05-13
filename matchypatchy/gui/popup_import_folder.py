@@ -1,16 +1,16 @@
 """
 Popup for Importing a Manifest
 """
-import os
 import logging
 from pathlib import Path
 import pandas as pd
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QProgressBar,
-                             QComboBox, QDialogButtonBox, QLabel)
+                             QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.widget_combobox import ComboBoxSeparator
 
 from matchypatchy.algo.animl_thread import BuildManifestThread
 from matchypatchy.algo.import_thread import FolderImportThread
@@ -35,9 +35,11 @@ class ImportFolderPopup(QDialog):
         layout.addSpacing(5)
 
         # station
-        self.station = QComboBox()
+        self.station = ComboBoxSeparator()
         self.station.hide()
         layout.addWidget(self.station)
+        self.station.addItems(['None'])
+        self.station.add_separator()
 
         # Ok/Cancel
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
@@ -82,10 +84,9 @@ class ImportFolderPopup(QDialog):
         self.station.show()
         self.buttonBox.show()
 
-        example = self.data.loc[0, 'FilePath']
         # get potential station
-        file_tree = ['None'] + example.split(os.sep)
-        self.station.addItems(file_tree)
+        example = self.data.loc[0, 'FilePath']
+        self.station.addItems(list(Path(example).parts)[1:])
 
     # 4. Import manifest into media table
     def import_manifest(self):
