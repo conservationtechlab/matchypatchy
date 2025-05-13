@@ -26,9 +26,9 @@ class LoadThumbnailThread(QThread):
         self.data_type = data_type
         self.size = 99
         if self.data_type == 1:
-            self.existing_filepaths = dict(self.mpDB.select("roi_thumbnails", "id, filepath"))
+            self.existing_filepaths = dict(self.mpDB.select("roi_thumbnails", "fid, filepath"))
         else:
-            self.existing_filepaths = dict(self.mpDB.select("media_thumbnails", "id, filepath"))
+            self.existing_filepaths = dict(self.mpDB.select("media_thumbnails", "fid, filepath"))
 
     def run(self):
         filepaths = []
@@ -39,14 +39,12 @@ class LoadThumbnailThread(QThread):
             futures = {executor.submit(self.process_image, roi): roi for _,roi in self.data.iterrows()}
 
             for i, future in enumerate(as_completed(futures)):
-                if not self.isInterruptionRequested():
-                    result = future.result()
-                    filepaths.append(result)
-                    self.progress_update.emit(int((i + 1) / len(self.data) * 100))
+                result = future.result()
+                filepaths.append(result)
+                self.progress_update.emit(int((i + 1) / len(self.data) * 100))
 
         self.loaded_images.emit(filepaths)
-        if not self.isInterruptionRequested():
-            self.done.emit()
+        self.done.emit()
 
 
     def process_image(self, roi):
