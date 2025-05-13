@@ -36,6 +36,8 @@ class MatchyPatchyDB():
             else:
                 return False
         else:
+            self.filepath = filepath
+            self.chroma_filepath = chroma_filepath
             self.key = '{:05}'.format(randrange(1, 10 ** 5))
             setup_database(self.key, self.filepath)
             setup_chromadb(self.key, self.chroma_filepath)
