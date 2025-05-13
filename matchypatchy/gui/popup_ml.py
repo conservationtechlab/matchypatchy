@@ -39,7 +39,7 @@ class MLDownloadPopup(QDialog):
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
+        self.buttonBox.rejected.connect(self.cancel)
 
         # Progress Bar (hidden at start)
         self.progress_bar = QProgressBar()
@@ -74,14 +74,25 @@ class MLDownloadPopup(QDialog):
         self.checked_models = all - set(self.available_models.keys())
         if self.checked_models:
             self.download_ml()
+    
+    def toggle_close(self):
+        ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+        ok_button.setEnabled(not ok_button.isEnabled())  # Disable the OK button
 
     def download_ml(self):
         # Start download thread
+        self.toggle_close()
         self.progress_bar.setRange(0, 0)
         self.progress_bar.show()
         self.build_thread = models.DownloadMLThread(self.ml_dir, self.checked_models)
         self.build_thread.finished.connect(self.progress_bar.hide)
+        self.build_thread.finished.connect(self.toggle_close)
         self.build_thread.start()
+
+    def cancel(self):
+        for key in self.checked_models:
+            models.delete(self.ml_dir, key)
+        self.reject()
 
 
 class MLOptionsPopup(QDialog):

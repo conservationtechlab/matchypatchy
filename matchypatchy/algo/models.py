@@ -68,7 +68,11 @@ def get_config_path(ML_DIR, key):
         return path
     else:
         return None
-
+    
+def delete(ML_DIR, key):
+    path = get_path(ML_DIR, key)
+    if path:
+        path.unlink()
 
 def download(ML_DIR, key):
     # read model directory
