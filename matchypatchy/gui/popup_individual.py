@@ -87,9 +87,9 @@ class IndividualPopup(QDialog):
         dialog = IndividualFillPopup(self, species_id=species_id, name=name, sex=sex, age=age)
         if dialog.exec():
             replace_dict = {"name": f"'{dialog.get_name()}'",
+                            "species_id": f"'{dialog.get_species_id()}'",
                             "sex": f"'{dialog.get_sex()}'",
-                            "age": f"'{dialog.get_age()}'",
-                            "species_id": f"'{dialog.get_species_id()}'", }
+                            "age": f"'{dialog.get_age()}'"}
             self.mpDB.edit_row("individual", id, replace_dict)
         del dialog
         # refetch data

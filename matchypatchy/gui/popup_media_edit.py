@@ -15,7 +15,7 @@ class MediaEditPopup(QDialog):
     def __init__(self, parent, ids):
         super().__init__(parent)
         self.parent = parent
-        self.setWindowTitle("Batch Edit ROI Viewpoint")
+        self.setWindowTitle("Edit Media")
         self.setFixedSize(900, 600)
         self.mpDB = parent.mpDB
 

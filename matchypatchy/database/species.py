@@ -31,6 +31,6 @@ def fetch_individual(mpDB):
     """
     individual = mpDB.select("individual")
     if individual:
-        return pd.DataFrame(individual, columns=["id", "species_id", "name", "sex", "age"])
+        return pd.DataFrame(individual, columns=["id", "name", "species_id","sex", "age"])
     else:  # return empty
-        return pd.DataFrame(columns=["id", "species_id", "name", "sex", "age"])
+        return pd.DataFrame(columns=["id", "name", "species_id","sex", "age"])

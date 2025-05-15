@@ -213,12 +213,12 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_individual(self, species_id: int, name: str, 
+    def add_individual(self, name: str, species_id: Optional[int]=None,
                        sex: Optional[str]=None, age: Optional[str]=None):
         """
         Add an individual with
-            - species_id (int)
             - name (str)
+            - species_id (int)
             - sex (str)
             - age (str)
         """
@@ -226,9 +226,9 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO individual
-                        (species_id, name, sex, age) 
+                        (name, species_id, sex, age) 
                         VALUES (?, ?, ?, ?);"""
-            data_tuple = (species_id, name, sex, age)
+            data_tuple = (name, species_id, sex, age)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
