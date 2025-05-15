@@ -48,7 +48,6 @@ class MediaTable(QWidget):
                                               "Reviewed", "Favorite", "Comment"])
         #self.table.setSortingEnabled(True)  # NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
-        self.table.verticalHeader().sectionClicked.connect(self.select_row)
         self.table.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.table.cellChanged.connect(self.update_entry)  # allow user editing
         
@@ -70,7 +69,6 @@ class MediaTable(QWidget):
         Fetch table, load images and save as thumbnails to TEMP_DIR
         """
         # clear old view
-
         self.data_type = data_type
         self.table.clearContents() 
         # fetch data
@@ -89,6 +87,7 @@ class MediaTable(QWidget):
         """
         self.species_list = fetch_species(self.mpDB)
         self.individual_list = fetch_individual(self.mpDB)
+        print(self.individual_list)
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
@@ -231,7 +230,7 @@ class MediaTable(QWidget):
         # refresh table contents
         self.refresh_table()
 
-    def refresh_table(self):
+    def refresh_table(self, popup=True):
         """
         Add rows to table
         """
@@ -247,16 +246,17 @@ class MediaTable(QWidget):
         station_delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
         self.table.setItemDelegateForColumn(4, station_delegate)
 
-        loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
-        loading_bar.set_max(n_rows)
-        loading_bar.show()
-
         self.table_loader_thread = LoadTableThread(self)
-        self.table_loader_thread.progress_update.connect(loading_bar.set_counter)
         self.table_loader_thread.loaded_cell.connect(self.add_cell)
         self.table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
 
-        loading_bar.rejected.connect(self.table_loader_thread.requestInterruption)
+        if popup:
+            loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
+            loading_bar.set_max(n_rows)
+            self.table_loader_thread.progress_update.connect(loading_bar.set_counter)
+            loading_bar.rejected.connect(self.table_loader_thread.requestInterruption)
+            loading_bar.show()
+        
         self.table_loader_thread.start()
         
     # Set Table Entries --------------------------------------------------------
@@ -290,8 +290,8 @@ class MediaTable(QWidget):
         """
         Applies all previous edits to the current data_filter if the row is present
         """
-        #print(self.edit_stack)
         for edit in self.edit_stack:
+            print(edit)
             if not self.data_filtered.empty and self.data_filtered['id'].isin([edit['id']]).any():
                 self.data_filtered.loc[edit['row'], edit['reference']] = edit['new_value']
 
@@ -301,7 +301,6 @@ class MediaTable(QWidget):
             item = self.table.item(row, column)
             if item is not None:
                 checked = item.checkState() == Qt.CheckState.Checked
-                print(f"Checkbox at row {row} is {'checked' if checked else 'unchecked'}")
                 self.select_row(row, overwrite=checked)
                 self.parent.check_selected_rows()
 
@@ -321,11 +320,8 @@ class MediaTable(QWidget):
             return
         # checked items
         elif reference == 'reviewed' or reference == 'favorite':
-            print("DataFrame columns:", self.data_filtered.columns)
             previous_value = int(self.data_filtered.at[row, reference])
-            print(f'previous_value is {previous_value}')
             new_value = self.get_checkstate_int(self.table.item(row, column).checkState())
-            print(new_value)
         # station
         elif reference == 'station':
             reference = 'station_id'
@@ -340,6 +336,7 @@ class MediaTable(QWidget):
                 new_value = None
             else:
                 new_value = int(key)
+
         # species
         elif reference == 'common':
             reference = 'species_id'
@@ -349,7 +346,6 @@ class MediaTable(QWidget):
                 new_value = None
             else:
                 new_value = self.species_list.loc[self.species_list['common'] == new, 'id'][0]
-
         elif reference ==  'binomen':
             reference = 'species_id'
             previous_value = self.data_filtered.at[row, reference]
@@ -359,7 +355,20 @@ class MediaTable(QWidget):
             else:
                 new_value = self.species_list.loc[self.species_list['binomen'] == new, 'id'][0]
     
-        # everything else
+        # individual
+        elif reference == 'name' or reference == 'sex' or reference == 'age':
+            reference = 'individual_id'
+            previous_value = self.data_filtered.at[row, reference]
+            if previous_value == None:
+                dialog = AlertPopup(self, "Please tag the ROI with an individual first.")
+                if dialog.exec():
+                    del dialog
+                    self.apply_edits()
+                    self.refresh_table(popup=False)
+                    return
+            else:
+                new_value = self.table.item(row, column).text()
+
         else:
             previous_value = self.data_filtered.at[row, reference]
             new_value = self.table.item(row, column).text()
@@ -374,8 +383,7 @@ class MediaTable(QWidget):
         self.edit_stack.append(edit)
         self.update_signal.emit([row, column])
         self.apply_edits()
-        self.refresh_table()
-
+        self.refresh_table(popup=False)
 
     def undo(self):
         """
@@ -384,7 +392,7 @@ class MediaTable(QWidget):
         if len(self.edit_stack) > 0:
             last = self.edit_stack.pop()
             self.data_filtered.loc[last['row'], last['reference']] = last['previous_value']
-            self.refresh_table()
+            self.refresh_table(popup=False)
 
     def save_changes(self):
         # commit all changes in self.edit_stack to database
@@ -393,14 +401,16 @@ class MediaTable(QWidget):
             id = edit['id']
             replace_dict = {edit['reference']: edit['new_value']}
             if self.data_type == 1:
-                self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
+                if edit['reference'] in {'station_id', 'sequence_id', 'external_id'}:
+                    self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
+                else:
+                    self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
             else:    
                 self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
                 pass
 
     def select_row(self, row, overwrite=None):
         select = self.table.item(row, 0)
-        print("select row")
         if overwrite is not None:
             if overwrite is True:
                 select.setCheckState(Qt.CheckState.Checked)
@@ -410,7 +420,6 @@ class MediaTable(QWidget):
             self.invert_checkstate(select)
 
     def selectedRows(self):
-        print("selectedRows called")
         selected_rows = []
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 0)
@@ -419,8 +428,8 @@ class MediaTable(QWidget):
         return selected_rows
 
     def edit_row(self, row):
-        rid = int(self.data_filtered.at[row, "id"])
-        self.parent.edit_row(rid)
+        id = int(self.data_filtered.at[row, "id"])
+        self.parent.edit_row(id)
 
 
 # COMBOBOX FOR VIEWPOINT, SPECIES, SEX

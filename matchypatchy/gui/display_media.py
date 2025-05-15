@@ -171,6 +171,8 @@ class DisplayMedia(QWidget):
             if dialog.exec():
                 self.parent._set_base_view()
                 del dialog
+            else:
+                return
         # stop thumbnail loader thread and unlock db
         if self.media_table.image_loader_thread is not None and self.media_table.image_loader_thread.isRunning():
             self.media_table.image_loader_thread.requestInterruption()
@@ -185,6 +187,7 @@ class DisplayMedia(QWidget):
         # check if there are rois first
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
+
         if media_n == 0:
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
@@ -305,20 +308,17 @@ class DisplayMedia(QWidget):
         else:
             self.button_undo.setEnabled(False)
 
-    def edit_row(self, rid):
+    def edit_row(self, id):
         # EDIT ROI
         if self.data_type == 1:
-            dialog = ROIPopup(self, rid)
+            dialog = ROIPopup(self, id)
             if dialog.exec():
                 del dialog
                 # reload data
                 data_available = self.load_table()
                 if data_available:
                     self.load_thumbnails()
-        # EDIT MEDIA
-        else:
-            # TODO
-            pass
+
     def update_buttons(self):
         has_selection = len(self.media_table.selectedRows()) > 0
         # Only allow edit in ROI mode
@@ -330,7 +330,7 @@ class DisplayMedia(QWidget):
         self.selected_rows = self.media_table.selectedRows()
         if len(self.selected_rows) > 0:
             selected_ids = [int(self.media_table.data_filtered.at[row, "id"]) for row in self.selected_rows]
-            dialog = MediaEditPopup(parent=self, ids=selected_ids)  # Ensure `parent=self`
+            dialog = MediaEditPopup(self, selected_ids)
             if dialog.exec():
                 del dialog
                  # reload data
@@ -347,7 +347,6 @@ class DisplayMedia(QWidget):
             self.media_table.select_row(row, overwrite=self.button_select.isChecked())
 
     def check_selected_rows(self):
-
         self.selected_rows = self.media_table.selectedRows()
         print("Selected rows:", self.selected_rows)
         if(self.data_type == 1):

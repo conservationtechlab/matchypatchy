@@ -23,7 +23,7 @@ class LoadTableThread(QThread):
 
     def __init__(self, parent):
         super().__init__()
-        self.data = parent.data
+        self.data = parent.data_filtered
         self.valid_stations = parent.valid_stations
         self.VIEWPOINTS = parent.VIEWPOINTS
         self.species_list = parent.species_list

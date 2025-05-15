@@ -13,6 +13,7 @@ from matchypatchy.gui.widget_image import ImageWidget
 
 from matchypatchy.algo.models import load
 import matchypatchy.database.media as db_roi
+from matchypatchy.database.species import fetch_individual
 from matchypatchy.database.location import fetch_station_names_from_id
 
 
@@ -128,7 +129,6 @@ class ROIPopup(QDialog):
         name_label.setFixedWidth(horizontal_gap)
         name_layout.addWidget(name_label, alignment=Qt.AlignmentFlag.AlignLeft)
         self.name = QComboBox()
-        self.refresh_names()
         self.name.currentIndexChanged.connect(self.change_name)
         name_layout.addWidget(self.name, stretch=1)
         add_individual = QPushButton("+")
@@ -200,17 +200,15 @@ class ROIPopup(QDialog):
         self.setLayout(container_layout)
 
         # display data
+        self.refresh_names()
         self.refresh_values()
 
     def refresh_names(self):
         self.name.blockSignals(True)
         self.name.clear()
-        individuals = self.mpDB.select("individual", "id, name, sex")
-        self.individuals = [(0, 'Unknown', 'Unknown')] + individuals
-        print("=== Loaded individuals ===")
-        for ind in self.individuals:
-            print(f"id={ind[0]}, name={ind[1]}, sex={ind[2]}")
-        self.name.addItems([el[1] for el in self.individuals])
+        self.individuals = fetch_individual(self.mpDB)
+        self.name_list = ["Unknown"] + [el for el in self.individuals["name"]]
+        self.name.addItems(self.name_list)
         self.name.blockSignals(False)
 
     def refresh_species(self):
@@ -239,14 +237,9 @@ class ROIPopup(QDialog):
 
         # Editable -------------------------------------------------------------
         # Name
-    
         self.iid = self.roi_data.at[0, "individual_id"]
-        print(f"\n=== REFRESHING VALUES ===")
-        print(f"individual_id in ROI: {self.iid}")
-        print(f"individuals list: {[ind[0] for ind in self.individuals]}")
 
         if self.iid is None:
-            print("self.iid is none")
             self.name.setCurrentIndex(0)
             self.sex.setDisabled(True)
         else:
@@ -278,13 +271,11 @@ class ROIPopup(QDialog):
 
     # Edits --------------------------------------------------------------------
     def change_name(self):
-        selected_individual = self.individuals[self.name.currentIndex()]
-        print(f"\n=== CHANGING NAME ===")
-        print(f"Selected: {selected_individual}")
-        if selected_individual[0] > 0:
+        if self.name.currentIndex() > 0:
+            selected_individual = self.individuals["name" == self.name_list[self.name.currentIndex()]]
             print(f"→ Assigning individual_id={selected_individual[0]} to ROI {self.rid}")
             self.mpDB.edit_row('roi', self.rid, {"individual_id": selected_individual[0]})
-            self.sex.setCurrentIndex(self.sex.findText(str(self.individuals[self.name.currentIndex()][2])))
+            self.sex.setCurrentIndex(self.sex.findText(str(selected_individual[2])))
             self.sex.setDisabled(False)
         else:
             print("→ Setting to Unknown")
@@ -292,11 +283,12 @@ class ROIPopup(QDialog):
             self.sex.setDisabled(True)
 
     def change_sex(self):
-        iid = self.individuals[self.name.currentIndex()][0]
-        sex_val = self.sex.currentText()
-        print(f"\n=== CHANGING SEX ===")
-        print(f"Setting sex of individual_id={iid} to '{sex_val}'")
-        self.mpDB.edit_row('individual', iid, {"sex": f"'{self.sex.currentText()}'"})
+        if self.name.currentIndex() > 0:
+            iid = self.individuals["name" == self.name_list[self.name.currentIndex()]]['id']
+            sex_val = self.sex.currentText()
+            print(f"\n=== CHANGING SEX ===")
+            print(f"Setting sex of individual_id={iid} to '{sex_val}'")
+            self.mpDB.edit_row('individual', iid, {"sex": f"'{self.sex.currentText()}'"})
 
     def change_species(self):
         selected_species = self.species_list[self.species.currentIndex()]
@@ -326,9 +318,10 @@ class ROIPopup(QDialog):
     def new_individual(self):
         dialog = IndividualFillPopup(self)
         if dialog.exec():
-            individual_id = self.mpDB.add_individual(dialog.get_species_id(),
-                                                     dialog.get_name(),
-                                                     dialog.get_sex())
+            individual_id = self.mpDB.add_individual(dialog.get_name(),
+                                                     dialog.get_species_id(),
+                                                     dialog.get_sex(),
+                                                     dialog.get_age())
             self.mpDB.edit_row('roi', self.rid, {"individual_id": individual_id})
         # reload data
         self.refresh_names()
