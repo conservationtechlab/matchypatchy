@@ -377,7 +377,11 @@ class MatchyPatchyDB():
             for key, value in replace.items():
                 if value in (None, ''):
                     replace[key] = 'NULL'
+                if isinstance(value, str):
+                    replace[key] = f"'{value}'"
+            
             replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
+
             command = f"UPDATE {table} SET {replace_values} WHERE id={id}"
             if not quiet: print(command)
             cursor.execute(command)

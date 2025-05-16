@@ -88,7 +88,7 @@ class SpeciesPopup(QDialog):
         id, binomen, common = self.mpDB.select('species', row_cond=cond)[0]
         dialog = SpeciesFillPopup(self, binomen=binomen, common=common)
         if dialog.exec():
-            replace_dict = {"binomen": f"'{dialog.get_binomen()}'", "common": f"'{dialog.get_common()}'"}
+            replace_dict = {"binomen": dialog.get_binomen(), "common": dialog.get_common()}
             self.mpDB.edit_row("species", id, replace_dict)
         del dialog
         self.stations = self.update()

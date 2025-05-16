@@ -81,7 +81,7 @@ class StationPopup(QDialog):
         id, name, lat, long = self.mpDB.select('station', columns='id, name, lat, long', row_cond=cond)[0]
         dialog = StationFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
-            replace_dict = {"name": f"'{dialog.get_name()}'", "lat": dialog.get_lat(), "long": dialog.get_long()}
+            replace_dict = {"name": dialog.get_name(), "lat": dialog.get_lat(), "long": dialog.get_long()}
             self.mpDB.edit_row("station", id, replace_dict)
         del dialog
         self.stations = self.update()

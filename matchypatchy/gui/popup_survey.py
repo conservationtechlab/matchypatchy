@@ -102,7 +102,7 @@ class SurveyPopup(QDialog):
             else:
                 region_id = region_id[0][0]
 
-            replace_dict = {"name": f"'{dialog.get_name()}'",
+            replace_dict = {"name": dialog.get_name(),
                             "region_id": region_id,
                             "year_start": dialog.get_year_start(),
                             "year_end": dialog.get_year_end()}
