@@ -10,7 +10,7 @@ COLUMNS = ["filepath", "timestamp", "station_id", "sequence_id", "external_id",
            "comment", "viewpoint", "species_id", "individual_id"]
 
 
-def fetch_media(mpDB):
+def fetch_media(mpDB, ids=None):
     """
     Fetches stations associated with given survey, checks that they have unique names
     (8) columns; (2) keys
@@ -21,7 +21,12 @@ def fetch_media(mpDB):
     Returns
         - an inverted dictionary in order to match manifest station names to table id
     """
-    media = mpDB.select("media")
+    if ids:
+        ids_str = ', '.join(map(str, ids))
+        media = mpDB.select("media", row_cond=f"id IN ({ids_str})")
+    else:
+        media = mpDB.select("media")
+
     if media:
         media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", 'station_id',
                                              'sequence_id', "external_id", 'comment', 'favorite'])
@@ -29,6 +34,22 @@ def fetch_media(mpDB):
         return media
     else:
         return pd.DataFrame()
+    
+
+    def load_selected_media(self):
+        """
+        Fetch all columns from both `roi` and `media` tables for the selected ROI IDs.
+        """
+        ids_str = ', '.join(map(str, self.ids))
+
+        # Use all_media to get a complete view of each ROI
+        data, col_names = self.mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
+
+        # Create DataFrame
+        df = pd.DataFrame(data, columns=col_names)
+        df = df.replace({float('nan'): None}).reset_index(drop=True)
+
+        return df
 
 
 def fetch_roi(mpDB):
@@ -50,7 +71,7 @@ def fetch_roi(mpDB):
         return False
 
 
-def fetch_roi_media(mpDB, reset_index=True):
+def fetch_roi_media(mpDB, rids=None, reset_index=True):
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
@@ -58,9 +79,15 @@ def fetch_roi_media(mpDB, reset_index=True):
                 'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age']
     """
-    media, column_names = mpDB.all_media()
+    if rids:
+        ids_str = ', '.join(map(str, rids))
+        media, column_names = mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
+    else:
+        media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
+    rois['viewpoint'] = rois["viewpoint"].astype(int, errors='ignore')
     rois = rois.replace({float('nan'): None})
+    
     if reset_index:
         rois = rois.set_index("id")
     return rois

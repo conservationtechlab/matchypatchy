@@ -87,15 +87,12 @@ class MediaTable(QWidget):
         """
         self.species_list = fetch_species(self.mpDB)
         self.individual_list = fetch_individual(self.mpDB)
-        print(self.individual_list)
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
-
         # MEDIA
         elif self.data_type == 0:
             self.data = fetch_media(self.mpDB)
-        
         # return empty
         else:
             self.data = pd.DataFrame()
@@ -291,9 +288,7 @@ class MediaTable(QWidget):
         Applies all previous edits to the current data_filter if the row is present
         """
         for edit in self.edit_stack:
-            print(edit)
-            if not self.data_filtered.empty and self.data_filtered['id'].isin([edit['id']]).any():
-                self.data_filtered.loc[edit['row'], edit['reference']] = edit['new_value']
+            self.data_filtered.loc[edit['row'], edit['reference']] = edit['new_value']
 
     def handle_checkbox_change(self, row, column):
         """ Detect when a checkbox is checked or unchecked """
@@ -357,9 +352,8 @@ class MediaTable(QWidget):
     
         # individual
         elif reference == 'name' or reference == 'sex' or reference == 'age':
-            reference = 'individual_id'
-            previous_value = self.data_filtered.at[row, reference]
-            if previous_value == None:
+            rid = self.data_filtered.at[row, 'individual_id']
+            if rid == None:
                 dialog = AlertPopup(self, "Please tag the ROI with an individual first.")
                 if dialog.exec():
                     del dialog
@@ -367,6 +361,7 @@ class MediaTable(QWidget):
                     self.refresh_table(popup=False)
                     return
             else:
+                previous_value = self.data_filtered.at[row, reference]
                 new_value = self.table.item(row, column).text()
 
         else:
@@ -396,18 +391,19 @@ class MediaTable(QWidget):
 
     def save_changes(self):
         # commit all changes in self.edit_stack to database
-        for edit in self.edit_stack:
-            print(edit)
+        while len(self.edit_stack) > 0:
+            edit = self.edit_stack.pop()
             id = edit['id']
             replace_dict = {edit['reference']: edit['new_value']}
             if self.data_type == 1:
                 if edit['reference'] in {'station_id', 'sequence_id', 'external_id'}:
                     self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
+                elif edit['reference'] in {'name', 'age', 'sex'}:
+                    self.mpDB.edit_row("individual", id, replace_dict, allow_none=False, quiet=False)
                 else:
                     self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
             else:    
                 self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
-                pass
 
     def select_row(self, row, overwrite=None):
         select = self.table.item(row, 0)

@@ -352,21 +352,21 @@ class DisplayMedia(QWidget):
         if(self.data_type == 1):
             if len(self.selected_rows) > 0:
                 self.button_edit.setEnabled(True)
-                #self.button_duplicate.setEnabled(True)
+                self.button_duplicate.setEnabled(True)
                 self.button_delete.setEnabled(True)
             else:
                 self.button_edit.setEnabled(False)
                 self.button_duplicate.setEnabled(False)
                 self.button_delete.setEnabled(False)
-        else:
-            if len(self.selected_rows) > 0:
-                self.button_edit.setEnabled(False)
-                #self.button_duplicate.setEnabled(True)
-                self.button_delete.setEnabled(True)
-            else:
-                self.button_edit.setEnabled(False)
-                self.button_duplicate.setEnabled(False)
-                self.button_delete.setEnabled(False)
+        #else:
+        #    if len(self.selected_rows) > 0:
+        #        self.button_edit.setEnabled(True)
+        #        self.button_duplicate.setEnabled(True)
+        #        self.button_delete.setEnabled(True)
+        #    else:
+        #        self.button_edit.setEnabled(False)
+        #        self.button_duplicate.setEnabled(False)
+        #        self.button_delete.setEnabled(False)
 
 
     def duplicate(self): 
@@ -379,7 +379,7 @@ class DisplayMedia(QWidget):
                         self.mpDB.copy("media", id)
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                        self.mpDB.copy("roi", id)
+                        self.mpDB.copy("media", id)
                 del dialog
      
     def delete(self):

@@ -3,14 +3,11 @@ QThread for saving thumbnails to temp dir for media table
 """
 import os
 import pandas as pd
-from pathlib import Path
 
-from PyQt6.QtGui import QImage, QPixmap
-from PyQt6.QtWidgets import (QTableWidgetItem, QWidget, 
-                             QComboBox, QLabel, QHeaderView, QStyledItemDelegate)
-from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
+from PyQt6.QtGui import QImage
+from PyQt6.QtWidgets import QTableWidgetItem
+from PyQt6.QtCore import QThread, pyqtSignal, Qt
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 THUMBNAIL_NOTFOUND = QImage(os.path.join(os.path.dirname(__file__), "assets/thumbnail_notfound.png"))
 # TODO THUMBNAIL_NOTFOUND = QImage(os.path.normpath("assets/logo.png"))
@@ -100,27 +97,19 @@ class LoadTableThread(QThread):
                 else:
                     qtw = QTableWidgetItem("Unknown")
 
-                '''
-                if roi['species_id'] is not None:
-                    print(f"species list is {self.species_list}")
-                    species = self.species_list[self.species_list['id'] == roi['species_id']]
-                    print(f"species is {species}")
-                    self.table.setItem(i, column, QTableWidgetItem(species[data][0]))
-                else:
-                    self.table.setItem(i, column, QTableWidgetItem(None))
-                '''
-        
-        elif column == "name" or column == "sex" or column == 'age':
+        #name not editable here
+        elif column == "name":
             if roi['individual_id'] is not None:
-                individual = self.individual_list[self.individual_list['id'] == roi['individual_id']]
-                if not individual.empty:
-                    qtw = QTableWidgetItem(str(individual[column].values[0]))
-                else:
-                    print(f"Warning: individual_id {roi['individual_id']} not found in individual_list")
-                    qtw = QTableWidgetItem("Unknown")
+                qtw = QTableWidgetItem(str(roi[column]))
             else:
                 qtw = QTableWidgetItem("Unknown")
-
+            qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        
+        elif column == "sex" or column == 'age':
+            if roi['individual_id'] is not None:
+                qtw = QTableWidgetItem(str(roi[column]))
+            else:
+                qtw = QTableWidgetItem("Unknown")
 
         # Reviewed and Favorite Checkbox
         elif column == 'reviewed' or column == 'favorite':

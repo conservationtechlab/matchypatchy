@@ -147,6 +147,17 @@ class ROIPopup(QDialog):
         sex_layout.addWidget(self.sex, stretch=1)
         info_layout.addLayout(sex_layout)
         info_layout.addSpacing(vertical_gap)
+        # Age - EDITABLE
+        age_layout = QHBoxLayout()
+        age_label = QLabel("Age: ")
+        age_label.setFixedWidth(horizontal_gap)
+        age_layout.addWidget(age_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.age = QComboBox()
+        self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
+        self.age.currentIndexChanged.connect(self.change_age)
+        age_layout.addWidget(self.age, stretch=1)
+        info_layout.addLayout(age_layout)
+        info_layout.addSpacing(vertical_gap)
         # Species - EDITABLE
         species_layout = QHBoxLayout()
         species_label = QLabel("Species: ")
@@ -225,7 +236,9 @@ class ROIPopup(QDialog):
 
     def refresh_values(self):
         # disable comboboxes
-        self.blockSignals(True)
+        self.name.blockSignals(True)
+        self.age.blockSignals(True)
+        self.sex.blockSignals(True)
 
         self.timestamp_data.setText(str(self.roi_data.at[0, "timestamp"]))
         survey_info = fetch_station_names_from_id(self.mpDB, self.roi_data.at[0, "station_id"])
@@ -252,6 +265,13 @@ class ROIPopup(QDialog):
             self.sex.setCurrentIndex(0)
         else:
             self.sex.setCurrentIndex(self.sex.findText(str(current_sex)))
+        # Age
+        current_age = self.roi_data.at[0, "age"]
+        if current_age is None:
+            self.age.setCurrentIndex(0)
+        else:
+            self.age.setCurrentIndex(self.age.findText(str(current_age)))
+
         # Species
         current_species = self.roi_data.at[0, "common"]
         if current_species is None:
@@ -267,33 +287,40 @@ class ROIPopup(QDialog):
         # Comment
         self.comment.setText(str(self.roi_data.at[0, "comment"]))
         # renable comboboxes
-        self.blockSignals(False)
+        self.name.blockSignals(False)
+        self.age.blockSignals(False)
+        self.sex.blockSignals(False)
 
     # Edits --------------------------------------------------------------------
     def change_name(self):
         if self.name.currentIndex() > 0:
-            selected_individual = self.individuals["name" == self.name_list[self.name.currentIndex()]]
-            print(f"→ Assigning individual_id={selected_individual[0]} to ROI {self.rid}")
-            self.mpDB.edit_row('roi', self.rid, {"individual_id": selected_individual[0]})
-            self.sex.setCurrentIndex(self.sex.findText(str(selected_individual[2])))
+            selected_individual = self.individuals[self.individuals["name" ] == self.name_list[self.name.currentIndex()]]
+            self.mpDB.edit_row('roi', self.rid, {"individual_id": selected_individual['id'].values[0]})
+            self.sex.setCurrentIndex(self.sex.findText(str(selected_individual['sex'].values[0])))
             self.sex.setDisabled(False)
+            self.age.setCurrentIndex(self.age.findText(str(selected_individual['age'].values[0])))
+            self.age.setDisabled(False)
         else:
-            print("→ Setting to Unknown")
             self.sex.setCurrentIndex(0)
             self.sex.setDisabled(True)
+            self.age.setCurrentIndex(0)
+            self.age.setDisabled(True)
 
     def change_sex(self):
         if self.name.currentIndex() > 0:
-            iid = self.individuals["name" == self.name_list[self.name.currentIndex()]]['id']
-            sex_val = self.sex.currentText()
-            print(f"\n=== CHANGING SEX ===")
-            print(f"Setting sex of individual_id={iid} to '{sex_val}'")
-            self.mpDB.edit_row('individual', iid, {"sex": f"'{self.sex.currentText()}'"})
+            iid = self.individuals.loc[self.individuals["name" ] == self.name_list[self.name.currentIndex()], 'id'].values[0]
+            self.mpDB.edit_row('individual', iid, {"sex": self.sex.currentText()}, quiet=False)
+
+    def change_age(self):
+        if self.name.currentIndex() > 0:
+            iid = self.individuals.loc[self.individuals["name" ] == self.name_list[self.name.currentIndex()], 'id'].values[0]
+            self.mpDB.edit_row('individual', iid, {"age": self.age.currentText()}, quiet=False)
 
     def change_species(self):
+        print("change species")
         selected_species = self.species_list[self.species.currentIndex()]
         if selected_species[0] > 0:
-            self.mpDB.edit_row('roi', self.rid, {"species_id": f"'{selected_species[0]}'"})
+            self.mpDB.edit_row('roi', self.rid, {"species_id": selected_species[0]})
 
     def change_viewpoint(self):
         viewpoint_keys = list(self.VIEWPOINTS.keys())

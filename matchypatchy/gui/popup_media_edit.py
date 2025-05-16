@@ -6,6 +6,8 @@ from matchypatchy.algo.models import load
 
 from PyQt6.QtWidgets import QPushButton
 import matchypatchy.database.media as db_roi
+
+
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_species import SpeciesFillPopup
@@ -20,7 +22,7 @@ class MediaEditPopup(QDialog):
         self.mpDB = parent.mpDB
 
         self.ids = ids  # List of ROI IDs
-        self.data = self.load_selected_media()
+        self.data = db_roi.fetch_roi_media(self.mpDB, self.ids, reset_index=False)
         self.current_image_index = 0
         self.fields_changed = {
             "name": False,
@@ -234,7 +236,7 @@ class MediaEditPopup(QDialog):
             print(f"[refresh_values] Unique viewpoints: {unique_viewpoints}")
             self.viewpoint.blockSignals(True)
             if len(unique_viewpoints) == 1:
-                vp_text = self.VIEWPOINTS[str(unique_viewpoints[0])]
+                vp_text = self.VIEWPOINTS[str(int(unique_viewpoints[0]))]  # TODO: fix
                 index = self.viewpoint.findText(vp_text)
                 print(f"[refresh_values] Setting viewpoint to {vp_text}")
                 self.viewpoint.setCurrentIndex(index)
@@ -252,21 +254,6 @@ class MediaEditPopup(QDialog):
             else:
                 self.favorite.setCurrentIndex(0)  # '— Mixed —'
             self.favorite.blockSignals(False)
-
-    def load_selected_media(self):
-        """
-        Fetch all columns from both `roi` and `media` tables for the selected ROI IDs.
-        """
-        ids_str = ', '.join(map(str, self.ids))
-
-        # Use all_media to get a complete view of each ROI
-        data, col_names = self.mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
-
-        # Create DataFrame
-        df = pd.DataFrame(data, columns=col_names)
-        df = df.replace({float('nan'): None}).reset_index(drop=True)
-
-        return df
 
     def update_image_counter_label(self):
         total = len(self.data)
@@ -370,7 +357,7 @@ class MediaEditPopup(QDialog):
         for _, row in self.data.iterrows():
             roi_id = row["id"]
             if selected_viewpoint_key == 'None':
-                self.mpDB.edit_row('roi', roi_id, {"viewpoint": "NULL"}, quiet=False)
+                self.mpDB.edit_row('roi', roi_id, {"viewpoint": None}, quiet=False)
             else:
                 self.mpDB.edit_row('roi', roi_id, {"viewpoint": int(selected_viewpoint_key)}, quiet=False)
         self.refresh_values()
@@ -389,7 +376,7 @@ class MediaEditPopup(QDialog):
                 self.mpDB.edit_row('roi', roi_id, {"individual_id": selected_individual[0]}, quiet=False)
                 self.data.at[i, "individual_id"] = selected_individual[0]
             else:
-                self.mpDB.edit_row('roi', roi_id, {"individual_id": "NULL"}, quiet=False)
+                self.mpDB.edit_row('roi', roi_id, {"individual_id": None}, quiet=False)
                 self.data.at[i, "individual_id"] = None
 
     # Sex
@@ -403,7 +390,7 @@ class MediaEditPopup(QDialog):
         for i, row in self.data.iterrows():
             iid = row["individual_id"]
             if iid:
-                self.mpDB.edit_row('individual', iid, {"sex": f"'{selected_sex}'"}, quiet=False)
+                self.mpDB.edit_row('individual', iid, {"sex": selected_sex}, quiet=False)
                 self.data.at[i, "sex"] = selected_sex
 
     # Favorite
