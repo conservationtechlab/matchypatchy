@@ -16,7 +16,8 @@ from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 from matchypatchy.gui.popup_pairx import PairXPopup
 
-from matchypatchy.algo.models import load
+from matchypatchy.algo.models import load, get_path
+from matchypatchy import config
 from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
@@ -392,7 +393,7 @@ class DisplayCompare(QWidget):
         emb_exist = self.QueryContainer.load_data()
         print("sequences: ", emb_exist)
         if emb_exist:
-            self.show_progress()
+            self.show_progress("Matching embeddings... This may take a while.")
             self.QueryContainer.calculate_neighbors()
             self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
             self.QueryContainer.thread_signal.connect(self.filter_neighbors)
@@ -400,8 +401,8 @@ class DisplayCompare(QWidget):
             self.home(warn=True)    
 
         # progress popup
-    def show_progress(self):
-        self.progress = AlertPopup(self, "Matching embeddings... This may take a while.", progressbar=True, cancel_only=True)
+    def show_progress(self, prompt):
+        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
         self.progress.show()
 
     def filter_neighbors(self):
@@ -713,6 +714,7 @@ class DisplayCompare(QWidget):
         dialog = PairXPopup(self, query, match)
         if dialog.exec():
             del dialog
+
 
     # ==========================================================================
     # FAVORITE

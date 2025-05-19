@@ -47,6 +47,11 @@ class ImageWidget(QLabel):
         self.pil_image = Image.open(self.image_path)
         self.adjust()
 
+    def load_from_array(self, img_array):
+        self.image_path = None
+        self.pil_image = Image.fromarray(img_array)
+        self.adjust()
+
     def adjust(self):
         """
         Adjust image values, convert to qimage, crop, display
