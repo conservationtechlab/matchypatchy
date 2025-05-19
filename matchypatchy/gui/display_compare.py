@@ -7,16 +7,17 @@ from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
-from PyQt6.QtCore import Qt, QPoint, QTimer
+from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtGui import QIntValidator
 
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_roi import ROIPopup
+from matchypatchy.gui.popup_pairx import PairXPopup
 
-
-from matchypatchy.algo.models import load
+from matchypatchy.algo.models import load, get_path
+from matchypatchy import config
 from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
@@ -331,8 +332,12 @@ class DisplayCompare(QWidget):
         button_validate = QPushButton("View Data")
         button_validate.pressed.connect(self.validate)
 
+        button_visualize = QPushButton("Visualize Match")
+        button_visualize.pressed.connect(self.press_visualize_button)
+
         # Add buttons to the layout
         bottom_layer.addWidget(button_validate)
+        bottom_layer.addWidget(button_visualize)
         layout.addLayout(bottom_layer)
         self.setLayout(layout)
         # ======================================================================
@@ -388,7 +393,7 @@ class DisplayCompare(QWidget):
         emb_exist = self.QueryContainer.load_data()
         print("sequences: ", emb_exist)
         if emb_exist:
-            self.show_progress()
+            self.show_progress("Matching embeddings... This may take a while.")
             self.QueryContainer.calculate_neighbors()
             self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
             self.QueryContainer.thread_signal.connect(self.filter_neighbors)
@@ -396,8 +401,8 @@ class DisplayCompare(QWidget):
             self.home(warn=True)    
 
         # progress popup
-    def show_progress(self):
-        self.progress = AlertPopup(self, "Matching embeddings... This may take a while.", progressbar=True, cancel_only=True)
+    def show_progress(self, prompt):
+        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
         self.progress.show()
 
     def filter_neighbors(self):
@@ -702,6 +707,14 @@ class DisplayCompare(QWidget):
         """
         img = Image.open(self.QueryContainer.get_info(rid, "filepath"))
         img.show()
+
+    def press_visualize_button(self):
+        query = self.QueryContainer.get_info(self.QueryContainer.current_query_rid)
+        match = self.QueryContainer.get_info(self.QueryContainer.current_match_rid)
+        dialog = PairXPopup(self, query, match)
+        if dialog.exec():
+            del dialog
+
 
     # ==========================================================================
     # FAVORITE

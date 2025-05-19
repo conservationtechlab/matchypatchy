@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
 
+from matchypatchy import config
+
 from matchypatchy.gui.popup_survey import SurveyPopup
 from matchypatchy.gui.popup_station import StationPopup
 from matchypatchy.gui.popup_individual import IndividualPopup
@@ -281,6 +283,8 @@ class DisplayBase(QWidget):
 
     def process_images(self, mloptions):
         if self.mpDB.count("media") > 0:
+            config.add(mloptions)
+
             dialog = AlertPopup(self, "Processing Images...", title="Processing Images", 
                                 progressbar=True, cancel_only=True)
             dialog.show()
