@@ -453,8 +453,8 @@ class DisplayCompare(QWidget):
             # make new individual
             dialog = IndividualFillPopup(self)
             if dialog.exec():
-                individual_id = self.mpDB.add_individual(dialog.get_species_id(),
-                                                         dialog.get_name(),
+                individual_id = self.mpDB.add_individual(dialog.get_name(),
+                                                         dialog.get_species_id(),
                                                          dialog.get_sex(),
                                                          dialog.get_age())
                 # update query and match
