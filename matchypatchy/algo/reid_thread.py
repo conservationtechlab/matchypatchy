@@ -4,7 +4,6 @@ Thread Class for Processing Viewpoint and Miew Embedding
 """
 from pathlib import Path
 import pandas as pd
-import torch
 import torchvision.transforms as transforms
 
 from PyQt6.QtCore import QThread, pyqtSignal

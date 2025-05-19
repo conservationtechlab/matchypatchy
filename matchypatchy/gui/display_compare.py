@@ -16,8 +16,7 @@ from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 from matchypatchy.gui.popup_pairx import PairXPopup
 
-from matchypatchy.algo.models import load, get_path
-from matchypatchy import config
+from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
@@ -390,6 +389,7 @@ class DisplayCompare(QWidget):
 
     # ON ENTRY
     def calculate_neighbors(self):
+        self.QueryContainer = QueryContainer(self)  #re-establish object
         emb_exist = self.QueryContainer.load_data()
         print("sequences: ", emb_exist)
         if emb_exist:
