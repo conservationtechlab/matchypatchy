@@ -20,6 +20,9 @@ from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
+from matchypatchy.database.species import fetch_individual
+
+
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
 FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
 
@@ -413,10 +416,13 @@ class DisplayCompare(QWidget):
             self.warn(prompt="No data to compare, all available data from same sequence/capture.")
 
     def recalculate_by_individual(self):
-        self.QueryContainer = QC_QueryContainer(self)
-        self.QueryContainer.load_data()
-        self.QueryContainer.filter()
-        self.change_query(0)
+        if not fetch_individual(self.mpDB).empty:
+            self.QueryContainer = QC_QueryContainer(self)
+            self.QueryContainer.load_data()
+            self.QueryContainer.filter()
+            self.change_query(0)
+        else:
+            self.warn(prompt="No data to compare, all available data from same sequence/capture.")
 
     # ==========================================================================
     # MATCHING PROCESS
