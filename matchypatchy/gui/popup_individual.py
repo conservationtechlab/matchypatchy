@@ -82,7 +82,7 @@ class IndividualPopup(QDialog):
 
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
 
-        id, species_id, name, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
+        id, name, species_id, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
 
         dialog = IndividualFillPopup(self, species_id=species_id, name=name, sex=sex, age=age)
         if dialog.exec():
