@@ -156,7 +156,7 @@ class QueryContainer(QObject):
         # if no ids, rank by distance
         else:
             if self.metric == 'cosine':
-                self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1], reverse=True)
+                self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
             else:
                 self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
 
