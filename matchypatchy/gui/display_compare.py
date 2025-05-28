@@ -33,7 +33,7 @@ class DisplayCompare(QWidget):
         self.parent = parent
         self.mpDB = parent.mpDB
         self.k = 3  # default knn
-        self.distance_metric = 'Cosine'
+        self.distance_metric = 'cosine'
         self.threshold = 50
         self.current_viewpoint = 'Any'
         
@@ -374,8 +374,8 @@ class DisplayCompare(QWidget):
             self.k = int(self.knn_number.text())
 
     def change_metric(self):
-        self.distance_metric = self.option_distance_metric.currentText()
-        if self.distance_metric == 'L2':
+        self.distance_metric = self.option_distance_metric.currentText().lower()
+        if self.distance_metric == 'l2':
             self.threshold_slider.setValue(70)
 
     def change_threshold(self):

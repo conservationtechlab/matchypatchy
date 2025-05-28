@@ -587,7 +587,7 @@ class MatchyPatchyDB():
             sqlite_vec.load(db)
             db.enable_load_extension(False)
             cursor = db.cursor()
-            if metric == 'Cosine':
+            if metric == 'cosine':
                 command = """SELECT
                                 rowid,
                                 vec_distance_cosine(embedding, ?) as dist_cos

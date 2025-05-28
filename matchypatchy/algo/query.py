@@ -19,6 +19,7 @@ class QueryContainer(QObject):
         super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
+        self.metric = self.parent.distance_metric
         self.filters = dict()
 
         self.neighbor_dict_raw = None
@@ -68,7 +69,7 @@ class QueryContainer(QObject):
     def calculate_neighbors(self):
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.rois, self.sequences,
                                                  k=self.parent.k, 
-                                                 metric=self.parent.distance_metric,
+                                                 metric=self.metric,
                                                  threshold=self.parent.threshold)
         self.match_thread.progress_update.connect(self.parent.progress.set_counter)
         self.match_thread.prompt_update.connect(self.parent.progress.update_prompt)
@@ -147,14 +148,19 @@ class QueryContainer(QObject):
         if ided_sequences:
             # rank sequences by number of matches
             rank_by_n_match = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
+            print(rank_by_n_match)
 
             # prioritize already id'd sequences
             self.ranked_sequences = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
 
         # if no ids, rank by distance
         else:
-            self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
+            if self.metric == 'cosine':
+                self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1], reverse=True)
+            else:
+                self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
 
+        print(self.ranked_sequences)
         # set number of queries to validate
         self.n_queries = len(self.ranked_sequences)
 
