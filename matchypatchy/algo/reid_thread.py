@@ -12,8 +12,8 @@ from matchypatchy.algo import models
 from matchypatchy import config
 from matchypatchy.database.media import fetch_roi
 
-import pairx.core
-import pairx.xai_dataset
+from matchypatchy.pairx.core import explain
+from matchypatchy.pairx import xai_dataset
 
 import animl
 
@@ -116,11 +116,11 @@ class PairXThread(QThread):
     def explain(self):
         
 
-        img_0, img_1, img_np_0, img_np_1 = pairx.xai_dataset.get_img_pair_from_paths(self.model.device, 
+        img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(self.model.device, 
                                                                                      self.query, 
                                                                                      self.match, 
                                                                                      (440,440), self.img_transforms)
-        explained_imgs = pairx.core.explain(self.model.device, img_0, img_1,  
+        explained_imgs = explain(self.model.device, img_0, img_1,  
                                                  img_np_0, img_np_1,
                                                  self.model,
                                                  ["backbone.blocks.3"],  
