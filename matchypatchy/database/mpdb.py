@@ -9,7 +9,6 @@ from pathlib import Path
 from random import randrange
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
-from matchypatchy import sqlite_vec
 
 
 class MatchyPatchyDB():
@@ -401,10 +400,6 @@ class MatchyPatchyDB():
         """
         try:
             db = sqlite3.connect(self.filepath)
-            if table == "roi_emb":
-                db.enable_load_extension(True)
-                sqlite_vec.load(db)
-                db.enable_load_extension(False)
             cursor = db.cursor()
             if row_cond:
                 command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
@@ -546,76 +541,18 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    # EMBEDDINGS ===============================================================
-
-    def add_emb(self, embedding):
-        try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
-            command = """INSERT INTO roi_emb (embedding)
-                        VALUES (?);"""
-            cursor.execute(command, [embedding])
-            id = cursor.lastrowid
-            db.commit()
-            db.close()
-            return id
-        except sqlite3.Error as error:
-            logging.error("Failed to add embedding: ", error)
-            if db:
-                db.close()
-            return None
-        
-    def add_emb_chroma(self, id, embedding):
+    # EMBEDDINGS ===============================================================  
+    def add_emb(self, id, embedding):
         client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         collection.add(embeddings=[embedding], ids=[str(id)])
 
-    def knn_chroma(self, query_id, k=3):
+    def knn(self, query_id, k=3):
         client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         query = collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
         knn = collection.query(query_embeddings=query, n_results=k+1)
         return knn
-
-    def knn(self, query, k=3, metric='cosine'):
-        """
-        Return the knn for a query embedding
-        """
-        try:
-            db = sqlite3.connect(self.filepath)
-            db.enable_load_extension(True)
-            sqlite_vec.load(db)
-            db.enable_load_extension(False)
-            cursor = db.cursor()
-            if metric == 'cosine':
-                command = """SELECT
-                                rowid,
-                                vec_distance_cosine(embedding, ?) as dist_cos
-                                FROM roi_emb
-                                ORDER by dist_cos
-                                LIMIT ?;
-                            """
-            elif metric == 'L2':
-                command = f"""SELECT
-                            rowid,
-                            distance
-                        FROM roi_emb
-                        WHERE embedding MATCH ?
-                        ORDER BY distance
-                        LIMIT ?
-                        """
-            else:
-                return
-            data_tuple = (query, k+1)
-            cursor.execute(command, data_tuple)
-            results = cursor.fetchall()
-            db.close()
-            return results
-        except sqlite3.Error as error:
-            logging.error("Failed to get knn for ROI", error)
-            if db:
-                db.close()
-            return None
 
     def clear_emb(self):
         """

@@ -78,7 +78,7 @@ class MatchEmbeddingThread(QThread):
         """
         Calcualtes knn for single roi embedding
         """
-        neighbors = self.mpDB.knn_chroma(emb_id, k=self.k)
+        neighbors = self.mpDB.knn(emb_id, k=self.k)
         nns = list(zip([int(x) for x in neighbors['ids'][0]], neighbors['distances'][0]))
         return nns[1:]  # skip self-match
 
