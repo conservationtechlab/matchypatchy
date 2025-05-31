@@ -3,11 +3,11 @@ QThread for saving thumbnails to temp dir for media table
 """
 import os
 from pathlib import Path
-import tempfile
 
 from PyQt6.QtGui import QImage
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 
+from matchypatchy import config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 THUMBNAIL_NOTFOUND = QImage(os.path.join(os.path.dirname(__file__), "assets/thumbnail_notfound.png"))
@@ -29,6 +29,8 @@ class LoadThumbnailThread(QThread):
             self.existing_filepaths = dict(self.mpDB.select("roi_thumbnails", "fid, filepath"))
         else:
             self.existing_filepaths = dict(self.mpDB.select("media_thumbnails", "fid, filepath"))
+        self.thumbnail_dir = config.load('THUMBNAIL_DIR')
+        
 
     def run(self):
         filepaths = []
@@ -85,8 +87,7 @@ class LoadThumbnailThread(QThread):
                                         Qt.TransformationMode.SmoothTransformation)
 
         # create a temporary file to hold thumbnail
-        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_file:
-            filepath = temp_file.name
+        filepath = Path(self.thumbnail_dir) / Path(self.original).name
         # save the image
         scaled_image.save(filepath, format="JPG")
 
