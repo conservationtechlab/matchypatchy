@@ -95,14 +95,12 @@ def setup_database(key, filepath):
 
 
     # THUMBNAILS
-    cursor.execute('''DROP TABLE IF EXISTS media_thumbnails;''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
                         id INTEGER PRIMARY KEY,
                         fid INTEGER NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES media (id));''')
 
-    cursor.execute('''DROP TABLE IF EXISTS roi_thumbnails;''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi_thumbnails (
                         id INTEGER PRIMARY KEY,
                         fid INTEGER NOT NULL,
