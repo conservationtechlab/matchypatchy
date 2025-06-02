@@ -2,6 +2,8 @@
 Functions for managing ML models
 
 """
+import sys
+import os
 import yaml
 import logging
 import urllib.request
@@ -9,15 +11,22 @@ from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-# TODO: PACKAGE models.yml 
+
+def resource_path(relative_path):
+    """ Get path to resource whether running in dev or PyInstaller bundle """
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.abspath(relative_path)
+
 
 def update_model_yml():
     """
     Downloads the most recent version of the models.yml file from SDZWA server and updates internal file
     """
     # download current version
+    model_yml_path = resource_path("models.yml")
     try:
-        urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", "models.yml")
+        urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", model_yml_path)
         return True
     except urllib.error.URLError:
         logging.error("Unable to connect to server.")
@@ -26,7 +35,9 @@ def update_model_yml():
 
 def load(key=None):
     # load the yaml file
-    with open('models.yml', 'r') as cfg_file:
+    model_yml_path = resource_path("models.yml")
+
+    with open(model_yml_path, 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
         if key:
             return cfg[key]
@@ -54,7 +65,6 @@ def get_class_path(ML_DIR, key):
         return path
     else:
         return None
-
 
 def get_config_path(ML_DIR, key):
     CONFIG_FILES = load('CONFIG_FILES')
