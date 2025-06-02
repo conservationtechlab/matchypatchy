@@ -9,9 +9,6 @@ from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy import config
-
-
 # TODO: PACKAGE models.yml 
 
 def update_model_yml():
