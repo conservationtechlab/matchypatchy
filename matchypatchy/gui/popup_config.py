@@ -13,10 +13,8 @@ from matchypatchy import config
 from matchypatchy.gui.popup_alert import AlertPopup
 
 
-ICON_PENCIL = "/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"
-# TODO ICON_PENCIL = os.path.normpath("assets/fluent_pencil_icon.png")
-
-#TODO: rename project folder
+#ICON_PENCIL = "/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"
+ICON_PENCIL = os.path.normpath("assets/fluent_pencil_icon.png")
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):
@@ -107,7 +105,6 @@ class ConfigPopup(QDialog):
             new_db = Path(new_project) / "Database"
             valid = self.mpDB.update_paths(new_db)
 
-
             if valid:
             # Update config
                 self.cfg['DB_DIR'] = str(new_db)
@@ -120,6 +117,7 @@ class ConfigPopup(QDialog):
                 if dialog.exec():
                     del dialog
 
+            # TODO:
             # Update config
             # self.cfg['LOG_PATH'] = str(new_log)
             # config.update(self.cfg)

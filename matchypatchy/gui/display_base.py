@@ -33,8 +33,8 @@ from matchypatchy.algo.reid_thread import ReIDThread
 from matchypatchy.database.media import export_data
 
 
-LOGO = os.path.join(os.path.dirname(__file__), "assets/logo.png")
-# TODO LOGO = os.path.normpath("assets/logo.png")
+#LOGO = os.path.join(os.path.dirname(__file__), "assets/logo.png")
+LOGO = os.path.normpath("assets/logo.png")
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
