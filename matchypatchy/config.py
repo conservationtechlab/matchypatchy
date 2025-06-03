@@ -2,52 +2,50 @@
 Functions for Handling Config
 
 """
-# TODO: MAKE INTERNAL?
-
+import os
+import sys
 from pathlib import Path
-import tempfile
 import logging 
 import yaml
 
-HOME_DIR = Path.cwd() / "MatchyPatchy-Share"
-CONFIG_PATH = HOME_DIR / 'config.yml'
+
+def get_config_path():
+    CONFIG_PATH = 'config.yml'
+    """ Get path to resource whether running in dev or PyInstaller bundle """
+    if getattr(sys, 'frozen', False):
+        return Path(os.path.join(sys._MEIPASS, CONFIG_PATH))
+    return Path(os.path.abspath(CONFIG_PATH))
+
 
 def initiate():
-    # create shareable home folder
-    HOME_DIR.mkdir(exist_ok=True)
-
-     # temp dir
-    tempfile.tempdir = tempfile.mkdtemp(prefix="MatchyPatchy_")
-    
-    default_cfg = {
-           'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
-           'HOME_DIR': str(HOME_DIR),
-           'DB_DIR': str(HOME_DIR / 'Database'),
-           'ML_DIR': str(HOME_DIR / 'Models'),
-           'FRAME_DIR': str(HOME_DIR / 'Frames'),
-           'THUMBNAIL_DIR': str(HOME_DIR / 'Thumbnails'),
-           'VIDEO_FRAMES': 1
-    }
-
     # check if cfg exists, load
+    HOME_DIR = Path.cwd() / "MatchyPatchy-Share"
+    default_cfg = {
+        'HOME_DIR': str(HOME_DIR),
+        'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
+        'DB_DIR': str(HOME_DIR / 'Database'),
+        'ML_DIR': str(HOME_DIR / 'Models'),
+        'FRAME_DIR': str(HOME_DIR / 'Frames'),
+        'THUMBNAIL_DIR': str(HOME_DIR / 'Thumbnails'),
+        'VIDEO_FRAMES': 1
+    }
+    CONFIG_PATH = get_config_path()
     if CONFIG_PATH.exists():
         cfg = load()
-        # add new temp folder
-        cfg['TEMP_DIR'] = str(Path(tempfile.gettempdir()))
-        #check remaining
+        #check remaining, save what' missing
         for key in default_cfg.keys():
             if key not in cfg:
                 cfg[key] = default_cfg[key]
         with open(CONFIG_PATH, 'w') as cfg_file:
             yaml.dump(cfg, cfg_file)
-    # else save default
+
     else:
-        default_cfg['TEMP_DIR'] = str(Path(tempfile.gettempdir()))
         with open(CONFIG_PATH, 'w') as cfg_file:
             yaml.dump(default_cfg, cfg_file)
         cfg = default_cfg
 
     # Make sure ML_DIR and DB_DIR exists
+    Path(cfg['HOME_DIR']).mkdir(exist_ok=True)
     Path(cfg['DB_DIR']).mkdir(exist_ok=True)
     Path(cfg['ML_DIR']).mkdir(exist_ok=True)
     Path(cfg['FRAME_DIR']).mkdir(exist_ok=True)
@@ -61,6 +59,7 @@ def initiate():
 
 
 def load(key=None):
+    CONFIG_PATH = get_config_path()
     # Load the config into a dict
     with open(CONFIG_PATH, 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
@@ -71,6 +70,7 @@ def load(key=None):
 
 
 def add(key_dict, quiet=False):
+    CONFIG_PATH = get_config_path()
     # Load the config into a dict
     with open(CONFIG_PATH, 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
@@ -85,6 +85,7 @@ def add(key_dict, quiet=False):
 
 
 def update(new_cfg):
+    CONFIG_PATH = get_config_path()
     # Update the yaml with new values
     with open(CONFIG_PATH, 'w') as cfg_file:
         yaml.dump(new_cfg, cfg_file)
