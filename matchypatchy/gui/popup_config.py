@@ -106,30 +106,37 @@ class ConfigPopup(QDialog):
             valid = self.mpDB.update_paths(new_db)
 
             if valid:
-            # Update config
+                # Update home dir
+                self.cfg['HOME_DIR'] = str(new_project)
                 self.cfg['DB_DIR'] = str(new_db)
+
+                # Update config
+                self.cfg['LOG_PATH'] = str(new_project / "matchypatchy.log")
+                logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
+                logging.info("HOME_DIR CHANGED")
+                logging.info('HOME_DIR: ' + self.cfg['HOME_DIR'])
+
+                # Check or create ML, Thumbnail and Frame folders
+                new_ml= Path(new_project) / "Models"
+                Path.mkdir(new_ml, exist_ok=True)
+                self.cfg['ML_DIR'] = str(new_ml)
+
+                new_thumb= Path(new_project) / "Thumbnails"
+                Path.mkdir(new_thumb, exist_ok=True)
+                self.cfg['THUMBNAIL_DIR'] = str(new_thumb)
+
+                new_frame = Path(new_project) / "Frames"
+                Path.mkdir(new_frame, exist_ok=True)
+                self.cfg['FRAME_DIR'] = str(new_frame)
+
+                # save changes to yml
                 config.update(self.cfg)
-                # Log changes
-                logging.info("DB_DIR CHANGED")
-                logging.info('DB_DIR: ' + self.cfg['DB_DIR'])
+
             else:
                 dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
                 if dialog.exec():
                     del dialog
 
-            # TODO:
-            # Update config
-            # self.cfg['LOG_PATH'] = str(new_log)
-            # config.update(self.cfg)
-            # # Log changes
-            # logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
-            # logging.info("LOG_PATH CHANGED")
-
-            # # Update config
-            # self.cfg['ML_DIR'] = str(new_ml)
-            # config.update(self.cfg)
-            # # Log changes
-            # logging.info("ML_DIR CHANGED")
-            # logging.info('ML_DIR: ' + self.cfg['ML_DIR'])
+          
 
 
