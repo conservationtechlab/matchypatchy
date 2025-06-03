@@ -1,6 +1,8 @@
 '''
 MP Installer
 '''
+import time
+start_time = time.time()
 import sys
 import os
 os.environ["CHROMA_TELEMETRY"] = "FALSE"
@@ -26,6 +28,7 @@ def main():
             del dialog
     
     models.update_model_yml()
+    print(f"Startup took {time.time() - start_time:.2f} seconds")
     sys.exit(app.exec())
     
 

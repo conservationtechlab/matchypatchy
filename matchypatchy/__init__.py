@@ -14,7 +14,7 @@ from matchypatchy.algo import (AnimlThread, BuildManifestThread,
                                import_thread, load, match_thread, models,
                                qc_query, query, reid_thread, sequence_thread,
                                thumbnail_thread, update_model_yml,)
-from matchypatchy.config import (HOME_DIR, add, initiate, load, update,)
+from matchypatchy.config import (add, initiate, load, update,)
 from matchypatchy.database import (COLUMNS, IMAGE_EXT, MatchyPatchyDB,
                                    VIDEO_EXT, fetch_media, fetch_regions,
                                    fetch_roi, fetch_roi_media, fetch_species,
@@ -33,7 +33,7 @@ from matchypatchy.gui import (AboutPopup, AlertPopup, ConfigPopup, DisplayBase,
                               ROIPopup, SpeciesFillPopup, SpeciesPopup,
                               StationFillPopup, StationPopup, SurveyFillPopup,
                               SurveyPopup, display_base, display_compare,
-                              display_media, main_display, main_gui,
+                              display_media, main_gui,
                               media_table, popup_alert, popup_config,
                               popup_dropdown, popup_import_csv,
                               popup_import_folder, popup_individual,
