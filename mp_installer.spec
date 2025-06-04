@@ -3,6 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas= [("/home/kyra/matchypatchy/models.yml", "."),
         ("/home/kyra/matchypatchy/config.yml", "."),
+        ("/home/kyra/matchypatchy/schema.txt", "."),
         ("/home/kyra/matchypatchy/matchypatchy/gui/assets/logo.png", "./assets"),
         ("/home/kyra/anaconda3/envs/mp/lib/python3.12/site-packages/ultralytics/cfg/default.yaml", "./ultralytics/cfg"),
         ("/home/kyra/anaconda3/envs/mp/lib/python3.12/site-packages/ultralytics/cfg/solutions/default.yaml", "./ultralytics/cfg/solutions")]
@@ -32,7 +33,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='mp_installer',
+    name='MatchyPatchy',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -51,5 +52,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='mp_installer',
+    name='MatchyPatchy',
 )

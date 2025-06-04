@@ -2,8 +2,6 @@
 Functions for managing ML models
 
 """
-import sys
-import os
 import yaml
 import logging
 import urllib.request
@@ -11,12 +9,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-
-def resource_path(relative_path):
-    """ Get path to resource whether running in dev or PyInstaller bundle """
-    if getattr(sys, 'frozen', False):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.abspath(relative_path)
+from matchypatchy.config import resource_path
 
 
 def update_model_yml():

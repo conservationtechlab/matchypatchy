@@ -9,7 +9,7 @@ from pathlib import Path
 from random import randrange
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
-
+from matchypatchy.config import resource_path
 
 class MatchyPatchyDB():
     def __init__(self, DB_PATH):
@@ -85,7 +85,8 @@ class MatchyPatchyDB():
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
 
-        with open('schema', 'r') as file:
+        schema_path = resource_path('schema.txt')
+        with open(schema_path, 'r') as file:
             content = file.read()
     
         match_schema = (content==s)
