@@ -37,12 +37,15 @@ class ReIDThread(QThread):
         self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "sequence_id"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
 
-        self.prompt_update.emit("Calculating viewpoint...")
-        self.get_viewpoint()
-        self.prompt_update.emit("Calculating embeddings...")
-        self.get_embeddings()
-        self.prompt_update.emit("Processing complete!")
-        self.done.emit()
+        if not self.isInterruptionRequested():
+            self.prompt_update.emit("Calculating viewpoint...")
+            self.get_viewpoint()
+        if not self.isInterruptionRequested():
+            self.prompt_update.emit("Calculating embeddings...")
+            self.get_embeddings()
+        if not self.isInterruptionRequested():
+            self.prompt_update.emit("Processing complete!")
+            self.done.emit()
 
     def get_viewpoint(self):
         # user did not select a viewpoint model
