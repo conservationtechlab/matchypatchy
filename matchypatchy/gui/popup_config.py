@@ -13,8 +13,7 @@ from matchypatchy import config
 from matchypatchy.gui.popup_alert import AlertPopup
 
 
-#ICON_PENCIL = "/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"
-ICON_PENCIL = os.path.normpath("assets/fluent_pencil_icon.png")
+ICON_PENCIL = config.resource_path("assets/fluent_pencil_icon.png")
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):

@@ -9,7 +9,6 @@ Display Pages:
     2. DisplayCompare
 """
 import sys
-import os
 from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
@@ -23,7 +22,6 @@ from matchypatchy.gui.popup_alert import AlertPopup
 
 from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
 
-from matchypatchy.database import location
 
 class MainWindow(QMainWindow):
     def __init__(self, mpDB):

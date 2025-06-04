@@ -28,7 +28,7 @@ def initiate():
         'THUMBNAIL_DIR': str(HOME_DIR / 'Thumbnails'),
         'VIDEO_FRAMES': 1
     }
-    CONFIG_PATH = resource_path('config.yml')
+    CONFIG_PATH = Path(resource_path('config.yml'))
     if CONFIG_PATH.exists():
         cfg = load()
         #check remaining, save what' missing
