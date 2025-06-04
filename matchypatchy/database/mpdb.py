@@ -11,6 +11,7 @@ from random import randrange
 from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy.config import resource_path
 
+
 class MatchyPatchyDB():
     def __init__(self, DB_PATH):
         self.filepath = Path(DB_PATH) / 'matchypatchy.db'
@@ -90,7 +91,9 @@ class MatchyPatchyDB():
             content = file.read()
     
         match_schema = (content==s)
+        print("Schema: ", match_schema)
         mpkey, chromakey = self.retrieve_key()
+        print("Key:", mpkey, chromakey)
         if match_schema and mpkey == chromakey:
             return mpkey
         else:
