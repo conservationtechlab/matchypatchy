@@ -85,7 +85,7 @@ class MatchyPatchyDB():
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
 
-        schema_path = resource_path('schema.txt')
+        schema_path = resource_path('assets/schema.txt')
         with open(schema_path, 'r') as file:
             content = file.read()
     
