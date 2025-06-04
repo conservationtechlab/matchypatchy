@@ -332,7 +332,7 @@ class MatchyPatchyDB():
     def add_thumbnail(self, table, fid, filepath):
         # Note difference in variable order, foreign keys
         try:
-            db = sqlite3.connect(self.filepath)
+            db = sqlite3.connect(self.filepath, timeout=1)
             cursor = db.cursor()
             command = f"""INSERT INTO {table}_thumbnails (fid, filepath) VALUES (?, ?);"""
             data_tuple = (fid, filepath)
