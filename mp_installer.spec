@@ -3,8 +3,10 @@ from PyInstaller.utils.hooks import collect_all
 
 datas= [("/home/kyra/matchypatchy/models.yml", "."),
         ("/home/kyra/matchypatchy/config.yml", "."),
-        ("/home/kyra/matchypatchy/schema.txt", "."),
-        ("/home/kyra/matchypatchy/matchypatchy/gui/assets/logo.png", "./assets"),
+        ("/home/kyra/matchypatchy/assets/schema.txt", "./assets"),
+        ("/home/kyra/matchypatchy/assets/logo.png", "./assets"),
+        ("/home/kyra/matchypatchy/assets/fluent_pencil_icon.png", "./assets"),
+        ("/home/kyra/matchypatchy/assets/thumbnail_notfound.png", "./assets"),
         ("/home/kyra/anaconda3/envs/mp/lib/python3.12/site-packages/ultralytics/cfg/default.yaml", "./ultralytics/cfg"),
         ("/home/kyra/anaconda3/envs/mp/lib/python3.12/site-packages/ultralytics/cfg/solutions/default.yaml", "./ultralytics/cfg/solutions")]
 binaries = []

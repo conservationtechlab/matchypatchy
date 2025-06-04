@@ -76,7 +76,8 @@ def delete(ML_DIR, key):
 
 def download(ML_DIR, key):
     # read model directory
-    with open('models.yml', 'r') as cfg_file:
+    model_yml_path = resource_path("models.yml")
+    with open(model_yml_path, 'r') as cfg_file:
         ml_cfg = yaml.safe_load(cfg_file)
         models = ml_cfg['MODELS']
         name = models[key][0]

@@ -31,12 +31,18 @@ def initiate():
     CONFIG_PATH = Path(resource_path('config.yml'))
     if CONFIG_PATH.exists():
         cfg = load()
-        #check remaining, save what' missing
-        for key in default_cfg.keys():
-            if key not in cfg:
-                cfg[key] = default_cfg[key]
-        with open(CONFIG_PATH, 'w') as cfg_file:
-            yaml.dump(cfg, cfg_file)
+        #start from empty
+        if cfg is None:
+            with open(CONFIG_PATH, 'w') as cfg_file:
+                yaml.dump(default_cfg, cfg_file)
+            cfg = default_cfg
+        else:
+            #check remaining, save what' missing
+            for key in default_cfg.keys():
+                if key not in cfg:
+                    cfg[key] = default_cfg[key]
+            with open(CONFIG_PATH, 'w') as cfg_file:
+                yaml.dump(cfg, cfg_file)
 
     else:
         with open(CONFIG_PATH, 'w') as cfg_file:
