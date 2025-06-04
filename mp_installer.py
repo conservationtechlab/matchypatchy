@@ -7,6 +7,27 @@ import sys
 import os
 os.environ["CHROMA_TELEMETRY"] = "FALSE"
 
+
+
+import torch
+
+print("CUDA available:", torch.cuda.is_available())
+print("cuDNN enabled:", torch.backends.cudnn.enabled)
+print("cuDNN version:", torch.backends.cudnn.version())
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+
+try:
+    x = torch.randn(1, 3, 224, 224).cuda()
+    y = torch.randn(1, 3, 224, 224).cuda()
+    z = x + y
+    print("Inference test passed:", z.shape)
+except Exception as e:
+    print("Runtime error:", e)
+
+
 from PyQt6.QtWidgets import QApplication
 
 # START GUI
