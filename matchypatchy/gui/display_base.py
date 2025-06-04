@@ -358,6 +358,7 @@ class DisplayBase(QWidget):
         dialog = ConfigPopup(self)
         if dialog.exec():
             del dialog
+        self.update_survey()
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)

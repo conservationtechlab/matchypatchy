@@ -110,7 +110,7 @@ class ConfigPopup(QDialog):
                 self.cfg['DB_DIR'] = str(new_db)
 
                 # Update config
-                self.cfg['LOG_PATH'] = str(new_project / "matchypatchy.log")
+                self.cfg['LOG_PATH'] = new_project + "/matchypatchy.log"
                 logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
                 logging.info("HOME_DIR CHANGED")
                 logging.info('HOME_DIR: ' + self.cfg['HOME_DIR'])
