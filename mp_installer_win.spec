@@ -1,16 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all, collect_submodules, collect_data_files
 
-datas= [("C:/Users/tswanson/matchypatchy/README.md", "."),
-        ("C:/Users/tswanson/matchypatchy/LICENSE", "."),
-        ("C:/Users/tswanson/matchypatchy/models.yml", "."),
-        ("C:/Users/tswanson/matchypatchy/config.yml", "."),
-        ("C:/Users/tswanson/matchypatchy/assets/schema.txt", "./assets"),
-        ("C:/Users/tswanson/matchypatchy/assets/logo.png", "./assets"),
-        ("C:/Users/tswanson/matchypatchy/assets/fluent_pencil_icon.png", "./assets"),
-        ("C:/Users/tswanson/matchypatchy/assets/thumbnail_notfound.png", "./assets"),
-        ("C:/Users/tswanson/anaconda3/envs/mp_installer/lib/python3.12/site-packages/ultralytics/cfg/default.yaml", "./ultralytics/cfg"),
-        ("C:/Users/tswanson/anaconda3/envs/mp_installer/lib/python3.12/site-packages/ultralytics/cfg/solutions/default.yaml", "./ultralytics/cfg/solutions"),
+datas= [("C:/Users/kyra/matchypatchy/README.md", "."),
+        ("C:/Users/kyra/matchypatchy/LICENSE", "."),
+        ("C:/Users/kyra/matchypatchy/models.yml", "."),
+        ("C:/Users/kyra/matchypatchy/config.yml", "."),
+        ("C:/Users/kyra/matchypatchy/assets/schema.txt", "./assets"),
+        ("C:/Users/kyra/matchypatchy/assets/logo.png", "./assets"),
+        ("C:/Users/kyra/matchypatchy/assets/fluent_pencil_icon.png", "./assets"),
+        ("C:/Users/kyra/matchypatchy/assets/thumbnail_notfound.png", "./assets"),
+        ("C:/Users/kyra/anaconda3/envs/mp_installer/lib/python3.12/site-packages/ultralytics/cfg/default.yaml", "./ultralytics/cfg"),
+        ("C:/Users/kyra/anaconda3/envs/mp_installer/lib/python3.12/site-packages/ultralytics/cfg/solutions/default.yaml", "./ultralytics/cfg/solutions"),
         ]
 binaries = []
 hiddenimports = ['torch._C',
