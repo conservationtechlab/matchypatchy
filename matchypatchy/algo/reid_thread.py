@@ -73,12 +73,12 @@ class ReIDThread(QThread):
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
 
-            model = animl.load_miew(self.reid_filepath)
+            model = animl.load_miew(self.reid_filepath, device='cpu')
             dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
 
             for i, img in enumerate(dataloader):
                 if not self.isInterruptionRequested():
-                    roi_id, emb = animl.miew_embedding(model, img)
+                    roi_id, emb = animl.miew_embedding(model, img, device='cpu')
 
                     self.mpDB.add_emb(roi_id, emb)
 
