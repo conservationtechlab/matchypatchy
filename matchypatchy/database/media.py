@@ -6,7 +6,7 @@ import pandas as pd
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.avi', '.mp4', '.wmv', '.mov']
 
-COLUMNS = ["filepath", "timestamp", "station_id", "sequence_id", "external_id",
+COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
            "comment", "viewpoint", "species_id", "individual_id"]
 
 
@@ -29,7 +29,7 @@ def fetch_media(mpDB, ids=None):
 
     if media:
         media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", 'station_id',
-                                             'sequence_id', "external_id", 'comment', 'favorite'])
+                                             "camera_id", 'sequence_id', "external_id", 'comment', 'favorite'])
         media = media.replace({float('nan'): None})
         return media
     else:
@@ -76,7 +76,7 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'media_id', 'species_id', 'individual_id', 'emb',
-                'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
+                'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age']
     """
     if rids:
@@ -98,7 +98,7 @@ def export_data(mpDB):
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'media_id', 'species_id', 'individual_id', 'emb',
-                'filepath', 'ext', 'timestamp', 'station_id', 'sequence_id', 'external_id',
+                'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age',
                 'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
     """

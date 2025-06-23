@@ -241,7 +241,7 @@ class MatchyPatchyDB():
             return None
 
     def add_media(self, filepath: str, ext: str, timestamp: str, station_id: int,
-                  sequence_id: Optional[int]=None, external_id: Optional[int]=None, 
+                  sequence_id: Optional[int]=None, camera_id: Optional[int]=None, external_id: Optional[int]=None, 
                   comment: Optional[str]=None, favorite: int=0):
         """
         Media has 9 attributes not including id:
@@ -251,6 +251,7 @@ class MatchyPatchyDB():
             timestamp TEXT NOT NULL,
             station_id INTEGER NOT NULL,
             sequence_id INTEGER,
+            camera_id INTEGER,
             external_id INTEGER,
             comment TEXT,
             favorite INTEGER,
@@ -260,10 +261,11 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO media
                         (filepath, ext, timestamp, station_id,
-                        sequence_id, external_id, comment, favorite) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
+                        camera_id, sequence_id, external_id, comment, favorite) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (filepath, ext, timestamp, station_id, 
-                          sequence_id, external_id, comment, favorite)
+                         sequence_id, camera_id, external_id, comment, favorite)
+            print(command, data_tuple)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -291,6 +293,8 @@ class MatchyPatchyDB():
 
         try:
             db = sqlite3.connect(self.filepath)
+            if db:
+                print("db")
             cursor = db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
@@ -322,6 +326,23 @@ class MatchyPatchyDB():
             return id
         except sqlite3.Error as error:
             logging.error("Failed to add sequence: ", error)
+            if db:
+                db.close()
+            return None
+        
+    def add_camera(self):
+        # Note difference in variable order, foreign keys
+        try:
+            db = sqlite3.connect(self.filepath)
+            cursor = db.cursor()
+            command = """INSERT INTO camera DEFAULT VALUES;"""
+            cursor.execute(command)
+            id = cursor.lastrowid
+            db.commit()
+            db.close()
+            return id
+        except sqlite3.Error as error:
+            logging.error("Failed to add camera: ", error)
             if db:
                 db.close()
             return None
@@ -447,7 +468,7 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
                          roi.media_id, roi.species_id, roi.individual_id, emb, filepath, ext, timestamp,
-                         station_id, sequence_id, external_id, comment, favorite, binomen, common, name, sex, age"""
+                         station_id, sequence_id, camera_id, external_id, comment, favorite, binomen, common, name, sex, age"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
                                             LEFT JOIN species ON roi.species_id = species.id

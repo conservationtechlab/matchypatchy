@@ -26,6 +26,7 @@ class ImportCSVPopup(QDialog):
         self.selected_survey = self.survey_columns[0]
         self.selected_region = self.columns[0]
         self.selected_sequence_id = self.columns[0]
+        self.selected_camera_id = self.columns[0]
         self.selected_external_id = self.columns[0]
         self.selected_viewpoint = self.columns[0]
         self.selected_species = self.columns[0]
@@ -112,6 +113,16 @@ class ImportCSVPopup(QDialog):
         self.sequence_id.currentTextChanged.connect(self.select_sequence)
         sequence_layout.addWidget(self.sequence_id)
         layout.addLayout(sequence_layout)
+        layout.addSpacing(5)
+
+        # Camera
+        camera_layout = QHBoxLayout()
+        camera_layout.addWidget(QLabel("Camera ID:"))
+        self.camera_id = QComboBox()
+        self.camera_id.addItems(self.columns)
+        self.camera_id.currentTextChanged.connect(self.select_camera)
+        camera_layout.addWidget(self.camera_id)
+        layout.addLayout(camera_layout)
         layout.addSpacing(5)
 
         # External ID
@@ -230,6 +241,13 @@ class ImportCSVPopup(QDialog):
             return True
         except IndexError:
             return False
+        
+    def select_camera(self):
+        try:
+            self.selected_camera_id = self.columns[self.camera_id.currentIndex()]
+            return True
+        except IndexError:
+            return False
 
     def select_external(self):
         try:
@@ -272,6 +290,7 @@ class ImportCSVPopup(QDialog):
 
         Must include filepath, timestamp, station
         """
+        self.survey.setCurrentIndex(0)
         self.select_survey()
         if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
            (self.selected_station != "None") and (self.selected_survey != "None"):
@@ -286,6 +305,7 @@ class ImportCSVPopup(QDialog):
                 "station": self.selected_station,
                 "region": self.selected_region,
                 "sequence_id": self.selected_sequence_id,
+                "camera_id": self.selected_camera_id,
                 "external_id": self.selected_external_id,
                 "viewpoint": self.selected_viewpoint,
                 "species": self.selected_species,
@@ -297,6 +317,7 @@ class ImportCSVPopup(QDialog):
         Media entry (id, filepath, ext, timestamp, comment, station_id)
         """
         # assert bbox in manifest.columns
+        print("here")
         self.progress_bar.show()
         selected_columns = self.collate_selections()
 

@@ -38,11 +38,13 @@ class CSVImportThread(QThread):
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
+            camera_id = int(exemplar[self.selected_columns["camera_id"]].item()) if self.selected_columns["camera_id"] != "None" else None
             external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
             comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
             media_id = self.mpDB.add_media(filepath, ext, timestamp, station_id,
                                            sequence_id=sequence_id,
+                                           camera_id=camera_id,
                                            external_id=external_id,
                                            comment=comment)
             # image already added
@@ -183,6 +185,7 @@ class FolderImportThread(QThread):
                                            str(timestamp),
                                            int(station_id),
                                            sequence_id=None,
+                                           camera_id=None,
                                            external_id=None,
                                            comment=None)
 

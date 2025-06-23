@@ -50,11 +50,13 @@ def setup_database(key, filepath):
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
                         sequence_id INTEGER,
+                        camera_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
                         favorite INTEGER NOT NULL,
                         FOREIGN KEY (station_id) REFERENCES station (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id) );''')
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id),
+                        FOREIGN KEY (camera_id) REFERENCES camera (id));''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
@@ -93,6 +95,9 @@ def setup_database(key, filepath):
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
 
+    # CAMERA
+    cursor.execute('''CREATE TABLE IF NOT EXISTS camera (
+                        id INTEGER PRIMARY KEY);''')
 
     # THUMBNAILS
     cursor.execute('''DROP TABLE IF EXISTS media_thumbnails;''')

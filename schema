@@ -36,11 +36,13 @@ CREATE TABLE media (
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
                         sequence_id INTEGER,
+                        camera_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
                         favorite INTEGER NOT NULL,
                         FOREIGN KEY (station_id) REFERENCES station (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id) )
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id),
+                        FOREIGN KEY (camera_id) REFERENCES camera (id))
 INDEX: sqlite_autoindex_media_1
 None
 TABLE: roi
@@ -75,6 +77,9 @@ CREATE TABLE species (
                         common TEXT NOT NULL )
 TABLE: sequence
 CREATE TABLE sequence (
+                        id INTEGER PRIMARY KEY)
+TABLE: camera
+CREATE TABLE camera (
                         id INTEGER PRIMARY KEY)
 TABLE: media_thumbnails
 CREATE TABLE media_thumbnails (
