@@ -293,8 +293,6 @@ class MatchyPatchyDB():
 
         try:
             db = sqlite3.connect(self.filepath)
-            if db:
-                print("db")
             cursor = db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
