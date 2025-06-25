@@ -39,6 +39,7 @@ class CSVImportThread(QThread):
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
+            #camera_id = int(exemplar[self.selected_columns["camera_id"]].item()) if self.selected_columns["camera_id"] != "None" else None
             external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
             comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
@@ -115,20 +116,30 @@ class CSVImportThread(QThread):
         except IndexError:
             station_id = self.mpDB.add_station(str(station_name), None, None, survey_id)
         return station_id
-
+    
     def camera(self, exemplar):
         # get or create station
         camera_name = exemplar[self.selected_columns["camera_id"]].item()
         print(f"[DEBUG] Attempting to insert camera name: {repr(camera_name)}")
         try:
+
+            #camera_id = self.mpDB.select("camera", columns="id", row_cond=f'name="{camera_name}"')[0][0]
+            #camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name = '{camera_name}'", quiet=False)[0][0]
             camera_name = str(camera_name).strip()
-            camera_name = camera_name.replace("'", "''")
+            camera_name = camera_name.replace("'", "''")  # SQL-escape single quotes if using raw string query
             row_cond = f"name = '{camera_name}'"
+            #print(f"camera_name = {repr(camera_name)}") 
             rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
             camera_id = rows[0][0]
+            print("try")
+            print(camera_id)
+            #print(f"[DEBUG] Searching for camera with name: {repr(camera_name)}")
+            #print(f"[DEBUG] SQL WHERE clause: {row_cond}")
+            #print(f"[DEBUG] Query result: {rows}")
         except IndexError:
             camera_id = self.mpDB.add_camera(str(camera_name))
             print(f"[DEBUG] Inserted new camera with ID: {camera_id}")
+            #print(self.mpDB.select("camera", quiet=False))
         return camera_id
 
     def species(self, roi):
