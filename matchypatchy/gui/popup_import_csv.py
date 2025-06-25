@@ -317,7 +317,6 @@ class ImportCSVPopup(QDialog):
         Media entry (id, filepath, ext, timestamp, comment, station_id)
         """
         # assert bbox in manifest.columns
-        print("here")
         self.progress_bar.show()
         selected_columns = self.collate_selections()
 

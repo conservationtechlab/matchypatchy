@@ -84,7 +84,6 @@ class MatchyPatchyDB():
         s = ""
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
-        print(s)
         with open('schema', 'r') as file:
             content = file.read()
     
@@ -264,7 +263,6 @@ class MatchyPatchyDB():
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (filepath, ext, timestamp, station_id, 
                          sequence_id, camera_id, external_id, comment, favorite)
-            print(command, data_tuple)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
