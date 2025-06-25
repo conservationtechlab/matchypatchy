@@ -80,7 +80,8 @@ CREATE TABLE sequence (
                         id INTEGER PRIMARY KEY)
 TABLE: camera
 CREATE TABLE camera (
-                        id INTEGER PRIMARY KEY)
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL)
 TABLE: media_thumbnails
 CREATE TABLE media_thumbnails (
                         id INTEGER PRIMARY KEY,
