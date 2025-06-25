@@ -40,6 +40,7 @@ class CSVImportThread(QThread):
             # Optional data
             sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
             #camera_id = int(exemplar[self.selected_columns["camera_id"]].item()) if self.selected_columns["camera_id"] != "None" else None
+            #camera_id = int(exemplar[self.selected_columns["camera_id"]].item()) if self.selected_columns["camera_id"] != "None" else None
             external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
             comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
@@ -131,7 +132,6 @@ class CSVImportThread(QThread):
             print(camera_id)
         except IndexError:
             camera_id = self.mpDB.add_camera(str(camera_name))
-            print(f"[DEBUG] Inserted new camera with ID: {camera_id}")
             #print(self.mpDB.select("camera", quiet=False))
         return camera_id
 
