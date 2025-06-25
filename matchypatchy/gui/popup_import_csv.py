@@ -290,8 +290,8 @@ class ImportCSVPopup(QDialog):
 
         Must include filepath, timestamp, station
         """
-        self.survey.setCurrentIndex(0)
-        self.select_survey()
+        if self.survey.currentIndex() == 0:
+            self.select_survey()
         if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
            (self.selected_station != "None") and (self.selected_survey != "None"):
             self.okButton.setEnabled(True)
