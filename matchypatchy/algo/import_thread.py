@@ -122,24 +122,13 @@ class CSVImportThread(QThread):
         camera_name = exemplar[self.selected_columns["camera_id"]].item()
         print(f"[DEBUG] Attempting to insert camera name: {repr(camera_name)}")
         try:
-
-            #camera_id = self.mpDB.select("camera", columns="id", row_cond=f'name="{camera_name}"')[0][0]
-            #camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name = '{camera_name}'", quiet=False)[0][0]
             camera_name = str(camera_name).strip()
-            camera_name = camera_name.replace("'", "''")  # SQL-escape single quotes if using raw string query
+            camera_name = camera_name.replace("'", "''")
             row_cond = f"name = '{camera_name}'"
-            #print(f"camera_name = {repr(camera_name)}") 
             rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
             camera_id = rows[0][0]
-            print("try")
-            print(camera_id)
-            #print(f"[DEBUG] Searching for camera with name: {repr(camera_name)}")
-            #print(f"[DEBUG] SQL WHERE clause: {row_cond}")
-            #print(f"[DEBUG] Query result: {rows}")
         except IndexError:
             camera_id = self.mpDB.add_camera(str(camera_name))
-            print(f"[DEBUG] Inserted new camera with ID: {camera_id}")
-            #print(self.mpDB.select("camera", quiet=False))
         return camera_id
 
     def species(self, roi):
