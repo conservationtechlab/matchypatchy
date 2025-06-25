@@ -74,7 +74,7 @@ def fetch_roi(mpDB):
 def fetch_roi_media(mpDB, rids=None, reset_index=True):
     """
     Fetch Info for Media Table
-    columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+    columns = ['roi_id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'media_id', 'species_id', 'individual_id', 'emb',
                 'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                 'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age']
@@ -85,7 +85,6 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     else:
         media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
-    rois['viewpoint'] = rois["viewpoint"].astype(int, errors='ignore')
     rois = rois.replace({float('nan'): None})
     
     if reset_index:

@@ -10,7 +10,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.algo import models
 from matchypatchy import config
-from matchypatchy.database.media import fetch_roi
+from matchypatchy.database.media import fetch_roi_media
 
 from matchypatchy.pairx.core import explain
 from matchypatchy.pairx import xai_dataset
@@ -32,10 +32,9 @@ class ReIDThread(QThread):
 
     def run(self):
         # must be fetched after start() to chain with animl
-        self.rois = fetch_roi(self.mpDB)
-        media, _ = self.mpDB.select_join("roi", "media", "roi.media_id = media.id", columns="roi.id, media_id, filepath, external_id, camera_id, sequence_id")
-        self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
-        self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
+        self.rois = fetch_roi_media(self.mpDB, reset_index=False)
+        self.rois.rename(columns={"id":"roi_id"},inplace=True)
+        self.image_paths = pd.Series(self.rois["filepath"].values, index=self.rois["roi_id"]).to_dict()
 
         self.prompt_update.emit("Calculating viewpoint...")
         self.get_viewpoint()
