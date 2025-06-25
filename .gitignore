@@ -9,6 +9,7 @@ __pycache__/
 Jaguar/
 examples/
 Models/
+MatchyPatchy-Share/
 
 # Distribution / packaging
 .Python
@@ -29,6 +30,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+MatchyPatchy-Share/
+
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

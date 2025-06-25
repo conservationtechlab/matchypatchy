@@ -1,3 +1,3 @@
 [submodule "pairx"]
-	path = pairx
+	path = matchypatchy/pairx
 	url = https://github.com/tkswanson/pairx.git

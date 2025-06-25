@@ -3,6 +3,7 @@ Popup to add or edit species
 '''
 import os
 import logging
+from pathlib import Path
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
@@ -12,9 +13,8 @@ from matchypatchy import config
 from matchypatchy.gui.popup_alert import AlertPopup
 
 
-ICON_PENCIL = "/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"
-# TODO ICON_PENCIL = os.path.normpath("assets/fluent_pencil_icon.png")
-
+#ICON_PENCIL = "/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"
+ICON_PENCIL = os.path.normpath("assets/fluent_pencil_icon.png")
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):
@@ -26,54 +26,59 @@ class ConfigPopup(QDialog):
 
         layout = QVBoxLayout()
 
-        # Paths
+        # TITLES ---------------------------------------------------------------
         path_layout = QHBoxLayout()
 
         titles_layout = QVBoxLayout()
-        titles_layout.addWidget(QLabel("Database Directory:"))
-        titles_layout.addWidget(QLabel("Log File:"))
-        titles_layout.addWidget(QLabel("Model Directory:"))
+        titles_layout.addWidget(QLabel("Project Directory:"))
+        #titles_layout.addWidget(QLabel("Model Directory:"))
+
+        # Advanced
+        self.advanced_command = QLabel("Database Command:")
+        self.advanced_command.hide()
+        titles_layout.addWidget(self.advanced_command)
         path_layout.addLayout(titles_layout)
         
+        # TEXT -----------------------------------------------------------------
         insert_layout = QVBoxLayout()
-        self.db_path = QLineEdit()
-        self.db_path.setText(str(self.cfg['DB_DIR']))
-        insert_layout.addWidget(self.db_path)
-        self.log_path = QLineEdit()
-        self.log_path.setText(str(self.cfg['LOG_PATH']))
-        insert_layout.addWidget(self.log_path)
-        self.ml_path = QLineEdit()
-        self.ml_path.setText(str(self.cfg['ML_DIR']))
-        insert_layout.addWidget(self.ml_path)
+        self.home_dir = QLineEdit()
+        self.home_dir.setText(str(self.cfg['HOME_DIR']))
+        insert_layout.addWidget(self.home_dir)
 
+        # Advanced
+        self.command_line = QLineEdit()
+        self.command_line.setText("Enter SQL Command")
+        self.command_line.hide()
+        insert_layout.addWidget(self.command_line)
         path_layout.addLayout(insert_layout)
 
+        # BUTTONS --------------------------------------------------------------
         path_button_layout = QVBoxLayout()
+        button_home_dir = QPushButton()
+        button_home_dir.setMaximumHeight(30)
+        button_home_dir.setFixedWidth(30)
+        button_home_dir.setIcon(QIcon(ICON_PENCIL))
+        button_home_dir.clicked.connect(self.set_home_dir)
+        path_button_layout.addWidget(button_home_dir)
 
-        button_db_path = QPushButton()
-        button_db_path.setMaximumHeight(30)
-        button_db_path.setIcon(QIcon(ICON_PENCIL))
-        button_db_path.clicked.connect(self.set_db)
-
-        button_log_path = QPushButton()
-        button_log_path.setMaximumHeight(30)
-        button_log_path.setIcon(QIcon(ICON_PENCIL))
-        button_log_path.clicked.connect(self.set_log)
-
-        button_ml_path = QPushButton()
-        button_ml_path.setIcon(QIcon(ICON_PENCIL))
-        button_ml_path.setMaximumHeight(30)
-        button_ml_path.clicked.connect(self.set_ml)
-
-        path_button_layout.addWidget(button_db_path)
-        path_button_layout.addWidget(button_log_path)
-        path_button_layout.addWidget(button_ml_path)
+        # Advanced
+        self.button_command = QPushButton("↵")
+        self.button_command.setMaximumHeight(30)
+        self.button_command.setFixedWidth(30)
+        self.button_command.clicked.connect(self.command)
+        self.button_command.hide()
+        path_button_layout.addWidget(self.button_command)
         path_layout.addLayout(path_button_layout)
 
         layout.addLayout(path_layout)
 
         # Buttons
         button_layout = QHBoxLayout()
+
+        button_advanced = QPushButton("Advanced")
+        button_advanced.clicked.connect(self.show_advanced)
+        button_layout.addWidget(button_advanced)
+
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
@@ -83,49 +88,55 @@ class ConfigPopup(QDialog):
 
         self.setLayout(layout)
 
-    def command(self, command):
-        self.mpDB._command(self)
+    def show_advanced(self):
+        self.advanced_command.show()
+        self.command_line.show()
+        self.button_command.show()
 
-    def set_db(self):
-        new_db = QFileDialog.getExistingDirectory(self, "Get Database",
+    def command(self):
+        new_cmd = self.command_line.text()
+        self.mpDB._command(new_cmd)
+
+    def set_home_dir(self):
+        new_project = QFileDialog.getExistingDirectory(self, "Get Project Folder",
                                                   os.path.expanduser('~'),)
-        if new_db:
-            self.db_path.setText(new_db)
+        if new_project:
+            self.home_dir.setText(new_project)
+            new_db = Path(new_project) / "Database"
             valid = self.mpDB.update_paths(new_db)
+
             if valid:
-            # Update config
+                # Update home dir
+                self.cfg['HOME_DIR'] = str(new_project)
                 self.cfg['DB_DIR'] = str(new_db)
+
+                # Update config
+                self.cfg['LOG_PATH'] = str(new_project / "matchypatchy.log")
+                logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
+                logging.info("HOME_DIR CHANGED")
+                logging.info('HOME_DIR: ' + self.cfg['HOME_DIR'])
+
+                # Check or create ML, Thumbnail and Frame folders
+                new_ml= Path(new_project) / "Models"
+                Path.mkdir(new_ml, exist_ok=True)
+                self.cfg['ML_DIR'] = str(new_ml)
+
+                new_thumb= Path(new_project) / "Thumbnails"
+                Path.mkdir(new_thumb, exist_ok=True)
+                self.cfg['THUMBNAIL_DIR'] = str(new_thumb)
+
+                new_frame = Path(new_project) / "Frames"
+                Path.mkdir(new_frame, exist_ok=True)
+                self.cfg['FRAME_DIR'] = str(new_frame)
+
+                # save changes to yml
                 config.update(self.cfg)
-                # Log changes
-                logging.info("DB_DIR CHANGED")
-                logging.info('DB_DIR: ' + self.cfg['DB_DIR'])
+
             else:
                 dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
                 if dialog.exec():
                     del dialog
 
-    def set_log(self):
-        new_log = QFileDialog.getSaveFileName(self, "New File",
-                                              os.path.expanduser('~'),
-                                              ("Log Files (*.log)"))[0]
-        if new_log:
-            self.log_path.setText(new_log)
-            # Update config
-            self.cfg['LOG_PATH'] = str(new_log)
-            config.update(self.cfg)
-            # Log changes
-            logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
-            logging.info("LOG_PATH CHANGED")
-
-    def set_ml(self):
-        new_ml = QFileDialog.getExistingDirectory(self)
-        if new_ml:
-            self.ml_path.setText(new_ml)
-            # Update config
-            self.cfg['ML_DIR'] = str(new_ml)
-            config.update(self.cfg)
-            # Log changes
-            logging.info("ML_DIR CHANGED")
-            logging.info('ML_DIR: ' + self.cfg['ML_DIR'])
+          
 
 
