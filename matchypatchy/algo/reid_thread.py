@@ -62,7 +62,7 @@ class ReIDThread(QThread):
                     # TODO: Utilize probability for captures/sequences
                     # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
                     self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
+                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
     def get_embeddings(self):
         # Process only those that have not yet been processed
@@ -79,8 +79,7 @@ class ReIDThread(QThread):
                     self.mpDB.add_emb(roi_id, emb)
 
                     self.mpDB.edit_row("roi", roi_id, {"emb": 1})
-                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
-
+                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
 
 # TODO: load model once?
@@ -93,9 +92,9 @@ class PairXThread(QThread):
         self.query = query
         self.match = match
         self.img_transforms = transforms.Compose([transforms.Resize((440, 440)),
-                                             transforms.ToTensor(),
-                                             transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                                  std=[0.229, 0.224, 0.225])])
+                                                  transforms.ToTensor(),
+                                                  transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                       std=[0.229, 0.224, 0.225])])
 
     def run(self):
         self.load_model()
@@ -113,19 +112,17 @@ class PairXThread(QThread):
             # TODO: if model key exists but file dne, recommend user redownloads
 
     def explain(self):
-        
-
-        img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(self.model.device, 
-                                                                                     self.query, 
-                                                                                     self.match, 
-                                                                                     (440,440), self.img_transforms)
-        explained_imgs = explain(self.model.device, img_0, img_1,  
-                                                 img_np_0, img_np_1,
-                                                 self.model,
-                                                 ["backbone.blocks.3"],  
-                                                 k_lines=20, k_colors=10)
+        img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(self.model.device,
+                                                                               self.query,
+                                                                               self.match,
+                                                                               (440, 440), self.img_transforms)
+        explained_imgs = explain(self.model.device, img_0, img_1,
+                                 img_np_0, img_np_1,
+                                 self.model,
+                                 ["backbone.blocks.3"],
+                                 k_lines=20, k_colors=10)
         return explained_imgs
-    
+
     def get_bbox(self, roi):
         """
         Return the bbox coordinates for a given roi row
