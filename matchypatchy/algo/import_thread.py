@@ -39,6 +39,7 @@ class CSVImportThread(QThread):
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
+            #camera_id = int(exemplar[self.selected_columns["camera_id"]].item()) if self.selected_columns["camera_id"] != "None" else None
             external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
             comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
@@ -115,7 +116,7 @@ class CSVImportThread(QThread):
         except IndexError:
             station_id = self.mpDB.add_station(str(station_name), None, None, survey_id)
         return station_id
-
+    
     def camera(self, exemplar):
         # get or create station
         camera_name = exemplar[self.selected_columns["camera_id"]].item()
