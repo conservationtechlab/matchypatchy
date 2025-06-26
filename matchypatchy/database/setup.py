@@ -84,7 +84,7 @@ def setup_database(key, filepath):
                         sex TEXT,
                         age TEXT,
                         FOREIGN KEY(species_id) REFERENCES species (id));''')
-    
+
     # SPECIES
     cursor.execute('''CREATE TABLE IF NOT EXISTS species (
                         id INTEGER PRIMARY KEY,
@@ -129,5 +129,5 @@ def setup_chromadb(key, filepath):
             "created": str(datetime.now()),
             "hnsw:space": "cosine",
             "key": key
-        }  
+        }
     )
