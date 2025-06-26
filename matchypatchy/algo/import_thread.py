@@ -120,7 +120,6 @@ class CSVImportThread(QThread):
     def camera(self, exemplar):
         # get or create station
         camera_name = exemplar[self.selected_columns["camera_id"]].item()
-        print(f"[DEBUG] Attempting to insert camera name: {repr(camera_name)}")
         try:
             camera_name = str(camera_name).strip()
             camera_name = camera_name.replace("'", "''")
