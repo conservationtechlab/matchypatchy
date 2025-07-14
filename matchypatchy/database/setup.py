@@ -49,14 +49,14 @@ def setup_database(key, filepath):
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
-                        sequence_id INTEGER,
                         camera_id INTEGER,
+                        sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
                         favorite INTEGER NOT NULL,
                         FOREIGN KEY (station_id) REFERENCES station (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id),
-                        FOREIGN KEY (camera_id) REFERENCES camera (id));''')
+                        FOREIGN KEY (camera_id) REFERENCES camera (id),
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id));''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (

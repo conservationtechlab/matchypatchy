@@ -238,18 +238,25 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_media(self, filepath: str, ext: str, timestamp: str, station_id: int,
-                  sequence_id: Optional[int] = None, camera_id: Optional[int] = None, external_id: Optional[int] = None,
-                  comment: Optional[str] = None, favorite: int = 0):
+    def add_media(self,
+                  filepath: str,
+                  ext: str,
+                  timestamp: str,
+                  station_id: int,
+                  camera_id: Optional[int] = None,
+                  sequence_id: Optional[int] = None,
+                  external_id: Optional[int] = None,
+                  comment: Optional[str] = None,
+                  favorite: int = 0):
         """
-        Media has 9 attributes not including id:
+        Media has 10 attributes not including id:
             id INTEGER PRIMARY KEY,
             filepath TEXT UNIQUE NOT NULL,
             ext TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             station_id INTEGER NOT NULL,
-            sequence_id INTEGER,
             camera_id INTEGER,
+            sequence_id INTEGER,
             external_id INTEGER,
             comment TEXT,
             favorite INTEGER,

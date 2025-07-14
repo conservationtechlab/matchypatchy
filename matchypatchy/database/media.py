@@ -28,14 +28,16 @@ def fetch_media(mpDB, ids=None):
         media = mpDB.select("media")
 
     if media:
-        media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", 'station_id',
-                                             "camera_id", 'sequence_id', "external_id", 'comment', 'favorite'])
+        media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp",
+                                             'station_id', "camera_id", 'sequence_id',
+                                             "external_id", 'comment', 'favorite'])
         media = media.replace({float('nan'): None})
         return media
     else:
         return pd.DataFrame()
 
-    def load_selected_media(self):
+
+def load_selected_media(self):
         """
         Fetch all columns from both `roi` and `media` tables for the selected ROI IDs.
         """
