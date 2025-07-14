@@ -33,7 +33,9 @@ class ReIDThread(QThread):
     def run(self):
         # must be fetched after start() to chain with animl
         self.rois = fetch_roi(self.mpDB)
-        media, _ = self.mpDB.select_join("roi", "media", "roi.media_id = media.id", columns="roi.id, media_id, filepath, external_id, camera_id, sequence_id")
+        media, _ = self.mpDB.select_join("roi", "media", "roi.media_id = media.id",
+                                         columns="roi.id, media_id, filepath, external_id, camera_id, sequence_id")
+        self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
 
         self.prompt_update.emit("Calculating viewpoint...")
@@ -51,13 +53,12 @@ class ReIDThread(QThread):
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
         if len(filtered_rois) > 0:
 
-            model = animl.load_model(self.viewpoint_filepath, 2)
+            model = animl.load_classifier(self.viewpoint_filepath, 2)
             dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
 
             for i, img in enumerate(dataloader):
                 if not self.isInterruptionRequested():
                     roi_id, value, prob = animl.viewpoint_estimator(model, img)
-                    print(roi_id, value)
 
                     # TODO: Utilize probability for captures/sequences
                     # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]

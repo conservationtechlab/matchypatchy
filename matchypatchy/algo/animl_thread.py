@@ -37,12 +37,13 @@ class AnimlThread(QThread):
         self.mpDB = mpDB
         self.ml_dir = Path(config.load('ML_DIR'))
         self.confidence_threshold = 0.1
+        self.detector_key = detector_key
 
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
 
-        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station",
+        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station_id", "camera_id",
                                                   "sequence_id", "external_id", "comment", "favorite"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 
@@ -66,20 +67,20 @@ class AnimlThread(QThread):
 
     def get_bbox(self):
         # 1 RUN MED
-        detector = animl.MegaDetector(self.md_filepath)
+        if self.detector_key == "MegaDetector v5a" or self.detector_key == "MegaDetector v5b":
+            detector = animl.load_detector(self.md_filepath, "MDV5")
 
         viewpoint = None
         individual_id = None
         species_id = None
-
 
         # 2 GET BOXES
         for i, image in self.media.iterrows():
             if not self.isInterruptionRequested():
                 media_id = image['id']
 
-                detections = animl.process_image(image['filepath'], detector, self.confidence_threshold)
-                detections = animl.parse_MD([detections], manifest=image)
+                detections = animl.detect(detector, image['Frame'], confidence_threshold=self.confidence_threshold)
+                detections = animl.parse_detections(detections, manifest=image)
                 detections = animl.get_animals(detections)
 
                 for _, roi in detections.iterrows():
