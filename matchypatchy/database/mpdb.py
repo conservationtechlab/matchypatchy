@@ -332,7 +332,7 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_camera(self, name: str):
+    def add_camera(self, name: str, station_id: int):
         """
         Add a camera with:
             - name (str) NOT NULL
@@ -340,8 +340,8 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            command = """INSERT INTO camera (name) VALUES (?);"""
-            data_tuple = (name,)
+            command = """INSERT INTO camera (name, station_id) VALUES (?, ?);"""
+            data_tuple = (name, station_id)
             cursor.execute(command, data_tuple)
             camera_id = cursor.lastrowid
             db.commit()

@@ -98,7 +98,9 @@ def setup_database(key, filepath):
     # CAMERA
     cursor.execute('''CREATE TABLE IF NOT EXISTS camera (
                         id INTEGER PRIMARY KEY,
-                        name TEXT NOT NULL);''')
+                        name TEXT NOT NULL,
+                        station_id INTEGER NOT NULL,
+                        FOREIGN KEY (station_id) REFERENCES station (id));''')
 
     # THUMBNAILS
     cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
