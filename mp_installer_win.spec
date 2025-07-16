@@ -9,8 +9,8 @@ datas= [("C:/Users/kyra/matchypatchy/README.md", "."),
         ("C:/Users/kyra/matchypatchy/assets/logo.png", "./assets"),
         ("C:/Users/kyra/matchypatchy/assets/fluent_pencil_icon.png", "./assets"),
         ("C:/Users/kyra/matchypatchy/assets/thumbnail_notfound.png", "./assets"),
-        ("C:/Users/kyra/anaconda3/envs/mp_installer/lib/python3.12/site-packages/ultralytics/cfg/default.yaml", "./ultralytics/cfg"),
-        ("C:/Users/kyra/anaconda3/envs/mp_installer/lib/python3.12/site-packages/ultralytics/cfg/solutions/default.yaml", "./ultralytics/cfg/solutions"),
+        ("C:/Users/kyra/anaconda3/envs/mp_installer/lib/site-packages/ultralytics/cfg/default.yaml", "./ultralytics/cfg"),
+        ("C:/Users/kyra/anaconda3/envs/mp_installer/lib/site-packages/ultralytics/cfg/solutions/default.yaml", "./ultralytics/cfg/solutions"),
         ]
 binaries = []
 hiddenimports = ['torch._C',

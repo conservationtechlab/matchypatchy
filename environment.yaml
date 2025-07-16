@@ -1,0 +1,12 @@
+name: mp_installer
+channels:
+  - defaults
+dependencies:
+  - pip:
+    - animl==2.0.0
+    - chromadb==1.0.13
+    - pyqt6==6.9.1
+    - timm==1.0.9
+    - torch==2.7.1+cu118
+    - torchvision==0.22.1
+    - zennit==0.5.1
