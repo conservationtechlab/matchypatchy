@@ -233,6 +233,9 @@ class DisplayMedia(QWidget):
         self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
         self.station_select.addItems(sorted([el[1] for el in self.station_list_ordered]))
 
+        # select all cameras for now
+        self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
+
         self.species_select.clear()
         self.species_list_ordered = [(0, 'Species')] + list(self.mpDB.select('species', columns='id, common'))
         self.species_select.addItems([el[1] for el in self.species_list_ordered])

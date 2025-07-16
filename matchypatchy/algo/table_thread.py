@@ -22,6 +22,7 @@ class LoadTableThread(QThread):
         super().__init__()
         self.data = parent.data_filtered
         self.valid_stations = parent.valid_stations
+        self.valid_cameras = parent.valid_cameras
         self.VIEWPOINTS = parent.VIEWPOINTS
         self.species_list = parent.species_list
         self.individual_list = parent.individual_list
@@ -61,6 +62,12 @@ class LoadTableThread(QThread):
         # Station
         elif column == 'station':
             qtw = QTableWidgetItem(self.valid_stations[roi["station_id"]])
+        # Camera
+        elif column == 'camera':
+            if roi["camera_id"]:
+                qtw = QTableWidgetItem(self.valid_cameras[roi["camera_id"]])
+            else:  # can be null
+                qtw = QTableWidgetItem()
         # Viewpoint
         elif column == 'viewpoint':
             vp_raw = roi["viewpoint"]

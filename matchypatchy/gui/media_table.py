@@ -41,9 +41,9 @@ class MediaTable(QWidget):
 
         # Create QTableWidget
         self.table = QTableWidget()
-        self.table.setColumnCount(15)  # Columns: Thumbnail, Name, and Description
+        self.table.setColumnCount(17)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp", 
-                                              "Station", "Sequence ID", "External ID",
+                                              "Station", "Camera", "Sequence ID", "External ID",
                                               "Viewpoint", "Species", "Common", "Individual", "Sex", "Age"
                                               "Reviewed", "Favorite", "Comment"])
         #self.table.setSortingEnabled(True)  # NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
@@ -101,17 +101,27 @@ class MediaTable(QWidget):
     def format_table(self):
         if self.data_type == 1:
             # corresponding mpDB column names
-            self.columns = {0: "select", 1:"thumbnail", 
-                            2:"filepath", 3:"timestamp",
-                            4:"station", 5:"sequence_id", 
-                            6:"external_id", 7:"viewpoint", 
-                            8:"binomen", 9:"common", 
-                            10:"name", 11:"sex", 12:"age",
-                            13:"reviewed", 14:"favorite", 15:"comment"}
+            self.columns = {0: "select",
+                            1:"thumbnail", 
+                            2:"filepath",
+                            3:"timestamp",
+                            4:"station",
+                            5:"camera",
+                            6:"sequence_id",
+                            7:"external_id",
+                            8:"viewpoint",
+                            9:"binomen",
+                            10:"common", 
+                            11:"name",
+                            12:"sex",
+                            13:"age",
+                            14:"reviewed",
+                            15:"favorite",
+                            16:"comment"}
 
-            self.table.setColumnCount(15)  
+            self.table.setColumnCount(17)  
             self.table.setHorizontalHeaderLabels(["Select","Thumbnail", "File Path", "Timestamp",
-                                                "Station", "Sequence ID", "External ID", 
+                                                "Station", "Camera", "Sequence ID", "External ID", 
                                                 "Viewpoint", "Species", "Common", "Individual", "Sex", "Age",
                                                 "Reviewed", "Favorite", "Comment"])
             # adjust widths
@@ -122,33 +132,34 @@ class MediaTable(QWidget):
 
             # VIEWPOINT COMBOS
             combo_items = list(self.VIEWPOINTS.values())[1:]
-            self.table.setItemDelegateForColumn(7, ComboBoxDelegate(combo_items, self))
+            self.table.setItemDelegateForColumn(8, ComboBoxDelegate(combo_items, self))
 
             # SPECIES COMBOBOX
             if not self.species_list.empty:
                 combo_items = [None] + self.species_list['binomen'].str.capitalize().to_list()
-                self.table.setItemDelegateForColumn(8, ComboBoxDelegate(combo_items, self))
-                combo_items = [None] + self.species_list['common'].str.capitalize().to_list()
                 self.table.setItemDelegateForColumn(9, ComboBoxDelegate(combo_items, self))
+                combo_items = [None] + self.species_list['common'].str.capitalize().to_list()
+                self.table.setItemDelegateForColumn(10, ComboBoxDelegate(combo_items, self))
 
             # SEX COMBOBOX
             combo_items = ['Unknown', 'Male', 'Female']
-            self.table.setItemDelegateForColumn(11, ComboBoxDelegate(combo_items, self))
+            self.table.setItemDelegateForColumn(12, ComboBoxDelegate(combo_items, self))
 
             # AGE COMBOBOX
             combo_items = ['Unknown', 'Juvenile', 'Subadult', 'Adult']
-            self.table.setItemDelegateForColumn(12, ComboBoxDelegate(combo_items, self))
+            self.table.setItemDelegateForColumn(13, ComboBoxDelegate(combo_items, self))
 
         # MEDIA
         elif self.data_type == 0:
             # corresponding mpDB column names
-            self.columns = {0:"select", 1:"thumbnail", 
+            self.columns = {0:"select", 1:"thumbnail",
                             2:"filepath", 3:"timestamp",
-                            4:"station", 5:"sequence_id", 
-                            6:"external_id", 7:"favorite", 8:"comment"}
-            self.table.setColumnCount(9)  # Columns: Thumbnail, Name, and Description
-            self.table.setHorizontalHeaderLabels( ["Select","Thumbnail", "File Path", "Timestamp", "Station",
-                                                   "Sequence ID", "External ID", "Favorite", "Comment"])
+                            4:"station", 5:"camera", 6:"sequence_id",
+                            7:"external_id", 8:"favorite", 9:"comment"}
+            self.table.setColumnCount(10)  # Columns: Thumbnail, Name, and Description
+            self.table.setHorizontalHeaderLabels( ["Select","Thumbnail", "File Path", "Timestamp", 
+                                                   "Station", "Camera", "Sequence ID",
+                                                   "External ID", "Favorite", "Comment"])
             # adjust widths
             self.table.resizeColumnsToContents()
             for col in range(self.table.columnCount()):
@@ -192,6 +203,7 @@ class MediaTable(QWidget):
         # map 
         filters = self.parent.filters
         self.valid_stations = self.parent.valid_stations
+        self.valid_cameras = self.parent.valid_cameras
 
         # Location Filter (depends on prefilterd stations from MediaDisplay)
         if self.valid_stations:
