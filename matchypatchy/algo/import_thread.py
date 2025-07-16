@@ -115,7 +115,7 @@ class CSVImportThread(QThread):
         except IndexError:
             station_id = self.mpDB.add_station(str(station_name), None, None, survey_id)
         return station_id
-    
+
     def camera(self, exemplar, station_id):
         # get or create station
         camera_name = exemplar[self.selected_columns["camera"]].item()

@@ -228,7 +228,7 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
 
-    # OPTIONAL 
+    # OPTIONAL
     def select_region(self):
         try:
             self.selected_region = self.columns[self.region.currentIndex()]
@@ -249,7 +249,7 @@ class ImportCSVPopup(QDialog):
             return True
         except IndexError:
             return False
-        
+
     def select_external(self):
         try:
             self.selected_external_id = self.columns[self.external_id.currentIndex()]
