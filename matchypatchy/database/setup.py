@@ -49,14 +49,14 @@ def setup_database(key, filepath):
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
-                        sequence_id INTEGER,
                         camera_id INTEGER,
+                        sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
                         favorite INTEGER NOT NULL,
                         FOREIGN KEY (station_id) REFERENCES station (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id),
-                        FOREIGN KEY (camera_id) REFERENCES camera (id));''')
+                        FOREIGN KEY (camera_id) REFERENCES camera (id),
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id));''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
@@ -84,7 +84,7 @@ def setup_database(key, filepath):
                         sex TEXT,
                         age TEXT,
                         FOREIGN KEY(species_id) REFERENCES species (id));''')
-    
+
     # SPECIES
     cursor.execute('''CREATE TABLE IF NOT EXISTS species (
                         id INTEGER PRIMARY KEY,
@@ -98,7 +98,9 @@ def setup_database(key, filepath):
     # CAMERA
     cursor.execute('''CREATE TABLE IF NOT EXISTS camera (
                         id INTEGER PRIMARY KEY,
-                        name TEXT NOT NULL);''')
+                        name TEXT NOT NULL,
+                        station_id INTEGER NOT NULL,
+                        FOREIGN KEY (station_id) REFERENCES station (id));''')
 
     # THUMBNAILS
     cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
@@ -129,5 +131,5 @@ def setup_chromadb(key, filepath):
             "created": str(datetime.now()),
             "hnsw:space": "cosine",
             "key": key
-        }  
+        }
     )
