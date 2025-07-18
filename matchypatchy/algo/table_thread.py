@@ -22,6 +22,7 @@ class LoadTableThread(QThread):
         super().__init__()
         self.data = parent.data_filtered
         self.valid_stations = parent.valid_stations
+        self.valid_cameras = parent.valid_cameras
         self.VIEWPOINTS = parent.VIEWPOINTS
         self.species_list = parent.species_list
         self.individual_list = parent.individual_list
@@ -33,11 +34,10 @@ class LoadTableThread(QThread):
                 if not self.isInterruptionRequested():
                     qtw = self.add_cell(roi, column)
                     self.loaded_cell.emit(i, j, qtw)
-            self.progress_update.emit(i+1)
+            self.progress_update.emit(i + 1)
 
         if not self.isInterruptionRequested():
             self.done.emit()
-
 
     def add_cell(self, roi, column):
         """
@@ -61,6 +61,12 @@ class LoadTableThread(QThread):
         # Station
         elif column == 'station':
             qtw = QTableWidgetItem(self.valid_stations[roi["station_id"]])
+        # Camera
+        elif column == 'camera':
+            if roi["camera_id"]:
+                qtw = QTableWidgetItem(self.valid_cameras[roi["camera_id"]])
+            else:  # can be null
+                qtw = QTableWidgetItem()
         # Viewpoint
         elif column == 'viewpoint':
             vp_raw = roi["viewpoint"]
@@ -72,7 +78,6 @@ class LoadTableThread(QThread):
 
             vp_value = self.VIEWPOINTS.get(vp_key, "None")
             qtw = QTableWidgetItem(vp_value)
-
 
         # Species ID
         elif column == 'binomen' or column == 'common':
@@ -97,14 +102,14 @@ class LoadTableThread(QThread):
                 else:
                     qtw = QTableWidgetItem("Unknown")
 
-        #name not editable here
+        # name not editable here
         elif column == "name":
             if roi['individual_id'] is not None:
                 qtw = QTableWidgetItem(str(roi[column]))
             else:
                 qtw = QTableWidgetItem("Unknown")
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        
+
         elif column == "sex" or column == 'age':
             if roi['individual_id'] is not None:
                 qtw = QTableWidgetItem(str(roi[column]))
@@ -121,7 +126,7 @@ class LoadTableThread(QThread):
 
         # return widget
         return qtw
-    
+
     def set_checkstate(self, item):
         """
         Set the checkbox of reviewed and favorite columns

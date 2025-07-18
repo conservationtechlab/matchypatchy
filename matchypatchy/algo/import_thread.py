@@ -34,8 +34,9 @@ class CSVImportThread(QThread):
             timestamp = exemplar[self.selected_columns["timestamp"]].item()
 
             survey_id = self.survey(exemplar)
-            camera_id = self.camera(exemplar)
             station_id = self.station(exemplar, survey_id)
+            camera_id = self.camera(exemplar, station_id)
+
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
@@ -117,11 +118,10 @@ class CSVImportThread(QThread):
         except IndexError:
             station_id = self.mpDB.add_station(str(station_name), None, None, survey_id)
         return station_id
-    
-    def camera(self, exemplar):
+
+    def camera(self, exemplar, station_id):
         # get or create station
-        camera_name = exemplar[self.selected_columns["camera_id"]].item()
-        print(f"[DEBUG] Attempting to insert camera name: {repr(camera_name)}")
+        camera_name = exemplar[self.selected_columns["camera"]].item()
         try:
             camera_name = str(camera_name).strip()
             camera_name = camera_name.replace("'", "''")
@@ -129,7 +129,7 @@ class CSVImportThread(QThread):
             rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
             camera_id = rows[0][0]
         except IndexError:
-            camera_id = self.mpDB.add_camera(str(camera_name))
+            camera_id = self.mpDB.add_camera(str(camera_name), station_id)
         return camera_id
 
     def species(self, roi):

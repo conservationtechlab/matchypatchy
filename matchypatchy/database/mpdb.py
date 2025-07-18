@@ -52,7 +52,7 @@ class MatchyPatchyDB():
         client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         chroma_key = collection.metadata['key']
-        
+
         return mpdb_key, chroma_key
 
     def info(self):
@@ -86,8 +86,8 @@ class MatchyPatchyDB():
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
         with open('schema', 'r') as file:
             content = file.read()
-    
-        match_schema = (content==s)
+
+        match_schema = (content == s)
         mpkey, chromakey = self.retrieve_key()
         if match_schema and mpkey == chromakey:
             return mpkey
@@ -126,7 +126,7 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO survey
-                        (name, region_id, year_start, year_end) 
+                        (name, region_id, year_start, year_end)
                         VALUES (?, ?, ?, ?);"""
             data_tuple = (name, region_id, year_start, year_end)
             cursor.execute(command, data_tuple)
@@ -139,7 +139,7 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return None
-        
+
     def add_region(self, name: str):
         """
         Add a region with
@@ -173,7 +173,7 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO station
-                        (name, lat, long, survey_id) 
+                        (name, lat, long, survey_id)
                         VALUES (?, ?, ?, ?);"""
             data_tuple = (name, lat, long, survey_id)
             cursor.execute(command, data_tuple)
@@ -197,7 +197,7 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO species
-                        (binomen, common) 
+                        (binomen, common)
                         VALUES (?, ?);"""
             data_tuple = (binomen, common)
             cursor.execute(command, data_tuple)
@@ -211,8 +211,8 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_individual(self, name: str, species_id: Optional[int]=None,
-                       sex: Optional[str]=None, age: Optional[str]=None):
+    def add_individual(self, name: str, species_id: Optional[int] = None,
+                       sex: Optional[str] = None, age: Optional[str] = None):
         """
         Add an individual with
             - name (str)
@@ -224,7 +224,7 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO individual
-                        (name, species_id, sex, age) 
+                        (name, species_id, sex, age)
                         VALUES (?, ?, ?, ?);"""
             data_tuple = (name, species_id, sex, age)
             cursor.execute(command, data_tuple)
@@ -238,18 +238,25 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_media(self, filepath: str, ext: str, timestamp: str, station_id: int,
-                  sequence_id: Optional[int]=None, camera_id: Optional[int]=None, external_id: Optional[int]=None, 
-                  comment: Optional[str]=None, favorite: int=0):
+    def add_media(self,
+                  filepath: str,
+                  ext: str,
+                  timestamp: str,
+                  station_id: int,
+                  camera_id: Optional[int] = None,
+                  sequence_id: Optional[int] = None,
+                  external_id: Optional[int] = None,
+                  comment: Optional[str] = None,
+                  favorite: int = 0):
         """
-        Media has 9 attributes not including id:
+        Media has 10 attributes not including id:
             id INTEGER PRIMARY KEY,
             filepath TEXT UNIQUE NOT NULL,
             ext TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             station_id INTEGER NOT NULL,
-            sequence_id INTEGER,
             camera_id INTEGER,
+            sequence_id INTEGER,
             external_id INTEGER,
             comment TEXT,
             favorite INTEGER,
@@ -259,16 +266,16 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO media
                         (filepath, ext, timestamp, station_id,
-                        camera_id, sequence_id, external_id, comment, favorite) 
+                        camera_id, sequence_id, external_id, comment, favorite)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, ext, timestamp, station_id, 
-                         sequence_id, camera_id, external_id, comment, favorite)
+            data_tuple = (filepath, ext, timestamp, station_id,
+                          sequence_id, camera_id, external_id, comment, favorite)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
             db.close()
             return id
-    
+
         # filepath already exists
         except sqlite3.IntegrityError as error:
             if error.sqlite_errorname == "SQLITE_CONSTRAINT_UNIQUE":
@@ -276,7 +283,7 @@ class MatchyPatchyDB():
                 if db:
                     db.close()
                 return "duplicate_error"
-        
+
         except sqlite3.Error as error:
             logging.error("Failed to add media: ", error)
             if db:
@@ -284,8 +291,8 @@ class MatchyPatchyDB():
             return None
 
     def add_roi(self, media_id: int, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
-                species_id: Optional[int]=None, viewpoint: Optional[str]=None, reviewed: int=0, 
-                individual_id: Optional[int]=None, emb: int=0):
+                species_id: Optional[int] = None, viewpoint: Optional[str] = None, reviewed: int = 0,
+                individual_id: Optional[int] = None, emb: int = 0):
         # Note difference in variable order, foreign keys
 
         try:
@@ -293,7 +300,7 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                         species_id, viewpoint, reviewed, individual_id, emb) 
+                         species_id, viewpoint, reviewed, individual_id, emb)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
                           species_id, viewpoint, reviewed, individual_id, emb)
@@ -324,8 +331,8 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return None
-        
-    def add_camera(self, name: str):
+
+    def add_camera(self, name: str, station_id: int):
         """
         Add a camera with:
             - name (str) NOT NULL
@@ -333,8 +340,8 @@ class MatchyPatchyDB():
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            command = """INSERT INTO camera (name) VALUES (?);"""
-            data_tuple = (name,)
+            command = """INSERT INTO camera (name, station_id) VALUES (?, ?);"""
+            data_tuple = (name, station_id)
             cursor.execute(command, data_tuple)
             camera_id = cursor.lastrowid
             db.commit()
@@ -344,7 +351,8 @@ class MatchyPatchyDB():
             logging.error(f"Failed to add camera: {error}")
             if db:
                 db.close()
-            return None        
+            return None
+
     def add_thumbnail(self, table, fid, filepath):
         # Note difference in variable order, foreign keys
         try:
@@ -362,7 +370,7 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return None
-        
+
     def copy(self, table, id):
         try:
             db = sqlite3.connect(self.filepath)
@@ -382,7 +390,7 @@ class MatchyPatchyDB():
     # EDIT ---------------------------------------------------------------------
     def edit_row(self, table: str, id: int, replace: dict, allow_none=False, quiet=True):
         """
-        Edit a row in place 
+        Edit a row in place
 
         Args
             - table (str):
@@ -398,11 +406,12 @@ class MatchyPatchyDB():
                     replace[key] = 'NULL'
                 if isinstance(value, str):
                     replace[key] = f"'{value}'"
-            
+
             replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
 
             command = f"UPDATE {table} SET {replace_values} WHERE id={id}"
-            if not quiet: print(command)
+            if not quiet:
+                print(command)
             cursor.execute(command)
             db.commit()
             db.close()
@@ -413,7 +422,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    def select(self, table: str, columns: str="*", row_cond: Optional[str]=None, quiet=True):
+    def select(self, table: str, columns: str = "*", row_cond: Optional[str] = None, quiet=True):
         """
         Select columns based on optional row_cond
         Returns each row as a tuple
@@ -425,9 +434,10 @@ class MatchyPatchyDB():
                 command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
             else:
                 command = f'SELECT {columns} FROM {table};'
-            if not quiet: print(command)
+            if not quiet:
+                print(command)
             cursor.execute(command)
-            rows = cursor.fetchall()  
+            rows = cursor.fetchall()
             db.close()
             return rows
         except sqlite3.Error as error:
@@ -435,8 +445,8 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return None
-    
-    def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str]=None, quiet=True):
+
+    def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None, quiet=True):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -444,7 +454,8 @@ class MatchyPatchyDB():
                 command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond} WHERE {row_cond};'
             else:
                 command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
-            if not quiet: print(command)
+            if not quiet:
+                print(command)
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
@@ -456,7 +467,7 @@ class MatchyPatchyDB():
                 db.close()
             return None, None
 
-    def all_media(self, row_cond: Optional[str]=None):
+    def all_media(self, row_cond: Optional[str] = None):
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
@@ -482,7 +493,7 @@ class MatchyPatchyDB():
             if db:
                 db.close()
             return None, None
-        
+
     def stations(self, row_cond=None):
         try:
             db = sqlite3.connect(self.filepath)
@@ -561,7 +572,7 @@ class MatchyPatchyDB():
                 db.close()
             return False
 
-    # EMBEDDINGS ===============================================================  
+    # EMBEDDINGS ===============================================================
     def add_emb(self, id, embedding):
         client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
@@ -571,7 +582,7 @@ class MatchyPatchyDB():
         client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         query = collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
-        knn = collection.query(query_embeddings=query, n_results=k+1)
+        knn = collection.query(query_embeddings=query, n_results=k + 1)
         return knn
 
     def clear_emb(self):

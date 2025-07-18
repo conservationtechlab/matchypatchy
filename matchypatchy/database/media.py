@@ -28,15 +28,16 @@ def fetch_media(mpDB, ids=None):
         media = mpDB.select("media")
 
     if media:
-        media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", 'station_id',
-                                             "camera_id", 'sequence_id', "external_id", 'comment', 'favorite'])
+        media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp",
+                                             'station_id', "camera_id", 'sequence_id',
+                                             "external_id", 'comment', 'favorite'])
         media = media.replace({float('nan'): None})
         return media
     else:
         return pd.DataFrame()
-    
 
-    def load_selected_media(self):
+
+def load_selected_media(self):
         """
         Fetch all columns from both `roi` and `media` tables for the selected ROI IDs.
         """
@@ -87,7 +88,7 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     rois = pd.DataFrame(media, columns=column_names)
     rois['viewpoint'] = rois["viewpoint"].astype(int, errors='ignore')
     rois = rois.replace({float('nan'): None})
-    
+
     if reset_index:
         rois = rois.set_index("id")
     return rois
@@ -167,7 +168,7 @@ def media_count(mpDB, survey_id):
     Get number of media files associated with a given survey_id
     """
 
-    valid_stations = list(mpDB.select("station", columns="id", row_cond= f'survey_id={survey_id}', quiet=False)[0])
+    valid_stations = list(mpDB.select("station", columns="id", row_cond=f'survey_id={survey_id}', quiet=False)[0])
     survey_list = ",".join([str(s) for s in valid_stations])
-    media = mpDB.select("media", columns="id", row_cond= f'station_id IN ({survey_list})', quiet=False)
+    media = mpDB.select("media", columns="id", row_cond=f'station_id IN ({survey_list})', quiet=False)
     return len(media)
