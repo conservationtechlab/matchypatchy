@@ -237,6 +237,7 @@ class MediaTable(QWidget):
         if filters['favorites_only']:
             self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
+        self.data_filtered.reset_index(inplace=True)
         # refresh table contents
         self.refresh_table()
 
