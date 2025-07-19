@@ -361,6 +361,7 @@ class DisplayBase(QWidget):
             del dialog
 
     def download_ml(self):
+        # TODO: popup can still be closed while downloading, will download in the background
         dialog = MLDownloadPopup(self)
         if dialog.exec():
             del dialog

@@ -133,4 +133,5 @@ class DownloadMLThread(QThread):
 
     def run(self):
         for key in self.checked_models:
-            download(self.ml_dir, key)
+            if not self.isInterruptionRequested():
+                download(self.ml_dir, key)
