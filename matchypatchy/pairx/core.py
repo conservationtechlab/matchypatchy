@@ -1,20 +1,14 @@
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
 import cv2
 import torch.nn.functional as F
 from zennit.composites import EpsilonPlus
 from matchypatchy.pairx.xai_canonizers.efficientnet import EfficientNetBNCanonizer
-import torchvision.transforms as transforms
 from zennit.torchvision import ResNetCanonizer
-#from custom_canonizers import ResNetCanonizerTimm
 import timm
 import torchvision
 import matplotlib.colors as mcolors
 import matplotlib.cm as cm
-#from LightGlue.lightglue import LightGlue, SuperPoint
-#from LightGlue.lightglue.utils import rbd
-import pickle
 
 
 COLORS = ['Grey', 'Purple', 'Blue', 'Green', 'Orange', 'Red']
