@@ -26,7 +26,7 @@ class ImportCSVPopup(QDialog):
         self.selected_survey = self.survey_columns[0]
         self.selected_region = self.columns[0]
         self.selected_sequence_id = self.columns[0]
-        self.selected_camera_id = self.columns[0]
+        self.selected_camera = self.columns[0]
         self.selected_external_id = self.columns[0]
         self.selected_viewpoint = self.columns[0]
         self.selected_species = self.columns[0]
