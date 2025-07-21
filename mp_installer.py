@@ -20,7 +20,7 @@ try:
     x = torch.randn(1, 3, 224, 224).cuda()
     y = torch.randn(1, 3, 224, 224).cuda()
     z = x + y
-    print("Inference test passed:", z.shape)
+    print("Inference test passed.")
 except Exception as e:
     print("Runtime error:", e)
 
