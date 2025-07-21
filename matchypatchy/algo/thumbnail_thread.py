@@ -10,8 +10,8 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt, QRect
 from matchypatchy import config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-#THUMBNAIL_NOTFOUND = QImage(os.path.join(os.path.dirname(__file__), "assets/thumbnail_notfound.png"))
-THUMBNAIL_NOTFOUND = QImage(os.path.normpath("assets/logo.png"))
+
+THUMBNAIL_NOTFOUND = QImage(config.resource_path("assets/thumbnail_notfound.png"))
 
 
 class LoadThumbnailThread(QThread):

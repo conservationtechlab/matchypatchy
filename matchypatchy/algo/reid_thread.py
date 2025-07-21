@@ -38,12 +38,15 @@ class ReIDThread(QThread):
         self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
 
-        self.prompt_update.emit("Calculating viewpoint...")
-        self.get_viewpoint()
-        self.prompt_update.emit("Calculating embeddings...")
-        self.get_embeddings()
-        self.prompt_update.emit("Processing complete!")
-        self.done.emit()
+        if not self.isInterruptionRequested():
+            self.prompt_update.emit("Calculating viewpoint...")
+            self.get_viewpoint()
+        if not self.isInterruptionRequested():
+            self.prompt_update.emit("Calculating embeddings...")
+            self.get_embeddings()
+        if not self.isInterruptionRequested():
+            self.prompt_update.emit("Processing complete!")
+            self.done.emit()
 
     def get_viewpoint(self):
         # user did not select a viewpoint model
@@ -70,12 +73,12 @@ class ReIDThread(QThread):
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
 
-            model = animl.load_miew(self.reid_filepath)
+            model = animl.load_miew(self.reid_filepath, device='cpu')
             dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
 
             for i, img in enumerate(dataloader):
                 if not self.isInterruptionRequested():
-                    roi_id, emb = animl.miew_embedding(model, img)
+                    roi_id, emb = animl.miew_embedding(model, img, device='cpu')
 
                     self.mpDB.add_emb(roi_id, emb)
 

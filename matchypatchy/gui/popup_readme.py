@@ -2,6 +2,7 @@
 View README
 
 """
+from matchypatchy import config
 
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit
 
@@ -20,8 +21,9 @@ class AboutPopup(QDialog):
         self.display_readme()
 
     def display_readme(self):
+        about_path = config.resource_path("ABOUT.md")
         try:
-            with open("/home/kyra/matchypatchy/ABOUT.md", "r") as file:
+            with open(about_path, "r") as file:
                 readme_text = file.read()
                 self.text_edit.setMarkdown(readme_text)
         except FileNotFoundError:
@@ -43,8 +45,9 @@ class READMEPopup(QDialog):
         self.display_readme()
 
     def display_readme(self):
+        readme_path = config.resource_path("README.md")
         try:
-            with open("/home/kyra/matchypatchy/README.md", "r") as file:
+            with open(readme_path, "r") as file:
                 readme_text = file.read()
                 self.text_edit.setMarkdown(readme_text)
         except FileNotFoundError:
@@ -66,8 +69,9 @@ class LicensePopup(QDialog):
         self.display_readme()
 
     def display_readme(self):
+        license_path = config.resource_path("LICENSE")
         try:
-            with open("/home/kyra/matchypatchy/LICENSE", "r") as file:
+            with open(license_path, "r") as file:
                 readme_text = file.read()
                 self.text_edit.setMarkdown(readme_text)
         except FileNotFoundError:

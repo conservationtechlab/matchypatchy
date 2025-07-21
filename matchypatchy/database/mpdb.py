@@ -9,6 +9,7 @@ from pathlib import Path
 from random import randrange
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
+from matchypatchy.config import resource_path
 
 
 class MatchyPatchyDB():
@@ -84,11 +85,15 @@ class MatchyPatchyDB():
         s = ""
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
-        with open('schema', 'r') as file:
-            content = file.read()
 
-        match_schema = (content == s)
+        schema_path = resource_path('assets/schema.txt')
+        with open(schema_path, 'r') as file:
+            content = file.read()
+    
+        match_schema = (content==s)
+        print("Schema: ", match_schema)
         mpkey, chromakey = self.retrieve_key()
+        print("Key:", mpkey, chromakey)
         if match_schema and mpkey == chromakey:
             return mpkey
         else:
@@ -356,7 +361,7 @@ class MatchyPatchyDB():
     def add_thumbnail(self, table, fid, filepath):
         # Note difference in variable order, foreign keys
         try:
-            db = sqlite3.connect(self.filepath)
+            db = sqlite3.connect(self.filepath, timeout=1)
             cursor = db.cursor()
             command = f"""INSERT INTO {table}_thumbnails (fid, filepath) VALUES (?, ?);"""
             data_tuple = (fid, filepath)

@@ -13,8 +13,7 @@ from matchypatchy import config
 from matchypatchy.gui.popup_alert import AlertPopup
 
 
-#ICON_PENCIL = "/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"
-ICON_PENCIL = os.path.normpath("assets/fluent_pencil_icon.png")
+ICON_PENCIL = config.resource_path("assets/fluent_pencil_icon.png")
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):
@@ -111,7 +110,7 @@ class ConfigPopup(QDialog):
                 self.cfg['DB_DIR'] = str(new_db)
 
                 # Update config
-                self.cfg['LOG_PATH'] = str(new_project / "matchypatchy.log")
+                self.cfg['LOG_PATH'] = new_project + "/matchypatchy.log"
                 logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
                 logging.info("HOME_DIR CHANGED")
                 logging.info('HOME_DIR: ' + self.cfg['HOME_DIR'])

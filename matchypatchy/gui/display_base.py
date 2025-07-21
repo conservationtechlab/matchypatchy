@@ -33,8 +33,7 @@ from matchypatchy.algo.reid_thread import ReIDThread
 from matchypatchy.database.media import export_data
 
 
-#LOGO = os.path.join(os.path.dirname(__file__), "assets/logo.png")
-LOGO = os.path.normpath("assets/logo.png")
+LOGO = config.resource_path("assets/logo.png")
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
@@ -359,6 +358,7 @@ class DisplayBase(QWidget):
         dialog = ConfigPopup(self)
         if dialog.exec():
             del dialog
+        self.update_survey()
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)
