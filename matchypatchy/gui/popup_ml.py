@@ -2,6 +2,8 @@
 Popup for Selection within a list, ie Survey selection
 
 """
+import logging
+
 from pathlib import Path
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
@@ -14,6 +16,9 @@ from matchypatchy import config
 class MLDownloadPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
+        # update model yml 
+        update_confirmed = models.update_model_yml()
+        logging.info(f"Model yaml update attempt: {update_confirmed}")
         self.ml_dir = Path(config.load('ML_DIR'))
         self.ml_cfg = models.load()
         self.models = self.ml_cfg['MODELS']
