@@ -5,11 +5,13 @@ import os
 import logging
 from pathlib import Path
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QFrame,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt
 
 from matchypatchy import config
+from matchypatchy.algo.utils import is_cuda_available
 from matchypatchy.gui.popup_alert import AlertPopup
 
 
@@ -25,53 +27,67 @@ class ConfigPopup(QDialog):
 
         layout = QVBoxLayout()
 
-        # TITLES ---------------------------------------------------------------
-        path_layout = QHBoxLayout()
-
-        titles_layout = QVBoxLayout()
-        titles_layout.addWidget(QLabel("Project Directory:"))
-        #titles_layout.addWidget(QLabel("Model Directory:"))
-
-        # Advanced
-        self.advanced_command = QLabel("Database Command:")
-        self.advanced_command.hide()
-        titles_layout.addWidget(self.advanced_command)
-        path_layout.addLayout(titles_layout)
-        
-        # TEXT -----------------------------------------------------------------
-        insert_layout = QVBoxLayout()
+        # Directory ---------------------------------------------------------------
+        directory_layout = QHBoxLayout()
+        directory_layout.addWidget(QLabel("Project Directory:"))
+ 
         self.home_dir = QLineEdit()
         self.home_dir.setText(str(self.cfg['HOME_DIR']))
-        insert_layout.addWidget(self.home_dir)
+        directory_layout.addWidget(self.home_dir)
 
-        # Advanced
-        self.command_line = QLineEdit()
-        self.command_line.setText("Enter SQL Command")
-        self.command_line.hide()
-        insert_layout.addWidget(self.command_line)
-        path_layout.addLayout(insert_layout)
-
-        # BUTTONS --------------------------------------------------------------
-        path_button_layout = QVBoxLayout()
         button_home_dir = QPushButton()
         button_home_dir.setMaximumHeight(30)
         button_home_dir.setFixedWidth(30)
         button_home_dir.setIcon(QIcon(ICON_PENCIL))
         button_home_dir.clicked.connect(self.set_home_dir)
-        path_button_layout.addWidget(button_home_dir)
+        directory_layout.addWidget(button_home_dir)
+        layout.addLayout(directory_layout)
 
-        # Advanced
+        # CUDA -----------------------------------------------------------------
+        cuda_layout = QHBoxLayout()
+        cuda_layout.addWidget(QLabel("CUDA Available:"))
+        cuda = is_cuda_available()
+        cuda_available = QLabel(f"{cuda}")
+        cuda_available.setStyleSheet("color: green;" if cuda else "color: red;")
+        cuda_layout.addWidget(cuda_available)
+        layout.addLayout(cuda_layout)
+
+        # MPDB KEY -----------------------------------------------------------------
+        mpdbkey_layout = QHBoxLayout()
+        mpdbkey_layout.addWidget(QLabel("DBKey:"))
+        mpdbkey = self.mpDB.validate()
+        mpdbkey_valid = QLabel(f"{mpdbkey}")
+        mpdbkey_valid.setStyleSheet("color: red;" if not mpdbkey else "")
+        mpdbkey_layout.addWidget(mpdbkey_valid)
+        layout.addLayout(mpdbkey_layout)
+
+        # Advanced -------------------------------------------------------------
+        self.separator = QFrame()
+        self.separator.setFrameShape(QFrame.Shape.HLine)  # Set the shape to a horizontal line
+        self.separator.setFrameShadow(QFrame.Shadow.Sunken) # Set the shadow style
+        self.separator.hide()
+        layout.addWidget(self.separator)
+
+        command_layout = QHBoxLayout()
+        self.advanced_command = QLabel("Database Command:")
+        self.advanced_command.hide()
+        command_layout.addWidget(self.advanced_command)
+        self.command_line = QLineEdit()
+        self.command_line.setText("Enter SQL Command")
+        self.command_line.hide()
+        command_layout.addWidget(self.command_line)
+
         self.button_command = QPushButton("↵")
         self.button_command.setMaximumHeight(30)
         self.button_command.setFixedWidth(30)
         self.button_command.clicked.connect(self.command)
         self.button_command.hide()
-        path_button_layout.addWidget(self.button_command)
-        path_layout.addLayout(path_button_layout)
+        command_layout.addWidget(self.button_command)
 
-        layout.addLayout(path_layout)
+        layout.addLayout(command_layout)
 
-        # Buttons
+
+        # BUTTONS --------------------------------------------------------------
         button_layout = QHBoxLayout()
 
         button_advanced = QPushButton("Advanced")
@@ -88,9 +104,11 @@ class ConfigPopup(QDialog):
         self.setLayout(layout)
 
     def show_advanced(self):
-        self.advanced_command.show()
-        self.command_line.show()
-        self.button_command.show()
+        visible = self.advanced_command.isVisible()
+        self.separator.setVisible(not visible)
+        self.advanced_command.setVisible(not visible)
+        self.command_line.setVisible(not visible)
+        self.button_command.setVisible(not visible)
 
     def command(self):
         new_cmd = self.command_line.text()

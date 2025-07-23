@@ -91,12 +91,15 @@ class MatchyPatchyDB():
             content = file.read()
     
         match_schema = (content==s)
-        print("Schema: ", match_schema)
         mpkey, chromakey = self.retrieve_key()
-        print("Key:", mpkey, chromakey)
-        if match_schema and mpkey == chromakey:
-            return mpkey
+        if match_schema:
+            if mpkey == chromakey:
+                return mpkey
+            else:
+                print("Key mismatch for Image DB and Emb DB.")
+                return False
         else:
+            print("Schema of selected DB invalid.")
             return False
 
     def _command(self, command):
@@ -361,7 +364,7 @@ class MatchyPatchyDB():
     def add_thumbnail(self, table, fid, filepath):
         # Note difference in variable order, foreign keys
         try:
-            db = sqlite3.connect(self.filepath, timeout=1)
+            db = sqlite3.connect(self.filepath, timeout=2)
             cursor = db.cursor()
             command = f"""INSERT INTO {table}_thumbnails (fid, filepath) VALUES (?, ?);"""
             data_tuple = (fid, filepath)
