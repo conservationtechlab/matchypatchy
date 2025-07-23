@@ -29,7 +29,6 @@ def main():
         if dialog.exec():
             del dialog
     
-    models.update_model_yml()
     print(f"Startup took {time.time() - start_time:.2f} seconds")
     sys.exit(app.exec())
 
