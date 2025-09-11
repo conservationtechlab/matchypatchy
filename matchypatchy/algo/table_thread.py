@@ -54,7 +54,7 @@ class LoadTableThread(QThread):
                 thumbnail_path = THUMBNAIL_NOTFOUND
             qtw = QImage(thumbnail_path)
 
-        # FilePath and Timestamp not editable
+        # filepath and Timestamp not editable
         elif column == 'filepath' or column == 'timestamp':
             qtw = QTableWidgetItem(roi[column])
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)

@@ -79,13 +79,15 @@ class AnimlThread(QThread):
         for i, image in self.media.iterrows():
             if not self.isInterruptionRequested():
                 media_id = image['id']
+                row = image.to_frame().T
 
-                detections = animl.detect(detector, image['Frame'], confidence_threshold=self.confidence_threshold)
-                detections = animl.parse_detections(detections, manifest=image)
+                detections = animl.detect(detector, row, animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
+                                           confidence_threshold=self.confidence_threshold)
+                detections = animl.parse_detections(detections, manifest=row)
                 detections = animl.get_animals(detections)
 
                 for _, roi in detections.iterrows():
-                    frame = roi['FrameNumber'] if 'FrameNumber' in roi.index else 1
+                    frame = roi['framenumber'] if 'framenumber' in roi.index else 1
 
                     bbox_x = roi['bbox_x']
                     bbox_y = roi['bbox_y']

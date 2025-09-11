@@ -37,6 +37,7 @@ class ReIDThread(QThread):
                                          columns="roi.id, media_id, filepath, external_id, camera_id, sequence_id")
         self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
+        self.rois['filepath'] = self.rois['roi_id'].map(self.image_paths)
 
         if not self.isInterruptionRequested():
             self.prompt_update.emit("Calculating viewpoint...")
@@ -57,16 +58,17 @@ class ReIDThread(QThread):
         if len(filtered_rois) > 0:
 
             model = animl.load_classifier(self.viewpoint_filepath, 2)
-            dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
+            dataloader = animl.manifest_dataloader(filtered_rois, self.image_paths)
 
             for i, img in enumerate(dataloader):
                 if not self.isInterruptionRequested():
-                    roi_id, value, prob = animl.viewpoint_estimator(model, img)
+                    pass
+                    #roi_id, value, prob = animl.viewpoint_estimator(model, img)
 
                     # TODO: Utilize probability for captures/sequences
                     # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
-                    self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
+                    #self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
+                    #self.progress_update.emit(round(100 * i/len(filtered_rois)))
 
     def get_embeddings(self):
         # Process only those that have not yet been processed
@@ -74,15 +76,16 @@ class ReIDThread(QThread):
         if len(filtered_rois) > 0:
 
             model = animl.load_miew(self.reid_filepath, device='cpu')
-            dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
 
-            for i, img in enumerate(dataloader):
+            for i in range(len(filtered_rois)):
                 if not self.isInterruptionRequested():
-                    roi_id, emb = animl.miew_embedding(model, img, device='cpu')
+                    row = filtered_rois.iloc[i].to_frame().T
+                    roi_id = row.at[i, 'roi_id']
+                    emb = animl.extract_miew_embeddings(model, row)[0]
 
                     self.mpDB.add_emb(roi_id, emb)
+                    self.mpDB.edit_row("roi", roi_id, {"emb": 1}, quiet=False)
 
-                    self.mpDB.edit_row("roi", roi_id, {"emb": 1})
                     self.progress_update.emit(round(100 * i/len(filtered_rois)))
 
 

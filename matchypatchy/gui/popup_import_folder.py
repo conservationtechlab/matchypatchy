@@ -85,7 +85,7 @@ class ImportFolderPopup(QDialog):
         self.buttonBox.show()
 
         # get potential station
-        example = self.data.loc[0, 'FilePath']
+        example = self.data.loc[0, 'filepath']
         self.station.addItems(list(Path(example).parts)[1:])
 
     # 4. Import manifest into media table
