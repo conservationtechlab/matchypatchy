@@ -244,7 +244,9 @@ class MediaTable(QWidget):
         """
         Add rows to table
         """
+        self.data_filtered.reset_index(drop=True, inplace=True)
         n_rows = self.data_filtered.shape[0]
+
         # clear old contents and prep for filtered data
         self.table.clearContents()
         # disconnect edit function while refreshing to prevent needless calls

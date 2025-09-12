@@ -15,6 +15,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 from matchypatchy.gui.popup_pairx import PairXPopup
+from matchypatchy.gui.gui_assets import VerticalSeparator
 
 from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
@@ -48,6 +49,8 @@ class DisplayCompare(QWidget):
         button_home.clicked.connect(lambda: self.home(warn=False))
         first_layer.addWidget(button_home)
         first_layer.addSpacing(10)
+        first_layer.addWidget(VerticalSeparator()) 
+        first_layer.addSpacing(10)
 
         # OPTIONS
         first_layer.addWidget(QLabel("Max # of Matches:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -80,7 +83,9 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(button_recalc)
 
         # FILTERS --------------------------------------------------------------
-        first_layer.addSpacing(20)
+        first_layer.addSpacing(10)
+        first_layer.addWidget(VerticalSeparator()) 
+        first_layer.addSpacing(10)
         first_layer.addWidget(QLabel("Filter:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Region
@@ -98,6 +103,10 @@ class DisplayCompare(QWidget):
         self.station_select.setFixedWidth(140)
         self.station_select.currentIndexChanged.connect(self.select_station)
         first_layer.addWidget(self.station_select, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        button_filter = QPushButton("Filter Images")
+        button_filter.clicked.connect(self.filter_neighbors)
+        first_layer.addWidget(button_filter)
 
         first_layer.addStretch()
         layout.addLayout(first_layer)
@@ -409,7 +418,7 @@ class DisplayCompare(QWidget):
         self.progress.show()
 
     def filter_neighbors(self):
-        filtered = self.QueryContainer.filter()
+        filtered = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
         if filtered:
             self.change_query(0)
         else:
@@ -631,16 +640,13 @@ class DisplayCompare(QWidget):
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
         self.filter_surveys()
         self.filter_stations(survey_ids=list(self.valid_surveys.items()))
-        self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
 
     def select_survey(self):
         self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
         self.filter_stations(survey_ids=[self.filters['active_survey']])
-        self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
 
     def select_station(self):
         self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
-        self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
 
     def filter_surveys(self):
         # block signals while updating combobox

@@ -3,13 +3,14 @@ GUI Window for viewing images
 """
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QFrame)
+                             QLabel, QComboBox)
 from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
+from matchypatchy.gui.gui_assets import VerticalSeparator
 
 
 class DisplayMedia(QWidget):
@@ -31,10 +32,7 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(button_return, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Divider
-        line = QFrame()
-        line.setFrameStyle(QFrame.Shape.VLine | QFrame.Shadow.Sunken)
-        line.setLineWidth(0)
-        first_layer.addWidget(line)
+        first_layer.addWidget(VerticalSeparator())
 
         # Save
         button_save = QPushButton("Save")
@@ -56,10 +54,7 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Divider
-        line = QFrame()
-        line.setFrameStyle(QFrame.Shape.VLine | QFrame.Shadow.Sunken)
-        line.setLineWidth(0)
-        first_layer.addWidget(line)
+        first_layer.addWidget(VerticalSeparator())
 
         # Select All
         self.button_select = QPushButton("Select All")
@@ -228,8 +223,8 @@ class DisplayMedia(QWidget):
 
         self.station_select.clear()
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
-        self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
-        self.station_select.addItems(sorted([el[1] for el in self.station_list_ordered]))
+        self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in sorted(self.valid_stations.items(), key=lambda item: item[1])]
+        self.station_select.addItems([el[1] for el in self.station_list_ordered])
 
         # select all cameras for now
         self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
