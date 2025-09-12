@@ -74,8 +74,8 @@ class ReIDThread(QThread):
         # Process only those that have not yet been processed
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
-
-            model = animl.load_miew(self.reid_filepath, device='cpu')
+            filtered_rois.reset_index(drop=True, inplace=True)
+            model = animl.load_miew(self.reid_filepath)
 
             for i in range(len(filtered_rois)):
                 if not self.isInterruptionRequested():
