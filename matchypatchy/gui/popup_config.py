@@ -5,7 +5,7 @@ import os
 import logging
 from pathlib import Path
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QFrame,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
@@ -13,6 +13,7 @@ from PyQt6.QtCore import Qt
 from matchypatchy import config
 from matchypatchy.algo.utils import is_cuda_available
 from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.gui_assets import HorizontalSeparator
 
 
 ICON_PENCIL = config.resource_path("assets/fluent_pencil_icon.png")
@@ -62,9 +63,7 @@ class ConfigPopup(QDialog):
         layout.addLayout(mpdbkey_layout)
 
         # Advanced -------------------------------------------------------------
-        self.separator = QFrame()
-        self.separator.setFrameShape(QFrame.Shape.HLine)  # Set the shape to a horizontal line
-        self.separator.setFrameShadow(QFrame.Shadow.Sunken) # Set the shadow style
+        self.separator = HorizontalSeparator()
         self.separator.hide()
         layout.addWidget(self.separator)
 

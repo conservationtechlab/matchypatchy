@@ -3,7 +3,7 @@ Edit A Single Image
 
 """
 import pandas as pd
-from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QFrame,
+from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboBox,
                              QLabel, QTextEdit, QDialogButtonBox, QPushButton)
 from PyQt6.QtCore import Qt
 
@@ -15,6 +15,7 @@ from matchypatchy.algo.models import load
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.species import fetch_individual
 from matchypatchy.database.location import fetch_station_names_from_id
+from matchypatchy.gui.gui_assets import HorizontalSeparator
 
 
 class ROIPopup(QDialog):
@@ -116,10 +117,8 @@ class ROIPopup(QDialog):
         info_layout.addLayout(external)
         info_layout.addSpacing(int(vertical_gap / 2))
 
-        line = QFrame()
-        line.setFrameStyle(QFrame.Shape.HLine | QFrame.Shadow.Raised)
-        line.setLineWidth(2)
-        info_layout.addWidget(line)
+        # Divider
+        info_layout.addWidget(HorizontalSeparator(linewidth=2))
         info_layout.addSpacing(int(vertical_gap / 2))
 
         # EDITABLE -------------------------------------------------------------
