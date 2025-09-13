@@ -2,6 +2,7 @@
 Thread Class for Processing Viewpoint and Miew Embedding
 
 """
+from numpy import argmax
 from pathlib import Path
 import pandas as pd
 import torchvision.transforms as transforms
@@ -56,19 +57,25 @@ class ReIDThread(QThread):
 
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
         if len(filtered_rois) > 0:
+            filtered_rois.reset_index(drop=True, inplace=True)
 
-            model = animl.load_classifier(self.viewpoint_filepath, 2)
-            dataloader = animl.manifest_dataloader(filtered_rois, self.image_paths)
+            device = animl.get_device()
+            model = animl.load_classifier(self.viewpoint_filepath, 2, device=device)
+            dataloader = animl.manifest_dataloader(filtered_rois, file_col='filepath', crop=True)
 
-            for i, img in enumerate(dataloader):
+            for i, batch in enumerate(dataloader):
                 if not self.isInterruptionRequested():
-                    pass
-                    #roi_id, value, prob = animl.viewpoint_estimator(model, img)
+                    data = batch[0]
+                    data = data.to(device)
+                    output = model(data)
+                    output = output.detach().cpu().numpy()
+                    value = argmax(animl.softmax(output), axis=1)[0]
 
                     # TODO: Utilize probability for captures/sequences
                     # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
-                    #self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                    #self.progress_update.emit(round(100 * i/len(filtered_rois)))
+                    roi_id = filtered_rois.at[i, 'roi_id']
+                    self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
+                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
 
     def get_embeddings(self):
         # Process only those that have not yet been processed
