@@ -417,12 +417,15 @@ class DisplayCompare(QWidget):
         self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
         self.progress.show()
 
-    def filter_neighbors(self):
-        filtered = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
-        if filtered:
-            self.change_query(0)
+    def filter_neighbors(self, thread_success):
+        if thread_success:
+            filtered = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
+            if filtered:
+                self.change_query(0)
+            else:
+                self.warn(prompt="No data to compare, all available data from same sequence/capture.")
         else:
-            self.warn(prompt="No data to compare, all available data from same sequence/capture.")
+            self.warn(prompt="Matching embeddings interrupted.")
 
     def recalculate_by_individual(self):
         if not fetch_individual(self.mpDB).empty:
