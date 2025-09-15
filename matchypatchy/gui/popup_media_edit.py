@@ -11,7 +11,7 @@ import matchypatchy.database.media as db_roi
 from matchypatchy.gui.widget_image import ImageWidget
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_species import SpeciesFillPopup
-from matchypatchy.gui.gui_assets import VerticalSeparator
+from matchypatchy.gui.gui_assets import HorizontalSeparator
 
 
 class MediaEditPopup(QDialog):
@@ -112,7 +112,7 @@ class MediaEditPopup(QDialog):
         self.viewpoint.currentIndexChanged.connect(lambda: self.mark_field_changed("viewpoint"))
         self.favorite.currentIndexChanged.connect(lambda: self.mark_field_changed("favorite"))
 
-        metadata_layout.addWidget(VerticalSeparator(linewidth=2))
+        metadata_layout.addWidget(HorizontalSeparator(linewidth=2))
 
         for label_txt, widget in [
             ("Name: ", self.name),

@@ -15,7 +15,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 from matchypatchy.gui.popup_pairx import PairXPopup
-from matchypatchy.gui.gui_assets import VerticalSeparator
+from matchypatchy.gui.gui_assets import VerticalSeparator, StandardButton
 
 from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
@@ -45,12 +45,10 @@ class DisplayCompare(QWidget):
         # FIRST LAYER ==========================================================
         layout = QVBoxLayout()
         first_layer = QHBoxLayout()
-        button_home = QPushButton("Home")
+        button_home = StandardButton("Home")
         button_home.clicked.connect(lambda: self.home(warn=False))
         first_layer.addWidget(button_home)
-        first_layer.addSpacing(10)
         first_layer.addWidget(VerticalSeparator()) 
-        first_layer.addSpacing(10)
 
         # OPTIONS
         first_layer.addWidget(QLabel("Max # of Matches:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)

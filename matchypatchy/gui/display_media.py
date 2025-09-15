@@ -10,7 +10,7 @@ from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
-from matchypatchy.gui.gui_assets import VerticalSeparator
+from matchypatchy.gui.gui_assets import VerticalSeparator, StandardButton
 
 
 class DisplayMedia(QWidget):
@@ -26,23 +26,24 @@ class DisplayMedia(QWidget):
         first_layer = QHBoxLayout()
         # Home Button
         first_layer.addSpacing(10)
-        button_return = QPushButton("Home")
+        button_return = StandardButton("Home")
         button_return.clicked.connect(self.home)
-        button_return.setFixedWidth(100)
         first_layer.addWidget(button_return, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        button_match = StandardButton("Match")
+        button_match.clicked.connect(self.match)
+        first_layer.addWidget(button_match, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Divider
         first_layer.addWidget(VerticalSeparator())
 
         # Save
-        button_save = QPushButton("Save")
+        button_save = StandardButton("Save")
         button_save.clicked.connect(self.save)
-        button_save.setFixedWidth(100)
         first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Undo
-        self.button_undo = QPushButton("Undo")
+        self.button_undo = StandardButton("Undo")
         self.button_undo.clicked.connect(self.undo)
-        self.button_undo.setFixedWidth(100)
         self.button_undo.setEnabled(False)
         first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Show Type
@@ -57,28 +58,24 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(VerticalSeparator())
 
         # Select All
-        self.button_select = QPushButton("Select All")
+        self.button_select = StandardButton("Select All")
         self.button_select.setCheckable(True)
         self.button_select.setChecked(False)
         self.button_select.clicked.connect(self.select_all)
-        self.button_select.setFixedWidth(100)
         first_layer.addWidget(self.button_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Edit Rows
-        self.button_edit = QPushButton("Edit Rows")
+        self.button_edit = StandardButton("Edit Rows")
         self.button_edit.clicked.connect(self.edit_row_multiple)
-        self.button_edit.setFixedWidth(100)
         self.button_edit.setEnabled(False)
         first_layer.addWidget(self.button_edit, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Duplicate
-        self.button_duplicate = QPushButton("Duplicate Rows")
+        self.button_duplicate = StandardButton("Duplicate Rows")
         self.button_duplicate.clicked.connect(self.duplicate)
-        self.button_duplicate.setFixedWidth(100)
         self.button_duplicate.setEnabled(False)
         first_layer.addWidget(self.button_duplicate, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Delete
-        self.button_delete = QPushButton("Delete Rows")
+        self.button_delete = StandardButton("Delete Rows")
         self.button_delete.clicked.connect(self.delete)
-        self.button_delete.setFixedWidth(100)
         self.button_delete.setEnabled(False)
         first_layer.addWidget(self.button_delete, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -174,6 +171,15 @@ class DisplayMedia(QWidget):
             self.parent._set_base_view()
         else:
             self.parent._set_base_view()
+
+    # Move to Match View
+    def match(self):
+        if len(self.media_table.edit_stack) > 0:
+            dialog = AlertPopup(self, prompt="There are unsaved changes. Please save before matching.")
+            if dialog.exec():
+                del dialog
+            return
+        self.parent._set_compare_view()
 
     # 1. RUN ON ENTRY
     def load_table(self):
