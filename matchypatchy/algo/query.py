@@ -13,7 +13,7 @@ from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
 class QueryContainer(QObject):
-    thread_signal = pyqtSignal()
+    thread_signal = pyqtSignal(bool)
 
     def __init__(self, parent):
         super().__init__()
@@ -87,8 +87,11 @@ class QueryContainer(QObject):
         self.nearest_dict_raw = nearest_dict
 
     def finish_calculating(self):
-        self.thread_signal.emit()
-        return True
+        if self.neighbor_dict_raw and self.nearest_dict_raw:
+            self.thread_signal.emit(True)
+        else:
+            # interrupt occurred, dicts are empty
+            self.thread_signal.emit(False)
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
