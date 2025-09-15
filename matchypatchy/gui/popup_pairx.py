@@ -8,7 +8,7 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy.algo.reid_thread import PairXThread
 
-from matchypatchy.gui.widget_image import ImageWidget
+from matchypatchy.gui.widget_media import ImageWidget
 
 
 class PairXPopup(QDialog):

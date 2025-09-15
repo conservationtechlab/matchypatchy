@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtGui import QIntValidator
 
-from matchypatchy.gui.widget_image import ImageWidget
+from matchypatchy.gui.widget_media import MediaWidget
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_roi import ROIPopup
@@ -168,9 +168,9 @@ class DisplayCompare(QWidget):
         query_options.addStretch()
         query_layout.addLayout(query_options)
         # Query Image
-        self.query_image = ImageWidget()
+        self.query_image = MediaWidget()
         self.query_image.setStyleSheet("border: 1px solid black;")
-        self.query_image.setAlignment(Qt.AlignmentFlag.AlignTop)
+        #self.query_image.setAlignment(Qt.AlignmentFlag.AlignTop)
         query_layout.addWidget(self.query_image, 1)
         # Query Image Tools
         query_image_buttons = QHBoxLayout()
@@ -179,21 +179,21 @@ class DisplayCompare(QWidget):
         self.slider_query_brightness = QSlider(Qt.Orientation.Horizontal)
         self.slider_query_brightness.setRange(25, 75)  # Set range from 1 to 100
         self.slider_query_brightness.setValue(50)  # Set initial value
-        self.slider_query_brightness.valueChanged.connect(self.query_image.adjust_brightness)
+        self.slider_query_brightness.valueChanged.connect(self.query_image.image_widget.adjust_brightness)
         query_image_buttons.addWidget(self.slider_query_brightness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Contrast
         query_image_buttons.addWidget(QLabel("Contrast:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.slider_query_contrast = QSlider(Qt.Orientation.Horizontal)
         self.slider_query_contrast.setRange(25, 75)  # Set range from 1 to 100
         self.slider_query_contrast.setValue(50)  # Set initial value
-        self.slider_query_contrast.valueChanged.connect(self.query_image.adjust_contrast)
+        self.slider_query_contrast.valueChanged.connect(self.query_image.image_widget.adjust_contrast)
         query_image_buttons.addWidget(self.slider_query_contrast, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Sharpness
         query_image_buttons.addWidget(QLabel("Sharpness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.slider_query_sharpness = QSlider(Qt.Orientation.Horizontal)
         self.slider_query_sharpness.setRange(25, 75)  # Set range from 1 to 100
         self.slider_query_sharpness.setValue(50)  # Set initial value
-        self.slider_query_sharpness.valueChanged.connect(self.query_image.adjust_sharpness)
+        self.slider_query_sharpness.valueChanged.connect(self.query_image.image_widget.adjust_sharpness)
         query_image_buttons.addWidget(self.slider_query_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Reset
         button_query_image_reset = QPushButton("Reset")
@@ -274,9 +274,9 @@ class DisplayCompare(QWidget):
         match_layout.addLayout(match_options)
 
         # Match Image
-        self.match_image = ImageWidget()
+        self.match_image = MediaWidget()
         self.match_image.setStyleSheet("border: 1px solid black;")
-        self.match_image.setAlignment(Qt.AlignmentFlag.AlignTop)
+        #self.match_image.setAlignment(Qt.AlignmentFlag.AlignTop)
         match_layout.addWidget(self.match_image, 1)
         # Match Image Tools
         match_image_buttons = QHBoxLayout()
@@ -285,21 +285,21 @@ class DisplayCompare(QWidget):
         self.slider_match_brightness = QSlider(Qt.Orientation.Horizontal)
         self.slider_match_brightness.setRange(25, 75)  # Set range from 1 to 100
         self.slider_match_brightness.setValue(50)  # Set initial value
-        self.slider_match_brightness.valueChanged.connect(self.match_image.adjust_brightness)
+        self.slider_match_brightness.valueChanged.connect(self.match_image.image_widget.adjust_brightness)
         match_image_buttons.addWidget(self.slider_match_brightness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Contrast
         match_image_buttons.addWidget(QLabel("Contrast:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.slider_match_contrast = QSlider(Qt.Orientation.Horizontal)
         self.slider_match_contrast.setRange(25, 75)  # Set range from 1 to 100
         self.slider_match_contrast.setValue(50)  # Set initial value
-        self.slider_match_contrast.valueChanged.connect(self.match_image.adjust_contrast)
+        self.slider_match_contrast.valueChanged.connect(self.match_image.image_widget.adjust_contrast)
         match_image_buttons.addWidget(self.slider_match_contrast, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Sharpness
         match_image_buttons.addWidget(QLabel("Sharpness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.slider_match_sharpness = QSlider(Qt.Orientation.Horizontal)
         self.slider_match_sharpness.setRange(25, 75)  # Set range from 1 to 100
         self.slider_match_sharpness.setValue(50)  # Set initial value
-        self.slider_match_sharpness.valueChanged.connect(self.match_image.adjust_sharpness)
+        self.slider_match_sharpness.valueChanged.connect(self.match_image.image_widget.adjust_sharpness)
         match_image_buttons.addWidget(self.slider_match_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Reset
         button_match_image_reset = QPushButton("Reset")

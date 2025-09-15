@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QPushButton
 import matchypatchy.database.media as db_roi
 
 
-from matchypatchy.gui.widget_image import ImageWidget
+from matchypatchy.gui.widget_media import MediaWidget
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_species import SpeciesFillPopup
 from matchypatchy.gui.gui_assets import HorizontalSeparator
@@ -57,13 +57,12 @@ class MediaEditPopup(QDialog):
         content_layout = QHBoxLayout()
 
         # Image
-        self.image = ImageWidget()
-        self.image.setStyleSheet("border: 1px solid black;")
-        self.image.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.image.setFixedHeight(400)
-        self.image.setFixedWidth(500)  # Adjusted width to make image smaller
+        self.media = MediaWidget()
+        self.media.setStyleSheet("border: 1px solid black;")
+        self.media.setFixedHeight(400)
+        self.media.setFixedWidth(500)  # Adjusted width to make image smaller
 
-        content_layout.addWidget(self.image, 3)
+        content_layout.addWidget(self.media, 3)
 
         # Metadata panel
         metadata_container = QWidget()
@@ -295,7 +294,7 @@ class MediaEditPopup(QDialog):
         if not self.data.empty:
             filepath = self.data.iloc[self.current_image_index]["filepath"]
             roi_row = self.data.iloc[self.current_image_index]
-            self.image.load(image_path=filepath,
+            self.media.load(filepath,
                             bbox=db_roi.get_bbox(roi_row),
                             crop=False)
             # Update filepath label
@@ -307,8 +306,6 @@ class MediaEditPopup(QDialog):
             self.region_label.setText(str(roi_row.get("region", "N/A")))
             self.sequence_id_label.setText(str(roi_row.get("sequence_id", "N/A")))
             self.external_id_label.setText(str(roi_row.get("external_id", "N/A")))
-        else:
-            self.image.setText("No image selected.")
 
         self.prev_btn.setEnabled(self.current_image_index > 0)
         self.next_btn.setEnabled(self.current_image_index < len(self.data) - 1)

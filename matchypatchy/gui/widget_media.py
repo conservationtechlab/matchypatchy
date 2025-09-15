@@ -1,15 +1,159 @@
-"""
-Custom Widget for Displaying an Image
-"""
+import cv2
+from pathlib import Path
 from PIL import Image, ImageEnhance
 
-from PyQt6.QtWidgets import QLabel
+from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, 
+                             QStackedLayout, QPushButton, QSlider)
 from PyQt6.QtGui import QPixmap, QPainter, QImage, QPen
-from PyQt6.QtCore import Qt, QRect, QPointF, QRectF
+from PyQt6.QtCore import Qt, QRect, QPointF, QRectF, QUrl
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PyQt6.QtMultimediaWidgets import QVideoWidget
 
+from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT
+
+
+class MediaWidget(QWidget):
+    """
+    Container Widget for Displaying Image or Video
+    """
+    def __init__(self):
+        super().__init__()
+        self.layout = QVBoxLayout(self)
+
+        # Stacked layout to switch between image and video
+        self.stacked = QStackedLayout()
+        self.layout.addLayout(self.stacked)
+
+        # Image widget
+        self.image_widget = ImageWidget()
+        self.stacked.addWidget(self.image_widget)
+
+        # Video widget
+        self.video_widget = VideoWidget()
+        self.stacked.addWidget(self.video_widget)
+
+        # Media player
+        self.player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.player.setAudioOutput(self.audio_output)
+        self.player.setVideoOutput(self.video_widget)
+        self.player.positionChanged.connect(self.update_position)
+        self.player.durationChanged.connect(self.update_duration)
+
+        # Playback controls
+
+        self.button_play = QPushButton("⏵︎")
+        self.button_pause = QPushButton("⏸︎")
+        self.button_play.clicked.connect(self.player.play)
+        self.button_pause.clicked.connect(self.player.pause)
+        self.button_play.setFixedWidth(60)
+        self.button_pause.setFixedWidth(60)
+        self.button_play.hide()
+        self.button_pause.hide()
+
+        # Seek slider
+        self.seek_slider = QSlider(Qt.Orientation.Horizontal)
+        self.seek_slider.setRange(0, 0)
+        self.seek_slider.sliderMoved.connect(self.seek_position)
+        self.seek_slider.sliderPressed.connect(self.pause_for_seek)
+        self.seek_slider.sliderReleased.connect(self.resume_after_seek)
+        self.seeking = False
+
+        # Volume slider
+        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(50)
+        self.audio_output.setVolume(0.5)
+        self.volume_slider.valueChanged.connect(self.set_volume)
+
+        playback_layout = QHBoxLayout()
+        playback_layout.addWidget(self.button_play, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        playback_layout.addWidget(self.button_pause, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        playback_layout.addSpacing(10)
+        playback_layout.addWidget(QLabel("Seek:"))
+        playback_layout.addWidget(self.seek_slider)
+        playback_layout.addSpacing(10)
+        playback_layout.addWidget(QLabel("Volume:"))
+        playback_layout.addWidget(self.volume_slider)
+
+        playback_layout.addStretch()
+        self.layout.addLayout(playback_layout)
+
+
+    def load(self, filepath, bbox=None, crop=False):
+        if Path(filepath).suffix.lower() in IMAGE_EXT:
+            self.button_play.hide()
+            self.button_pause.hide()
+            self.seek_slider.hide()
+            self.volume_slider.hide()
+            self.image_widget.load(filepath, bbox=bbox, crop=crop)
+            self.stacked.setCurrentWidget(self.image_widget)
+        elif Path(filepath).suffix.lower() in VIDEO_EXT:
+            self.button_play.show()
+            self.button_pause.show()
+            self.seek_slider.show()
+            self.volume_slider.show()
+            self.player.setSource(QUrl.fromLocalFile(filepath))
+            self.stacked.setCurrentWidget(self.video_widget)
+            self.player.play()
+        else:
+            raise ValueError("Unsupported file format")
+        
+    def reset(self):
+        self.player.stop()
+        if self.stacked.currentWidget() == self.video_widget:
+            pass
+        elif self.stacked.currentWidget() == self.image_widget:
+            self.image_widget.reset()
+
+    # playback controls --------------------------------------------------------
+    def update_position(self, position):
+        if not self.seeking:
+            self.seek_slider.setValue(position)
+
+    def update_duration(self, duration):
+        self.seek_slider.setRange(0, duration)
+
+    def seek_position(self, position):
+        self.player.setPosition(position)
+
+    def pause_for_seek(self):
+        self.seeking = True
+        self.was_playing = self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        self.player.pause()
+
+    def resume_after_seek(self):
+        self.seeking = False
+        if self.was_playing:
+            self.player.play()
+
+    def set_volume(self, value):
+        self.audio_output.setVolume(value / 100)
+
+    def get_frame(self):
+        cap = cv2.VideoCapture('/path/to/video.mp4')
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        return int(self.player.position() / 1000 * fps)
+
+# ==============================================================================
+class VideoWidget(QVideoWidget):
+    """
+    Custom Widget for Displaying a Video
+    """
+    def __init__(self, file_path=None, width=600, height=400):
+        super().__init__()
+        self.default_width = width
+        self.default_height = height
+        self.file_path = file_path
+
+
+# ==============================================================================
 # TODO: FIX IMAGE ADJUSTMENTS
-
 class ImageWidget(QLabel):
+    """
+    Custom Widget for Displaying an Image
+    """
     def __init__(self, image_path=None, width=600, height=400):
         super().__init__()
         self.default_width = width

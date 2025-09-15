@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.popup_species import SpeciesFillPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
-from matchypatchy.gui.widget_image import ImageWidget
+from matchypatchy.gui.widget_media import MediaWidget
 
 from matchypatchy.algo.models import load
 import matchypatchy.database.media as db_roi
@@ -46,10 +46,9 @@ class ROIPopup(QDialog):
 
         layout = QHBoxLayout()
         # Image
-        self.image = ImageWidget()
+        self.image = MediaWidget()
         self.image.setStyleSheet("border: 1px solid black;")
-        self.image.setAlignment(Qt.AlignmentFlag.AlignTop)
-        self.image.load(image_path=self.roi_data.at[0, "filepath"],
+        self.image.load(self.roi_data.at[0, "filepath"],
                         bbox=db_roi.get_bbox(self.roi_data.iloc[0]), crop=False)
         layout.addWidget(self.image, 1)
 
@@ -204,14 +203,28 @@ class ROIPopup(QDialog):
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
-        buttonBox.accepted.connect(self.accept)
-        buttonBox.rejected.connect(self.reject)
+        buttonBox.accepted.connect(self.save)
+        buttonBox.rejected.connect(self.close_out)
         container_layout.addLayout(button_layout)
         self.setLayout(container_layout)
 
         # display data
         self.refresh_names()
         self.refresh_values()
+
+    def closeEvent(self, event):
+        # user pressed 'x' to close window
+        self.close_out()
+
+    def save(self):
+        # stop video if playing
+        self.image.player.stop()
+        self.accept()
+
+    def close_out(self):
+        # stop video if playing
+        self.image.player.stop()
+        self.reject()
 
     def refresh_names(self):
         self.name.blockSignals(True)
