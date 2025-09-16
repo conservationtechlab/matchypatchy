@@ -186,8 +186,11 @@ class MLOptionsPopup(QDialog):
         return self.sequence.isChecked()
 
     def select_detector(self):
-        self.selected_detector_key = self.available_detectors[self.detector.currentIndex()]
-        return self.selected_detector_key
+        if len(self.available_detectors) == 0:
+            return None
+        else:
+            self.selected_detector_key = self.available_detectors[self.detector.currentIndex()]
+            return self.selected_detector_key
 
     def select_classifier(self):
         if self.classifier.currentIndex() == 0:
@@ -197,8 +200,11 @@ class MLOptionsPopup(QDialog):
             return self.selected_classifier_key
 
     def select_reid(self):
-        self.selected_reid_key = self.available_reids[self.reid.currentIndex()]
-        return self.selected_reid_key
+        if len(self.available_reids) == 0:
+            return None
+        else:
+            self.selected_reid_key = self.available_reids[self.reid.currentIndex()]
+            return self.selected_reid_key
 
     def select_viewpoint(self):
         if self.viewpoint.currentIndex() == 0:
