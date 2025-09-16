@@ -256,6 +256,10 @@ class DisplayMedia(QWidget):
                 self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
                 self.individual_select.setCurrentIndex(prefilter['individual_id'])
 
+        # wipe previous selections
+        self.select_all(reset=True)
+
+        # unblock signals
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
         self.station_select.blockSignals(False)
@@ -340,9 +344,13 @@ class DisplayMedia(QWidget):
 
                 self.update_buttons()
 
-    def select_all(self):
-        for row in range(self.media_table.table.rowCount()):
-            self.media_table.select_row(row, overwrite=self.button_select.isChecked())
+    def select_all(self, reset=False):
+        if reset:
+            for row in range(self.media_table.table.rowCount()):
+                self.media_table.select_row(row, overwrite=False)
+        else:  #toggle based on select all button
+            for row in range(self.media_table.table.rowCount()):
+                self.media_table.select_row(row, overwrite=self.button_select.isChecked())
 
     def check_selected_rows(self):
         self.selected_rows = self.media_table.selectedRows()
@@ -360,7 +368,7 @@ class DisplayMedia(QWidget):
             if len(self.selected_rows) > 0:
                 # self.button_edit.setEnabled(True)
                 self.button_duplicate.setEnabled(True)
-                # self.button_delete.setEnabled(True)
+                self.button_delete.setEnabled(True)
             else:
                 self.button_edit.setEnabled(False)
                 self.button_duplicate.setEnabled(False)
