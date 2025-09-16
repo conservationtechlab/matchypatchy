@@ -102,6 +102,7 @@ class ImportFolderPopup(QDialog):
         logging.info(f"Adding {len(self.data)} files to Database")
 
         self.import_thread = FolderImportThread(self.mpDB, self.active_survey, self.data, station_level)
+        self.rejected.connect(self.import_thread.requestInterruption)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.accept)
         self.import_thread.start()
