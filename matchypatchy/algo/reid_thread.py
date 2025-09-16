@@ -33,6 +33,12 @@ class ReIDThread(QThread):
     def run(self):
         # must be fetched after start() to chain with animl
         self.rois = fetch_roi(self.mpDB)
+
+        if not self.rois:
+            self.prompt_update.emit("No ROIs found, please run detection first...")
+            self.done.emit()
+            return
+
         media, _ = self.mpDB.select_join("roi", "media", "roi.media_id = media.id",
                                          columns="roi.id, media_id, filepath, external_id, camera_id, sequence_id")
         self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
@@ -40,10 +46,10 @@ class ReIDThread(QThread):
 
         if not self.isInterruptionRequested():
             self.prompt_update.emit("Calculating viewpoint...")
-            self.get_viewpoint()
+            #self.get_viewpoint()
         if not self.isInterruptionRequested():
             self.prompt_update.emit("Calculating embeddings...")
-            self.get_embeddings()
+            #self.get_embeddings()
         if not self.isInterruptionRequested():
             self.prompt_update.emit("Processing complete!")
             self.done.emit()
@@ -70,6 +76,10 @@ class ReIDThread(QThread):
 
     def get_embeddings(self):
         # Process only those that have not yet been processed
+        if self.reid_filepath is None:
+            self.prompt_update.emit("No Re-ID model selected, skipping embedding extraction...")
+            return
+
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
 

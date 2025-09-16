@@ -2,7 +2,7 @@
 QThreads for Importing Data
 
 """
-import os
+from pathlib import Path
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -21,12 +21,12 @@ class CSVImportThread(QThread):
         roi_counter = 0  # progressbar counter
         for filepath, group in self.unique_images:
             # check to see if file exists
-            if not os.path.exists(filepath):
+            if not Path(filepath).exists():
                 logging.warning(f"File {filepath} does not exist")
                 continue
 
             # get file extension
-            _, ext = os.path.splitext(os.path.basename(filepath))
+            ext = Path(filepath).suffix.lower()
 
             # get remaining information
             exemplar = group.head(1)
@@ -172,40 +172,44 @@ class FolderImportThread(QThread):
 
     def run(self):
         for i, file in self.data.iterrows():
+            if not self.isInterruptionRequested():
+                filepath = file['filepath']
+                timestamp = file['datetime']
 
-            filepath = file[self.animl_conversion['filepath']]
-            timestamp = file[self.animl_conversion['timestamp']]
+                # check to see if file exists
+                if not Path(filepath).exists():
+                    logging.warning(f"File {filepath} does not exist")
+                    continue
 
-            # check to see if file exists
-            if not os.path.exists(filepath):
-                logging.warning(f"File {filepath} does not exist")
-                continue
+                # get file extension
+                ext = Path(filepath).suffix.lower()
 
-            # get file extension
-            _, ext = os.path.splitext(os.path.basename(filepath))
+                # get remaining information
+                if self.station_level > 0:
+                    station_name = Path(filepath).parts[self.station_level]
+                    try:
+                        station_id = self.mpDB.select("station", columns='id', row_cond=f'name="{station_name}"')[0][0]
+                    except IndexError:
+                        station_id = self.mpDB.add_station(str(station_name), None, None, int(self.active_survey[0]))
+                else:
+                    if not self.default_station:
+                        self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
+                    station_id = self.default_station
 
-            # get remaining information
-            if self.station_level > 0:
-                station_name = os.path.normpath(filepath).split(os.sep)[self.station_level]
-                try:
-                    station_id = self.mpDB.select("station", columns='id', row_cond=f'name="{station_name}"')[0][0]
-                except IndexError:
-                    station_id = self.mpDB.add_station(str(station_name), None, None, int(self.active_survey[0]))
-            else:
-                if not self.default_station:
-                    self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
-                station_id = self.default_station
+                # insert into table, force type
+                media_id = self.mpDB.add_media(filepath,
+                                               ext,
+                                               str(timestamp),
+                                               int(station_id),
+                                               camera_id=None,
+                                               sequence_id=None,
+                                               external_id=None,
+                                               comment=None)
+                if media_id == "duplicate_error":
+                    print(f"File {filepath} already in database, skipping")
+                    logging.info(f"File {filepath} already in database, skipping")
 
-            # insert into table, force type
-            media_id = self.mpDB.add_media(filepath, ext,
-                                           str(timestamp),
-                                           int(station_id),
-                                           camera_id=None,
-                                           sequence_id=None,
-                                           external_id=None,
-                                           comment=None)
-
-            self.progress_update.emit(i)
+                self.progress_update.emit(i)
 
         # finished adding media
         self.finished.emit()

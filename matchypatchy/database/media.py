@@ -4,7 +4,7 @@ Functions for Manipulating and Processing ROIs
 import pandas as pd
 
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
-VIDEO_EXT = ['.avi', '.mp4', '.wmv', '.mov']
+VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
 COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
            "comment", "viewpoint", "species_id", "individual_id"]

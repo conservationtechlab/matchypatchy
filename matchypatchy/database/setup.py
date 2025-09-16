@@ -72,8 +72,8 @@ def setup_database(key, filepath):
                         reviewed INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb INTEGER,
-                        FOREIGN KEY(media_id) REFERENCES media (id)
-                        FOREIGN KEY(individual_id) REFERENCES individual (id)
+                        FOREIGN KEY(media_id) REFERENCES media (id),
+                        FOREIGN KEY(individual_id) REFERENCES individual (id),
                         FOREIGN KEY(species_id) REFERENCES species (id));''')
 
     # INDIVIDUAL
