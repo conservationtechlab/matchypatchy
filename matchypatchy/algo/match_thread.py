@@ -3,6 +3,7 @@ QThread for Matching
 
 """
 import time
+import logging
 from datetime import timedelta
 import pandas as pd
 import warnings
@@ -71,8 +72,15 @@ class MatchEmbeddingThread(QThread):
 
                 self.progress_update.emit(completed_percentage)
 
-        self.neighbor_dict_return.emit(neighbor_dict)
-        self.nearest_dict_return.emit(nearest_dict)
+        if not self.isInterruptionRequested():
+            self.neighbor_dict_return.emit(neighbor_dict)
+            self.nearest_dict_return.emit(nearest_dict)
+
+        else:
+            logging.info("Matching embeddings interrupted.")
+            self.neighbor_dict_return.emit({})
+            self.nearest_dict_return.emit({})
+            
 
     def roi_knn(self, emb_id):
         """

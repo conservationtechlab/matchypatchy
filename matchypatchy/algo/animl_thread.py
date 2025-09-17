@@ -75,6 +75,7 @@ class AnimlThread(QThread):
         elif self.detector_key == "MegaDetector v5a" or self.detector_key == "MegaDetector v5b":
             detector = animl.load_detector(self.md_filepath, "MDV5")
 
+        # viewpoint, individual TBD
         viewpoint = None
         individual_id = None
         species_id = None
@@ -84,23 +85,21 @@ class AnimlThread(QThread):
             if not self.isInterruptionRequested():
                 media_id = image['id']
                 row = image.to_frame().T
-    
-                detections = animl.detect(detector, row,
-                                          animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
-                                          file_col='filepath',
-                                          confidence_threshold=self.confidence_threshold)
+
+
+                detections = animl.detect(detector, row, animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
+                                           confidence_threshold=self.confidence_threshold)
+
                 detections = animl.parse_detections(detections, manifest=row)
                 detections = animl.get_animals(detections)
 
                 for _, roi in detections.iterrows():
                     frame = roi['framenumber'] if 'framenumber' in roi.index else 0
 
-                    bbox_x = roi['bbox1']
-                    bbox_y = roi['bbox2']
-                    bbox_w = roi['bbox3']
-                    bbox_h = roi['bbox4']
-
-                    # viewpoint, individual TBD
+                    bbox_x = roi['bbox_x']
+                    bbox_y = roi['bbox_y']
+                    bbox_w = roi['bbox_w']
+                    bbox_h = roi['bbox_h']
 
                     # do not add emb_id, to be determined later
                     self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,

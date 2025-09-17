@@ -13,7 +13,7 @@ from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
 class QueryContainer(QObject):
-    thread_signal = pyqtSignal()
+    thread_signal = pyqtSignal(bool)
 
     def __init__(self, parent):
         super().__init__()
@@ -87,8 +87,11 @@ class QueryContainer(QObject):
         self.nearest_dict_raw = nearest_dict
 
     def finish_calculating(self):
-        self.thread_signal.emit()
-        return True
+        if self.neighbor_dict_raw and self.nearest_dict_raw:
+            self.thread_signal.emit(True)
+        else:
+            # interrupt occurred, dicts are empty
+            self.thread_signal.emit(False)
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
@@ -148,7 +151,6 @@ class QueryContainer(QObject):
         if ided_sequences:
             # rank sequences by number of matches
             rank_by_n_match = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
-            print(rank_by_n_match)
 
             # prioritize already id'd sequences
             self.ranked_sequences = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
@@ -160,7 +162,6 @@ class QueryContainer(QObject):
             else:
                 self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
 
-        print(self.ranked_sequences)
         # set number of queries to validate
         self.n_queries = len(self.ranked_sequences)
 

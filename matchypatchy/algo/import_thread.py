@@ -54,7 +54,7 @@ class CSVImportThread(QThread):
                 media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{filepath}"')[0][0]
 
             for i, roi in group.iterrows():
-                # Frame number for videos, else 1 if image
+                # frame number for videos, else 1 if image
                 # WARNING! WILL HAVE TO DYNAMICALLY PULL FRAME WHEN RUNNING miewid
                 frame = roi["frame_number"] if "frame_number" in group.columns else 1
 
@@ -167,8 +167,6 @@ class FolderImportThread(QThread):
         self.data = data
         self.station_level = station_level
         self.default_station = None
-        self.animl_conversion = {"filepath": "FilePath",
-                                 "timestamp": "DateTime"}
 
     def run(self):
         for i, file in self.data.iterrows():
