@@ -11,7 +11,6 @@ from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT
 
-
 class MediaWidget(QWidget):
     """
     Container Widget for Displaying Image or Video
@@ -37,62 +36,20 @@ class MediaWidget(QWidget):
         self.audio_output = QAudioOutput()
         self.player.setAudioOutput(self.audio_output)
         self.player.setVideoOutput(self.video_widget)
-        self.player.positionChanged.connect(self.update_position)
-        self.player.durationChanged.connect(self.update_duration)
 
         # Playback controls
-
-        self.button_play = QPushButton("⏵︎")
-        self.button_pause = QPushButton("⏸︎")
-        self.button_play.clicked.connect(self.player.play)
-        self.button_pause.clicked.connect(self.player.pause)
-        self.button_play.setFixedWidth(60)
-        self.button_pause.setFixedWidth(60)
-        self.button_play.hide()
-        self.button_pause.hide()
-
-        # Seek slider
-        self.seek_slider = QSlider(Qt.Orientation.Horizontal)
-        self.seek_slider.setRange(0, 0)
-        self.seek_slider.sliderMoved.connect(self.seek_position)
-        self.seek_slider.sliderPressed.connect(self.pause_for_seek)
-        self.seek_slider.sliderReleased.connect(self.resume_after_seek)
-        self.seeking = False
-
-        # Volume slider
-        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(50)
-        self.audio_output.setVolume(0.5)
-        self.volume_slider.valueChanged.connect(self.set_volume)
-
-        playback_layout = QHBoxLayout()
-        playback_layout.addWidget(self.button_play, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        playback_layout.addWidget(self.button_pause, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        playback_layout.addSpacing(10)
-        playback_layout.addWidget(QLabel("Seek:"))
-        playback_layout.addWidget(self.seek_slider)
-        playback_layout.addSpacing(10)
-        playback_layout.addWidget(QLabel("Volume:"))
-        playback_layout.addWidget(self.volume_slider)
-
-        playback_layout.addStretch()
-        self.layout.addLayout(playback_layout)
+        self.playbackbar = VideoPlayerBar(self.player, self.audio_output)
+        self.playbackbar.setVisible(False)
+        self.layout.addWidget(self.playbackbar)
 
 
     def load(self, filepath, bbox=None, crop=False):
         if Path(filepath).suffix.lower() in IMAGE_EXT:
-            self.button_play.hide()
-            self.button_pause.hide()
-            self.seek_slider.hide()
-            self.volume_slider.hide()
+            self.playbackbar.setVisible(False)
             self.image_widget.load(filepath, bbox=bbox, crop=crop)
             self.stacked.setCurrentWidget(self.image_widget)
         elif Path(filepath).suffix.lower() in VIDEO_EXT:
-            self.button_play.show()
-            self.button_pause.show()
-            self.seek_slider.show()
-            self.volume_slider.show()
+            self.playbackbar.setVisible(True)
             self.player.setSource(QUrl.fromLocalFile(filepath))
             self.stacked.setCurrentWidget(self.video_widget)
             self.player.play()
@@ -106,48 +63,9 @@ class MediaWidget(QWidget):
         elif self.stacked.currentWidget() == self.image_widget:
             self.image_widget.reset()
 
-    # playback controls --------------------------------------------------------
-    def update_position(self, position):
-        if not self.seeking:
-            self.seek_slider.setValue(position)
-
-    def update_duration(self, duration):
-        self.seek_slider.setRange(0, duration)
-
-    def seek_position(self, position):
-        self.player.setPosition(position)
-
-    def pause_for_seek(self):
-        self.seeking = True
-        self.was_playing = self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
-        self.player.pause()
-
-    def resume_after_seek(self):
-        self.seeking = False
-        if self.was_playing:
-            self.player.play()
-
-    def set_volume(self, value):
-        self.audio_output.setVolume(value / 100)
-
-    def get_frame(self):
-        cap = cv2.VideoCapture('/path/to/video.mp4')
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        cap.release()
-        return int(self.player.position() / 1000 * fps)
 
 # ==============================================================================
-class VideoWidget(QVideoWidget):
-    """
-    Custom Widget for Displaying a Video
-    """
-    def __init__(self, file_path=None, width=600, height=400):
-        super().__init__()
-        self.default_width = width
-        self.default_height = height
-        self.file_path = file_path
-
-
+# IMAGE
 # ==============================================================================
 # TODO: FIX IMAGE ADJUSTMENTS
 class ImageWidget(QLabel):
@@ -359,3 +277,183 @@ class ImageWidget(QLabel):
         if event.button() == Qt.MouseButton.LeftButton:
             self.reset()
         super().mouseDoubleClickEvent(event)
+
+
+class ImageAdjustBar(QWidget):
+    FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
+
+    def __init__(self, parent, mediawidget, side):
+        super().__init__()
+        self.parent = parent
+        self.mediawidget = mediawidget
+        self.side = side  # "query" or "match"
+        query_image_buttons = QHBoxLayout()
+        # Brightness
+        query_image_buttons.addWidget(QLabel("Brightness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_brightness = QSlider(Qt.Orientation.Horizontal)
+        self.slider_brightness.setRange(25, 75)  # Set range from 1 to 100
+        self.slider_brightness.setValue(50)  # Set initial value
+        self.slider_brightness.valueChanged.connect(self.mediawidget.image_widget.adjust_brightness)
+        query_image_buttons.addWidget(self.slider_brightness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Contrast
+        query_image_buttons.addWidget(QLabel("Contrast:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_contrast = QSlider(Qt.Orientation.Horizontal)
+        self.slider_contrast.setRange(25, 75)  # Set range from 1 to 100
+        self.slider_contrast.setValue(50)  # Set initial value
+        self.slider_contrast.valueChanged.connect(self.mediawidget.image_widget.adjust_contrast)
+        query_image_buttons.addWidget(self.slider_contrast, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Sharpness
+        query_image_buttons.addWidget(QLabel("Sharpness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.slider_sharpness = QSlider(Qt.Orientation.Horizontal)
+        self.slider_sharpness.setRange(25, 75)  # Set range from 1 to 100
+        self.slider_sharpness.setValue(50)  # Set initial value
+        self.slider_sharpness.valueChanged.connect(self.mediawidget.image_widget.adjust_sharpness)
+        query_image_buttons.addWidget(self.slider_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Reset
+        button_query_image_reset = QPushButton("Reset")
+        button_query_image_reset.clicked.connect(self.image_reset)
+        query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # View Image
+        button_query_image_edit = QPushButton("Edit Image")
+        button_query_image_edit.clicked.connect(self.edit_image)
+        query_image_buttons.addWidget(button_query_image_edit, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Open Image
+        button_query_image_open = QPushButton("Open Image")
+        button_query_image_open.clicked.connect(self.open_image)
+        query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # favorite
+        self.button_favorite = QPushButton("♥")
+        self.button_favorite.setFixedWidth(30)
+        self.button_favorite.clicked.connect(self.press_favorite)
+        query_image_buttons.addWidget(self.button_favorite)
+        self.button_favorite.setCheckable(True)
+
+        query_image_buttons.addStretch()
+        self.setLayout(query_image_buttons)
+
+    def image_reset(self):
+        self.mediawidget.image_widget.reset()
+        self.slider_brightness.setValue(50)
+        self.slider_contrast.setValue(50)
+        self.slider_sharpness.setValue(50)
+
+    def press_favorite(self):
+        if self.side == "query":
+            current_rid = self.parent.QueryContainer.current_query_rid
+        else:
+            current_rid = self.parent.QueryContainer.current_match_rid
+        self.parent.press_favorite_button(current_rid)
+
+    def set_favorite(self, state):
+        if state:
+            self.button_favorite.setChecked(True)
+            self.button_favorite.setStyleSheet(self.FAVORITE_STYLE)
+        else:
+            self.button_favorite.setChecked(False)
+            self.button_favorite.setStyleSheet("")
+
+    def edit_image(self):
+        if self.side == "query":
+            current_rid = self.parent.QueryContainer.current_query_rid
+        else:
+            current_rid = self.parent.QueryContainer.current_match_rid
+        self.parent.edit_image(current_rid)
+    
+    def open_image(self, rid):
+        if self.side == "query":
+            current_rid = self.parent.QueryContainer.current_query_rid
+        else:
+            current_rid = self.parent.QueryContainer.current_match_rid
+        self.parent.open_image(current_rid)     
+
+
+# ==============================================================================
+# VIDEO
+# ==============================================================================
+class VideoWidget(QVideoWidget):
+    """
+    Custom Widget for Displaying a Video
+    """
+    def __init__(self, file_path=None, width=600, height=400):
+        super().__init__()
+        self.default_width = width
+        self.default_height = height
+        self.file_path = file_path
+
+
+class VideoPlayerBar(QWidget):
+    def __init__(self, player, audio_output):
+        super().__init__()
+        self.player = player
+        self.audio_output = audio_output
+
+        self.playback_layout = QHBoxLayout()
+
+        self.button_play = QPushButton("⏵︎")
+        self.button_pause = QPushButton("⏸︎")
+        self.button_play.clicked.connect(self.player.play)
+        self.button_pause.clicked.connect(self.player.pause)
+        self.button_play.setFixedWidth(60)
+        self.button_pause.setFixedWidth(60)
+
+        # Seek slider
+        self.seek_slider = QSlider(Qt.Orientation.Horizontal)
+        self.seek_slider.setRange(0, 0)
+        self.seek_slider.sliderMoved.connect(self.seek_position)
+        self.seek_slider.sliderPressed.connect(self.pause_for_seek)
+        self.seek_slider.sliderReleased.connect(self.resume_after_seek)
+        self.seeking = False
+
+        self.player.positionChanged.connect(self.update_position)
+        self.player.durationChanged.connect(self.update_duration)
+
+
+        # Volume slider
+        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(50)
+
+        self.volume_slider.valueChanged.connect(self.set_volume)
+
+        playback_layout = QHBoxLayout()
+        playback_layout.addWidget(self.button_play, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        playback_layout.addWidget(self.button_pause, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        playback_layout.addSpacing(10)
+        playback_layout.addWidget(QLabel("Seek:"))
+        playback_layout.addWidget(self.seek_slider)
+        playback_layout.addSpacing(10)
+        playback_layout.addWidget(QLabel("Volume:"))
+        playback_layout.addWidget(self.volume_slider)
+
+        playback_layout.addStretch()
+        self.setLayout(playback_layout)
+
+
+    def update_position(self, position):
+        if not self.seeking:
+            self.seek_slider.setValue(position)
+
+    def update_duration(self, duration):
+        self.seek_slider.setRange(0, duration)
+
+    def seek_position(self, position):
+        self.player.setPosition(position)
+
+    def pause_for_seek(self):
+        self.seeking = True
+        self.was_playing = self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
+        self.player.pause()
+
+    def resume_after_seek(self):
+        self.seeking = False
+        if self.was_playing:
+            self.player.play()
+
+    def set_volume(self, value):
+        self.audio_output.setVolume(value / 100)
+
+    def get_frame(self):
+        cap = cv2.VideoCapture('/path/to/video.mp4')
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+        return int(self.player.position() / 1000 * fps)
