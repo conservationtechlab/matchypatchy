@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
 from PyQt6.QtCore import Qt
 
 from matchypatchy.algo.import_thread import CSVImportThread
-from matchypatchy.gui.widget_combobox import ComboBoxSeparator
+from matchypatchy.gui.gui_assets import ComboBoxSeparator
 
 
 class ImportCSVPopup(QDialog):

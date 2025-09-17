@@ -41,3 +41,12 @@ class ComboBoxSeparator(QComboBox):
         separator = QStandardItem(label)
         separator.setFlags(Qt.ItemFlag.NoItemFlags)  # Non-selectable, disabled
         self.model().appendRow(separator)
+
+
+class FilterBox(QComboBox):
+    def __init__(self, initial_list, width):
+        super().__init__()
+        self.setModel(QStandardItemModel())
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.setFixedWidth(width)
+        self.addItems([el[1] for el in initial_list])

@@ -10,7 +10,7 @@ from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_roi import ROIPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
-from matchypatchy.gui.gui_assets import VerticalSeparator, StandardButton
+from matchypatchy.gui.gui_assets import FilterBox, VerticalSeparator, StandardButton
 
 
 class DisplayMedia(QWidget):
@@ -89,36 +89,26 @@ class DisplayMedia(QWidget):
         survey_label.setFixedWidth(50)
         second_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # REGION
-        self.region_select = QComboBox()
-        self.region_select.setFixedWidth(200)
         self.region_list_ordered = [(0, 'Region')]
-        self.region_select.addItems([el[1] for el in self.region_list_ordered])
+        self.region_select = FilterBox(self.region_list_ordered, 200)
         second_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # SURVEY
-        self.survey_select = QComboBox()
-        self.survey_select.setFixedWidth(200)
-        second_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.survey_list_ordered = [(0, 'Survey')]
-        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
+        self.survey_select = FilterBox(self.survey_list_ordered, 200)
+        second_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # STATION
-        self.station_select = QComboBox()
-        self.station_select.setFixedWidth(200)
-        second_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.valid_stations = None
         self.station_list_ordered = [(0, 'Station')]
-        self.station_select.addItems([el[1] for el in self.station_list_ordered])
+        self.station_select = FilterBox(self.station_list_ordered, 200)
+        second_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # SPECIES
-        self.species_select = QComboBox()
-        self.species_select.setFixedWidth(200)
-        second_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.species_list_ordered = [(0, 'Species')]
-        self.species_select.addItems([el[1] for el in self.species_list_ordered])
+        self.species_select = FilterBox(self.species_list_ordered, 200)
+        second_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # INDIVIDUAL
-        self.individual_select = QComboBox()
-        self.individual_select.setFixedWidth(200)
-        second_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.individual_list_ordered = [(0, 'Individual')]
-        self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
+        self.individual_select = FilterBox(self.individual_list_ordered, 200)
+        second_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # UNIDENTIFIED
         unidentified = QPushButton("Unidentified")
         unidentified.setCheckable(True)
