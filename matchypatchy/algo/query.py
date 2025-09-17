@@ -12,6 +12,7 @@ from matchypatchy.algo.models import load
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
+# TODO: sequences for videos 
 class QueryContainer(QObject):
     thread_signal = pyqtSignal(bool)
 

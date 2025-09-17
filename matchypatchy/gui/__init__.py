@@ -18,14 +18,13 @@ from matchypatchy.gui import popup_roi
 from matchypatchy.gui import popup_species
 from matchypatchy.gui import popup_station
 from matchypatchy.gui import popup_survey
-from matchypatchy.gui import widget_combobox
 from matchypatchy.gui import widget_media
 
 from matchypatchy.gui.display_base import (DisplayBase, LOGO,)
-from matchypatchy.gui.display_compare import (DisplayCompare, FAVORITE_STYLE,
-                                              MATCH_STYLE,)
+from matchypatchy.gui.display_compare import (DisplayCompare,)
 from matchypatchy.gui.display_media import (DisplayMedia,)
-from matchypatchy.gui.gui_assets import (HorizontalSeparator, StandardButton,
+from matchypatchy.gui.gui_assets import (ComboBoxSeparator, FilterBox,
+                                         HorizontalSeparator, StandardButton,
                                          VerticalSeparator,)
 from matchypatchy.gui.main_gui import (MainWindow, main_display,)
 from matchypatchy.gui.media_table import (ComboBoxDelegate, MediaTable,)
@@ -45,24 +44,24 @@ from matchypatchy.gui.popup_roi import (ROIPopup,)
 from matchypatchy.gui.popup_species import (SpeciesFillPopup, SpeciesPopup,)
 from matchypatchy.gui.popup_station import (StationFillPopup, StationPopup,)
 from matchypatchy.gui.popup_survey import (SurveyFillPopup, SurveyPopup,)
-from matchypatchy.gui.widget_combobox import (ComboBoxSeparator,)
-from matchypatchy.gui.widget_media import (ImageWidget, MediaWidget,
+from matchypatchy.gui.widget_media import (ImageAdjustBar, ImageWidget,
+                                           MediaWidget, VideoPlayerBar,
                                            VideoWidget,)
 
 __all__ = ['AboutPopup', 'AlertPopup', 'ComboBoxDelegate', 'ComboBoxSeparator',
            'ConfigPopup', 'DisplayBase', 'DisplayCompare', 'DisplayMedia',
-           'DropdownPopup', 'FAVORITE_STYLE', 'HorizontalSeparator',
-           'ICON_PENCIL', 'ImageWidget', 'ImportCSVPopup', 'ImportFolderPopup',
-           'IndividualFillPopup', 'IndividualPopup', 'LOGO', 'LicensePopup',
-           'MATCH_STYLE', 'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow',
-           'MediaEditPopup', 'MediaTable', 'MediaWidget', 'PairXPopup',
-           'READMEPopup', 'ROIPopup', 'SpeciesFillPopup', 'SpeciesPopup',
-           'StandardButton', 'StationFillPopup', 'StationPopup',
-           'SurveyFillPopup', 'SurveyPopup', 'VerticalSeparator',
-           'VideoWidget', 'display_base', 'display_compare', 'display_media',
-           'gui_assets', 'main_display', 'main_gui', 'media_table',
-           'popup_alert', 'popup_config', 'popup_dropdown', 'popup_import_csv',
+           'DropdownPopup', 'FilterBox', 'HorizontalSeparator', 'ICON_PENCIL',
+           'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
+           'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
+           'LOGO', 'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
+           'MainWindow', 'MediaEditPopup', 'MediaTable', 'MediaWidget',
+           'PairXPopup', 'READMEPopup', 'ROIPopup', 'SpeciesFillPopup',
+           'SpeciesPopup', 'StandardButton', 'StationFillPopup',
+           'StationPopup', 'SurveyFillPopup', 'SurveyPopup',
+           'VerticalSeparator', 'VideoPlayerBar', 'VideoWidget',
+           'display_base', 'display_compare', 'display_media', 'gui_assets',
+           'main_display', 'main_gui', 'media_table', 'popup_alert',
+           'popup_config', 'popup_dropdown', 'popup_import_csv',
            'popup_import_folder', 'popup_individual', 'popup_media_edit',
            'popup_ml', 'popup_pairx', 'popup_readme', 'popup_roi',
-           'popup_species', 'popup_station', 'popup_survey', 'widget_combobox',
-           'widget_media']
+           'popup_species', 'popup_station', 'popup_survey', 'widget_media']

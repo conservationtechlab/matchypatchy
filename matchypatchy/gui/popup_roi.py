@@ -17,7 +17,7 @@ from matchypatchy.database.species import fetch_individual
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.gui.gui_assets import HorizontalSeparator
 
-
+# TODO: If video, add all frames
 class ROIPopup(QDialog):
     def __init__(self, parent, rid, crop=False):
         super().__init__(parent)
@@ -47,15 +47,14 @@ class ROIPopup(QDialog):
         layout = QHBoxLayout()
         # Image
         self.image = MediaWidget()
-        self.image.setStyleSheet("border: 1px solid black;")
+        #self.image.setStyleSheet("border: 1px solid black;")
         self.image.load(self.roi_data.at[0, "filepath"],
                         bbox=db_roi.get_bbox(self.roi_data.iloc[0]), crop=False)
         layout.addWidget(self.image, 1)
 
         # Metadata -------------------------------------------------------------
         border_widget = QWidget()
-        border_widget.setObjectName("borderWidget")
-        border_widget.setStyleSheet("""#borderWidget { border: 1px solid black; }""")
+        border_widget.setStyleSheet("""{ border: 1px solid black; }""")
         info_layout = QVBoxLayout()
 
         horizontal_gap = 80
