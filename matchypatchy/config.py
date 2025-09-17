@@ -24,9 +24,8 @@ def initiate():
         'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
         'DB_DIR': str(HOME_DIR / 'Database'),
         'ML_DIR': str(HOME_DIR / 'Models'),
-        'FRAME_DIR': str(HOME_DIR / 'Frames'),
         'THUMBNAIL_DIR': str(HOME_DIR / 'Thumbnails'),
-        'VIDEO_FRAMES': 1
+        'VIDEO_FRAMES': 3
     }
     CONFIG_PATH = Path(resource_path('config.yml'))
     if CONFIG_PATH.exists():
@@ -53,7 +52,6 @@ def initiate():
     Path(cfg['HOME_DIR']).mkdir(exist_ok=True)
     Path(cfg['DB_DIR']).mkdir(exist_ok=True)
     Path(cfg['ML_DIR']).mkdir(exist_ok=True)
-    Path(cfg['FRAME_DIR']).mkdir(exist_ok=True)
     Path(cfg['THUMBNAIL_DIR']).mkdir(exist_ok=True)
         
     # LOG CONFIG

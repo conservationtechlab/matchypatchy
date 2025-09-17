@@ -1,7 +1,7 @@
 """
 QThread for saving thumbnails to temp dir for media table
 """
-import os
+import cv2
 from pathlib import Path
 
 from PyQt6.QtGui import QImage
@@ -11,7 +11,7 @@ from matchypatchy import config
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-THUMBNAIL_NOTFOUND = QImage(config.resource_path("assets/thumbnail_notfound.png"))
+THUMBNAIL_NOTFOUND = config.resource_path("assets/thumbnail_notfound.png")
 
 
 class LoadThumbnailThread(QThread):
@@ -30,13 +30,11 @@ class LoadThumbnailThread(QThread):
         else:
             self.existing_filepaths = dict(self.mpDB.select("media_thumbnails", "fid, filepath"))
         self.thumbnail_dir = config.load('THUMBNAIL_DIR')
-        
 
     def run(self):
         filepaths = []
 
         #TODO: break into chunks so thread can be interupted 
-
         with ThreadPoolExecutor() as executor:
             futures = {executor.submit(self.process_image, roi): roi for _,roi in self.data.iterrows()}
 
@@ -47,7 +45,6 @@ class LoadThumbnailThread(QThread):
 
         self.loaded_images.emit(filepaths)
         self.done.emit()
-
 
     def process_image(self, roi):
         id = roi['id']
@@ -61,15 +58,22 @@ class LoadThumbnailThread(QThread):
 
         return id, filepath
 
-
+    # create a new thumbnail
     def save_image(self, roi):
-        # create a new thumbnail
-         # load image
-        self.original = QImage(roi['filepath'])
-        # image not found, use placeholder
-        if self.original.isNull():
-            self.image = QImage(THUMBNAIL_NOTFOUND)
+        frame = roi['frame'] if 'frame' in roi.index else 0
+        # load video
+        if roi['ext'].lower() in ['.mp4', '.avi', '.mov', '.mkv', '.wmv']:
+            if self.data_type == 1:
+                self.original = self.get_frame(roi['filepath'], frame=frame)
+            else:
+                # rois/frames not yet processed, use first frame
+                self.original = self.get_frame(roi['filepath'], frame=frame)
+        # load image
         else:
+            self.original = QImage(roi['filepath'])
+            # image not found, use placeholder
+
+        if not self.original.isNull():
             # crop for rois
             if self.data_type == 1:
                 left = self.original.width() * roi['bbox_x']
@@ -81,22 +85,40 @@ class LoadThumbnailThread(QThread):
             # no crop for media
             else:
                 self.image = self.original.copy()
-        # scale it to 99x99
-        scaled_image = self.image.scaled(self.size, self.size,
-                                        Qt.AspectRatioMode.KeepAspectRatio,
-                                        Qt.TransformationMode.SmoothTransformation)
 
-        # create a temporary file to hold thumbnail
-        filepath = Path(self.thumbnail_dir) / Path(roi['filepath']).name
-        filepath = str(filepath)
+            # scale it to 99x99
+            scaled_image = self.image.scaled(self.size, self.size,
+                                            Qt.AspectRatioMode.KeepAspectRatio,
+                                            Qt.TransformationMode.SmoothTransformation)
 
-        # save the image
-        scaled_image.save(filepath, format="JPG")
+            # create a temporary file to hold thumbnail
+            newpath = Path(self.thumbnail_dir) / Path(roi['filepath']).stem
+            filepath = f"{str(newpath)}_{frame}.jpg"
 
-        # save to table
-        if self.data_type == 1:
-            self.mpDB.add_thumbnail("roi", roi['id'], filepath)
+            # save the image
+            scaled_image.save(filepath, format="JPG")
+
+            # save to table
+            if self.data_type == 1:
+                self.mpDB.add_thumbnail("roi", roi['id'], filepath)
+            else:
+                self.mpDB.add_thumbnail("media", roi['id'], filepath)
+                    
         else:
-            self.mpDB.add_thumbnail("media", roi['id'], filepath)
+            filepath = THUMBNAIL_NOTFOUND
 
         return filepath
+    
+    # get specific frame of video as QImage
+    def get_frame(self, video_path, frame=0):
+        cap = cv2.VideoCapture(video_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
+        ret, still = cap.read()  # Read the first frame
+        cap.release()
+
+        if ret:
+            rgb_frame = cv2.cvtColor(still, cv2.COLOR_BGR2RGB)
+            h, w, ch = rgb_frame.shape
+            bytes_per_line = ch * w
+            qimg = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+        return qimg

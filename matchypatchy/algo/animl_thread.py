@@ -36,6 +36,7 @@ class AnimlThread(QThread):
         super().__init__()
         self.mpDB = mpDB
         self.ml_dir = Path(config.load('ML_DIR'))
+        self.n_frames = config.load('VIDEO_FRAMES')
         self.confidence_threshold = 0.1
         self.detector_key = detector_key
 
@@ -62,12 +63,16 @@ class AnimlThread(QThread):
         #self.get_species()
 
     def get_frames(self):
-        self.media = animl.extract_frames(self.media, config.load('FRAME_DIR'), 
-                                          frames=int(config.load('VIDEO_FRAMES')), file_col="filepath")
+        self.media = animl.extract_frames2(self.media, frames=self.n_frames)
 
     def get_bbox(self):
-        # 1 RUN MED
-        if self.detector_key == "MegaDetector v5a" or self.detector_key == "MegaDetector v5b":
+        # SKIP if no detector selected
+        if self.detector_key is None:
+            print("No detector selected, skipping detection...")
+            self.prompt_update.emit("No detector selected, skipping detection...")
+            return
+        # load detector
+        elif self.detector_key == "MegaDetector v5a" or self.detector_key == "MegaDetector v5b":
             detector = animl.load_detector(self.md_filepath, "MDV5")
 
         # viewpoint, individual TBD
@@ -81,13 +86,15 @@ class AnimlThread(QThread):
                 media_id = image['id']
                 row = image.to_frame().T
 
+
                 detections = animl.detect(detector, row, animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
                                            confidence_threshold=self.confidence_threshold)
+
                 detections = animl.parse_detections(detections, manifest=row)
                 detections = animl.get_animals(detections)
 
                 for _, roi in detections.iterrows():
-                    frame = roi['framenumber'] if 'framenumber' in roi.index else 1
+                    frame = roi['framenumber'] if 'framenumber' in roi.index else 0
 
                     bbox_x = roi['bbox_x']
                     bbox_y = roi['bbox_y']
@@ -96,8 +103,9 @@ class AnimlThread(QThread):
 
                     # do not add emb_id, to be determined later
                     self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                                    viewpoint=viewpoint, reviewed=0, species_id=species_id,
-                                    individual_id=individual_id, emb=0)
+                                      viewpoint=viewpoint, reviewed=0, species_id=species_id,
+                                      individual_id=individual_id, emb=0)
+                    
             self.progress_update.emit(round(100 * (i + 1) / len(self.media)))
 
 
