@@ -69,7 +69,7 @@ def fetch_roi(mpDB):
         rois = rois.replace({float('nan'): None})
         return rois
     else:
-        return False
+        return pd.DataFrame()
 
 
 def fetch_roi_media(mpDB, rids=None, reset_index=True):

@@ -34,7 +34,7 @@ class ReIDThread(QThread):
         # must be fetched after start() to chain with animl
         self.rois = fetch_roi(self.mpDB)
 
-        if not self.rois:
+        if self.rois.empty:
             self.prompt_update.emit("No ROIs found, please run detection first...")
             self.done.emit()
             return
@@ -63,7 +63,7 @@ class ReIDThread(QThread):
         if len(filtered_rois) > 0:
 
             model = animl.load_classifier(self.viewpoint_filepath, 2)
-            dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
+            dataloader = animl.reid_dataloader(filtered_rois, self.image_paths)
 
             for i, img in enumerate(dataloader):
                 if not self.isInterruptionRequested():
@@ -84,7 +84,7 @@ class ReIDThread(QThread):
         if len(filtered_rois) > 0:
 
             model = animl.load_miew(self.reid_filepath, device='cpu')
-            dataloader = animl.matchypatchy.reid_dataloader(filtered_rois, self.image_paths)
+            dataloader = animl.reid_dataloader(filtered_rois, self.image_paths)
 
             for i, img in enumerate(dataloader):
                 if not self.isInterruptionRequested():
