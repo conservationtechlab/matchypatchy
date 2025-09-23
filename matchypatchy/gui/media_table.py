@@ -394,6 +394,25 @@ class MediaTable(QWidget):
         self.apply_edits()
         self.refresh_table(popup=False)
 
+    def transpose_edit_stack(self, edit_stack):
+        """
+        Transpose edit stack from popup_roi to media_table format
+        """
+        for edit in edit_stack:
+            id = edit['id']
+            row = self.data_filtered.index[self.data_filtered['id'] == id].tolist()
+            column = list(self.columns.keys())[list(self.columns.values()).index(edit['reference'])]
+            if row:
+                row = row[0]
+                new_edit = {'row': row,
+                            'column': column,
+                            'id': id,
+                            'reference': edit['reference'],
+                            'previous_value': edit['previous_value'],
+                            'new_value': edit['new_value']}
+                print(new_edit)
+                self.edit_stack.append(new_edit)
+
     def undo(self):
         """
         Undo last edit and refresh table
@@ -438,8 +457,7 @@ class MediaTable(QWidget):
         return selected_rows
 
     def edit_row(self, row):
-        id = int(self.data_filtered.at[row, "id"])
-        self.parent.edit_row(id)
+        self.parent.edit_row(row)
 
 
 # COMBOBOX FOR VIEWPOINT, SPECIES, SEX

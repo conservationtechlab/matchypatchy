@@ -328,7 +328,7 @@ class QueryContainer(QObject):
             return self.data.loc[rid]
         elif column == 'bbox':
             # Return the bbox coordinates for current query
-            return db_roi.get_bbox(self.data.loc[rid])
+            return db_roi.get_bbox(self.data.loc[[rid]])
         elif column == 'metadata':
             return self.roi_metadata(self.data.loc[rid])
         else:

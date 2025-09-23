@@ -9,6 +9,7 @@ Display Pages:
     2. DisplayCompare
 """
 import sys
+import logging
 from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
@@ -19,9 +20,9 @@ from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
 from matchypatchy.gui.display_compare import DisplayCompare
 from matchypatchy.gui.popup_alert import AlertPopup
-
 from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
 
+from matchypatchy.database.media import export_data
 
 class MainWindow(QMainWindow):
     def __init__(self, mpDB):
@@ -69,7 +70,7 @@ class MainWindow(QMainWindow):
 
         # FILE IMPORT
         file_import = QMenu("Import", self)
-        #file.addMenu(file_import)
+        file.addMenu(file_import)
 
         #file_import_station = QAction("Stations", self)
         #file_import_station.triggered.connect(lambda: self.import_popup('station'))
@@ -83,6 +84,10 @@ class MainWindow(QMainWindow):
         #file_import_media.triggered.connect(lambda: self.import_popup('media'))
         #file_import.addAction(file_import_media)
 
+        file_export = QAction("Export", self)
+        file_export.triggered.connect(self.export)
+        file.addAction(file_export)
+
         # EDIT
         edit_preferences = QAction("Preferences", self)
         edit_survey = QAction("Surveys", self)
@@ -90,11 +95,12 @@ class MainWindow(QMainWindow):
         edit_species = QAction("Species", self)
         edit_media = QAction("Media", self)
 
-        #edit.addAction(edit_preferences)
-        #edit.addAction(edit_survey)
-        #edit.addAction(edit_station)
-        #edit.addAction(edit_species)
-        #edit.addAction(edit_media)
+        edit.addAction(edit_survey)
+        edit.addAction(edit_station)
+        edit.addAction(edit_species)
+        edit.addAction(edit_media)
+        edit.addSeparator()
+        edit.addAction(edit_preferences)
 
         # VIEW
 
@@ -139,9 +145,28 @@ class MainWindow(QMainWindow):
         """
         pass
 
+    def export(self):
+        data = export_data(self.mpDB)
+        if data is not None:
+            file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
+            if file_path:
+              # add csv if user didnt enter
+                if not file_path.endswith(".csv"):
+                    file_path += ".csv"
+
+                with open(file_path, 'w') as file:
+                    data.to_csv(file)
+                logging.info(f"Data exported to: {file_path}")
+        else:
+            dialog = AlertPopup(self, prompt="No data to export.")
+            if dialog.exec():
+                del dialog
+
     # EDIT =====================================================================
 
+
     # VIEW =====================================================================
+    
         
     # HELP =====================================================================
     def about(self):

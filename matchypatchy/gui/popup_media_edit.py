@@ -18,7 +18,7 @@ class MediaEditPopup(QDialog):
     def __init__(self, parent, ids):
         super().__init__(parent)
         self.parent = parent
-        self.setWindowTitle("Edit Media")
+        self.setWindowTitle("View Media")
         self.setFixedSize(900, 600)
         self.mpDB = parent.mpDB
 
@@ -37,21 +37,21 @@ class MediaEditPopup(QDialog):
         self.VIEWPOINTS = load('VIEWPOINTS')
 
         # Layout
-        main_layout = QVBoxLayout()
+        container_layout = QVBoxLayout()
 
         # Top: filepath
         self.filepath_label = QLabel()
         self.filepath_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.filepath_label.setStyleSheet("padding: 0px; margin: 0px; font-size: 10pt;")
         self.filepath_label.setFixedHeight(20)
-        main_layout.addWidget(self.filepath_label)
+        container_layout.addWidget(self.filepath_label)
 
         # Image index label (e.g., "1/32")
         self.image_counter_label = QLabel()
         self.image_counter_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_counter_label.setStyleSheet("font-size: 9pt; color: gray;")
         self.image_counter_label.setFixedHeight(20)
-        main_layout.addWidget(self.image_counter_label)
+        container_layout.addWidget(self.image_counter_label)
 
         # Image + metadata horizontal layout
         content_layout = QHBoxLayout()
@@ -59,10 +59,7 @@ class MediaEditPopup(QDialog):
         # Image
         self.media = MediaWidget()
         self.media.setStyleSheet("border: 1px solid black;")
-        self.media.setFixedHeight(400)
-        self.media.setFixedWidth(500)  # Adjusted width to make image smaller
-
-        content_layout.addWidget(self.media, 3)
+        content_layout.addWidget(self.media, 1)
 
         # Metadata panel
         metadata_container = QWidget()
@@ -92,7 +89,7 @@ class MediaEditPopup(QDialog):
         self.external_id_label = add_row("External ID: ")
         metadata_container.setLayout(metadata_layout)
         content_layout.addWidget(metadata_container, 1)
-        main_layout.addLayout(content_layout)
+        container_layout.addLayout(content_layout)
 
         # Editable fields
         self.name = QComboBox()
@@ -171,14 +168,14 @@ class MediaEditPopup(QDialog):
         self.next_btn.clicked.connect(self.show_next_image)
         img_nav_layout.addWidget(self.prev_btn)
         img_nav_layout.addWidget(self.next_btn)
-        main_layout.addLayout(img_nav_layout)
+        container_layout.addLayout(img_nav_layout)
 
         # OK/cancel buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
-        main_layout.addWidget(buttonBox)
-        self.setLayout(main_layout)
+        container_layout.addWidget(buttonBox)
+        self.setLayout(container_layout)
 
         # Show the first image
         self.update_image()

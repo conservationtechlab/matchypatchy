@@ -43,16 +43,22 @@ class MediaWidget(QWidget):
         self.layout.addWidget(self.playbackbar)
 
 
-    def load(self, filepath, bbox=None, crop=False):
+    def load(self, filepath, bbox=None, frame=None, crop=False):
         if Path(filepath).suffix.lower() in IMAGE_EXT:
             self.playbackbar.setVisible(False)
-            self.image_widget.load(filepath, bbox=bbox, crop=crop)
+            self.image_widget.load(filepath, bbox=bbox, frame=frame, crop=crop)
             self.stacked.setCurrentWidget(self.image_widget)
         elif Path(filepath).suffix.lower() in VIDEO_EXT:
-            self.playbackbar.setVisible(True)
-            self.player.setSource(QUrl.fromLocalFile(filepath))
-            self.stacked.setCurrentWidget(self.video_widget)
-            self.player.play()
+            if bbox is not None:
+                # display frame instead of video
+                self.playbackbar.setVisible(False)
+                self.image_widget.load(filepath, bbox=bbox, frame=frame, crop=crop)
+                self.stacked.setCurrentWidget(self.image_widget)
+            else:
+                self.playbackbar.setVisible(True)
+                self.player.setSource(QUrl.fromLocalFile(filepath))
+                self.stacked.setCurrentWidget(self.video_widget)
+                self.player.play()
         else:
             raise ValueError("Unsupported file format")
         
@@ -96,23 +102,37 @@ class ImageWidget(QLabel):
         self.pixmap = QPixmap(self.size())
         self.setPixmap(self.pixmap)
 
-    def load(self, image_path, bbox=None, crop=False):
+    def load(self, image_path, bbox=None, frame=None, crop=False):
         """
         Load image path with pillow
         """
         if self.image_path is None or image_path != self.image_path:
             self.image_path = image_path
 
+        if frame is not None:
+            self.pil_image = self.load_from_video(frame)
+        else:
+            self.pil_image = Image.open(self.image_path)
+
         self.rel_bbox = bbox
         self.crop_to_bbox = crop
-
-        self.pil_image = Image.open(self.image_path)
         self.adjust()
 
     def load_from_array(self, img_array):
         self.image_path = None
         self.pil_image = Image.fromarray(img_array)
         self.adjust()
+
+    def load_from_video(self, frame):
+        cap = cv2.VideoCapture(self.image_path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
+        ret, frame = cap.read()
+        cap.release()
+        if ret:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            return Image.fromarray(frame)
+        else:
+            raise ValueError("Could not read frame from video.")
 
     def adjust(self):
         """
@@ -153,10 +173,10 @@ class ImageWidget(QLabel):
         Crop to bbox before painting
         """
         if self.rel_bbox is not None:
-            left = self.qimage.width() * self.rel_bbox['bbox_x']
-            top = self.qimage.height() * self.rel_bbox['bbox_y']
-            right = self.qimage.width() * self.rel_bbox['bbox_w']
-            bottom = self.qimage.height() * self.rel_bbox['bbox_h']
+            left = self.qimage.width() * self.rel_bbox.iloc[0]['bbox_x']
+            top = self.qimage.height() * self.rel_bbox.iloc[0]['bbox_y']
+            right = self.qimage.width() * self.rel_bbox.iloc[0]['bbox_w']
+            bottom = self.qimage.height() * self.rel_bbox.iloc[0]['bbox_h']
             return QRect(int(left), int(top), int(right), int(bottom))
         else:
             return None
