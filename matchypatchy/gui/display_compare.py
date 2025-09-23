@@ -13,7 +13,7 @@ from PyQt6.QtGui import QIntValidator
 from matchypatchy.gui.widget_media import ImageAdjustBar, MediaWidget
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
-from matchypatchy.gui.popup_roi import ROIPopup
+from matchypatchy.gui.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.popup_pairx import PairXPopup
 from matchypatchy.gui.gui_assets import FilterBox, VerticalSeparator, StandardButton
 
@@ -609,7 +609,7 @@ class DisplayCompare(QWidget):
 
         NOTE: Redraws query and match
         """
-        dialog = ROIPopup(self, rid)
+        dialog = MediaEditPopup(self, rid)
         if dialog.exec():
             del dialog
             # reload data

@@ -10,7 +10,7 @@ from matchypatchy.database.media import IMAGE_EXT
 
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.popup_roi import ROIPopup
+from matchypatchy.gui.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.gui_assets import FilterBox, VerticalSeparator, StandardButton
 
 
@@ -333,7 +333,7 @@ class DisplayMedia(QWidget):
             # full image mode/video only mode
             data = self.media_table.data_filtered.iloc[[row]]
             current_image_index = 0
-        dialog = ROIPopup(self, data, current_image_index=current_image_index)
+        dialog = MediaEditPopup(self, data, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
             edit_stack = self.media_table.transpose_edit_stack(edit_stack)
@@ -349,7 +349,7 @@ class DisplayMedia(QWidget):
         data = self.media_table.data_filtered.iloc[selected_rows]
         current_image_index = 0
 
-        dialog = ROIPopup(self, data, current_image_index=current_image_index)
+        dialog = MediaEditPopup(self, data, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
             edit_stack = self.media_table.transpose_edit_stack(edit_stack)

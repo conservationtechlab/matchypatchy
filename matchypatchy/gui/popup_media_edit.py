@@ -1,437 +1,536 @@
-import pandas as pd
+"""
+Edit A Single Image
+
+"""
 from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboBox,
-                             QLabel, QDialogButtonBox)
+                             QLabel, QTextEdit, QDialogButtonBox, QPushButton)
 from PyQt6.QtCore import Qt
-from matchypatchy.algo.models import load
 
-from PyQt6.QtWidgets import QPushButton
-import matchypatchy.database.media as db_roi
-
-
-from matchypatchy.gui.widget_media import MediaWidget
-from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_species import SpeciesFillPopup
+from matchypatchy.gui.popup_individual import IndividualFillPopup
+from matchypatchy.gui.widget_media import MediaWidget
 from matchypatchy.gui.gui_assets import HorizontalSeparator
+
+from matchypatchy.algo.models import load
+import matchypatchy.database.media as db_roi
+from matchypatchy.database.species import fetch_individual
+from matchypatchy.database.location import fetch_station_names_from_id
 
 
 class MediaEditPopup(QDialog):
-    def __init__(self, parent, ids):
+    def __init__(self, parent, data, current_image_index=0, crop=False):
         super().__init__(parent)
-        self.parent = parent
-        self.setWindowTitle("View Media")
-        self.setFixedSize(900, 600)
+        self.setWindowTitle("View ROI")
+        self.setFixedSize(1000, 500)
         self.mpDB = parent.mpDB
+        self.data = data
+        self.ids = data["id"].tolist()
+        self.crop = crop
+        self.current_image_index = current_image_index
+        self.individuals = []
+        self.species_list = []
 
-        self.ids = ids  # List of ROI IDs
-        self.data = db_roi.fetch_roi_media(self.mpDB, self.ids, reset_index=False)
-        self.current_image_index = 0
-        self.fields_changed = {
-            "name": False,
-            "sex": False,
-            # "species": False,
-            "viewpoint": False,
-            "favorite": False,
-        }
-
-        # Load Viewpoint options
-        self.VIEWPOINTS = load('VIEWPOINTS')
-
-        # Layout
+        # Layout ---------------------------------------------------------------
         container_layout = QVBoxLayout()
 
-        # Top: filepath
-        self.filepath_label = QLabel()
-        self.filepath_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.filepath_label.setStyleSheet("padding: 0px; margin: 0px; font-size: 10pt;")
-        self.filepath_label.setFixedHeight(20)
-        container_layout.addWidget(self.filepath_label)
+        # Title Bar
+        top = QHBoxLayout()
+        # Filepath
+        self.filepath = QLabel()
+        top.addWidget(self.filepath, 1, alignment=Qt.AlignmentFlag.AlignCenter)
+        # Favorite
+        self.button_favorite = QPushButton("♥")
+        self.button_favorite.setFixedWidth(30)
+        self.button_favorite.setCheckable(True)
+        self.button_favorite.clicked.connect(self.favorite)
+        top.addWidget(self.button_favorite, 0, alignment=Qt.AlignmentFlag.AlignRight)
+        container_layout.addLayout(top)
 
+        # Image ----------------------------------------------------------------
+        content_layout = QHBoxLayout()
+        self.image = MediaWidget()
+        content_layout.addWidget(self.image, 1)
+        # Metadata
+        self.metadatapanel = MetadataPanel(self.mpDB, self.data, self.ids)
+        content_layout.addWidget(self.metadatapanel, 1)
+        container_layout.addLayout(content_layout)
+        container_layout.addStretch()
+
+        # Bottom Buttons -------------------------------------------------------
+        button_layout = QHBoxLayout()
+
+        self.prev_btn = QPushButton("Previous")
+        self.prev_btn.clicked.connect(self.show_previous_image)
+
+        button_layout.addWidget(self.prev_btn)
         # Image index label (e.g., "1/32")
         self.image_counter_label = QLabel()
-        self.image_counter_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_counter_label.setStyleSheet("font-size: 9pt; color: gray;")
-        self.image_counter_label.setFixedHeight(20)
-        container_layout.addWidget(self.image_counter_label)
+        button_layout.addWidget(self.image_counter_label, 0)
+        self.next_btn = QPushButton("Next")
+        self.next_btn.clicked.connect(self.show_next_image)
+        button_layout.addWidget(self.next_btn)
+        self.check_next_buttons()
 
-        # Image + metadata horizontal layout
-        content_layout = QHBoxLayout()
+        # Ok/Cancel Buttons
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        button_layout.addWidget(buttonBox)
+        buttonBox.accepted.connect(self.save)
+        buttonBox.rejected.connect(self.close_out)
+        container_layout.addLayout(button_layout)
+        self.setLayout(container_layout)
 
-        # Image
-        self.media = MediaWidget()
-        self.media.setStyleSheet("border: 1px solid black;")
-        content_layout.addWidget(self.media, 1)
+        self.refresh()
 
-        # Metadata panel
-        metadata_container = QWidget()
-        metadata_container.setObjectName("borderWidget")
-        metadata_container.setStyleSheet("""#borderWidget { border: 1px solid black; }""")
-        metadata_layout = QVBoxLayout()
+    def closeEvent(self, event):
+        # user pressed 'x' to close window
+        self.close_out()
 
+    def save(self):
+        # stop video if playing
+        self.image.player.stop()
+        self.accept()
+
+    def get_edit_stack(self):
+        edit_stack = self.metadatapanel.edit_stack
+        return edit_stack
+
+    def close_out(self):
+        # stop video if playing
+        self.image.player.stop()
+        self.reject()
+
+    def refresh(self):
+        # load image
+        self.filepath.setText(self.data.iloc[self.current_image_index]["filepath"])
+        self.check_favorite()
+        self.image_counter_label.setText(f"{self.current_image_index + 1} / {len(self.ids)}")  
+        self.image.load(self.data.iloc[self.current_image_index]["filepath"],
+                        bbox=db_roi.get_bbox(self.data.iloc[[self.current_image_index]]),
+                        frame=db_roi.get_frame(self.data.iloc[[self.current_image_index]]),
+                        crop=False)
+        # display data
+        self.metadatapanel.refresh_names()
+        self.metadatapanel.refresh_values(self.current_image_index)
+
+    def favorite(self):
+        if {"media_id"}.issubset(self.data.columns):
+            media_id = self.data.iloc[self.current_image_index]["media_id"]  # roi
+        else:
+            media_id = self.data.iloc[self.current_image_index]["id"]  # media
+        if self.button_favorite.isChecked():
+            self.button_favorite.setStyleSheet(""" QPushButton { background-color: #b51b32; color: white; }""")
+            self.mpDB.edit_row('media', media_id, {"favorite": 1})
+        else:
+            self.button_favorite.setStyleSheet("")
+            self.mpDB.edit_row('media', media_id, {"favorite": 0})
+
+    def check_favorite(self):
+        favorite = self.data.iloc[self.current_image_index]["favorite"]
+        if favorite == 1:
+            self.button_favorite.setChecked(True)
+            self.button_favorite.setStyleSheet(""" QPushButton { background-color: #b51b32; color: white; }""")
+        else:
+            self.button_favorite.setChecked(False)
+            self.button_favorite.setStyleSheet("")
+
+    def check_next_buttons(self):
+        if len(self.ids) > 1:
+            self.next_btn.setEnabled(True)
+            self.prev_btn.setEnabled(True)
+        else:
+            self.next_btn.setEnabled(False)
+            self.prev_btn.setEnabled(False)
+
+    def show_previous_image(self):
+        self.current_image_index = (self.current_image_index - 1) % len(self.data)
+        self.refresh()
+
+    def show_next_image(self):
+        self.current_image_index = (self.current_image_index + 1) % len(self.data)
+        self.refresh()
+
+
+class MetadataPanel(QWidget):
+    def __init__(self, mpDB, data, ids):
+        super().__init__()
+        self.mpDB = mpDB
+        self.data = data
+        self.ids = ids
         horizontal_gap = 80
         vertical_gap = 8
 
-        def add_row(label_txt):
-            row = QHBoxLayout()
-            label = QLabel(label_txt)
-            label.setFixedWidth(horizontal_gap)
-            val = QLabel()
-            row.addWidget(label)
-            row.addWidget(val)
-            metadata_layout.addLayout(row)
-            metadata_layout.addSpacing(vertical_gap)
-            return val
+        self.edit_stack = []
 
-        self.timestamp_label = add_row("Timestamp: ")
-        self.station_label = add_row("Station: ")
-        self.survey_label = add_row("Survey: ")
-        self.region_label = add_row("Region: ")
-        self.sequence_id_label = add_row("Sequence ID: ")
-        self.external_id_label = add_row("External ID: ")
-        metadata_container.setLayout(metadata_layout)
-        content_layout.addWidget(metadata_container, 1)
-        container_layout.addLayout(content_layout)
+        # Layout ---------------------------------------------------------------
+        metadata_layout = QVBoxLayout()
 
-        # Editable fields
-        self.name = QComboBox()
-        self.sex = QComboBox()
-        self.sex.addItems(['— Mixed —', 'Unknown', 'Male', 'Female'])
-        self.species = QComboBox()
-        self.viewpoint = QComboBox()
-        self.viewpoint.addItem("— Mixed —")  # Index 0
-        self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])
-        self.favorite = QComboBox()
-        self.favorite.addItems(["— Mixed —", "Not Favorite", "Favorite"])
-        # Connect signals to flags only
-        self.name.currentIndexChanged.connect(lambda: self.mark_field_changed("name"))
-        self.sex.currentIndexChanged.connect(lambda: self.mark_field_changed("sex"))
-        self.species.currentIndexChanged.connect(lambda: self.mark_field_changed("species"))
-        self.viewpoint.currentIndexChanged.connect(lambda: self.mark_field_changed("viewpoint"))
-        self.favorite.currentIndexChanged.connect(lambda: self.mark_field_changed("favorite"))
+        # Timestamp
+        timestamp = QHBoxLayout()
+        timestamp_label = QLabel("Timestamp: ")
+        timestamp_label.setFixedWidth(horizontal_gap)
+        timestamp.addWidget(timestamp_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.timestamp_data = QLabel()
+        timestamp.addWidget(self.timestamp_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        metadata_layout.addLayout(timestamp)
+        metadata_layout.addSpacing(vertical_gap)
+        # Station
+        station = QHBoxLayout()
+        station_label = QLabel("Station: ")
+        station_label.setFixedWidth(horizontal_gap)
+        station.addWidget(station_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.station_data = QLabel()
+        station.addWidget(self.station_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        metadata_layout.addLayout(station)
+        metadata_layout.addSpacing(vertical_gap)
+        # Survey
+        survey = QHBoxLayout()
+        survey_label = QLabel("Survey: ")
+        survey_label.setFixedWidth(horizontal_gap)
+        survey.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.survey_data = QLabel()
+        survey.addWidget(self.survey_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        metadata_layout.addLayout(survey)
+        metadata_layout.addSpacing(vertical_gap)
+        # Region
+        region = QHBoxLayout()
+        region_label = QLabel("Region: ")
+        region_label.setFixedWidth(horizontal_gap)
+        region.addWidget(region_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.region_data = QLabel()
+        region.addWidget(self.region_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        metadata_layout.addLayout(region)
+        metadata_layout.addSpacing(vertical_gap)
+        # Sequence ID
+        sequence = QHBoxLayout()
+        sequence_label = QLabel("Sequence ID: ")
+        sequence_label.setFixedWidth(horizontal_gap)
+        sequence.addWidget(sequence_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.sequence_data = QLabel()
+        sequence.addWidget(self.sequence_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        metadata_layout.addLayout(sequence)
+        metadata_layout.addSpacing(vertical_gap)
+        # External ID
+        external = QHBoxLayout()
+        external_label = QLabel("External ID: ")
+        external_label.setFixedWidth(horizontal_gap)
+        external.addWidget(external_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.external_data = QLabel()
+        external.addWidget(self.external_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        metadata_layout.addLayout(external)
+        metadata_layout.addSpacing(int(vertical_gap / 2))
 
+        # Divider
         metadata_layout.addWidget(HorizontalSeparator(linewidth=2))
+        metadata_layout.addSpacing(int(vertical_gap / 2))
 
-        for label_txt, widget in [
-            ("Name: ", self.name),
-            ("Sex: ", self.sex),
-            ("Species: ", self.species),
-            ("Viewpoint: ", self.viewpoint),
-            ("Favorite: ", self.favorite),
-        ]:
-            row = QHBoxLayout()
-            label = QLabel(label_txt)
-            label.setFixedWidth(horizontal_gap)
-            row.addWidget(label)
-            if label_txt == "Name: ":
-                name_layout = QHBoxLayout()
-                name_layout.setContentsMargins(0, 0, 0, 0)
-                name_layout.setSpacing(6)
+        # EDITABLE -------------------------------------------------------------
+        # Name - EDITABLE
+        name_layout = QHBoxLayout()
+        name_label = QLabel("Name: ")
+        name_label.setFixedWidth(horizontal_gap)
+        name_layout.addWidget(name_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.name = QComboBox()
+        self.name.currentIndexChanged.connect(self.change_name)
+        name_layout.addWidget(self.name, stretch=1)
+        self.add_individual = QPushButton("+")
+        self.add_individual.pressed.connect(self.new_individual)
+        name_layout.addWidget(self.add_individual)
+        metadata_layout.addLayout(name_layout)
+        metadata_layout.addSpacing(vertical_gap)
+        # Sex - EDITABLE
+        sex_layout = QHBoxLayout()
+        sex_label = QLabel("Sex: ")
+        sex_label.setFixedWidth(horizontal_gap)
+        sex_layout.addWidget(sex_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.sex = QComboBox()
+        self.sex.currentIndexChanged.connect(self.change_sex)
+        sex_layout.addWidget(self.sex, stretch=1)
+        metadata_layout.addLayout(sex_layout)
+        metadata_layout.addSpacing(vertical_gap)
+        # Age - EDITABLE
+        age_layout = QHBoxLayout()
+        age_label = QLabel("Age: ")
+        age_label.setFixedWidth(horizontal_gap)
+        age_layout.addWidget(age_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.age = QComboBox()
+        self.age.currentIndexChanged.connect(self.change_age)
+        age_layout.addWidget(self.age, stretch=1)
+        metadata_layout.addLayout(age_layout)
+        metadata_layout.addSpacing(vertical_gap)
+        # Species - EDITABLE
+        species_layout = QHBoxLayout()
+        species_label = QLabel("Species: ")
+        species_label.setFixedWidth(horizontal_gap)
+        species_layout.addWidget(species_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.species = QComboBox()
+        self.refresh_species()
+        self.species.currentIndexChanged.connect(self.change_species)
+        species_layout.addWidget(self.species, stretch=1)
+        self.button_add_species = QPushButton("+")
+        self.button_add_species.pressed.connect(self.new_species)
+        species_layout.addWidget(self.button_add_species)
+        metadata_layout.addLayout(species_layout)
+        metadata_layout.addSpacing(vertical_gap)
+        # Viewpoint - EDITABLE
+        viewpoint_layout = QHBoxLayout()
+        viewpoint_label = QLabel("Viewpoint: ")
+        viewpoint_label.setFixedWidth(horizontal_gap)
+        viewpoint_layout.addWidget(viewpoint_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.VIEWPOINTS = load('VIEWPOINTS')
+        self.viewpoint = QComboBox()
+        self.viewpoint.currentIndexChanged.connect(self.change_viewpoint)
+        viewpoint_layout.addWidget(self.viewpoint, 1)
+        metadata_layout.addLayout(viewpoint_layout)
+        metadata_layout.addSpacing(vertical_gap)
+        # Comment - EDITABLE
+        comment = QHBoxLayout()
+        comment_label = QLabel("Comment: ")
+        comment_label.setFixedWidth(horizontal_gap)
+        comment.addWidget(comment_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.comment = QTextEdit()
+        self.comment.setFixedHeight(60)
+        comment.addWidget(self.comment, 1)
+        comment.addStretch()
+        metadata_layout.addLayout(comment)
+        metadata_layout.addStretch()
 
-                name_layout.addWidget(widget, 1)
+        self.setLayout(metadata_layout)
 
-                plus_btn = QPushButton("+")
-                plus_btn.setFixedWidth(24)
-                plus_btn.setToolTip("Add new individual")
-                plus_btn.clicked.connect(self.add_new_individual)
-                name_layout.addWidget(plus_btn)
-
-                name_container = QWidget()
-                name_container.setLayout(name_layout)
-                row.addWidget(name_container, 1)
-
-            elif label_txt == "Species: ":
-                species_layout = QHBoxLayout()
-                species_layout.setContentsMargins(0, 0, 0, 0)
-                species_layout.setSpacing(6)
-
-                species_layout.addWidget(widget, 1)
-
-                plus_btn = QPushButton("+")
-                plus_btn.setFixedWidth(24)
-                plus_btn.setToolTip("Add new species")
-                plus_btn.clicked.connect(self.add_new_species)
-                species_layout.addWidget(plus_btn)
-
-                species_container = QWidget()
-                species_container.setLayout(species_layout)
-                row.addWidget(species_container, 1)
-
-            else:
-                row.addWidget(widget, 1)
-            metadata_layout.addLayout(row)
-            metadata_layout.addSpacing(vertical_gap)
-
-        # Navigation Buttons
-        img_nav_layout = QHBoxLayout()
-        self.prev_btn = QPushButton("Previous")
-        self.next_btn = QPushButton("Next")
-        self.prev_btn.clicked.connect(self.show_previous_image)
-        self.next_btn.clicked.connect(self.show_next_image)
-        img_nav_layout.addWidget(self.prev_btn)
-        img_nav_layout.addWidget(self.next_btn)
-        container_layout.addLayout(img_nav_layout)
-
-        # OK/cancel buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttonBox.accepted.connect(self.accept)
-        buttonBox.rejected.connect(self.reject)
-        container_layout.addWidget(buttonBox)
-        self.setLayout(container_layout)
-
-        # Show the first image
-        self.update_image()
-        self.load_individuals()
-
-        self.refresh_values()
-
-    def refresh_values(self):
-        print("\n[refresh_values] Running refresh...")
-        # --- Name ---
-        if not self.fields_changed["name"]:
-            unique_ids = self.data["individual_id"].unique()
-            self.name.blockSignals(True)
-            # Convert None/NaN to a consistent value (e.g., 0 for 'Unknown')
-            cleaned_ids = [0 if pd.isna(uid) else int(uid) for uid in unique_ids]
-            print(f"[refresh_values] Cleaned individual_ids: {cleaned_ids}")
-
-            if len(set(cleaned_ids)) == 1:
-                iid = cleaned_ids[0]
-                index = next((i for i, (id, _, _) in enumerate(self.individuals) if id == iid), 1)
-                print(f"[refresh_values] Setting name to {self.individuals[index][1]}")
-                self.name.setCurrentIndex(index)
-                self.sex.setDisabled(iid == 0)
-            else:
-                print("[refresh_values] Name is mixed — setting to '— Mixed —'")
-                self.name.setCurrentIndex(0)  # Index 0 = "— Mixed —"
-                self.sex.setDisabled(True)
-
-            self.name.blockSignals(False)
-        # --- Sex ---
-        if not self.fields_changed["sex"]:
-            unique_sexes = self.data["sex"].dropna().unique()
-            print(f"[refresh_values] Unique sexes: {unique_sexes}")
-            self.sex.blockSignals(True)
-
-            if len(unique_sexes) == 1:
-                sex_text = unique_sexes[0]
-                index = self.sex.findText(str(sex_text))
-                print(f"[refresh_values] Setting sex to {sex_text}")
-                self.sex.setCurrentIndex(index)
-            else:
-                print("[refresh_values] Sex is mixed — setting to '— Mixed —'")
-                self.sex.setCurrentIndex(0)  # '— Mixed —'
-            # Only enable if there's at least one valid individual
-            non_null_iids = self.data["individual_id"].dropna()
-            self.sex.setDisabled(non_null_iids.empty)
-            self.sex.blockSignals(False)
-
-        # --- Viewpoint ---
-        if not self.fields_changed["viewpoint"]:
-            unique_viewpoints = self.data["viewpoint"].dropna().unique()
-            print(f"[refresh_values] Unique viewpoints: {unique_viewpoints}")
-            self.viewpoint.blockSignals(True)
-            if len(unique_viewpoints) == 1:
-                vp_text = self.VIEWPOINTS[str(int(unique_viewpoints[0]))]  # TODO: fix
-                index = self.viewpoint.findText(vp_text)
-                print(f"[refresh_values] Setting viewpoint to {vp_text}")
-                self.viewpoint.setCurrentIndex(index)
-            else:
-                print("[refresh_values] Viewpoint is mixed, setting to '— Mixed —'")
-                self.viewpoint.setCurrentIndex(0)  # '— Mixed —'
-            self.viewpoint.blockSignals(False)
-        # --- Favorite ---
-        if not self.fields_changed["favorite"]:
-            unique_fav = self.data["favorite"].dropna().unique()
-            self.favorite.blockSignals(True)
-            if len(unique_fav) == 1:
-                index = 2 if unique_fav[0] == 1 else 1  # 1 = Not Favorite, 2 = Favorite
-                self.favorite.setCurrentIndex(index)
-            else:
-                self.favorite.setCurrentIndex(0)  # '— Mixed —'
-            self.favorite.blockSignals(False)
-
-    def update_image_counter_label(self):
-        total = len(self.data)
-        current = self.current_image_index + 1
-        self.image_counter_label.setText(f"{current} / {total}")
-
-    def add_new_individual(self):
-        dialog = IndividualFillPopup(self)
-        if dialog.exec():
-            individual_id = self.mpDB.add_individual(dialog.get_species_id(),
-                                                     dialog.get_name(),
-                                                     dialog.get_sex())
-            print(f"[add_new_individual] Added individual_id = {individual_id}")
-
-            # Update all selected ROIs with this new individual
-            for i, row in self.data.iterrows():
-                roi_id = row["id"]
-                self.mpDB.edit_row('roi', roi_id, {"individual_id": individual_id}, quiet=False)
-                self.data.at[i, "individual_id"] = individual_id
-                self.data.at[i, "sex"] = dialog.get_sex()
-
-            # Refresh dropdown and UI
-            self.load_individuals()
-            self.refresh_values()
-
-            # Auto-select the new individual
-            index = next((i for i, (id, _, _) in enumerate(self.individuals) if id == individual_id), 0)
-            self.name.setCurrentIndex(index)
-            print("[add_new_individual] Auto-selected new individual in dropdown")
-
-    def load_individuals(self):
-        individuals = self.mpDB.select("individual", "id, name, sex")
-        # Prepend special entries
-        self.individuals = [(-1, '— Mixed —', 'Unknown'), (0, 'Unknown', 'Unknown')] + individuals
+    def refresh_names(self):
         self.name.blockSignals(True)
         self.name.clear()
-        self.name.addItems([ind[1] for ind in self.individuals])
+        self.individuals = fetch_individual(self.mpDB)
+        self.name_list = ["Unknown"] + [el for el in self.individuals["name"]]
+        self.name.addItems(self.name_list)
         self.name.blockSignals(False)
 
-    def update_image(self):
-        if not self.data.empty:
-            filepath = self.data.iloc[self.current_image_index]["filepath"]
-            roi_row = self.data.iloc[self.current_image_index]
-            self.media.load(filepath,
-                            bbox=db_roi.get_bbox(roi_row),
-                            crop=False)
-            # Update filepath label
-            self.filepath_label.setText(filepath)
-            # Update metadata labels
-            self.timestamp_label.setText(str(roi_row.get("timestamp", "N/A")))
-            self.station_label.setText(str(roi_row.get("station_id", "N/A")))
-            self.survey_label.setText(str(roi_row.get("survey", "N/A")))
-            self.region_label.setText(str(roi_row.get("region", "N/A")))
-            self.sequence_id_label.setText(str(roi_row.get("sequence_id", "N/A")))
-            self.external_id_label.setText(str(roi_row.get("external_id", "N/A")))
+    def refresh_species(self):
+        self.species.blockSignals(True)
+        self.species.clear()
+        species = self.mpDB.select("species", "id, common")
+        self.species_list = [(0, 'Unknown')] + species
+        self.species.addItems([el[1] for el in self.species_list])
+        self.species.blockSignals(False)
 
-        self.prev_btn.setEnabled(self.current_image_index > 0)
-        self.next_btn.setEnabled(self.current_image_index < len(self.data) - 1)
-        self.update_image_counter_label()
+    def refresh_values(self, current_image_index):
+        # disable comboboxes
+        self.name.blockSignals(True)
+        self.age.blockSignals(True)
+        self.sex.blockSignals(True)
+        self.species.blockSignals(True)
+        self.viewpoint.blockSignals(True)
 
-    def show_next_image(self):
-        if self.current_image_index < len(self.data) - 1:
-            self.current_image_index += 1
-            self.update_image()
+        self.timestamp_data.setText(str(self.data.iloc[current_image_index]["timestamp"]))
+        survey_info = fetch_station_names_from_id(self.mpDB, self.data.iloc[current_image_index]["station_id"])
+        self.station_data.setText(str(survey_info['station_name']))
+        self.survey_data.setText(str(survey_info["survey_name"]))
+        self.region_data.setText(str(survey_info["region_name"]))
+        self.sequence_data.setText(str(self.data.iloc[current_image_index]["sequence_id"]))
+        self.external_data.setText(str(self.data.iloc[current_image_index]["external_id"]))
 
-    def show_previous_image(self):
-        if self.current_image_index > 0:
-            self.current_image_index -= 1
-            self.update_image()
+        # Name
+        iid = self.data.iloc[current_image_index]["individual_id"] if {"individual_id"}.issubset(self.data.columns) else 0
+        if iid == 0:
+            # media only, no individual column
+            self.name.setCurrentIndex(0)
+            self.name.setDisabled(True)
+            self.age.setDisabled(True)
+            self.sex.setDisabled(True)
+        elif iid is None:
+            self.name.setCurrentIndex(0)
+            self.sex.setDisabled(True)
+            self.age.setDisabled(True)
+        else:
+            self.name.setCurrentIndex(iid)
+            self.sex.setDisabled(False)
+            self.age.setDisabled(False)
 
-    def mark_field_changed(self, field):
-        if field == "viewpoint" and self.viewpoint.currentIndex() == 0:
-            print("[mark_field_changed] Viewpoint still mixed — not marking as changed.")
-            return
-        if field == "name" and self.name.currentIndex() == 0:
-            print("[mark_field_changed] Name still mixed — not marking as changed.")
-            return
-        if field == "sex" and self.sex.currentIndex() == 0:
-            print("[mark_field_changed] Sex still mixed — not marking as changed.")
-            return
-        if field == "favorite" and self.favorite.currentIndex() == 0:
-            print("[mark_field_changed] Favorite still mixed — not marking as changed.")
-            return
-
-        print(f"[mark_field_changed] {field} is marked as changed.")
-        self.fields_changed[field] = True
-
-    # Viewpoint
-    def apply_viewpoint(self):
-        """
-        Update `viewpoint` for all selected ROIs.
-        """
-        viewpoint_keys = list(self.VIEWPOINTS.keys())
-        if self.viewpoint.currentIndex() <= 0:  # 0 = '— Mixed —'
-            print("[apply_viewpoint] Skipping update — still mixed or invalid.")
-            return
-        selected_viewpoint_key = viewpoint_keys[self.viewpoint.currentIndex()]  # Adjust for 'any' skipping
-        print(f"[apply_viewpoint] Applying viewpoint: {selected_viewpoint_key}")
-        for _, row in self.data.iterrows():
-            roi_id = row["id"]
-            if selected_viewpoint_key == 'None':
-                self.mpDB.edit_row('roi', roi_id, {"viewpoint": None}, quiet=False)
+        # Sex
+        if len(self.ids) > 1:
+            self.sex.addItems(['— Mixed —', 'Unknown', 'Male', 'Female'])
+            unique_sexes = self.data["sex"].dropna().unique() if {"sex"}.issubset(self.data.columns) else []
+            if len(unique_sexes) == 0:
+                self.sex.setCurrentIndex(self.sex.findText('Unknown'))
+            elif len(unique_sexes) == 1:
+                sex_text = unique_sexes[0]
+                self.sex.setCurrentIndex(self.sex.findText(str(sex_text)))
             else:
-                self.mpDB.edit_row('roi', roi_id, {"viewpoint": int(selected_viewpoint_key)}, quiet=False)
+                self.sex.setCurrentIndex(0)  # '— Mixed —'
+        else:
+            self.sex.addItems(['Unknown', 'Male', 'Female'])
+            current_sex = self.data.iloc[current_image_index]["sex"] if {"sex"}.issubset(self.data.columns) else None
+            if current_sex is None:
+                self.sex.setCurrentIndex(0)
+            else:
+                self.sex.setCurrentIndex(self.sex.findText(str(current_sex)))
+        # Age
+        if len(self.ids) > 1:
+            self.age.addItems(['— Mixed —', 'Unknown', 'Juvenile', 'Subadult', 'Adult'])
+            unique_ages = self.data["age"].dropna().unique() if {"age"}.issubset(self.data.columns) else []
+            if len(unique_ages) == 0:
+                self.age.setCurrentIndex(1) # 'Unknown'
+            elif len(unique_ages) == 1:
+                age_text = unique_ages[0]
+                self.age.setCurrentIndex(self.age.findText(str(age_text)))
+            else:
+                self.age.setCurrentIndex(0)  # '— Mixed —'
+        else:
+            self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
+            current_age = self.data.iloc[current_image_index]["age"] if {"age"}.issubset(self.data.columns) else None
+            if current_age is None:
+                self.age.setCurrentIndex(0)
+            else:
+                self.age.setCurrentIndex(self.age.findText(str(current_age)))
+
+        # Species
+        self.species.setDisabled(False)
+        self.button_add_species.setDisabled(False)
+        current_species = self.data.iloc[current_image_index]["common"] if {"common"}.issubset(self.data.columns) else 0
+        if current_species == 0:
+            # media only, no species column
+            self.species.setCurrentIndex(0)
+            self.species.setDisabled(True)
+            self.button_add_species.setDisabled(True)
+        elif current_species == None:
+            self.species.setCurrentIndex(0)
+        else:
+            self.species.setCurrentIndex(self.species.findText(str(current_species)))
+
+        # Viewpoint
+        self.viewpoint.setDisabled(False)
+        if len(self.ids) > 1:
+            self.viewpoint.addItems(['— Mixed —'] + list(self.VIEWPOINTS.values())[1:])  # skip 'any'
+            unique_viewpoints = self.data["viewpoint"].dropna().unique() if {"viewpoint"}.issubset(self.data.columns) else []
+            if len(unique_viewpoints) == 0:
+                # viewpoint not in columns, media only
+                self.viewpoint.setCurrentIndex(self.viewpoint.findText('None'))
+                self.viewpoint.setDisabled(True)
+            elif len(unique_viewpoints) == 1:
+                viewpoint_key = str(unique_viewpoints[0])
+                viewpoint_text = self.VIEWPOINTS[viewpoint_key]
+                self.viewpoint.setCurrentIndex(self.viewpoint.findText(str(viewpoint_text)))
+            else:
+                self.viewpoint.setCurrentIndex(0)  # '— Mixed —'
+        else:
+            self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])  # skip 'any'
+            viewpoint = str(self.data.iloc[current_image_index]["viewpoint"]) if {"viewpoint"}.issubset(self.data.columns) else -1
+            if viewpoint == -1:
+                # no viewpoint column, media only
+                self.setDisabled(True)
+                self.viewpoint.setCurrentIndex(0)
+            elif viewpoint == 'None' or viewpoint is None or viewpoint == 'nan':
+                self.viewpoint.setCurrentIndex(0)
+            else:
+                current_viewpoint = self.VIEWPOINTS[viewpoint]
+                self.viewpoint.setCurrentIndex(self.viewpoint.findText(current_viewpoint))
+
+        # Comment
+        self.comment.setText(str(self.data.iloc[current_image_index]["comment"]))
+
+        # renable comboboxes
+        self.name.blockSignals(False)
+        self.age.blockSignals(False)
+        self.sex.blockSignals(False)
+        self.species.blockSignals(False)
+        self.viewpoint.blockSignals(False)
+
+
+    # Edits --------------------------------------------------------------------
+    def change_name(self):
+        if self.name.currentIndex() > 0:
+            selected_individual = self.individuals[self.individuals["name" ] == self.name_list[self.name.currentIndex()]]
+            print(selected_individual)
+
+            for id in self.ids:
+                previous_value = self.data[self.data["id"] == id]["individual_id"].item()
+                edit = {'id': id,
+                        'reference': 'individual_id',
+                        'previous_value': previous_value,
+                        'new_value': selected_individual['id'].item()}
+                self.edit_stack.append(edit)
+            self.sex.setCurrentIndex(self.sex.findText(str(selected_individual['sex'].values[0])))
+            self.sex.setDisabled(False)
+            self.age.setCurrentIndex(self.age.findText(str(selected_individual['age'].values[0])))
+            self.age.setDisabled(False)
+        else:
+            self.sex.setCurrentIndex(0)
+            self.sex.setDisabled(True)
+            self.age.setCurrentIndex(0)
+            self.age.setDisabled(True)
+
+    def change_sex(self):
+        if self.name.currentIndex() > 0:
+            iid = self.individuals.loc[self.individuals["name" ] == self.name_list[self.name.currentIndex()], 'id'].item()
+            for id in self.ids:
+                previous_value = self.data[self.data["id"] == id]["sex"].item()
+                edit = {'id': id,
+                        'reference': 'sex',
+                        'previous_value': previous_value,
+                        'new_value': self.sex.currentText()}
+                print(edit)
+                self.edit_stack.append(edit)
+
+    def change_age(self):
+        # updates individual table
+        if self.name.currentIndex() > 0:
+            iid = self.individuals.loc[self.individuals["name" ] == self.name_list[self.name.currentIndex()], 'id'].values[0]
+            for id in self.ids:
+                previous_value = self.data[self.data["id"] == id]["age"].item()
+                edit = {'id': id,
+                        'reference': 'age',
+                        'previous_value': previous_value,
+                        'new_value': self.age.currentText()}
+                print(edit)
+                self.edit_stack.append(edit)
+
+    def change_species(self):
+        selected_species = self.species_list[self.species.currentIndex()]
+        if selected_species[0] > 0:
+            for id in self.ids:
+                edit = {'id': id,
+                        'reference': 'species_id',
+                        'previous_value': self.data[self.data["id"] == id]["species_id"].item(),
+                        'new_value': selected_species[0]}
+                print(edit)
+                self.edit_stack.append(edit)
+
+    def change_viewpoint(self):
+        viewpoint_keys = list(self.VIEWPOINTS.keys())
+        selected_viewpoint = viewpoint_keys[self.viewpoint.currentIndex() + 1]
+        for id in self.ids:
+            if selected_viewpoint == 'None':
+                edit = {'id': id,
+                        'reference': 'viewpoint',
+                        'previous_value': self.data[self.data["id"] == id]["viewpoint"].item(),
+                        'new_value': None}
+            else:
+                edit = {'id': id,
+                        'reference': 'viewpoint',
+                        'previous_value': self.data[self.data["id"] == id]["viewpoint"].item(),
+                        'new_value': int(selected_viewpoint)}
+            print(edit)
+            self.edit_stack.append(edit)
+
+    def new_individual(self):
+        dialog = IndividualFillPopup(self)
+        if dialog.exec():
+            individual_id = self.mpDB.add_individual(dialog.get_name(),
+                                                     dialog.get_species_id(),
+                                                     dialog.get_sex(),
+                                                     dialog.get_age())
+            for rid in self.ids:
+                self.mpDB.edit_row('roi', rid, {"individual_id": individual_id})
+        # reload data
+        self.refresh_names()
         self.refresh_values()
 
-    # Name
-    def apply_name(self):
-        if self.name.currentIndex() == 0:
-            print("[apply_name] Still showing '— Mixed —', skipping.")
-            return
-
-        selected_individual = self.individuals[self.name.currentIndex()]
-        print(f"[apply_name] Applying individual_id = {selected_individual[0]}")
-        for i, row in self.data.iterrows():
-            roi_id = row["id"]
-            if selected_individual[0] > 0:
-                self.mpDB.edit_row('roi', roi_id, {"individual_id": selected_individual[0]}, quiet=False)
-                self.data.at[i, "individual_id"] = selected_individual[0]
-            else:
-                self.mpDB.edit_row('roi', roi_id, {"individual_id": None}, quiet=False)
-                self.data.at[i, "individual_id"] = None
-
-    # Sex
-    def apply_sex(self):
-        if self.sex.currentIndex() == 0:
-            print("[apply_sex] Still showing '— Mixed —', skipping.")
-            return
-
-        selected_sex = self.sex.currentText()
-        print(f"[apply_sex] Applying sex: {selected_sex}")
-        for i, row in self.data.iterrows():
-            iid = row["individual_id"]
-            if iid:
-                self.mpDB.edit_row('individual', iid, {"sex": selected_sex}, quiet=False)
-                self.data.at[i, "sex"] = selected_sex
-
-    # Favorite
-    def apply_favorite(self):
-        if self.favorite.currentIndex() == 0:
-            print("[apply_favorite] Still showing '— Mixed —', skipping.")
-            return
-
-        new_val = 1 if self.favorite.currentIndex() == 2 else 0
-        print(f"[apply_favorite] Setting favorite = {new_val}")
-
-        updated_media_ids = set()
-
-        for idx, row in self.data.iterrows():
-            media_id = row["media_id"]
-            if media_id not in updated_media_ids:
-                self.mpDB.edit_row("media", media_id, {"favorite": new_val}, quiet=False)
-                updated_media_ids.add(media_id)
-            self.data.loc[idx, "favorite"] = new_val
-
-        self.parent.media_table.refresh_table()
-
-    def add_new_species(self):
+    def new_species(self):
         dialog = SpeciesFillPopup(self)
         if dialog.exec():
             species_id = self.mpDB.add_species(dialog.get_binomen(),
                                                dialog.get_common())
-            print(f"[add_new_species] Added species_id = {species_id}")
-
-            # Apply to all selected ROIs
-            for i, row in self.data.iterrows():
-                roi_id = row["id"]
-                self.mpDB.edit_row('roi', roi_id, {"species_id": species_id}, quiet=False)
-                self.data.at[i, "species_id"] = species_id
-            # Reload UI
-            # self.refresh_species()
-            self.refresh_values()
-
-    def accept(self):
-        print("\n=== ACCEPTING CHANGES ===")
-        for key, changed in self.fields_changed.items():
-            print(f"[accept] {key} changed? {changed}")
-
-        if self.fields_changed["viewpoint"]:
-            self.apply_viewpoint()
-        if self.fields_changed["name"]:
-            self.apply_name()
-        if self.fields_changed["sex"]:
-            self.apply_sex()
-        if self.fields_changed["favorite"]:
-            self.apply_favorite()
-        super().accept()
+            for rid in self.ids:
+                self.mpDB.edit_row('roi', rid, {"species_id": species_id})
+        # reload data
+        self.refresh_species()
+        self.refresh_values()

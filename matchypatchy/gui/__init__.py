@@ -14,7 +14,6 @@ from matchypatchy.gui import popup_media_edit
 from matchypatchy.gui import popup_ml
 from matchypatchy.gui import popup_pairx
 from matchypatchy.gui import popup_readme
-from matchypatchy.gui import popup_roi
 from matchypatchy.gui import popup_species
 from matchypatchy.gui import popup_station
 from matchypatchy.gui import popup_survey
@@ -35,12 +34,11 @@ from matchypatchy.gui.popup_import_csv import (ImportCSVPopup,)
 from matchypatchy.gui.popup_import_folder import (ImportFolderPopup,)
 from matchypatchy.gui.popup_individual import (IndividualFillPopup,
                                                IndividualPopup,)
-from matchypatchy.gui.popup_media_edit import (MediaEditPopup,)
+from matchypatchy.gui.popup_media_edit import (MediaEditPopup, MetadataPanel,)
 from matchypatchy.gui.popup_ml import (MLDownloadPopup, MLOptionsPopup,)
 from matchypatchy.gui.popup_pairx import (PairXPopup,)
 from matchypatchy.gui.popup_readme import (AboutPopup, LicensePopup,
                                            READMEPopup,)
-from matchypatchy.gui.popup_roi import (ROIPopup,)
 from matchypatchy.gui.popup_species import (SpeciesFillPopup, SpeciesPopup,)
 from matchypatchy.gui.popup_station import (StationFillPopup, StationPopup,)
 from matchypatchy.gui.popup_survey import (SurveyFillPopup, SurveyPopup,)
@@ -55,7 +53,7 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ComboBoxDelegate', 'ComboBoxSeparator',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
            'LOGO', 'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
            'MainWindow', 'MediaEditPopup', 'MediaTable', 'MediaWidget',
-           'PairXPopup', 'READMEPopup', 'ROIPopup', 'SpeciesFillPopup',
+           'MetadataPanel', 'PairXPopup', 'READMEPopup', 'SpeciesFillPopup',
            'SpeciesPopup', 'StandardButton', 'StationFillPopup',
            'StationPopup', 'SurveyFillPopup', 'SurveyPopup',
            'VerticalSeparator', 'VideoPlayerBar', 'VideoWidget',
@@ -63,5 +61,5 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ComboBoxDelegate', 'ComboBoxSeparator',
            'main_display', 'main_gui', 'media_table', 'popup_alert',
            'popup_config', 'popup_dropdown', 'popup_import_csv',
            'popup_import_folder', 'popup_individual', 'popup_media_edit',
-           'popup_ml', 'popup_pairx', 'popup_readme', 'popup_roi',
-           'popup_species', 'popup_station', 'popup_survey', 'widget_media']
+           'popup_ml', 'popup_pairx', 'popup_readme', 'popup_species',
+           'popup_station', 'popup_survey', 'widget_media']
