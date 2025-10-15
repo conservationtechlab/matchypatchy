@@ -297,7 +297,7 @@ class DisplayBase(QWidget):
             # 2. ANIML (BBOX + SPECIES)
             dialog.set_max(100)
             dialog.set_counter(0)
-            self.animl_thread = AnimlThread(self.mpDB, mloptions['detector_key'], mloptions['classifier_key'])
+            self.animl_thread = AnimlThread(self.mpDB, mloptions['detector_key']) #, mloptions['classifier_key']) --- IGNORE ---
             self.animl_thread.prompt_update.connect(dialog.update_prompt)
             self.animl_thread.progress_update.connect(dialog.set_value)
 

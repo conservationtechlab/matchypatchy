@@ -18,12 +18,13 @@ def update_model_yml():
     """
     # download current version
     model_yml_path = resource_path("models.yml")
-    try:
-        urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", model_yml_path)
-        return True
-    except urllib.error.URLError:
-        logging.error("Unable to connect to server.")
-        return False
+    # TODO: re-enable when final list of models is ready
+    #try:
+    #    urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", model_yml_path)
+    #    return True
+    #except urllib.error.URLError:
+    #    logging.error("Unable to connect to server.")
+    #    return False
 
 
 def load(key=None):
@@ -93,25 +94,9 @@ def download(ML_DIR, key):
                 logging.error("Unable to connect to server.")
                 return False
         if path.exists():  # validate that it downloaded
-            # if key is a classifier, get class list and config
-            if key in ml_cfg['CLASSIFIER_MODELS']:
-                class_path = ML_DIR / ml_cfg['CLASS_FILES'][key][0]
-                config_path = ML_DIR / ml_cfg['CONFIG_FILES'][key][0]
-                if not class_path.exists():
-                    try:
-                        urllib.request.urlretrieve(ml_cfg['CLASS_FILES'][key][1], path)
-                    except urllib.error.URLError:
-                        logging.error("Unable to connect to server.")
-                if not config_path.exists():
-                    try:
-                        urllib.request.urlretrieve(ml_cfg['CONFIG_FILES'][key][1], path)
-                    except urllib.error.URLError:
-                        logging.error("Unable to connect to server.")
-                if class_path.exists() and config_path.exists():
-                    # validate download
-                    return True
-                else:
-                    return False
+            return True
+        else:
+            return False
 
 
 class DownloadMLThread(QThread):
