@@ -48,10 +48,10 @@ class ReIDThread(QThread):
 
         if not self.isInterruptionRequested():
             self.prompt_update.emit("Calculating viewpoint...")
-            #self.get_viewpoint()
+            self.get_viewpoint()
         if not self.isInterruptionRequested():
             self.prompt_update.emit("Calculating embeddings...")
-            #self.get_embeddings()
+            self.get_embeddings()
         if not self.isInterruptionRequested():
             self.prompt_update.emit("Processing complete!")
             self.done.emit()
@@ -67,7 +67,7 @@ class ReIDThread(QThread):
 
             device = animl.get_device()
             model = animl.load_classifier(self.viewpoint_filepath, 2, device=device)
-            dataloader = animl.manifest_dataloader(filtered_rois, file_col='filepath', crop=True)
+            dataloader = animl.manifest_dataloader(filtered_rois, crop=True)
 
             for i, batch in enumerate(dataloader):
                 if not self.isInterruptionRequested():

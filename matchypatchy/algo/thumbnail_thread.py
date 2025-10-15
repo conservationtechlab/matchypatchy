@@ -2,6 +2,7 @@
 QThread for saving thumbnails to temp dir for media table
 """
 import cv2
+import random
 from pathlib import Path
 
 from PyQt6.QtGui import QImage
@@ -92,8 +93,9 @@ class LoadThumbnailThread(QThread):
                                             Qt.TransformationMode.SmoothTransformation)
 
             # create a temporary file to hold thumbnail
+            rand = random.randint(1000, 9999)
             newpath = Path(self.thumbnail_dir) / Path(roi['filepath']).stem
-            filepath = f"{str(newpath)}_{frame}.jpg"
+            filepath = f"{str(newpath)}_{frame}_{rand}.jpg"
 
             # save the image
             scaled_image.save(filepath, format="JPG")

@@ -120,7 +120,19 @@ def get_bbox(roi):
     """
     Return the bbox coordinates for a given roi row
     """
-    return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
+    if {'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'}.issubset(roi.columns) and \
+        roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']].notnull().all(axis=None):
+        return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
+    return None
+
+
+def get_frame(roi):
+    """
+    Return the frame for a given roi row
+    """
+    if {'frame'}.issubset(roi.columns):
+        return roi['frame'].values[0]
+    return None
 
 
 def get_sequence(id, roi_media):
@@ -167,7 +179,6 @@ def media_count(mpDB, survey_id):
     """
     Get number of media files associated with a given survey_id
     """
-
     valid_stations = list(mpDB.select("station", columns="id", row_cond=f'survey_id={survey_id}', quiet=False)[0])
     survey_list = ",".join([str(s) for s in valid_stations])
     media = mpDB.select("media", columns="id", row_cond=f'station_id IN ({survey_list})', quiet=False)

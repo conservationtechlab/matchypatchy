@@ -65,6 +65,7 @@ class AnimlThread(QThread):
     def get_frames(self):
         self.media = animl.extract_frames2(self.media, frames=self.n_frames)
 
+
     def get_bbox(self):
         # SKIP if no detector selected
         if self.DETECTOR_KEY is None:
@@ -94,7 +95,7 @@ class AnimlThread(QThread):
                 detections = animl.get_animals(detections)
 
                 for _, roi in detections.iterrows():
-                    frame = roi['framenumber'] if 'framenumber' in roi.index else 0
+                    frame = roi['frame'] if 'frame' in roi.index else 0
 
                     bbox_x = roi['bbox_x']
                     bbox_y = roi['bbox_y']

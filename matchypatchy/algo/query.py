@@ -12,6 +12,7 @@ from matchypatchy.algo.models import load
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
+# TODO: sequences for videos 
 class QueryContainer(QObject):
     thread_signal = pyqtSignal(bool)
 
@@ -327,7 +328,7 @@ class QueryContainer(QObject):
             return self.data.loc[rid]
         elif column == 'bbox':
             # Return the bbox coordinates for current query
-            return db_roi.get_bbox(self.data.loc[rid])
+            return db_roi.get_bbox(self.data.loc[[rid]])
         elif column == 'metadata':
             return self.roi_metadata(self.data.loc[rid])
         else:

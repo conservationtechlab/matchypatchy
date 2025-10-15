@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QProgressBar,
 from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.widget_combobox import ComboBoxSeparator
+from matchypatchy.gui.gui_assets import ComboBoxSeparator
 
 from matchypatchy.algo.animl_thread import BuildManifestThread
 from matchypatchy.algo.import_thread import FolderImportThread
