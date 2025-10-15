@@ -32,7 +32,7 @@ class AnimlThread(QThread):
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, detector_key, classifier_key):
+    def __init__(self, mpDB, detector_key): #, classifier_key):
         super().__init__()
         self.mpDB = mpDB
         self.ml_dir = Path(config.load('ML_DIR'))
@@ -49,9 +49,9 @@ class AnimlThread(QThread):
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 
         self.md_filepath = models.get_path(self.ml_dir, detector_key)
-        self.classifier_filepath = models.get_path(self.ml_dir, classifier_key)
-        self.class_filepath = models.get_class_path(self.ml_dir, classifier_key)
-        self.config_filepath = models.get_config_path(self.ml_dir, classifier_key)
+        #self.classifier_filepath = models.get_path(self.ml_dir, classifier_key)
+        #self.class_filepath = models.get_class_path(self.ml_dir, classifier_key)
+        #self.config_filepath = models.get_config_path(self.ml_dir, classifier_key)
 
     def run(self):
         if not self.media.empty:
