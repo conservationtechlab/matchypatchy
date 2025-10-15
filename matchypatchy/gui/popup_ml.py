@@ -127,13 +127,13 @@ class MLOptionsPopup(QDialog):
         self.detector.addItems(self.available_detectors)
 
         # Classifier
-        self.classifier_label = QLabel("Select Classifier Model:")
-        self.classifier = QComboBox()
-        layout.addWidget(self.classifier_label)
-        layout.addWidget(self.classifier)
+        #self.classifier_label = QLabel("Select Classifier Model:")
+        #self.classifier = QComboBox()
+        #layout.addWidget(self.classifier_label)
+        #layout.addWidget(self.classifier)
 
-        self.available_classifiers = ['None'] + self.get_subset('CLASSIFIER_MODELS')
-        self.classifier.addItems(self.available_classifiers)
+        #self.available_classifiers = ['None'] + self.get_subset('CLASSIFIER_MODELS')
+        #self.classifier.addItems(self.available_classifiers)
 
         # Re-ID
         self.reid_label = QLabel("Select Re-Identification Model:")
@@ -189,38 +189,38 @@ class MLOptionsPopup(QDialog):
         if len(self.available_detectors) == 0:
             return None
         else:
-            self.selected_detector_key = self.available_detectors[self.detector.currentIndex()]
-            return self.selected_detector_key
+            self.selected_DETECTOR_KEY = self.available_detectors[self.detector.currentIndex()]
+            return self.selected_DETECTOR_KEY
 
-    def select_classifier(self):
-        if self.classifier.currentIndex() == 0:
-            return None
-        else:
-            self.selected_classifier_key = self.available_classifiers[self.classifier.currentIndex()]
-            return self.selected_classifier_key
+    # def select_classifier(self):
+    #     if self.classifier.currentIndex() == 0:
+    #         return None
+    #     else:
+    #         self.selected_classifier_key = self.available_classifiers[self.classifier.currentIndex()]
+    #         return self.selected_classifier_key
 
     def select_reid(self):
         if len(self.available_reids) == 0:
             return None
         else:
-            self.selected_reid_key = self.available_reids[self.reid.currentIndex()]
-            return self.selected_reid_key
+            self.selected_REID_KEY = self.available_reids[self.reid.currentIndex()]
+            return self.selected_REID_KEY
 
     def select_viewpoint(self):
         if self.viewpoint.currentIndex() == 0:
             return None
         else:
-            self.selected_viewpoint_key = self.available_viewpoints[self.viewpoint.currentIndex()]
-            return self.selected_viewpoint_key
+            self.selected_VIEWPOINT_KEY = self.available_viewpoints[self.viewpoint.currentIndex()]
+            return self.selected_VIEWPOINT_KEY
         
     def return_selections(self):
         sequence_checked = self.select_sequence()
-        detector_key = self.select_detector()
-        classifier_key = self.select_classifier()
-        reid_key = self.select_reid()
-        viewpoint_key = self.select_viewpoint()
+        DETECTOR_KEY = self.select_detector()
+        #classifier_key = self.select_classifier()
+        REID_KEY = self.select_reid()
+        VIEWPOINT_KEY = self.select_viewpoint()
         return {"sequence_checked":sequence_checked,
-                "detector_key":detector_key,
-                "classifier_key":classifier_key,
-                "reid_key":reid_key,
-                "viewpoint_key":viewpoint_key,}
+                "DETECTOR_KEY":DETECTOR_KEY,
+                #"classifier_key":classifier_key,
+                "REID_KEY":REID_KEY,
+                "VIEWPOINT_KEY":VIEWPOINT_KEY,}

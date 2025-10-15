@@ -25,7 +25,11 @@ def initiate():
         'DB_DIR': str(HOME_DIR / 'Database'),
         'ML_DIR': str(HOME_DIR / 'Models'),
         'THUMBNAIL_DIR': str(HOME_DIR / 'Thumbnails'),
-        'VIDEO_FRAMES': 3
+        'VIDEO_FRAMES': 3,
+        'REID_KEY': None,
+        'VIEWPOINT_KEY': None,
+        'DETECTION_KEY': None,
+        'DEFAULT_KNN': 100
     }
     CONFIG_PATH = Path(resource_path('config.yml'))
     if CONFIG_PATH.exists():
