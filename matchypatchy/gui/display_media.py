@@ -319,6 +319,7 @@ class DisplayMedia(QWidget):
                 data = self.media_table.data_filtered.iloc[[row]]
                 current_image_index = 0
             else: 
+                # TODO Only show multiple frames if selected
                 # display frames as well as video
                 mid = int(self.media_table.data_filtered.at[row, "media_id"])
                 data = self.media_table.data_filtered[self.media_table.data_filtered['media_id'] == mid]

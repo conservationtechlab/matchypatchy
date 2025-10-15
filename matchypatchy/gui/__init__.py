@@ -44,7 +44,7 @@ from matchypatchy.gui.popup_station import (StationFillPopup, StationPopup,)
 from matchypatchy.gui.popup_survey import (SurveyFillPopup, SurveyPopup,)
 from matchypatchy.gui.widget_media import (ImageAdjustBar, ImageWidget,
                                            MediaWidget, VideoPlayerBar,
-                                           VideoWidget,)
+                                           VideoViewer, VideoWidget,)
 
 __all__ = ['AboutPopup', 'AlertPopup', 'ComboBoxDelegate', 'ComboBoxSeparator',
            'ConfigPopup', 'DisplayBase', 'DisplayCompare', 'DisplayMedia',
@@ -56,7 +56,7 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ComboBoxDelegate', 'ComboBoxSeparator',
            'MetadataPanel', 'PairXPopup', 'READMEPopup', 'SpeciesFillPopup',
            'SpeciesPopup', 'StandardButton', 'StationFillPopup',
            'StationPopup', 'SurveyFillPopup', 'SurveyPopup',
-           'VerticalSeparator', 'VideoPlayerBar', 'VideoWidget',
+           'VerticalSeparator', 'VideoPlayerBar', 'VideoViewer', 'VideoWidget',
            'display_base', 'display_compare', 'display_media', 'gui_assets',
            'main_display', 'main_gui', 'media_table', 'popup_alert',
            'popup_config', 'popup_dropdown', 'popup_import_csv',

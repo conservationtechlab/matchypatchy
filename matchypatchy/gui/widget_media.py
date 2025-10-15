@@ -2,7 +2,7 @@ import cv2
 from pathlib import Path
 from PIL import Image, ImageEnhance
 
-from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, 
+from PyQt6.QtWidgets import (QDialog, QWidget, QLabel, QVBoxLayout, QHBoxLayout, 
                              QStackedLayout, QPushButton, QSlider)
 from PyQt6.QtGui import QPixmap, QPainter, QImage, QPen
 from PyQt6.QtCore import Qt, QRect, QPointF, QRectF, QUrl
@@ -358,10 +358,7 @@ class ImageAdjustBar(QWidget):
         self.slider_sharpness.setValue(50)
 
     def press_favorite(self):
-        if self.side == "query":
-            current_rid = self.parent.QueryContainer.current_query_rid
-        else:
-            current_rid = self.parent.QueryContainer.current_match_rid
+        current_rid = self.parent.get_rid(self.side)
         self.parent.press_favorite_button(current_rid)
 
     def set_favorite(self, state):
@@ -373,17 +370,11 @@ class ImageAdjustBar(QWidget):
             self.button_favorite.setStyleSheet("")
 
     def edit_image(self):
-        if self.side == "query":
-            current_rid = self.parent.QueryContainer.current_query_rid
-        else:
-            current_rid = self.parent.QueryContainer.current_match_rid
+        current_rid = self.parent.get_rid(self.side)
         self.parent.edit_image(current_rid)
     
-    def open_image(self, rid):
-        if self.side == "query":
-            current_rid = self.parent.QueryContainer.current_query_rid
-        else:
-            current_rid = self.parent.QueryContainer.current_match_rid
+    def open_image(self):
+        current_rid = self.parent.get_rid(self.side)
         self.parent.open_image(current_rid)     
 
 
@@ -477,3 +468,23 @@ class VideoPlayerBar(QWidget):
         fps = cap.get(cv2.CAP_PROP_FPS)
         cap.release()
         return int(self.player.position() / 1000 * fps)
+    
+
+class VideoViewer(QDialog):
+    """
+    Popup window to view video
+    """
+    def __init__(self, parent, filepath):
+        super().__init__(parent)
+        self.setWindowTitle("Video Viewer")
+        self.setGeometry(100, 100, 800, 600)
+
+        self.layout = QVBoxLayout(self)
+
+        self.mediawidget = MediaWidget()
+        self.layout.addWidget(self.mediawidget)
+
+        self.mediawidget.load(filepath)
+
+        self.setLayout(self.layout)
+        self.show()

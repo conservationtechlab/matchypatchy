@@ -3,6 +3,8 @@ GUI Window for Match Comparisons
 
 """
 import os
+import cv2
+from pathlib import Path
 from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
@@ -10,7 +12,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtGui import QIntValidator
 
-from matchypatchy.gui.widget_media import ImageAdjustBar, MediaWidget
+from matchypatchy.gui.widget_media import ImageAdjustBar, MediaWidget, VideoViewer
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
@@ -22,7 +24,7 @@ from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
 from matchypatchy.database.species import fetch_individual
-
+from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT
 
 
 class DisplayCompare(QWidget):
@@ -419,6 +421,12 @@ class DisplayCompare(QWidget):
     # ==========================================================================
     # LOAD FUNCTIONS
     # ==========================================================================
+    def get_rid(self, side):    
+        if side == "query":
+            return self.QueryContainer.current_query_rid
+        else:
+            return self.QueryContainer.current_match_rid
+
     def change_query(self, n):
         self.QueryContainer.set_query(n)
         # update text
@@ -452,6 +460,7 @@ class DisplayCompare(QWidget):
         Load Images for Current Query ROI
         """
         self.query_image.load(self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "filepath"),
+                              frame=self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "frame"),
                               bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid, 'bbox'), crop=True)
         
         metadata = self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata")
@@ -468,6 +477,7 @@ class DisplayCompare(QWidget):
         self.match_distance.setText(f"Distance: {distance:.2f}")
 
         self.match_image.load(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "filepath"),
+                              frame=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "frame"),
                               bbox=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "bbox"), crop=True)
 
         metadata = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "metadata")
@@ -494,7 +504,6 @@ class DisplayCompare(QWidget):
         self.load_match()
 
     def format_metadata(self, info_dict, spacing=1):
-        #TODO: Figure out how to display file name
         spacer = "&nbsp;" * 20
         html_text = f"""<div style="line-height: {spacing}; width: 100%; height: 100%;">
                             <table cellspacing="5">
@@ -624,8 +633,14 @@ class DisplayCompare(QWidget):
 
         Currently only supports one image at a time
         """
-        img = Image.open(self.QueryContainer.get_info(rid, "filepath"))
-        img.show()
+        filepath = self.QueryContainer.get_info(rid, "filepath")
+        if Path(filepath).suffix.lower() in IMAGE_EXT:
+            img = Image.open(filepath)
+            img.show()
+        elif Path(filepath).suffix.lower() in VIDEO_EXT:
+            dialog = VideoViewer(self, filepath)
+            if dialog.exec():
+                del dialog
 
     def press_visualize_button(self):
         query = self.QueryContainer.get_info(self.QueryContainer.current_query_rid)
