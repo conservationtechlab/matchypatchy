@@ -32,13 +32,13 @@ class AnimlThread(QThread):
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, detector_key): #, classifier_key):
+    def __init__(self, mpDB, DETECTOR_KEY): #, classifier_key):
         super().__init__()
         self.mpDB = mpDB
         self.ml_dir = Path(config.load('ML_DIR'))
         self.n_frames = config.load('VIDEO_FRAMES')
         self.confidence_threshold = 0.1
-        self.detector_key = detector_key
+        self.DETECTOR_KEY = DETECTOR_KEY
 
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
@@ -48,7 +48,7 @@ class AnimlThread(QThread):
                                                   "sequence_id", "external_id", "comment", "favorite"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 
-        self.md_filepath = models.get_path(self.ml_dir, detector_key)
+        self.md_filepath = models.get_path(self.ml_dir, DETECTOR_KEY)
         #self.classifier_filepath = models.get_path(self.ml_dir, classifier_key)
         #self.class_filepath = models.get_class_path(self.ml_dir, classifier_key)
         #self.config_filepath = models.get_config_path(self.ml_dir, classifier_key)
@@ -67,12 +67,12 @@ class AnimlThread(QThread):
 
     def get_bbox(self):
         # SKIP if no detector selected
-        if self.detector_key is None:
+        if self.DETECTOR_KEY is None:
             print("No detector selected, skipping detection...")
             self.prompt_update.emit("No detector selected, skipping detection...")
             return
         # load detector
-        elif self.detector_key == "MegaDetector v5a" or self.detector_key == "MegaDetector v5b":
+        elif self.DETECTOR_KEY == "MegaDetector v5a" or self.DETECTOR_KEY == "MegaDetector v5b":
             detector = animl.load_detector(self.md_filepath, "MDV5")
 
         # viewpoint, individual TBD

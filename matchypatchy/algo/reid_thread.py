@@ -24,12 +24,12 @@ class ReIDThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     done = pyqtSignal()
 
-    def __init__(self, mpDB, reid_key, viewpoint_key):
+    def __init__(self, mpDB, REID_KEY, VIEWPOINT_KEY):
         super().__init__()
         self.mpDB = mpDB
         self.ml_dir = Path(config.load('ML_DIR'))
-        self.reid_filepath = models.get_path(self.ml_dir, reid_key)
-        self.viewpoint_filepath = models.get_path(self.ml_dir, viewpoint_key)
+        self.reid_filepath = models.get_path(self.ml_dir, REID_KEY)
+        self.viewpoint_filepath = models.get_path(self.ml_dir, VIEWPOINT_KEY)
 
     def run(self):
         # must be fetched after start() to chain with animl
@@ -112,42 +112,30 @@ class PairXThread(QThread):
     explained_img = pyqtSignal(list)  # Signal to update the alert prompt
     done = pyqtSignal()
 
-    def __init__(self, query, match):
+    def __init__(self, query, match, model):
         super().__init__()
         self.query = query
         self.match = match
+        self.model = model
         self.img_transforms = transforms.Compose([transforms.Resize((440, 440)),
-                                             transforms.ToTensor(),
-                                             transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                                  std=[0.229, 0.224, 0.225])])
+                                                  transforms.ToTensor(),
+                                                  transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                       std=[0.229, 0.224, 0.225])])
 
     def run(self):
-        self.load_model()
-        print("explain")
         explained_imgs = self.explain()
         self.explained_img.emit(explained_imgs[0])
         self.done.emit()
 
-    def load_model(self):
-        self.reid_filepath = models.get_path(Path(config.load('ML_DIR')), config.load('reid_key'))
-        if self.reid_filepath:
-            self.model = animl.load_miew(self.reid_filepath)
-        else:
-            print(f"Warning, Re-ID model not found. Expected path: {self.reid_filepath}")
-            # TODO: if model key exists but file dne, recommend user redownloads
-
     def explain(self):
-        
+        device = animl.get_device()
 
-        img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(self.model.device, 
-                                                                                     self.query, 
-                                                                                     self.match, 
-                                                                                     (440,440), self.img_transforms)
-        explained_imgs = explain(self.model.device, img_0, img_1,  
-                                                 img_np_0, img_np_1,
-                                                 self.model,
-                                                 ["backbone.blocks.3"],  
-                                                 k_lines=20, k_colors=10)
+        img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(device, self.query, self.match,
+                                                                               (440,440), self.img_transforms)
+        explained_imgs = explain(device, img_0, img_1, 
+                                 img_np_0, img_np_1,
+                                 self.model, ["backbone.blocks.3"],
+                                 k_lines=20, k_colors=10)
         return explained_imgs
     
     def get_bbox(self, roi):

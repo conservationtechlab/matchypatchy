@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.config import resource_path
+from matchypatchy.config import resource_path, load
 
 
 def update_model_yml():
@@ -36,7 +36,15 @@ def load(key=None):
         if key:
             return cfg[key]
         else:
-            return cfg
+          return cfg
+
+
+def is_valid_reid_model(basename):
+    models = load('REID_MODELS')
+    if basename in models:
+        return True
+    else:
+        return False
 
 
 def get_path(ML_DIR, key):
@@ -60,6 +68,7 @@ def get_class_path(ML_DIR, key):
     else:
         return None
 
+
 def get_config_path(ML_DIR, key):
     CONFIG_FILES = load('CONFIG_FILES')
     if key is None:
@@ -69,11 +78,13 @@ def get_config_path(ML_DIR, key):
         return path
     else:
         return None
-    
+
+
 def delete(ML_DIR, key):
     path = get_path(ML_DIR, key)
     if path:
         path.unlink()
+
 
 def download(ML_DIR, key):
     # read model directory

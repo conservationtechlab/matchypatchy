@@ -15,6 +15,8 @@ from matchypatchy.algo.utils import is_cuda_available
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.gui_assets import HorizontalSeparator
 
+from matchypatchy.algo.models import get_path, is_valid_reid_model
+
 
 ICON_PENCIL = config.resource_path("assets/fluent_pencil_icon.png")
 
@@ -25,6 +27,7 @@ class ConfigPopup(QDialog):
         self.setMinimumWidth(600)
         self.mpDB = parent.mpDB
         self.cfg = config.load()
+        self.ml_dir = Path(config.load('ML_DIR'))
 
         layout = QVBoxLayout()
 
@@ -43,6 +46,21 @@ class ConfigPopup(QDialog):
         button_home_dir.clicked.connect(self.set_home_dir)
         directory_layout.addWidget(button_home_dir)
         layout.addLayout(directory_layout)
+
+        # Visualizer Model
+        visualizer_layout = QHBoxLayout()
+        visualizer_layout.addWidget(QLabel("Visualizer Model:"))
+        self.visualizer_model = QLineEdit()
+        reid_path = get_path(self.ml_dir, self.cfg['REID_KEY'])
+        self.visualizer_model.setText(str(reid_path))
+        visualizer_layout.addWidget(self.visualizer_model)
+        button_visualizer_model = QPushButton()
+        button_visualizer_model.setMaximumHeight(30)
+        button_visualizer_model.setFixedWidth(30)
+        button_visualizer_model.setIcon(QIcon(ICON_PENCIL))
+        button_visualizer_model.clicked.connect(self.set_visualizer_model)
+        visualizer_layout.addWidget(button_visualizer_model)
+        layout.addLayout(visualizer_layout)
 
         # CUDA -----------------------------------------------------------------
         cuda_layout = QHBoxLayout()
@@ -153,6 +171,21 @@ class ConfigPopup(QDialog):
                 if dialog.exec():
                     del dialog
 
+    def set_visualizer_model(self):
+        
+        new_model = QFileDialog.getOpenFileName(self, "Select Re-ID Model",
+                                                  os.path.expanduser(self.ml_dir),"Model Files (*.pt *.pth *.bin)")
+        if new_model and new_model[0]:
+            if is_valid_reid_model(Path(new_model[0]).stem):
+                # Update config
+                self.visualizer_model.setText(new_model[0])
+                self.cfg['REID_KEY'] = str(Path(new_model[0]).stem)
+                # save changes to yml
+                config.update(self.cfg)
+            else:
+                dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
+                if dialog.exec():
+                    del dialog
           
 
 
