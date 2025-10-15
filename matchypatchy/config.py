@@ -29,7 +29,7 @@ def initiate():
         'REID_KEY': None,
         'VIEWPOINT_KEY': None,
         'DETECTION_KEY': None,
-        'NUM_MATCHES': 100
+        'DEFAULT_KNN': 100
     }
     CONFIG_PATH = Path(resource_path('config.yml'))
     if CONFIG_PATH.exists():

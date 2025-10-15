@@ -8,7 +8,6 @@ from PIL import Image
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
 from PyQt6.QtCore import Qt, QPoint
-from PyQt6.QtGui import QIntValidator
 
 from matchypatchy.gui.widget_media import MediaWidget
 from matchypatchy.gui.popup_alert import AlertPopup
@@ -22,6 +21,7 @@ from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
 from matchypatchy.database.species import fetch_individual
+from matchypatchy import config
 
 
 MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
@@ -33,7 +33,7 @@ class DisplayCompare(QWidget):
         super().__init__()
         self.parent = parent
         self.mpDB = parent.mpDB
-        self.k = 3  # default knn
+        self.k = config.load('DEFAULT_KNN')  # default knn
         self.distance_metric = 'cosine'
         self.threshold = 50
         self.current_viewpoint = 'Any'
@@ -51,17 +51,9 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(VerticalSeparator()) 
 
         # OPTIONS
-        first_layer.addWidget(QLabel("Max # of Matches:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.knn_number = QLineEdit(str(self.k))
-        self.knn_number.setValidator(QIntValidator(0, 1000))
-        self.knn_number.setToolTip('Maximum number of matches allowed per ROI (not per sequence)')
-        self.knn_number.textChanged.connect(self.change_k)
-        self.knn_number.setMaximumWidth(50)
-        first_layer.addWidget(self.knn_number, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
         first_layer.addWidget(QLabel("Distance Metric:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.option_distance_metric = QComboBox()
-        self.option_distance_metric.addItems(['Cosine', 'L2'])
+        self.option_distance_metric.addItems(['Cosine','L2'])
         self.option_distance_metric.currentIndexChanged.connect(self.change_metric)
         first_layer.addWidget(self.option_distance_metric, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -71,6 +63,8 @@ class DisplayCompare(QWidget):
         self.threshold_slider.setValue(self.threshold)  # Set initial value
         self.threshold_slider.valueChanged.connect(self.change_threshold)
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.threshold_label = QLabel(f"{self.threshold / 100:.2f}")
+        first_layer.addWidget(self.threshold_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         button_recalc = QPushButton("Recalculate Matches")
         button_recalc.clicked.connect(self.calculate_neighbors)
@@ -374,12 +368,6 @@ class DisplayCompare(QWidget):
         if dialog.exec():
             del dialog
 
-    def change_k(self):
-        # Set new k value
-        # Must recalculate neighbors to activate
-        if self.knn_number.text() != '':
-            self.k = int(self.knn_number.text())
-
     def change_metric(self):
         self.distance_metric = self.option_distance_metric.currentText().lower()
         if self.distance_metric == 'l2':
@@ -393,15 +381,17 @@ class DisplayCompare(QWidget):
                                                                          (self.threshold - self.threshold_slider.minimum()) //
                                                                          (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
         if self.distance_metric == 'Cosine':
-            QToolTip.showText(slider_handle_position, f"{self.threshold / 100}", self.threshold_slider)
+           # QToolTip.showText(slider_handle_position, f"{self.threshold / 100}", self.threshold_slider)
+            self.threshold_label.setText(f"{self.threshold / 100:.2f}")
         else:
-            QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
+           # QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
+            self.threshold_label.setText(f"{self.threshold:d}")
 
     # ON ENTRY
     def calculate_neighbors(self):
+        self.k = config.load('DEFAULT_KNN')  # can be changed in configuration
         self.QueryContainer = QueryContainer(self)  #re-establish object
         emb_exist = self.QueryContainer.load_data()
-        print("sequences: ", emb_exist)
         if emb_exist:
             self.show_progress("Matching embeddings... This may take a while.")
             self.QueryContainer.calculate_neighbors()
