@@ -217,11 +217,11 @@ class MediaTable(QWidget):
             # no valid stations, empty dataframe
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
-        # Species Filter
-        if filters['active_species'][0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == filters['active_species'][0]]
-        elif filters['active_species'][0] is None:
-            self.data_filtered = self.data_filtered[self.data_filtered['species_id'].isna()]
+        # Viewpoint Filter
+        if filters['active_viewpoint'][0] > 0:
+            self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'] == filters['active_viewpoint'][0] - 1]
+        elif filters['active_viewpoint'][0] is None:
+            self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'].isna()]
 
         # Individual Filter
         if filters['active_individual'][0] > 0:
