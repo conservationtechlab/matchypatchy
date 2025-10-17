@@ -102,10 +102,10 @@ class DisplayMedia(QWidget):
         self.station_list_ordered = [(0, 'Station')]
         self.station_select = FilterBox(self.station_list_ordered, 200)
         second_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # SPECIES
-        self.species_list_ordered = [(0, 'Species')]
-        self.species_select = FilterBox(self.species_list_ordered, 200)
-        second_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # VIEWPOINT
+        self.viewpoint_list_ordered = [(0, 'Viewpoint'), (1, 'Left'), (2, 'Right')]
+        self.viewpoint_select = FilterBox(self.viewpoint_list_ordered, 200)
+        second_layer.addWidget(self.viewpoint_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # INDIVIDUAL
         self.individual_list_ordered = [(0, 'Individual')]
         self.individual_select = FilterBox(self.individual_list_ordered, 200)
@@ -134,13 +134,13 @@ class DisplayMedia(QWidget):
         self.region_select.currentIndexChanged.connect(self.select_region)
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         self.station_select.currentIndexChanged.connect(self.select_station)
-        self.species_select.currentIndexChanged.connect(self.select_species)
+        self.viewpoint_select.currentIndexChanged.connect(self.select_viewpoint)
         self.individual_select.currentIndexChanged.connect(self.select_individual)
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
                         'active_station': self.station_list_ordered[self.station_select.currentIndex()],
-                        'active_species': self.species_list_ordered[self.species_select.currentIndex()],
+                        'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only}
@@ -207,7 +207,7 @@ class DisplayMedia(QWidget):
         self.region_select.blockSignals(True)
         self.survey_select.blockSignals(True)
         self.station_select.blockSignals(True)
-        self.species_select.blockSignals(True)
+        self.viewpoint_select.blockSignals(True)
         self.individual_select.blockSignals(True)
 
         self.region_select.clear()
@@ -226,10 +226,6 @@ class DisplayMedia(QWidget):
         # select all cameras for now
         self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
 
-        self.species_select.clear()
-        self.species_list_ordered = [(0, 'Species')] + list(self.mpDB.select('species', columns='id, common'))
-        self.species_select.addItems([el[1] for el in self.species_list_ordered])
-
         self.individual_select.clear()
         self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
@@ -237,7 +233,7 @@ class DisplayMedia(QWidget):
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
                         'active_station': self.station_list_ordered[self.station_select.currentIndex()],
-                        'active_species': self.species_list_ordered[self.species_select.currentIndex()],
+                        'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only}
@@ -254,7 +250,7 @@ class DisplayMedia(QWidget):
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
         self.station_select.blockSignals(False)
-        self.species_select.blockSignals(False)
+        self.viewpoint_select.blockSignals(False)
         self.individual_select.blockSignals(False)
 
     # 3. RUN ON ENTRY
@@ -460,6 +456,10 @@ class DisplayMedia(QWidget):
 
     def select_individual(self):
         self.filters['active_individual'] = self.individual_list_ordered[self.individual_select.currentIndex()]
+        self.filter_table()
+
+    def select_viewpoint(self):
+        self.filters['active_viewpoint'] = self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()]
         self.filter_table()
 
     def filter_surveys(self):
