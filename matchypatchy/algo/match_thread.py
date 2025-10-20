@@ -16,13 +16,15 @@ class MatchEmbeddingThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     neighbor_dict_return = pyqtSignal(dict)
-    nearest_dict_return = pyqtSignal(dict)
+    ranked_sequences_return = pyqtSignal(list)
     done = pyqtSignal()
 
-    def __init__(self, mpDB, rois, sequences, k=3, metric='cosine', threshold=70):
+    def __init__(self, mpDB, rois, sequences, k=3, metric='cosine', threshold=70,
+                 filter_dict=None, valid_stations=None):
         super().__init__()
         self.mpDB = mpDB
-        self.rois = rois
+        self.rois = rois.drop(['frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 
+                               'comment', 'binomen', 'common', 'name', 'sex', 'age'], axis=1).reset_index()
         self.sequences = sequences
         self.n = len(sequences)
         self.k = k
@@ -31,6 +33,11 @@ class MatchEmbeddingThread(QThread):
             self.threshold = threshold/100
         else:
             self.threshold = threshold
+        self.filter_dict = filter_dict
+        self.valid_stations = valid_stations
+
+        self.neighbor_dict = {}
+        self.ranked_sequences = []
 
     def run(self):
         """
@@ -39,11 +46,6 @@ class MatchEmbeddingThread(QThread):
         # 3. filter out matches from same sequence
         # 4. rank ROIs by match scores
         """
-        neighbor_dict = {}
-        nearest_dict = {}
-
-        start_time = time.perf_counter()
-
         for i, s in enumerate(self.sequences):
             if not self.isInterruptionRequested():
                 sequence_rois = self.sequences[s]
@@ -54,34 +56,28 @@ class MatchEmbeddingThread(QThread):
                     all_neighbors.extend(self.roi_knn(roi_id))
 
                 all_neighbors = self.remove_duplicate_matches(all_neighbors)
-                filtered_neighbors = self.filter(sequence_rois, all_neighbors)
+                #print("All Neighbors after removing duplicates:", all_neighbors)
+                filtered_neighbors = self.filter_valid(sequence_rois, all_neighbors)
 
-                # still have neighbors remaining after filtering, rank by difference
                 if filtered_neighbors:
-                    filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
+                   filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
+                   self.neighbor_dict[s] = filtered_neighbors
 
-                    neighbor_dict[s] = filtered_neighbors
-                    nearest_dict[s] = filtered_neighbors[0][1]
-
-                #elapsed_time = time.perf_counter() - start_time
-                completed_percentage = round(100 * (i + 1) / self.n)
-
-                #if completed_percentage > 1:
-                #    remaining_time = (elapsed_time / completed_percentage) - elapsed_time
-                #    self.prompt_update.emit("Matching embeddings, remaining time: approx. {:0>8}".format(str(timedelta(seconds=remaining_time))))
+                completed_percentage = round((100 * (i + 1) / self.n) - 1)
 
                 self.progress_update.emit(completed_percentage)
 
-        if not self.isInterruptionRequested():
-            self.neighbor_dict_return.emit(neighbor_dict)
-            self.nearest_dict_return.emit(nearest_dict)
+       # print("Neighbor Dict before ranking:", self.neighbor_dict)
+        # rank sequences if matches found
+        if self.neighbor_dict:
+            self.ranked_sequences = self.rank()
+            #print("Ranked Sequences:", self.ranked_sequences)
 
-        else:
-            logging.info("Matching embeddings interrupted.")
-            self.neighbor_dict_return.emit({})
-            self.nearest_dict_return.emit({})
-            
+        self.progress_update.emit(100)
+        self.neighbor_dict_return.emit(self.neighbor_dict)
+        self.ranked_sequences_return.emit(self.ranked_sequences)
 
+    # STEP 1
     def roi_knn(self, emb_id):
         """
         Calcualtes knn for single roi embedding
@@ -90,14 +86,15 @@ class MatchEmbeddingThread(QThread):
         nns = list(zip([int(x) for x in neighbors['ids'][0]], neighbors['distances'][0]))
         return nns[1:]  # skip self-match
 
-    def filter(self, sequence_rois, neighbors):
+    # STEP 2
+    def filter_valid(self, sequence_rois, neighbors):
         """
         Returns list of valid neighbors by roi_emb.id
         """
         filtered = []
         query_rois = self.rois.loc[self.rois['id'].isin(sequence_rois)]
-        neighbors_df = self.rois.loc[self.rois['id'].isin([n[0] for n in neighbors])]
-        neighbors_df["distance"] = [n[1] for n in neighbors]  # Add distances from KNN
+        neighbors = pd.DataFrame(neighbors, columns=['id', 'distance'])
+        neighbors_df = pd.merge(self.rois, neighbors, on='id')
 
         # Perform a cross-join using a Cartesian product
         query_rois["key"] = 1  # Temporary key for cross-join
@@ -113,6 +110,50 @@ class MatchEmbeddingThread(QThread):
         ]
         # Return filtered neighbors as tuples of (ROI ID, distance)
         return list(zip(filtered["id_neighbor"], filtered["distance"]))
+
+    # STEP 3
+    def rank(self):
+        """
+        Ranking Function
+            Prioritizes previously IDd individuals and number of matches,
+            then ranks matchs by distances
+        """
+        # remove query sequences with IDed individuals
+        ided_sequences = self.rois[~self.rois["individual_id"].isna()]["sequence_id"].unique().tolist()
+        self.neighbor_dict = {k: v for k, v in self.neighbor_dict.items() if k not in ided_sequences}
+
+        ided_rois = self.rois[~self.rois["individual_id"].isna()]["id"].unique().tolist()
+        favorite_rois = self.rois[self.rois["favorite"] == 1]["id"].tolist()
+        #print("Favorite Sequences:", favorite_rois)
+        #print("IDed Sequences:", ided_rois)
+
+        # prioritize sequences with IDed individuals
+        if len(ided_rois) > 0:
+            # remove named individuals from list of queries
+            for seq in self.neighbor_dict:
+                # rank by distance first
+                self.neighbor_dict[seq] = sorted(self.neighbor_dict[seq], key=lambda x: x[1])
+
+                if len(favorite_rois) > 0:
+                    self.neighbor_dict[seq] = sorted(self.neighbor_dict[seq], key=lambda x: (x[0] not in favorite_rois))
+                self.neighbor_dict[seq] = sorted(self.neighbor_dict[seq], key=lambda x: (x[0] not in ided_rois))
+           
+            # prioritize by number of matches and ided status
+            ranked_sequences = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
+            ranked_sequences = sorted(ranked_sequences, key=lambda x: any(item[0] in ided_rois for item in x[1]), reverse=True) 
+            ranked_sequences = [x[0] for x in ranked_sequences]
+
+        # if no ids, rank by distance
+        else:
+            for seq in self.neighbor_dict:
+                self.neighbor_dict[seq] = sorted(self.neighbor_dict[seq], key=lambda x: x[1])
+
+            # prioritize by number of matches
+            ranked_sequences = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
+            ranked_sequences = [x[0] for x in ranked_sequences]
+
+        return ranked_sequences
+
 
     def remove_duplicate_matches(self, matches):
         """

@@ -37,6 +37,7 @@ class QC_QueryContainer(QObject):
         self.empty_query = 0
         self.empty_match = 0
 
+    # STEP 1
     def load_data(self):
         """
         Load ROI Table
@@ -44,11 +45,11 @@ class QC_QueryContainer(QObject):
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
         # no data
         if self.data_raw.empty:
-            self.parent.home(warn=True)
             return False
 
         self.individuals = db_roi.individual_roi_dict(self.data_raw)
         self.individuals.pop(None, None)
+        return True
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
@@ -77,7 +78,7 @@ class QC_QueryContainer(QObject):
             elif filter_dict['active_station'][0] == 0 and valid_stations:
                 self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
             else:  # no valid stations, empty dataframe
-                self.parent.warn("No data to compare within filter.")
+                self.parent.show_progress("No data to compare within filter.")
 
         # compute viewpoints
         self.compute_viewpoints()
@@ -88,7 +89,7 @@ class QC_QueryContainer(QObject):
             self.rank()
         # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
-            self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
+            self.parent.show_progress(prompt="No data to compare, all available data from same sequence/capture.")
             return False
 
     def rank(self):
@@ -176,7 +177,6 @@ class QC_QueryContainer(QObject):
         """
         Flip between viewpoints in paired images within a sequence
         """
-        self.VIEWPOINT_DICT.values()
         self.selected_viewpoint = selected_viewpoint
 
         self.update_viewpoint()
@@ -209,7 +209,7 @@ class QC_QueryContainer(QObject):
             return self.data.loc[rid]
         elif column == 'bbox':
             # Return the bbox coordinates for current query
-            return db_roi.get_bbox(self.data.loc[rid])
+            return db_roi.get_bbox(self.data.loc[[rid]])
         elif column == 'metadata':
             return self.roi_metadata(self.data.loc[rid])
         else:
