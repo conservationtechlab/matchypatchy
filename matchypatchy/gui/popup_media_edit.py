@@ -18,12 +18,13 @@ from matchypatchy.database.location import fetch_station_names_from_id
 
 
 class MediaEditPopup(QDialog):
-    def __init__(self, parent, data, current_image_index=0, crop=False):
+    def __init__(self, parent, data, data_type, current_image_index=0, crop=False):
         super().__init__(parent)
         self.setWindowTitle("View ROI")
         self.setFixedSize(1000, 500)
         self.mpDB = parent.mpDB
         self.data = data
+        self.data_type = data_type
         self.ids = data["id"].tolist()
         self.crop = crop
         self.current_image_index = current_image_index
@@ -92,6 +93,18 @@ class MediaEditPopup(QDialog):
 
     def get_edit_stack(self):
         edit_stack = self.metadatapanel.edit_stack
+        # add comment change if applicable
+        if self.metadatapanel.comment_changed:
+            for id in self.ids:
+                if self.data_type == 1:
+                    media_id = self.data[self.data["id"] == id]["media_id"].item()
+                else:
+                    media_id = id
+                edit = {'id': media_id,
+                        'reference': 'comment',
+                        'previous_value': self.data[self.data["id"] == id]["comment"].item(),
+                        'new_value': self.metadatapanel.comment.toPlainText()}
+                edit_stack.append(edit)
         return edit_stack
 
     def close_out(self):
@@ -158,7 +171,8 @@ class MetadataPanel(QWidget):
         self.ids = ids
         horizontal_gap = 80
         vertical_gap = 8
-
+        # handle comment change only after editing is done
+        self.comment_changed = False
         self.edit_stack = []
 
         # Layout ---------------------------------------------------------------
@@ -289,6 +303,7 @@ class MetadataPanel(QWidget):
         comment.addWidget(comment_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.comment = QTextEdit()
         self.comment.setFixedHeight(60)
+        self.comment.textChanged.connect(self.change_comment)
         comment.addWidget(self.comment, 1)
         comment.addStretch()
         metadata_layout.addLayout(comment)
@@ -510,6 +525,9 @@ class MetadataPanel(QWidget):
                         'new_value': int(selected_viewpoint)}
             print(edit)
             self.edit_stack.append(edit)
+
+    def change_comment(self):
+        self.comment_changed = True
 
     def new_individual(self):
         dialog = IndividualFillPopup(self)
