@@ -153,8 +153,8 @@ class DisplayBase(QWidget):
         button_configuration = QPushButton("Configuration")
         button_download_ml = QPushButton("Download Models")
         button_help = QPushButton("Help")
-        button_validate_db = QPushButton("Validate Database")
-        button_clear_data = QPushButton("Clear Data")
+        button_validate_db = QPushButton("")
+        button_clear_data = QPushButton("")
 
         other_layer.addWidget(button_configuration)
         other_layer.addWidget(button_download_ml)
@@ -165,8 +165,8 @@ class DisplayBase(QWidget):
         button_configuration.clicked.connect(self.edit_config)
         button_download_ml.clicked.connect(self.download_ml)
         button_help.clicked.connect(self.help)
-        button_validate_db.clicked.connect(self.validate_db)
-        button_clear_data.clicked.connect(self.clear_data)
+        # button_validate_db.clicked.connect(self.validate_db)
+        # button_clear_data.clicked.connect(self.clear_data)
 
         border_other.setLayout(other_layer)
         column_layout.addWidget(border_other, 1)
