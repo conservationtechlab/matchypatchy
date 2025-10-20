@@ -157,16 +157,16 @@ class MediaTable(QWidget):
                             5: "camera",
                             6: "sequence_id",
                             7: "external_id",
-                            8: "favorite",
-                            9: "comment"}
+                            8: "comment"}
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
                                                   "Station", "Camera", "Sequence ID",
-                                                  "External ID", "Favorite", "Comment"])
+                                                  "External ID", "Comment"])
             # adjust widths
             self.table.resizeColumnsToContents()
             for col in range(self.table.columnCount()):
-                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 50))
+                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
+            self.table.setColumnWidth(0, 50)
             self.table.setColumnWidth(1, 100)
 
     # STEP 4 - CALLED BY MAIN GUI IF DATA FOUND

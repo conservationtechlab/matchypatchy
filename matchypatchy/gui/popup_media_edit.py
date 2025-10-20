@@ -126,16 +126,13 @@ class MediaEditPopup(QDialog):
         self.metadatapanel.refresh_values(self.current_image_index)
 
     def favorite(self):
-        if {"media_id"}.issubset(self.data.columns):
-            media_id = self.data.iloc[self.current_image_index]["media_id"]  # roi
-        else:
-            media_id = self.data.iloc[self.current_image_index]["id"]  # media
+        rid = self.data.iloc[self.current_image_index]["id"]  # roi
         if self.button_favorite.isChecked():
             self.button_favorite.setStyleSheet(""" QPushButton { background-color: #b51b32; color: white; }""")
-            self.mpDB.edit_row('media', media_id, {"favorite": 1})
+            self.mpDB.edit_row('roi', rid, {"favorite": 1})
         else:
             self.button_favorite.setStyleSheet("")
-            self.mpDB.edit_row('media', media_id, {"favorite": 0})
+            self.mpDB.edit_row('roi', rid, {"favorite": 0})
 
     def check_favorite(self):
         favorite = self.data.iloc[self.current_image_index]["favorite"]
