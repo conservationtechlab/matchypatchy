@@ -16,7 +16,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.popup_pairx import PairXPopup
-from matchypatchy.gui.gui_assets import FilterBox, VerticalSeparator, StandardButton
+from matchypatchy.gui.gui_assets import FilterBox, VerticalSeparator, StandardButton, ThreePointSlider
 
 from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
@@ -126,7 +126,7 @@ class DisplayCompare(QWidget):
         self.button_previous_query.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query - 1))
         query_options.addWidget(self.button_previous_query)
         self.query_number = QLineEdit(str(self.QueryContainer.current_query + 1))
-        self.query_number.setMaximumWidth(100)
+        self.query_number.setFixedWidth(50)
         query_options.addWidget(self.query_number)
         self.query_n = QLabel("/9")
         query_options.addWidget(self.query_n)
@@ -134,6 +134,7 @@ class DisplayCompare(QWidget):
         self.button_next_query.setMaximumWidth(40)
         self.button_next_query.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query + 1))
         query_options.addWidget(self.button_next_query)
+        query_options.addSpacing(20)
         # # Sequence Number
         query_options.addWidget(QLabel("Sequence:"))
         self.button_previous_query_seq = QPushButton("<<")
@@ -141,7 +142,7 @@ class DisplayCompare(QWidget):
         self.button_previous_query_seq.clicked.connect(lambda: self.change_query_in_sequence(self.QueryContainer.current_query_sn - 1))
         query_options.addWidget(self.button_previous_query_seq)
         self.query_seq_number = QLineEdit(str(self.QueryContainer.current_query_sn + 1))
-        self.query_seq_number.setMaximumWidth(100)
+        self.query_seq_number.setFixedWidth(50)
         query_options.addWidget(self.query_seq_number)
         self.query_sequence_n = QLabel("/ 3")
         query_options.addWidget(self.query_sequence_n)
@@ -149,17 +150,6 @@ class DisplayCompare(QWidget):
         self.button_next_query_seq.setMaximumWidth(40)
         self.button_next_query_seq.clicked.connect(lambda: self.change_query_in_sequence(self.QueryContainer.current_query_sn + 1))
         query_options.addWidget(self.button_next_query_seq)
-
-        # Viewpoint Toggle
-        query_options.addSpacing(20)
-        query_options.addWidget(QLabel("Viewpoint:"))
-        self.dropdown_viewpoint = QComboBox()
-        VIEWPOINT_DICT = load('VIEWPOINTS')
-        self.dropdown_viewpoint.addItems([v for v in VIEWPOINT_DICT.values() if v != 'None'])
-        self.dropdown_viewpoint.setCurrentIndex(0)
-        self.dropdown_viewpoint.currentIndexChanged.connect(self.toggle_viewpoint)
-        self.dropdown_viewpoint.setMaximumWidth(100)
-        query_options.addWidget(self.dropdown_viewpoint)
 
         query_options.addStretch()
         query_layout.addLayout(query_options)
@@ -205,6 +195,14 @@ class DisplayCompare(QWidget):
         # OptionsVIEWPOINT_DICT
         match_options = QHBoxLayout()
         match_options.addStretch()
+
+        # Viewpoint Toggle
+        match_options.addWidget(QLabel("Viewpoint: "))
+        self.button_viewpoint = ThreePointSlider(initial=1)
+        self.button_viewpoint.state_changed.connect(self.toggle_viewpoint)
+        match_options.addWidget(self.button_viewpoint)
+        match_options.addSpacing(20)
+
         # # Match Number
         match_options.addWidget(QLabel("Match Image:"))
         self.button_previous_match = QPushButton("<<")
@@ -212,7 +210,7 @@ class DisplayCompare(QWidget):
         self.button_previous_match.clicked.connect(lambda: self.change_match(self.QueryContainer.current_match - 1))
         match_options.addWidget(self.button_previous_match)
         self.match_number = QLineEdit(str(self.QueryContainer.current_match + 1))
-        self.match_number.setMaximumWidth(100)
+        self.match_number.setFixedWidth(50)
         match_options.addWidget(self.match_number)
         self.match_n = QLabel("/ 9")
         match_options.addWidget(self.match_n)
@@ -313,10 +311,11 @@ class DisplayCompare(QWidget):
         self.QueryContainer = QueryContainer(self)  #re-establish object
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
+            self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
             self.show_progress("Matching embeddings... This may take a while.")
             self.QueryContainer.calculate_neighbors()
             self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
-            self.QueryContainer.thread_signal.connect(self.filter_neighbors)
+            self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
         else:
             self.home(warn=True)    
 
@@ -325,15 +324,11 @@ class DisplayCompare(QWidget):
         self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
         self.progress.show()
 
-    def filter_neighbors(self, thread_success):
+    def check_matchthread_success(self, thread_success):
         if thread_success:
-            filtered = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
-            if filtered:
-                self.change_query(0)
-            else:
-                self.warn(prompt="No data to compare, all available data from same sequence/capture.")
+            self.change_query(0)
         else:
-            self.warn(prompt="Matching embeddings interrupted.")
+            self.warn(prompt="No data to compare, all available data from same sequence/capture.")
 
     def recalculate_by_individual(self):
         if not fetch_individual(self.mpDB).empty:
@@ -475,17 +470,23 @@ class DisplayCompare(QWidget):
         self.toggle_match_button()
         self.toggle_match_favorite()
 
-    def toggle_viewpoint(self):
+    def toggle_viewpoint(self, selected_viewpoint):
         """
         Flip between viewpoints in paired images within a sequence
         """
-        selected_viewpoint = self.dropdown_viewpoint.currentText()
+        if selected_viewpoint == 0:
+            selected_viewpoint = 'Left'
+        elif selected_viewpoint == 1:
+            selected_viewpoint = 'Any'
+        else:
+            selected_viewpoint = 'Right'
+        
         self.current_viewpoint = selected_viewpoint
-        self.QueryContainer.toggle_viewpoint(selected_viewpoint)
+        self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
         # either query or match has no examples with selected viewpoint, defaults to all viewpoints
         if (self.QueryContainer.empty_query is True or self.QueryContainer.empty_match is True):
-            self.warn(f'No query image with {selected_viewpoint} viewpoint in the current sequence.')
-            self.dropdown_viewpoint.setCurrentIndex(0)
+            self.warn(f'No query image with {self.current_viewpoint} viewpoint in the current sequence.')
+            self.button_viewpoint.set_index(1)
         self.query_sequence_n.setText('/ ' + str(len(self.QueryContainer.current_query_rois)))
         self.match_n.setText('/ ' + str(len(self.QueryContainer.current_match_rois)))
         self.query_seq_number.setText('1')
@@ -598,6 +599,12 @@ class DisplayCompare(QWidget):
         self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
         self.station_select.blockSignals(False)
+
+    def filter_neighbors(self):
+        self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
+                        'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
+                        'active_station': self.station_list_ordered[self.station_select.currentIndex()], }
+        self.calculate_neighbors()
 
     # ==========================================================================
     # IMAGE MANIPULATION
