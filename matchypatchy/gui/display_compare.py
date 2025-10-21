@@ -716,16 +716,21 @@ class DisplayCompare(QWidget):
         # M - Match
         elif key == 77:
             self.button_match.click()
-
+            
+        # L - Left Viewpoint
+        elif key == 76:
+            self.button_viewpoint.set_index(0)
+        # R - Right Viewpoint
+        elif key == 82:
+            self.button_viewpoint.set_index(2)
         # V - Viewpoint
         elif key == 86:
-            n = self.dropdown_viewpoint.currentIndex()
-            # wrap around
-            if n < 0:
-                n = self.dropdown_viewpoint.count() - 1
-            if n > self.dropdown_viewpoint.count() - 1:
-                n = 0
-            self.dropdown_viewpoint.setCurrentIndex(n + 1)
+            if self.current_viewpoint == 'Left':
+                self.button_viewpoint.set_index(1)
+            elif self.current_viewpoint == 'Any':
+                self.button_viewpoint.set_index(2)
+            else:
+                self.button_viewpoint.set_index(0)
 
         # Escape - Home
         elif key ==16777216:
