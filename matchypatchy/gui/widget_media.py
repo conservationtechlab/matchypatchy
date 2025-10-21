@@ -17,11 +17,11 @@ class MediaWidget(QWidget):
     """
     def __init__(self):
         super().__init__()
-        self.layout = QVBoxLayout(self)
+        layout = QVBoxLayout(self)
 
         # Stacked layout to switch between image and video
         self.stacked = QStackedLayout()
-        self.layout.addLayout(self.stacked)
+        layout.addLayout(self.stacked)
 
         # Image widget
         self.image_widget = ImageWidget()
@@ -40,14 +40,17 @@ class MediaWidget(QWidget):
         # Playback controls
         self.playbackbar = VideoPlayerBar(self.player, self.audio_output)
         self.playbackbar.setVisible(False)
-        self.layout.addWidget(self.playbackbar)
+        layout.addWidget(self.playbackbar)
 
+        self.setLayout(layout)
 
     def load(self, filepath, bbox=None, frame=None, crop=False):
+        # IMAGE
         if Path(filepath).suffix.lower() in IMAGE_EXT:
             self.playbackbar.setVisible(False)
             self.image_widget.load(filepath, bbox=bbox, frame=frame, crop=crop)
             self.stacked.setCurrentWidget(self.image_widget)
+        # VIDEO
         elif Path(filepath).suffix.lower() in VIDEO_EXT:
             if bbox is not None:
                 # display frame instead of video
@@ -91,9 +94,6 @@ class ImageWidget(QLabel):
         # Image Adjustments
         self.zoom_factor = 1.0
         self.image_offset = QPointF(0, 0)  # Image translation offset
-        self.brightness_factor = 1.0
-        self.contrast_factor = 1.0
-        self.sharpness_factor = 1.0
 
         # Create a QLabel to hold the image
         self.setMinimumSize(self.default_width, self.default_height)
@@ -134,16 +134,16 @@ class ImageWidget(QLabel):
         else:
             raise ValueError("Could not read frame from video.")
 
-    def adjust(self):
+    def adjust(self, brightness=1.0, contrast=1.0, sharpness=1.0):
         """
         Adjust image values, convert to qimage, crop, display
         """
         enhancer = ImageEnhance.Brightness(self.pil_image)
-        self.pil_image = enhancer.enhance(self.brightness_factor)
+        self.pil_image = enhancer.enhance(brightness)
         enhancer = ImageEnhance.Contrast(self.pil_image)
-        self.pil_image = enhancer.enhance(self.contrast_factor)
+        self.pil_image = enhancer.enhance(contrast)
         enhancer = ImageEnhance.Sharpness(self.pil_image)
-        self.pil_image = enhancer.enhance(self.sharpness_factor)
+        self.pil_image = enhancer.enhance(sharpness)
 
         # Convert to QImage
         self.qimage = self.to_qimage()
@@ -182,32 +182,8 @@ class ImageWidget(QLabel):
             return None
 
     # IMAGE ADJUSTMENTS ========================================================
-    def adjust_brightness(self, value):
-        """
-        QImage needs to be reconverted each time
-        """
-        self.brightness_factor = value / 50
-        self.adjust()
-
-    def adjust_contrast(self, value):
-        """
-        QImage needs to be reconverted each time
-        """
-        self.contrast_factor = value / 50
-        self.adjust()
-
-    def adjust_sharpness(self, value):
-        """
-        QImage needs to be reconverted each time
-        """
-        self.sharpness_factor = value / 50
-        self.adjust()
-
     def reset(self):
         self.scale_factor = 1.0
-        self.brightness_factor = 1.0
-        self.contrast_factor = 1.0
-        self.sharpness_factor = 1.0
         self.zoom_factor = 1.0
         self.image_offset = QPointF(0, 0)
         # reload image
@@ -297,85 +273,6 @@ class ImageWidget(QLabel):
         if event.button() == Qt.MouseButton.LeftButton:
             self.reset()
         super().mouseDoubleClickEvent(event)
-
-
-class ImageAdjustBar(QWidget):
-    FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
-
-    def __init__(self, parent, mediawidget, side):
-        super().__init__()
-        self.parent = parent
-        self.mediawidget = mediawidget
-        self.side = side  # "query" or "match"
-        query_image_buttons = QHBoxLayout()
-        # Brightness
-        query_image_buttons.addWidget(QLabel("Brightness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.slider_brightness = QSlider(Qt.Orientation.Horizontal)
-        self.slider_brightness.setRange(25, 75)  # Set range from 1 to 100
-        self.slider_brightness.setValue(50)  # Set initial value
-        self.slider_brightness.valueChanged.connect(self.mediawidget.image_widget.adjust_brightness)
-        query_image_buttons.addWidget(self.slider_brightness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Contrast
-        query_image_buttons.addWidget(QLabel("Contrast:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.slider_contrast = QSlider(Qt.Orientation.Horizontal)
-        self.slider_contrast.setRange(25, 75)  # Set range from 1 to 100
-        self.slider_contrast.setValue(50)  # Set initial value
-        self.slider_contrast.valueChanged.connect(self.mediawidget.image_widget.adjust_contrast)
-        query_image_buttons.addWidget(self.slider_contrast, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Sharpness
-        query_image_buttons.addWidget(QLabel("Sharpness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.slider_sharpness = QSlider(Qt.Orientation.Horizontal)
-        self.slider_sharpness.setRange(25, 75)  # Set range from 1 to 100
-        self.slider_sharpness.setValue(50)  # Set initial value
-        self.slider_sharpness.valueChanged.connect(self.mediawidget.image_widget.adjust_sharpness)
-        query_image_buttons.addWidget(self.slider_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Reset
-        button_query_image_reset = QPushButton("Reset")
-        button_query_image_reset.clicked.connect(self.image_reset)
-        query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # View Image
-        button_query_image_edit = QPushButton("Edit Image")
-        button_query_image_edit.clicked.connect(self.edit_image)
-        query_image_buttons.addWidget(button_query_image_edit, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Open Image
-        button_query_image_open = QPushButton("Open Image")
-        button_query_image_open.clicked.connect(self.open_image)
-        query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # favorite
-        self.button_favorite = QPushButton("♥")
-        self.button_favorite.setFixedWidth(30)
-        self.button_favorite.clicked.connect(self.press_favorite)
-        query_image_buttons.addWidget(self.button_favorite)
-        self.button_favorite.setCheckable(True)
-
-        query_image_buttons.addStretch()
-        self.setLayout(query_image_buttons)
-
-    def image_reset(self):
-        self.mediawidget.image_widget.reset()
-        self.slider_brightness.setValue(50)
-        self.slider_contrast.setValue(50)
-        self.slider_sharpness.setValue(50)
-
-    def press_favorite(self):
-        current_rid = self.parent.get_rid(self.side)
-        self.parent.press_favorite_button(current_rid)
-
-    def set_favorite(self, state):
-        if state:
-            self.button_favorite.setChecked(True)
-            self.button_favorite.setStyleSheet(self.FAVORITE_STYLE)
-        else:
-            self.button_favorite.setChecked(False)
-            self.button_favorite.setStyleSheet("")
-
-    def edit_image(self):
-        current_rid = self.parent.get_rid(self.side)
-        self.parent.edit_image(current_rid)
-    
-    def open_image(self):
-        current_rid = self.parent.get_rid(self.side)
-        self.parent.open_image(current_rid)     
 
 
 # ==============================================================================

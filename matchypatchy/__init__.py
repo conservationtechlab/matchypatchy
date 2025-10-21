@@ -43,7 +43,8 @@ from matchypatchy.gui import (AboutPopup, AlertPopup, ClickableSlider,
                               popup_import_folder, popup_individual,
                               popup_media_edit, popup_ml, popup_pairx,
                               popup_readme, popup_species, popup_station,
-                              popup_survey, widget_media,)
+                              popup_survey, widget_image_adjustment,
+                              widget_media,)
 from matchypatchy.pairx import (CMAPS, COLORS, XAIDataset, calculate_residuals,
                                 choose_canonizer, core,
                                 display_image_with_heatmap, draw_color_maps,
@@ -92,4 +93,5 @@ __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'popup_station', 'popup_survey', 'qc_query', 'query', 'reid_thread',
            'resource_path', 'sequence_roi_dict', 'sequence_thread', 'setup',
            'setup_database', 'species', 'thumbnail_thread', 'update',
-           'update_model_yml', 'widget_media', 'xai_dataset']
+           'update_model_yml', 'widget_image_adjustment', 'widget_media',
+           'xai_dataset']
