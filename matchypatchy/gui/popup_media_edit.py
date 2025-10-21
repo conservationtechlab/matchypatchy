@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt
 from matchypatchy.gui.popup_species import SpeciesFillPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.widget_media import MediaWidget
+from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.gui_assets import HorizontalSeparator
 
 from matchypatchy.algo.models import load
@@ -52,7 +53,7 @@ class MediaEditPopup(QDialog):
         self.image = MediaWidget()
         content_layout.addWidget(self.image, 1)
         # Metadata
-        self.metadatapanel = MetadataPanel(self.mpDB, self.data, self.ids)
+        self.metadatapanel = MetadataPanel(self)
         content_layout.addWidget(self.metadatapanel, 1)
         container_layout.addLayout(content_layout)
         container_layout.addStretch()
@@ -122,7 +123,6 @@ class MediaEditPopup(QDialog):
                         frame=db_roi.get_frame(self.data.iloc[[self.current_image_index]]),
                         crop=False)
         # display data
-        self.metadatapanel.refresh_names()
         self.metadatapanel.refresh_values(self.current_image_index)
 
     def favorite(self):
@@ -161,11 +161,12 @@ class MediaEditPopup(QDialog):
 
 
 class MetadataPanel(QWidget):
-    def __init__(self, mpDB, data, ids):
+    def __init__(self, parent):
         super().__init__()
-        self.mpDB = mpDB
-        self.data = data
-        self.ids = ids
+        self.parent = parent
+        self.mpDB = parent.mpDB
+        self.data = parent.data
+        self.ids = parent.ids
         horizontal_gap = 80
         vertical_gap = 8
         # handle comment change only after editing is done
@@ -274,7 +275,6 @@ class MetadataPanel(QWidget):
         species_label.setFixedWidth(horizontal_gap)
         species_layout.addWidget(species_label, alignment=Qt.AlignmentFlag.AlignLeft)
         self.species = QComboBox()
-        self.refresh_species()
         self.species.currentIndexChanged.connect(self.change_species)
         species_layout.addWidget(self.species, stretch=1)
         self.button_add_species = QPushButton("+")
@@ -308,21 +308,6 @@ class MetadataPanel(QWidget):
 
         self.setLayout(metadata_layout)
 
-    def refresh_names(self):
-        self.name.blockSignals(True)
-        self.name.clear()
-        self.individuals = fetch_individual(self.mpDB)
-        self.name_list = ["Unknown"] + [el for el in self.individuals["name"]]
-        self.name.addItems(self.name_list)
-        self.name.blockSignals(False)
-
-    def refresh_species(self):
-        self.species.blockSignals(True)
-        self.species.clear()
-        species = self.mpDB.select("species", "id, common")
-        self.species_list = [(0, 'Unknown')] + species
-        self.species.addItems([el[1] for el in self.species_list])
-        self.species.blockSignals(False)
 
     def refresh_values(self, current_image_index):
         # disable comboboxes
@@ -331,6 +316,16 @@ class MetadataPanel(QWidget):
         self.sex.blockSignals(True)
         self.species.blockSignals(True)
         self.viewpoint.blockSignals(True)
+        self.comment.blockSignals(True)
+
+        # update lists
+        self.individuals = fetch_individual(self.mpDB)
+        self.name_list = ["Unknown"] + [el for el in self.individuals["name"]]
+        self.name.addItems(self.name_list)
+
+        species = self.mpDB.select("species", "id, common")
+        self.species_list = [(0, 'Unknown')] + species
+        self.species.addItems([el[1] for el in self.species_list])
 
         self.timestamp_data.setText(str(self.data.iloc[current_image_index]["timestamp"]))
         survey_info = fetch_station_names_from_id(self.mpDB, self.data.iloc[current_image_index]["station_id"])
@@ -342,18 +337,14 @@ class MetadataPanel(QWidget):
 
         # Name
         iid = self.data.iloc[current_image_index]["individual_id"] if {"individual_id"}.issubset(self.data.columns) else 0
-        if iid == 0:
+        if iid == 0 or iid is None:
             # media only, no individual column
             self.name.setCurrentIndex(0)
-            self.name.setDisabled(True)
             self.age.setDisabled(True)
             self.sex.setDisabled(True)
-        elif iid is None:
-            self.name.setCurrentIndex(0)
-            self.sex.setDisabled(True)
-            self.age.setDisabled(True)
         else:
-            self.name.setCurrentIndex(iid)
+            name_index = self.name.findText(self.individuals.loc[iid, 'name'])
+            self.name.setCurrentIndex(name_index)
             self.sex.setDisabled(False)
             self.age.setDisabled(False)
 
@@ -445,26 +436,35 @@ class MetadataPanel(QWidget):
         self.sex.blockSignals(False)
         self.species.blockSignals(False)
         self.viewpoint.blockSignals(False)
-
+        self.comment.blockSignals(False)
 
     # Edits --------------------------------------------------------------------
     def change_name(self):
         if self.name.currentIndex() > 0:
-            selected_individual = self.individuals[self.individuals["name" ] == self.name_list[self.name.currentIndex()]]
-            print(selected_individual)
-
+            iid = self.individuals.loc[self.individuals["name"] == self.name_list[self.name.currentIndex()]].index.item()
             for id in self.ids:
                 previous_value = self.data[self.data["id"] == id]["individual_id"].item()
                 edit = {'id': id,
                         'reference': 'individual_id',
-                        'previous_value': previous_value,
-                        'new_value': selected_individual['id'].item()}
+                        'previous_value': int(previous_value) if previous_value is not None else None,
+                        'new_value': iid}
+                #print(edit)
                 self.edit_stack.append(edit)
-            self.sex.setCurrentIndex(self.sex.findText(str(selected_individual['sex'].values[0])))
+            self.sex.setCurrentIndex(self.sex.findText(str(self.individuals.loc[iid, 'sex'])))
             self.sex.setDisabled(False)
-            self.age.setCurrentIndex(self.age.findText(str(selected_individual['age'].values[0])))
+            self.age.setCurrentIndex(self.age.findText(str(self.individuals.loc[iid, 'age'])))
             self.age.setDisabled(False)
         else:
+            dialog = AlertPopup(self, "Are you sure you want to set the name to 'Unknown'?\nThis will remove the ID assignment from the selected ROI(s).")
+            if dialog.exec():
+                for id in self.ids:
+                    previous_value = int(self.data[self.data["id"] == id]["individual_id"].item())
+                    edit = {'id': id,
+                            'reference': 'individual_id',
+                            'previous_value': previous_value,
+                            'new_value': None}
+                    #print(edit)
+                    self.edit_stack.append(edit)
             self.sex.setCurrentIndex(0)
             self.sex.setDisabled(True)
             self.age.setCurrentIndex(0)
@@ -472,27 +472,25 @@ class MetadataPanel(QWidget):
 
     def change_sex(self):
         if self.name.currentIndex() > 0:
-            iid = self.individuals.loc[self.individuals["name" ] == self.name_list[self.name.currentIndex()], 'id'].item()
             for id in self.ids:
                 previous_value = self.data[self.data["id"] == id]["sex"].item()
                 edit = {'id': id,
                         'reference': 'sex',
                         'previous_value': previous_value,
                         'new_value': self.sex.currentText()}
-                print(edit)
+                #print(edit)
                 self.edit_stack.append(edit)
 
     def change_age(self):
         # updates individual table
         if self.name.currentIndex() > 0:
-            iid = self.individuals.loc[self.individuals["name" ] == self.name_list[self.name.currentIndex()], 'id'].values[0]
             for id in self.ids:
                 previous_value = self.data[self.data["id"] == id]["age"].item()
                 edit = {'id': id,
                         'reference': 'age',
                         'previous_value': previous_value,
                         'new_value': self.age.currentText()}
-                print(edit)
+                #print(edit)
                 self.edit_stack.append(edit)
 
     def change_species(self):
@@ -503,24 +501,19 @@ class MetadataPanel(QWidget):
                         'reference': 'species_id',
                         'previous_value': self.data[self.data["id"] == id]["species_id"].item(),
                         'new_value': selected_species[0]}
-                print(edit)
+                #print(edit)
                 self.edit_stack.append(edit)
 
     def change_viewpoint(self):
         viewpoint_keys = list(self.VIEWPOINTS.keys())
         selected_viewpoint = viewpoint_keys[self.viewpoint.currentIndex() + 1]
         for id in self.ids:
-            if selected_viewpoint == 'None':
-                edit = {'id': id,
-                        'reference': 'viewpoint',
-                        'previous_value': self.data[self.data["id"] == id]["viewpoint"].item(),
-                        'new_value': None}
-            else:
-                edit = {'id': id,
-                        'reference': 'viewpoint',
-                        'previous_value': self.data[self.data["id"] == id]["viewpoint"].item(),
-                        'new_value': int(selected_viewpoint)}
-            print(edit)
+            selected_viewpoint = None if selected_viewpoint == 'None' else int(selected_viewpoint)
+            edit = {'id': id,
+                    'reference': 'viewpoint',
+                    'previous_value': self.data[self.data["id"] == id]["viewpoint"].item(),
+                    'new_value': selected_viewpoint}
+            #print(edit)
             self.edit_stack.append(edit)
 
     def change_comment(self):
@@ -536,8 +529,7 @@ class MetadataPanel(QWidget):
             for rid in self.ids:
                 self.mpDB.edit_row('roi', rid, {"individual_id": individual_id})
         # reload data
-        self.refresh_names()
-        self.refresh_values()
+        self.refresh_values(self.parent.current_image_index)
 
     def new_species(self):
         dialog = SpeciesFillPopup(self)
@@ -547,5 +539,4 @@ class MetadataPanel(QWidget):
             for rid in self.ids:
                 self.mpDB.edit_row('roi', rid, {"species_id": species_id})
         # reload data
-        self.refresh_species()
-        self.refresh_values()
+        self.refresh_values(self.parent.current_image_index)

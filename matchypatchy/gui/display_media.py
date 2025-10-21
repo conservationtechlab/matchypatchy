@@ -37,16 +37,6 @@ class DisplayMedia(QWidget):
 
         # Divider
         first_layer.addWidget(VerticalSeparator())
-
-        # Save
-        button_save = StandardButton("Save")
-        button_save.clicked.connect(self.save)
-        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Undo
-        self.button_undo = StandardButton("Undo")
-        self.button_undo.clicked.connect(self.undo)
-        self.button_undo.setEnabled(False)
-        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Show Type
         first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.show_type = QComboBox()
@@ -80,8 +70,22 @@ class DisplayMedia(QWidget):
         self.button_delete.setEnabled(False)
         first_layer.addWidget(self.button_delete, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # Save
+        first_layer.addWidget(VerticalSeparator())
+        button_save = StandardButton("Save")
+        button_save.clicked.connect(self.save)
+        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Undo
+        self.button_undo = StandardButton("Undo")
+        self.button_undo.clicked.connect(self.undo)
+        self.button_undo.setEnabled(False)
+        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         first_layer.addStretch()
+
         layout.addLayout(first_layer)
+
+
 
         # FILTERS --------------------------------------------------------------
         second_layer = QHBoxLayout()
@@ -339,6 +343,8 @@ class DisplayMedia(QWidget):
             # full image mode/video only mode
             data = self.media_table.data_filtered.iloc[[row]]
             current_image_index = 0
+
+        print(data)
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()

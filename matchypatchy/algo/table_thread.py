@@ -103,9 +103,11 @@ class LoadTableThread(QThread):
                     qtw = QTableWidgetItem("Unknown")
 
         # name not editable here
-        elif column == "name":
+        elif column == "individual_id":
             if roi['individual_id'] is not None:
-                qtw = QTableWidgetItem(str(roi[column]))
+                name = self.individual_list.loc[roi['individual_id'], 'name']
+                #print(f"individual_id is {roi['individual_id']}, name is {name}")
+                qtw = QTableWidgetItem(str(name))
             else:
                 qtw = QTableWidgetItem("Unknown")
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)

@@ -106,7 +106,7 @@ class MediaTable(QWidget):
                             7: "external_id",
                             8: "viewpoint",
                             9: "common",
-                            10: "name",
+                            10: "individual_id",
                             11: "sex",
                             12: "age",
                             13: "reviewed",
@@ -367,7 +367,8 @@ class MediaTable(QWidget):
                 new_value = self.species_list.loc[self.species_list['binomen'] == new, 'id'][0]
 
         # individual
-        elif reference == 'name' or reference == 'sex' or reference == 'age':
+        elif reference == 'individual_id' or reference == 'sex' or reference == 'age':
+           #  TODO handle load and change
             rid = self.data_filtered.at[row, 'individual_id']
             if rid is None:
                 dialog = AlertPopup(self, "Please tag the ROI with an individual first.")
@@ -434,9 +435,11 @@ class MediaTable(QWidget):
             if self.data_type == 1:
                 if edit['reference'] in {'station_id', 'sequence_id', 'external_id'}:
                     self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
-                elif edit['reference'] in {'name', 'age', 'sex'}:
-                    self.mpDB.edit_row("individual", id, replace_dict, allow_none=False, quiet=False)
-
+                elif edit['reference'] in {'age', 'sex'}:
+                    iid = self.data_filtered.loc[self.data_filtered['id'] == id, 'individual_id'].values[0]
+                    iid = int(iid) if pd.notna(iid) else None
+                    if iid is not None:
+                        self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
                 elif edit['reference'] in {'comment'}:
                     self.mpDB.edit_row("media", id, replace_dict, allow_none=True, quiet=False)
                 else:
