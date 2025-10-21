@@ -76,7 +76,6 @@ class MediaWidget(QWidget):
 # ==============================================================================
 # IMAGE
 # ==============================================================================
-# TODO: FIX IMAGE ADJUSTMENTS
 class ImageWidget(QLabel):
     """
     Custom Widget for Displaying an Image

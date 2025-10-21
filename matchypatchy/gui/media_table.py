@@ -371,7 +371,6 @@ class MediaTable(QWidget):
 
         # individual
         elif reference == 'individual_id' or reference == 'sex' or reference == 'age':
-           #  TODO handle load and change
             rid = self.data_filtered.at[row, 'individual_id']
             if rid is None:
                 dialog = AlertPopup(self, "Please tag the ROI with an individual first.")
