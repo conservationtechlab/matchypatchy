@@ -3,22 +3,21 @@ GUI Window for Match Comparisons
 
 """
 import os
-import cv2
 from pathlib import Path
 from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QLineEdit, QSlider, QToolTip)
+                             QLabel, QComboBox, QLineEdit, QSlider)
 from PyQt6.QtCore import Qt, QPoint
 
-from matchypatchy.gui.widget_media import ImageAdjustBar, MediaWidget, VideoViewer
+from matchypatchy.gui.widget_media import MediaWidget, VideoViewer
+from matchypatchy.gui.widget_image_adjustment import ImageAdjustBar
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.popup_pairx import PairXPopup
-from matchypatchy.gui.gui_assets import FilterBox, VerticalSeparator, StandardButton, ThreePointSlider
+from matchypatchy.gui.gui_assets import *
 
-from matchypatchy.algo.models import load
 from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
@@ -425,18 +424,23 @@ class DisplayCompare(QWidget):
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
 
         self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
+
+        self.query_image_bar.reset_sliders()
+        self.match_image_bar.reset_sliders()
         # load new images
         self.load_query()
         self.load_match()
 
     def change_query_in_sequence(self, n):
         self.QueryContainer.set_within_query_sequence(n)
+        self.query_image_bar.reset_sliders()
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
         self.load_query()
 
     def change_match(self, n):
         # load new images
         self.QueryContainer.set_match(n)
+        self.match_image_bar.reset_sliders()
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.load_match()
 
@@ -467,6 +471,7 @@ class DisplayCompare(QWidget):
 
         metadata = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "metadata")
         self.match_info.setText(self.format_metadata(metadata))
+        self.match_info.adjustSize()
         self.toggle_match_button()
         self.toggle_match_favorite()
 
