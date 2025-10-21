@@ -109,6 +109,7 @@ class MatchyPatchyDB():
         Meant for one-time use
         """
         try:
+            print(command)
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             cursor.execute(command)
@@ -117,7 +118,7 @@ class MatchyPatchyDB():
             db.close()
             return rows
         except sqlite3.Error as error:
-            logging.error("Failed to execute fetch.", error)
+            logging.error("Failed to execute command.", error)
             if db:
                 db.close()
             return None
