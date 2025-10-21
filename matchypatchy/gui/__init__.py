@@ -29,7 +29,6 @@ from matchypatchy.gui.main_gui import (MainWindow, main_display,)
 from matchypatchy.gui.media_table import (ComboBoxDelegate, MediaTable,)
 from matchypatchy.gui.popup_alert import (AlertPopup,)
 from matchypatchy.gui.popup_config import (ConfigPopup, ICON_PENCIL,)
-from matchypatchy.gui.popup_dropdown import (DropdownPopup,)
 from matchypatchy.gui.popup_import_csv import (ImportCSVPopup,)
 from matchypatchy.gui.popup_import_folder import (ImportFolderPopup,)
 from matchypatchy.gui.popup_individual import (IndividualFillPopup,
@@ -48,7 +47,7 @@ from matchypatchy.gui.widget_media import (ImageAdjustBar, ImageWidget,
 
 __all__ = ['AboutPopup', 'AlertPopup', 'ComboBoxDelegate', 'ComboBoxSeparator',
            'ConfigPopup', 'DisplayBase', 'DisplayCompare', 'DisplayMedia',
-           'DropdownPopup', 'FilterBox', 'HorizontalSeparator', 'ICON_PENCIL',
+           'FilterBox', 'HorizontalSeparator', 'ICON_PENCIL',
            'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
            'LOGO', 'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
