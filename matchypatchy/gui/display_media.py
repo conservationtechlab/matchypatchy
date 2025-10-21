@@ -224,8 +224,7 @@ class DisplayMedia(QWidget):
 
         self.station_select.clear()
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
-        self.station_list_ordered = [(0, 'Station')] + sorted([(k, v) for k, v in self.valid_stations.items()], 
-                                                              key=lambda e: e[0])
+        self.station_list_ordered = [(0, 'Station')] + list(self.valid_stations.items())
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
 
         # select all cameras for now
@@ -344,8 +343,7 @@ class DisplayMedia(QWidget):
             # full image mode/video only mode
             data = self.media_table.data_filtered.iloc[[row]]
             current_image_index = 0
-
-        print(data)
+    
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
@@ -411,7 +409,7 @@ class DisplayMedia(QWidget):
             dialog = AlertPopup(self, f"""Are you sure you want to delete {len(self.selected_rows)} files? This cannot be undone.""", title="Warning")
             if dialog.exec():
                 for row in self.selected_rows:
-                    if self.data_type == 1:
+                    if self.data_type == 0:
                         id = int(self.media_table.data_filtered.at[row, "media_id"])
                         rois = self.media_table.data[self.media_table.data['media_id'] == id]
                         self.mpDB.delete('media', f'id={id}')
@@ -463,7 +461,6 @@ class DisplayMedia(QWidget):
         self.filter_table()
 
     def select_station(self):
-        print('select')
         self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
         self.filter_table()
 
