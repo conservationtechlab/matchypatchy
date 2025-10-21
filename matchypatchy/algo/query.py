@@ -343,8 +343,6 @@ class QueryContainer(QObject):
     def merge(self):
         """
         Merge two individuals after match
-
-        TODO: Add option to select which name to keep
         """
         query = self.data.loc[self.current_query_rid]
         match = self.data.loc[self.current_match_rid]
@@ -352,23 +350,23 @@ class QueryContainer(QObject):
         query_iid = query['individual_id']
         match_iid = match['individual_id']
 
-        print("Merging", query_iid, match_iid)
 
-        # both are none
-        if query_iid is None and match_iid is None:
-            sequence = [match['sequence_id'], self.current_sequence_id]
-            keep_id = match_iid
-            drop_id = None
-        # query is newer, give match name
-        elif match_iid is not None and query_iid > match_iid:
+        # both are named
+        if query_iid is not None:
+            # query is older, keep query name
+            if match_iid is None or match_iid < query_iid:
+                sequence = [match['sequence_id']]
+                keep_id = query_iid
+
+            # match is older, keep match name
+            else:
+                sequence = [self.current_sequence_id]
+                keep_id = match_iid
+
+        # query is None, give match name
+        else:
             sequence = [self.current_sequence_id]
             keep_id = match_iid
-            drop_id = query_iid
-        # query is older or match is None update match
-        else:
-            sequence = [match['sequence_id']]
-            keep_id = query_iid
-            drop_id = match_iid
 
         # find all rois with newer name
         to_merge = self.data[self.data["sequence_id"].isin(sequence)]
@@ -377,5 +375,9 @@ class QueryContainer(QObject):
             self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
 
     def unmatch(self):
-        # Set current match id to none
+        """
+        Unmatch the current query ROI from the matched ROI
+
+        TODO: HOW TO HANDLE?
+        """
         self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': None}, quiet=False)
