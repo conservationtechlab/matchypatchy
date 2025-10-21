@@ -45,7 +45,8 @@ class MediaEditPopup(QDialog):
         self.button_favorite.setFixedWidth(30)
         self.button_favorite.setCheckable(True)
         self.button_favorite.clicked.connect(self.favorite)
-        top.addWidget(self.button_favorite, 0, alignment=Qt.AlignmentFlag.AlignRight)
+        if self.data_type == 1:
+            top.addWidget(self.button_favorite, 0, alignment=Qt.AlignmentFlag.AlignRight)
         container_layout.addLayout(top)
 
         # Image ----------------------------------------------------------------
@@ -135,6 +136,9 @@ class MediaEditPopup(QDialog):
             self.mpDB.edit_row('roi', rid, {"favorite": 0})
 
     def check_favorite(self):
+        if self.data_type != 1:
+            self.button_favorite.setDisabled(True)
+            return
         favorite = self.data.iloc[self.current_image_index]["favorite"]
         if favorite == 1:
             self.button_favorite.setChecked(True)
@@ -167,6 +171,7 @@ class MetadataPanel(QWidget):
         self.mpDB = parent.mpDB
         self.data = parent.data
         self.ids = parent.ids
+        self.data_type = parent.data_type
         horizontal_gap = 80
         vertical_gap = 8
         # handle comment change only after editing is done
@@ -337,98 +342,107 @@ class MetadataPanel(QWidget):
         self.sequence_data.setText(str(self.data.iloc[current_image_index]["sequence_id"]))
         self.external_data.setText(str(self.data.iloc[current_image_index]["external_id"]))
 
-        # Name
-        iid = self.data.iloc[current_image_index]["individual_id"] if {"individual_id"}.issubset(self.data.columns) else 0
-        if iid == 0 or iid is None:
-            # media only, no individual column
+        if self.data_type == 1:
+            # Name
+            iid = self.data.iloc[current_image_index]["individual_id"] if {"individual_id"}.issubset(self.data.columns) else 0
+            if iid == 0 or iid is None:
+                # media only, no individual column
+                self.name.setCurrentIndex(0)
+                self.age.setDisabled(True)
+                self.sex.setDisabled(True)
+            else:
+                name_index = self.name.findText(self.individuals.loc[iid, 'name'])
+                print(name_index, self.individuals.loc[iid, 'name'])
+                self.name.setCurrentIndex(name_index)
+                self.sex.setDisabled(False)
+                self.age.setDisabled(False)
+
+            # Sex
+            self.sex.clear()
+            if len(self.ids) > 1:
+                self.sex.addItems(['— Mixed —', 'Unknown', 'Male', 'Female'])
+                unique_sexes = self.data["sex"].dropna().unique() if {"sex"}.issubset(self.data.columns) else []
+                if len(unique_sexes) == 0:
+                    self.sex.setCurrentIndex(self.sex.findText('Unknown'))
+                elif len(unique_sexes) == 1:
+                    sex_text = unique_sexes[0]
+                    self.sex.setCurrentIndex(self.sex.findText(str(sex_text)))
+                else:
+                    self.sex.setCurrentIndex(0)  # '— Mixed —'
+            else:
+                self.sex.addItems(['Unknown', 'Male', 'Female'])
+                current_sex = self.data.iloc[current_image_index]["sex"] if {"sex"}.issubset(self.data.columns) else None
+                if current_sex is None:
+                    self.sex.setCurrentIndex(0)
+                else:
+                    self.sex.setCurrentIndex(self.sex.findText(str(current_sex)))
+            # Age
+            self.age.clear()
+            if len(self.ids) > 1:
+                self.age.addItems(['— Mixed —', 'Unknown', 'Juvenile', 'Subadult', 'Adult'])
+                unique_ages = self.data["age"].dropna().unique() if {"age"}.issubset(self.data.columns) else []
+                if len(unique_ages) == 0:
+                    self.age.setCurrentIndex(1) # 'Unknown'
+                elif len(unique_ages) == 1:
+                    age_text = unique_ages[0]
+                    self.age.setCurrentIndex(self.age.findText(str(age_text)))
+                else:
+                    self.age.setCurrentIndex(0)  # '— Mixed —'
+            else:
+                self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
+                current_age = self.data.iloc[current_image_index]["age"] if {"age"}.issubset(self.data.columns) else None
+                if current_age is None:
+                    self.age.setCurrentIndex(0)
+                else:
+                    self.age.setCurrentIndex(self.age.findText(str(current_age)))
+
+            # Species
+            self.species.setDisabled(False)
+            self.button_add_species.setDisabled(False)
+            current_species = self.data.iloc[current_image_index]["common"] if {"common"}.issubset(self.data.columns) else 0
+            if current_species == 0:
+                # media only, no species column
+                self.species.setCurrentIndex(0)
+                self.species.setDisabled(True)
+                self.button_add_species.setDisabled(True)
+            elif current_species == None:
+                self.species.setCurrentIndex(0)
+            else:
+                self.species.setCurrentIndex(self.species.findText(str(current_species)))
+
+            # Viewpoint
+            self.viewpoint.clear()
+            if len(self.ids) > 1:
+                self.viewpoint.addItems(['— Mixed —'] + list(self.VIEWPOINTS.values())[1:])  # skip 'any'
+                unique_viewpoints = self.data["viewpoint"].dropna().unique() if {"viewpoint"}.issubset(self.data.columns) else []
+                if len(unique_viewpoints) == 0:
+                    self.viewpoint.setCurrentIndex(self.viewpoint.findText('None'))
+                elif len(unique_viewpoints) == 1:
+                    viewpoint_key = str(unique_viewpoints[0])
+                    viewpoint_text = self.VIEWPOINTS[viewpoint_key]
+                    self.viewpoint.setCurrentIndex(self.viewpoint.findText(str(viewpoint_text)))
+                else:
+                    self.viewpoint.setCurrentIndex(0)  # '— Mixed —'
+            else:
+                self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])  # skip 'any'
+                viewpoint = str(self.data.iloc[current_image_index]["viewpoint"]) if {"viewpoint"}.issubset(self.data.columns) else -1
+                if viewpoint == -1:
+                    self.viewpoint.setCurrentIndex(0)
+                elif viewpoint == 'None' or viewpoint is None or viewpoint == 'nan':
+                    self.viewpoint.setCurrentIndex(0)
+                else:
+                    current_viewpoint = self.VIEWPOINTS[viewpoint]
+                    self.viewpoint.setCurrentIndex(self.viewpoint.findText(current_viewpoint))
+
+        else: # media only
             self.name.setCurrentIndex(0)
-            self.age.setDisabled(True)
+            self.name.setDisabled(True)
             self.sex.setDisabled(True)
-        else:
-            name_index = self.name.findText(self.individuals.loc[iid, 'name'])
-            print(name_index, self.individuals.loc[iid, 'name'])
-            self.name.setCurrentIndex(name_index)
-            self.sex.setDisabled(False)
-            self.age.setDisabled(False)
-
-        # Sex
-        if len(self.ids) > 1:
-            self.sex.addItems(['— Mixed —', 'Unknown', 'Male', 'Female'])
-            unique_sexes = self.data["sex"].dropna().unique() if {"sex"}.issubset(self.data.columns) else []
-            if len(unique_sexes) == 0:
-                self.sex.setCurrentIndex(self.sex.findText('Unknown'))
-            elif len(unique_sexes) == 1:
-                sex_text = unique_sexes[0]
-                self.sex.setCurrentIndex(self.sex.findText(str(sex_text)))
-            else:
-                self.sex.setCurrentIndex(0)  # '— Mixed —'
-        else:
-            self.sex.addItems(['Unknown', 'Male', 'Female'])
-            current_sex = self.data.iloc[current_image_index]["sex"] if {"sex"}.issubset(self.data.columns) else None
-            if current_sex is None:
-                self.sex.setCurrentIndex(0)
-            else:
-                self.sex.setCurrentIndex(self.sex.findText(str(current_sex)))
-        # Age
-        if len(self.ids) > 1:
-            self.age.addItems(['— Mixed —', 'Unknown', 'Juvenile', 'Subadult', 'Adult'])
-            unique_ages = self.data["age"].dropna().unique() if {"age"}.issubset(self.data.columns) else []
-            if len(unique_ages) == 0:
-                self.age.setCurrentIndex(1) # 'Unknown'
-            elif len(unique_ages) == 1:
-                age_text = unique_ages[0]
-                self.age.setCurrentIndex(self.age.findText(str(age_text)))
-            else:
-                self.age.setCurrentIndex(0)  # '— Mixed —'
-        else:
-            self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
-            current_age = self.data.iloc[current_image_index]["age"] if {"age"}.issubset(self.data.columns) else None
-            if current_age is None:
-                self.age.setCurrentIndex(0)
-            else:
-                self.age.setCurrentIndex(self.age.findText(str(current_age)))
-
-        # Species
-        self.species.setDisabled(False)
-        self.button_add_species.setDisabled(False)
-        current_species = self.data.iloc[current_image_index]["common"] if {"common"}.issubset(self.data.columns) else 0
-        if current_species == 0:
-            # media only, no species column
-            self.species.setCurrentIndex(0)
+            self.age.setDisabled(True)
             self.species.setDisabled(True)
+            self.viewpoint.setDisabled(True)
+            self.add_individual.setDisabled(True)
             self.button_add_species.setDisabled(True)
-        elif current_species == None:
-            self.species.setCurrentIndex(0)
-        else:
-            self.species.setCurrentIndex(self.species.findText(str(current_species)))
-
-        # Viewpoint
-        self.viewpoint.setDisabled(False)
-        if len(self.ids) > 1:
-            self.viewpoint.addItems(['— Mixed —'] + list(self.VIEWPOINTS.values())[1:])  # skip 'any'
-            unique_viewpoints = self.data["viewpoint"].dropna().unique() if {"viewpoint"}.issubset(self.data.columns) else []
-            if len(unique_viewpoints) == 0:
-                # viewpoint not in columns, media only
-                self.viewpoint.setCurrentIndex(self.viewpoint.findText('None'))
-                self.viewpoint.setDisabled(True)
-            elif len(unique_viewpoints) == 1:
-                viewpoint_key = str(unique_viewpoints[0])
-                viewpoint_text = self.VIEWPOINTS[viewpoint_key]
-                self.viewpoint.setCurrentIndex(self.viewpoint.findText(str(viewpoint_text)))
-            else:
-                self.viewpoint.setCurrentIndex(0)  # '— Mixed —'
-        else:
-            self.viewpoint.addItems(list(self.VIEWPOINTS.values())[1:])  # skip 'any'
-            viewpoint = str(self.data.iloc[current_image_index]["viewpoint"]) if {"viewpoint"}.issubset(self.data.columns) else -1
-            if viewpoint == -1:
-                # no viewpoint column, media only
-                self.setDisabled(True)
-                self.viewpoint.setCurrentIndex(0)
-            elif viewpoint == 'None' or viewpoint is None or viewpoint == 'nan':
-                self.viewpoint.setCurrentIndex(0)
-            else:
-                current_viewpoint = self.VIEWPOINTS[viewpoint]
-                self.viewpoint.setCurrentIndex(self.viewpoint.findText(current_viewpoint))
 
         # Comment
         self.comment.setText(str(self.data.iloc[current_image_index]["comment"]))
@@ -501,17 +515,27 @@ class MetadataPanel(QWidget):
         if selected_species[0] > 0:
             for id in self.ids:
                 edit = {'id': id,
-                        'reference': 'species_id',
+                        'reference': 'common',
                         'previous_value': self.data[self.data["id"] == id]["species_id"].item(),
                         'new_value': selected_species[0]}
-                #print(edit)
+                print(edit)
                 self.edit_stack.append(edit)
 
     def change_viewpoint(self):
         viewpoint_keys = list(self.VIEWPOINTS.keys())
-        selected_viewpoint = viewpoint_keys[self.viewpoint.currentIndex() + 1]
+        if len(self.ids) > 1:
+            selected_viewpoint = viewpoint_keys[self.viewpoint.currentIndex()]
+        else:
+            selected_viewpoint = viewpoint_keys[self.viewpoint.currentIndex() + 1]
         for id in self.ids:
-            selected_viewpoint = None if selected_viewpoint == 'None' else int(selected_viewpoint)
+            print(f"selected_viewpoint: {selected_viewpoint}")
+            if selected_viewpoint == 'Any':
+                continue  # invalid selection, no change
+
+            elif selected_viewpoint == 'None' or selected_viewpoint is None:
+                selected_viewpoint = None
+            else:
+                selected_viewpoint = int(selected_viewpoint)
             edit = {'id': id,
                     'reference': 'viewpoint',
                     'previous_value': self.data[self.data["id"] == id]["viewpoint"].item(),

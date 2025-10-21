@@ -6,7 +6,6 @@ from matchypatchy.gui import main_gui
 from matchypatchy.gui import media_table
 from matchypatchy.gui import popup_alert
 from matchypatchy.gui import popup_config
-from matchypatchy.gui import popup_dropdown
 from matchypatchy.gui import popup_import_csv
 from matchypatchy.gui import popup_import_folder
 from matchypatchy.gui import popup_individual
@@ -22,8 +21,9 @@ from matchypatchy.gui import widget_media
 from matchypatchy.gui.display_base import (DisplayBase, LOGO,)
 from matchypatchy.gui.display_compare import (DisplayCompare,)
 from matchypatchy.gui.display_media import (DisplayMedia,)
-from matchypatchy.gui.gui_assets import (ComboBoxSeparator, FilterBox,
-                                         HorizontalSeparator, StandardButton,
+from matchypatchy.gui.gui_assets import (ClickableSlider, ComboBoxSeparator,
+                                         FilterBox, HorizontalSeparator,
+                                         StandardButton, ThreePointSlider,
                                          VerticalSeparator,)
 from matchypatchy.gui.main_gui import (MainWindow, main_display,)
 from matchypatchy.gui.media_table import (ComboBoxDelegate, MediaTable,)
@@ -45,9 +45,9 @@ from matchypatchy.gui.widget_media import (ImageAdjustBar, ImageWidget,
                                            MediaWidget, VideoPlayerBar,
                                            VideoViewer, VideoWidget,)
 
-__all__ = ['AboutPopup', 'AlertPopup', 'ComboBoxDelegate', 'ComboBoxSeparator',
-           'ConfigPopup', 'DisplayBase', 'DisplayCompare', 'DisplayMedia',
-           'FilterBox', 'HorizontalSeparator', 'ICON_PENCIL',
+__all__ = ['AboutPopup', 'AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
+           'ComboBoxSeparator', 'ConfigPopup', 'DisplayBase', 'DisplayCompare',
+           'DisplayMedia', 'FilterBox', 'HorizontalSeparator', 'ICON_PENCIL',
            'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
            'LOGO', 'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
@@ -55,10 +55,10 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ComboBoxDelegate', 'ComboBoxSeparator',
            'MetadataPanel', 'PairXPopup', 'READMEPopup', 'SpeciesFillPopup',
            'SpeciesPopup', 'StandardButton', 'StationFillPopup',
            'StationPopup', 'SurveyFillPopup', 'SurveyPopup',
-           'VerticalSeparator', 'VideoPlayerBar', 'VideoViewer', 'VideoWidget',
-           'display_base', 'display_compare', 'display_media', 'gui_assets',
-           'main_display', 'main_gui', 'media_table', 'popup_alert',
-           'popup_config', 'popup_dropdown', 'popup_import_csv',
+           'ThreePointSlider', 'VerticalSeparator', 'VideoPlayerBar',
+           'VideoViewer', 'VideoWidget', 'display_base', 'display_compare',
+           'display_media', 'gui_assets', 'main_display', 'main_gui',
+           'media_table', 'popup_alert', 'popup_config', 'popup_import_csv',
            'popup_import_folder', 'popup_individual', 'popup_media_edit',
            'popup_ml', 'popup_pairx', 'popup_readme', 'popup_species',
            'popup_station', 'popup_survey', 'widget_media']

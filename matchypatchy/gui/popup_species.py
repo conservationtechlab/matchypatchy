@@ -99,6 +99,7 @@ class SpeciesPopup(QDialog):
         if dialog.exec():
             row = self.species_list_ordered[self.list.currentRow()][0]
             self.mpDB.delete("species", f'id={row}')
+            self.mpDB._command(f"UPDATE roi set species_id = NULL where species_id={row}")
         del dialog
         self.update()
 
