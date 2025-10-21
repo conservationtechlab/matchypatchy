@@ -126,8 +126,7 @@ class MediaTable(QWidget):
             # adjust widths
             self.table.resizeColumnsToContents()
             for col in range(self.table.columnCount()):
-                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 50))
-            self.table.setColumnWidth(1, 100)
+                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
 
             # VIEWPOINT COMBOS
             combo_items = list(self.VIEWPOINTS.values())[1:]
@@ -166,8 +165,10 @@ class MediaTable(QWidget):
             self.table.resizeColumnsToContents()
             for col in range(self.table.columnCount()):
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
-            self.table.setColumnWidth(0, 50)
-            self.table.setColumnWidth(1, 100)
+        
+        # FIX FIRST TWO COLUMNS
+        self.table.setColumnWidth(0, 30) # select
+        self.table.setColumnWidth(1, 100) # thumbnail
 
     # STEP 4 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
@@ -406,6 +407,7 @@ class MediaTable(QWidget):
         Transpose edit stack from popup_roi to media_table format
         """
         for edit in edit_stack:
+            print(edit)
             id = edit['id']
             row = self.data_filtered.index[self.data_filtered['id'] == id].tolist()
             column = list(self.columns.keys())[list(self.columns.values()).index(edit['reference'])]
