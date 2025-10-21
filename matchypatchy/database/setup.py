@@ -53,7 +53,6 @@ def setup_database(key, filepath):
                         sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
-                        favorite INTEGER NOT NULL,
                         FOREIGN KEY (station_id) REFERENCES station (id),
                         FOREIGN KEY (camera_id) REFERENCES camera (id),
                         FOREIGN KEY (sequence_id) REFERENCES sequence (id));''')
@@ -70,6 +69,7 @@ def setup_database(key, filepath):
                         viewpoint INTEGER,
                         species_id INTEGER,
                         reviewed INTEGER NOT NULL,
+                        favorite INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb INTEGER,
                         FOREIGN KEY(media_id) REFERENCES media (id),

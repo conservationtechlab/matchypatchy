@@ -30,7 +30,7 @@ def fetch_media(mpDB, ids=None):
     if media:
         media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp",
                                              'station_id', "camera_id", 'sequence_id',
-                                             "external_id", 'comment', 'favorite'])
+                                             "external_id", 'comment'])
         media = media.replace({float('nan'): None})
         return media
     else:
@@ -65,7 +65,7 @@ def fetch_roi(mpDB):
     manifest = mpDB.select("roi")
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
-                                               "species_id", "viewpoint", "reviewed", "individual_id", "emb"])
+                                               "species_id", "viewpoint", "reviewed", "favorite", "individual_id", "emb"])
         rois = rois.replace({float('nan'): None})
         return rois
     else:
@@ -76,9 +76,9 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb',
+                'reviewed', 'favorite', 'media_id', 'species_id', 'individual_id', 'emb',
                 'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-                'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age']
+                'comment',  'binomen', 'common', 'name', 'sex', 'age']
     """
     if rids:
         ids_str = ', '.join(map(str, rids))
@@ -98,9 +98,9 @@ def export_data(mpDB):
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                'reviewed', 'media_id', 'species_id', 'individual_id', 'emb',
+                'reviewed', 'favorite', 'media_id', 'species_id', 'individual_id', 'emb',
                 'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-                'comment', 'favorite', 'binomen', 'common', 'name', 'sex', 'age',
+                'comment', 'binomen', 'common', 'name', 'sex', 'age',
                 'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
     """
     media, column_names = mpDB.all_media()

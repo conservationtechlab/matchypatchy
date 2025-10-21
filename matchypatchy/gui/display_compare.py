@@ -656,8 +656,7 @@ class DisplayCompare(QWidget):
             self.favorite(rid)
 
     def favorite(self, rid):
-        media_id = self.QueryContainer.get_info(rid, "media_id")
-        self.mpDB.edit_row('media', media_id, {"favorite": 1})
+        self.mpDB.edit_row('roi', rid, {"favorite": 1})
         # reload database
         self.QueryContainer.load_data()
         self.QueryContainer.filter()
@@ -665,8 +664,7 @@ class DisplayCompare(QWidget):
         self.load_match()
 
     def unfavorite(self, rid):
-        media_id = self.QueryContainer.get_info(rid, "media_id")
-        self.mpDB.edit_row('media', media_id, {"favorite": 0})
+        self.mpDB.edit_row('roi', rid, {"favorite": 0})
         # reload database
         self.QueryContainer.load_data()
         self.QueryContainer.filter()

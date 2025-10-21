@@ -3,7 +3,7 @@ GUI Window for viewing images
 """
 import pandas as pd
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox)
+                             QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt
 
 from matchypatchy.database.media import IMAGE_EXT
@@ -37,16 +37,6 @@ class DisplayMedia(QWidget):
 
         # Divider
         first_layer.addWidget(VerticalSeparator())
-
-        # Save
-        button_save = StandardButton("Save")
-        button_save.clicked.connect(self.save)
-        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Undo
-        self.button_undo = StandardButton("Undo")
-        self.button_undo.clicked.connect(self.undo)
-        self.button_undo.setEnabled(False)
-        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Show Type
         first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.show_type = QComboBox()
@@ -80,8 +70,22 @@ class DisplayMedia(QWidget):
         self.button_delete.setEnabled(False)
         first_layer.addWidget(self.button_delete, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # Save
+        first_layer.addWidget(VerticalSeparator())
+        button_save = StandardButton("Save")
+        button_save.clicked.connect(self.save)
+        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Undo
+        self.button_undo = StandardButton("Undo")
+        self.button_undo.clicked.connect(self.undo)
+        self.button_undo.setEnabled(False)
+        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         first_layer.addStretch()
+
         layout.addLayout(first_layer)
+
+
 
         # FILTERS --------------------------------------------------------------
         second_layer = QHBoxLayout()
@@ -265,10 +269,19 @@ class DisplayMedia(QWidget):
         self.media_table.load_images()
 
     def change_type(self):
+        if len(self.media_table.edit_stack) > 0:
+            dialog = AlertPopup(self, prompt="There are unsaved changes. Are you sure you want to change view?")
+            cont = dialog.exec()
+            del dialog
+            if cont == QDialog.DialogCode.Rejected:
+                self.show_type.blockSignals(True)
+                self.show_type.setCurrentIndex(self.data_type)
+                self.show_type.blockSignals(False)
+                return
+
         self.data_type = self.show_type.currentIndex()
         # reload table
         data_available = self.load_table()
-        #TODO: CHECK IF EDIT
         if data_available:
             self.load_thumbnails()
         # Disable "Edit Rows" if not in ROI mode
@@ -330,7 +343,9 @@ class DisplayMedia(QWidget):
             # full image mode/video only mode
             data = self.media_table.data_filtered.iloc[[row]]
             current_image_index = 0
-        dialog = MediaEditPopup(self, data, current_image_index=current_image_index)
+
+        print(data)
+        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
             edit_stack = self.media_table.transpose_edit_stack(edit_stack)

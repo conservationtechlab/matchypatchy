@@ -45,7 +45,7 @@ class AnimlThread(QThread):
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
 
         self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station_id", "camera_id",
-                                                  "sequence_id", "external_id", "comment", "favorite"])
+                                                  "sequence_id", "external_id", "comment"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 
         self.md_filepath = models.get_path(self.ml_dir, DETECTOR_KEY)
@@ -104,7 +104,7 @@ class AnimlThread(QThread):
 
                     # do not add emb_id, to be determined later
                     self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                                      viewpoint=viewpoint, reviewed=0, species_id=species_id,
+                                      viewpoint=viewpoint, species_id=species_id,
                                       individual_id=individual_id, emb=0)
                     
             self.progress_update.emit(round(100 * (i + 1) / len(self.media)))

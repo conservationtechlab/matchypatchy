@@ -61,7 +61,7 @@ class IndividualPopup(QDialog):
         self.button_view.setEnabled(flag)
 
     def update(self):
-        self.individuals = self.mpDB._command("""SELECT individual.name, roi.individual_id, COUNT(roi.individual_id) AS count
+        self.individuals = self.mpDB._command("""SELECT individual.name, individual.id, COUNT(roi.individual_id) AS count
                                                  FROM individual LEFT JOIN roi ON roi.individual_id = individual.id
                                                  GROUP BY roi.individual_id;""")
         self.nulls = self.mpDB.select("roi", "COUNT(*)", row_cond="individual_id IS NULL")[0][0]
