@@ -256,6 +256,10 @@ class MediaTable(QWidget):
         for row in range(n_rows):
             self.table.setRowHeight(row, 100)
 
+        # no data after filter
+        if n_rows == 0:
+            return
+
         # set station delegate post filter
         station_delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
         self.table.setItemDelegateForColumn(4, station_delegate)

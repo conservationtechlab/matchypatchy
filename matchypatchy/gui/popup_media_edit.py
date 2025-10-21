@@ -320,10 +320,12 @@ class MetadataPanel(QWidget):
 
         # update lists
         self.individuals = fetch_individual(self.mpDB)
+        self.name.clear()
         self.name_list = ["Unknown"] + [el for el in self.individuals["name"]]
         self.name.addItems(self.name_list)
 
         species = self.mpDB.select("species", "id, common")
+        self.species.clear()
         self.species_list = [(0, 'Unknown')] + species
         self.species.addItems([el[1] for el in self.species_list])
 
@@ -344,6 +346,7 @@ class MetadataPanel(QWidget):
             self.sex.setDisabled(True)
         else:
             name_index = self.name.findText(self.individuals.loc[iid, 'name'])
+            print(name_index, self.individuals.loc[iid, 'name'])
             self.name.setCurrentIndex(name_index)
             self.sex.setDisabled(False)
             self.age.setDisabled(False)
@@ -530,6 +533,7 @@ class MetadataPanel(QWidget):
                 self.mpDB.edit_row('roi', rid, {"individual_id": individual_id})
         # reload data
         self.refresh_values(self.parent.current_image_index)
+        self.name.setCurrentIndex(self.name.count() - 1)  # select new individual
 
     def new_species(self):
         dialog = SpeciesFillPopup(self)
@@ -540,3 +544,4 @@ class MetadataPanel(QWidget):
                 self.mpDB.edit_row('roi', rid, {"species_id": species_id})
         # reload data
         self.refresh_values(self.parent.current_image_index)
+        self.species.setCurrentIndex(self.species.count() - 1)  # select new species
