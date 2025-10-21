@@ -99,7 +99,6 @@ class IndividualPopup(QDialog):
         # set to media view filtered by individual
         if self.list.currentRow() == 0:
             filters = {"individual_id": 0}
-
         else:
             self.selected_ind = self.individuals[self.list.currentRow() - 1]
             filters = {"individual_id": self.selected_ind[1]}

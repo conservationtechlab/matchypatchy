@@ -224,7 +224,8 @@ class DisplayMedia(QWidget):
 
         self.station_select.clear()
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
-        self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in sorted(self.valid_stations.items(), key=lambda item: item[1])]
+        self.station_list_ordered = [(0, 'Station')] + sorted([(k, v) for k, v in self.valid_stations.items()], 
+                                                              key=lambda e: e[0])
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
 
         # select all cameras for now
@@ -462,6 +463,7 @@ class DisplayMedia(QWidget):
         self.filter_table()
 
     def select_station(self):
+        print('select')
         self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
         self.filter_table()
 

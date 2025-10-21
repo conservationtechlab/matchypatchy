@@ -240,6 +240,7 @@ class MediaTable(QWidget):
         if filters['favorites_only']:
             self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
+        self.data_filtered.reset_index(inplace=True)
         # refresh table contents
         self.refresh_table()
 
@@ -247,36 +248,33 @@ class MediaTable(QWidget):
         """
         Add rows to table
         """
-        self.data_filtered.reset_index(drop=True, inplace=True)
-        n_rows = self.data_filtered.shape[0]
-
         # clear old contents and prep for filtered data
         self.table.clearContents()
-        # disconnect edit function while refreshing to prevent needless calls
-        self.table.setRowCount(n_rows)
-        for row in range(n_rows):
-            self.table.setRowHeight(row, 100)
 
-        # no data after filter
-        if n_rows == 0:
-            return
+        # if there are any left
+        n_rows = self.data_filtered.shape[0]
+        if n_rows:
+            # disconnect edit function while refreshing to prevent needless calls
+            self.table.setRowCount(n_rows)
+            for row in range(n_rows):
+                self.table.setRowHeight(row, 100)
 
-        # set station delegate post filter
-        station_delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
-        self.table.setItemDelegateForColumn(4, station_delegate)
+            # set station delegate post filter
+            station_delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
+            self.table.setItemDelegateForColumn(4, station_delegate)
 
-        self.table_loader_thread = LoadTableThread(self)
-        self.table_loader_thread.loaded_cell.connect(self.add_cell)
-        self.table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
+            self.table_loader_thread = LoadTableThread(self)
+            self.table_loader_thread.loaded_cell.connect(self.add_cell)
+            self.table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
 
-        if popup:
-            loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
-            loading_bar.set_max(n_rows)
-            self.table_loader_thread.progress_update.connect(loading_bar.set_counter)
-            loading_bar.rejected.connect(self.table_loader_thread.requestInterruption)
-            loading_bar.show()
+            if popup:
+                loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
+                loading_bar.set_max(n_rows)
+                self.table_loader_thread.progress_update.connect(loading_bar.set_counter)
+                loading_bar.rejected.connect(self.table_loader_thread.requestInterruption)
+                loading_bar.show()
 
-        self.table_loader_thread.start()
+            self.table_loader_thread.start()
 
     # Set Table Entries --------------------------------------------------------
     def add_cell(self, row, column, qtw):
