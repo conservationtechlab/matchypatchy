@@ -87,11 +87,7 @@ class LoadTableThread(QThread):
                 qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
             else:
                 if roi['species_id'] is not None:
-                    print(f"species_id is {roi['species_id']}")
-                    print("species_list is\n", self.species_list)
-
                     species = self.species_list[self.species_list['id'] == roi['species_id']]
-                    print("filtered species is\n", species)
 
                     if not species.empty:
                         qtw = QTableWidgetItem(str(species[column].values[0]))
@@ -106,7 +102,6 @@ class LoadTableThread(QThread):
         elif column == "individual_id":
             if roi['individual_id'] is not None:
                 name = self.individual_list.loc[roi['individual_id'], 'name']
-                #print(f"individual_id is {roi['individual_id']}, name is {name}")
                 qtw = QTableWidgetItem(str(name))
             else:
                 qtw = QTableWidgetItem("Unknown")
