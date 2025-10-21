@@ -726,8 +726,6 @@ class DisplayCompare(QWidget):
         # V - Viewpoint
         elif key == 86:
             if self.current_viewpoint == 'Left':
-                self.button_viewpoint.set_index(1)
-            elif self.current_viewpoint == 'Any':
                 self.button_viewpoint.set_index(2)
             else:
                 self.button_viewpoint.set_index(0)
