@@ -32,25 +32,26 @@ class AnimlThread(QThread):
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, detector_key, classifier_key):
+    def __init__(self, mpDB, DETECTOR_KEY): #, classifier_key):
         super().__init__()
         self.mpDB = mpDB
         self.ml_dir = Path(config.load('ML_DIR'))
+        self.n_frames = config.load('VIDEO_FRAMES')
         self.confidence_threshold = 0.1
-        self.detector_key = detector_key
+        self.DETECTOR_KEY = DETECTOR_KEY
 
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
 
         self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station_id", "camera_id",
-                                                  "sequence_id", "external_id", "comment", "favorite"])
+                                                  "sequence_id", "external_id", "comment"])
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
 
-        self.md_filepath = models.get_path(self.ml_dir, detector_key)
-        self.classifier_filepath = models.get_path(self.ml_dir, classifier_key)
-        self.class_filepath = models.get_class_path(self.ml_dir, classifier_key)
-        self.config_filepath = models.get_config_path(self.ml_dir, classifier_key)
+        self.md_filepath = models.get_path(self.ml_dir, DETECTOR_KEY)
+        #self.classifier_filepath = models.get_path(self.ml_dir, classifier_key)
+        #self.class_filepath = models.get_class_path(self.ml_dir, classifier_key)
+        #self.config_filepath = models.get_config_path(self.ml_dir, classifier_key)
 
     def run(self):
         if not self.media.empty:
@@ -62,14 +63,20 @@ class AnimlThread(QThread):
         #self.get_species()
 
     def get_frames(self):
-        self.media = animl.extract_frames(self.media, config.load('FRAME_DIR'), 
-                                          frames=int(config.load('VIDEO_FRAMES')), file_col="filepath")
+        self.media = animl.extract_frames2(self.media, frames=self.n_frames)
+
 
     def get_bbox(self):
-        # 1 RUN MED
-        if self.detector_key == "MegaDetector v5a" or self.detector_key == "MegaDetector v5b":
+        # SKIP if no detector selected
+        if self.DETECTOR_KEY is None:
+            print("No detector selected, skipping detection...")
+            self.prompt_update.emit("No detector selected, skipping detection...")
+            return
+        # load detector
+        elif self.DETECTOR_KEY == "MegaDetector v5a" or self.DETECTOR_KEY == "MegaDetector v5b":
             detector = animl.load_detector(self.md_filepath, "MDV5")
 
+        # viewpoint, individual TBD
         viewpoint = None
         individual_id = None
         species_id = None
@@ -78,25 +85,28 @@ class AnimlThread(QThread):
         for i, image in self.media.iterrows():
             if not self.isInterruptionRequested():
                 media_id = image['id']
+                row = image.to_frame().T
 
-                detections = animl.detect(detector, image['Frame'], confidence_threshold=self.confidence_threshold)
-                detections = animl.parse_detections(detections, manifest=image)
+
+                detections = animl.detect(detector, row, animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
+                                           confidence_threshold=self.confidence_threshold)
+
+                detections = animl.parse_detections(detections, manifest=row)
                 detections = animl.get_animals(detections)
 
                 for _, roi in detections.iterrows():
-                    frame = roi['FrameNumber'] if 'FrameNumber' in roi.index else 1
+                    frame = roi['frame'] if 'frame' in roi.index else 0
 
-                    bbox_x = roi['bbox1']
-                    bbox_y = roi['bbox2']
-                    bbox_w = roi['bbox3']
-                    bbox_h = roi['bbox4']
-
-                    # viewpoint, individual TBD
+                    bbox_x = roi['bbox_x']
+                    bbox_y = roi['bbox_y']
+                    bbox_w = roi['bbox_w']
+                    bbox_h = roi['bbox_h']
 
                     # do not add emb_id, to be determined later
                     self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                                    viewpoint=viewpoint, reviewed=0, species_id=species_id,
-                                    individual_id=individual_id, emb=0)
+                                      viewpoint=viewpoint, species_id=species_id,
+                                      individual_id=individual_id, emb=0)
+                    
             self.progress_update.emit(round(100 * (i + 1) / len(self.media)))
 
 

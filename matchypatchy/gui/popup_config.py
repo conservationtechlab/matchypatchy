@@ -8,13 +8,17 @@ from pathlib import Path
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt
 
 from matchypatchy import config
+from matchypatchy.algo.utils import is_cuda_available
 from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.gui_assets import HorizontalSeparator
+
+from matchypatchy.algo.models import get_path, is_valid_reid_model
 
 
-#ICON_PENCIL = "/home/kyra/matchypatchy/matchypatchy/gui/assets/fluent_pencil_icon.png"
-ICON_PENCIL = os.path.normpath("assets/fluent_pencil_icon.png")
+ICON_PENCIL = config.resource_path("assets/fluent_pencil_icon.png")
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):
@@ -23,56 +27,111 @@ class ConfigPopup(QDialog):
         self.setMinimumWidth(600)
         self.mpDB = parent.mpDB
         self.cfg = config.load()
+        self.ml_dir = Path(config.load('ML_DIR'))
+        self.column1_width = 120
 
         layout = QVBoxLayout()
 
-        # TITLES ---------------------------------------------------------------
-        path_layout = QHBoxLayout()
+        # Directory ---------------------------------------------------------------
+        directory_layout = QHBoxLayout()
+        directory_label = QLabel("Project Directory:")
+        directory_label.setToolTip("Path to the main project folder containing Database, Models, Thumbnails, etc.")
+        directory_label.setFixedWidth(self.column1_width)
+        directory_layout.addWidget(directory_label)
 
-        titles_layout = QVBoxLayout()
-        titles_layout.addWidget(QLabel("Project Directory:"))
-        #titles_layout.addWidget(QLabel("Model Directory:"))
-
-        # Advanced
-        self.advanced_command = QLabel("Database Command:")
-        self.advanced_command.hide()
-        titles_layout.addWidget(self.advanced_command)
-        path_layout.addLayout(titles_layout)
-        
-        # TEXT -----------------------------------------------------------------
-        insert_layout = QVBoxLayout()
         self.home_dir = QLineEdit()
         self.home_dir.setText(str(self.cfg['HOME_DIR']))
-        insert_layout.addWidget(self.home_dir)
+        directory_layout.addWidget(self.home_dir)
 
-        # Advanced
-        self.command_line = QLineEdit()
-        self.command_line.setText("Enter SQL Command")
-        self.command_line.hide()
-        insert_layout.addWidget(self.command_line)
-        path_layout.addLayout(insert_layout)
-
-        # BUTTONS --------------------------------------------------------------
-        path_button_layout = QVBoxLayout()
         button_home_dir = QPushButton()
         button_home_dir.setMaximumHeight(30)
         button_home_dir.setFixedWidth(30)
         button_home_dir.setIcon(QIcon(ICON_PENCIL))
         button_home_dir.clicked.connect(self.set_home_dir)
-        path_button_layout.addWidget(button_home_dir)
+        directory_layout.addWidget(button_home_dir)
+        layout.addLayout(directory_layout)
 
-        # Advanced
+        # Visualizer Model
+        visualizer_layout = QHBoxLayout()
+        visualizer_label = QLabel("Visualizer Model:")
+        visualizer_label.setToolTip("Model used for visualizing and comparing individuals.")
+        visualizer_label.setFixedWidth(self.column1_width)
+        visualizer_layout.addWidget(visualizer_label)
+        self.visualizer_model = QLineEdit()
+        reid_path = get_path(self.ml_dir, self.cfg['REID_KEY'])
+        self.visualizer_model.setText(str(reid_path))
+        visualizer_layout.addWidget(self.visualizer_model)
+        button_visualizer_model = QPushButton()
+        button_visualizer_model.setMaximumHeight(30)
+        button_visualizer_model.setFixedWidth(30)
+        button_visualizer_model.setIcon(QIcon(ICON_PENCIL))
+        button_visualizer_model.clicked.connect(self.set_visualizer_model)
+        visualizer_layout.addWidget(button_visualizer_model)
+        layout.addLayout(visualizer_layout)
+
+        # NUM MATCHES
+        nummatches_layout = QHBoxLayout()
+        nummatches_label = QLabel("Max # of Matches:")
+        nummatches_label.setToolTip("Number of nearest neighbors to consider.")
+        nummatches_label.setFixedWidth(self.column1_width)
+        nummatches_layout.addWidget(nummatches_label)
+        self.nummatches = QLineEdit()
+        self.nummatches.setFixedWidth(100)
+        self.nummatches.setText(str(self.cfg['DEFAULT_KNN']))
+        nummatches_layout.addWidget(self.nummatches, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.nummatches.textChanged.connect(self.update_nummatches)
+        layout.addLayout(nummatches_layout)
+
+
+        # CUDA -----------------------------------------------------------------
+        cuda_layout = QHBoxLayout()
+        cuda_label = QLabel("CUDA Available:")
+        cuda_label.setFixedWidth(self.column1_width)
+        cuda_layout.addWidget(cuda_label)
+        cuda = is_cuda_available()
+        cuda_available = QLabel(f"{cuda}")
+        cuda_available.setStyleSheet("color: green;" if cuda else "color: red;")
+        cuda_layout.addWidget(cuda_available, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addLayout(cuda_layout)
+
+        # MPDB KEY -----------------------------------------------------------------
+        mpdbkey_layout = QHBoxLayout()
+        mpdbkey_label = QLabel("Database Key:")
+        mpdbkey_label.setToolTip("Unique identifier for the current database.")
+        mpdbkey_label.setFixedWidth(self.column1_width)
+        mpdbkey_layout.addWidget(mpdbkey_label)
+        mpdbkey = self.mpDB.validate()
+        mpdbkey_valid = QLabel(f"{mpdbkey}")
+        mpdbkey_valid.setStyleSheet("color: red;" if not mpdbkey else "")
+        mpdbkey_layout.addWidget(mpdbkey_valid, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addLayout(mpdbkey_layout)
+
+        # Advanced -------------------------------------------------------------
+        self.separator = HorizontalSeparator()
+        self.separator.hide()
+        layout.addWidget(self.separator)
+
+        command_layout = QHBoxLayout()
+        self.advanced_command = QLabel("Database Command:")
+        self.advanced_command.setFixedWidth(self.column1_width)
+        self.advanced_command.hide()
+        command_layout.addWidget(self.advanced_command)
+        self.command_line = QLineEdit()
+        self.command_line.setText("Enter SQL Command")
+        self.command_line.hide()
+        command_layout.addWidget(self.command_line)
+
         self.button_command = QPushButton("↵")
         self.button_command.setMaximumHeight(30)
         self.button_command.setFixedWidth(30)
         self.button_command.clicked.connect(self.command)
         self.button_command.hide()
-        path_button_layout.addWidget(self.button_command)
-        path_layout.addLayout(path_button_layout)
+        command_layout.addWidget(self.button_command)
 
-        layout.addLayout(path_layout)
+        layout.addLayout(command_layout)
 
-        # Buttons
+
+        # BUTTONS --------------------------------------------------------------
         button_layout = QHBoxLayout()
 
         button_advanced = QPushButton("Advanced")
@@ -89,9 +148,11 @@ class ConfigPopup(QDialog):
         self.setLayout(layout)
 
     def show_advanced(self):
-        self.advanced_command.show()
-        self.command_line.show()
-        self.button_command.show()
+        visible = self.advanced_command.isVisible()
+        self.separator.setVisible(not visible)
+        self.advanced_command.setVisible(not visible)
+        self.command_line.setVisible(not visible)
+        self.button_command.setVisible(not visible)
 
     def command(self):
         new_cmd = self.command_line.text()
@@ -111,7 +172,7 @@ class ConfigPopup(QDialog):
                 self.cfg['DB_DIR'] = str(new_db)
 
                 # Update config
-                self.cfg['LOG_PATH'] = str(new_project / "matchypatchy.log")
+                self.cfg['LOG_PATH'] = new_project + "/matchypatchy.log"
                 logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
                 logging.info("HOME_DIR CHANGED")
                 logging.info('HOME_DIR: ' + self.cfg['HOME_DIR'])
@@ -137,6 +198,29 @@ class ConfigPopup(QDialog):
                 if dialog.exec():
                     del dialog
 
+    def set_visualizer_model(self):
+        
+        new_model = QFileDialog.getOpenFileName(self, "Select Re-ID Model",
+                                                  os.path.expanduser(self.ml_dir),"Model Files (*.pt *.pth *.bin)")
+        if new_model and new_model[0]:
+            if is_valid_reid_model(Path(new_model[0]).stem):
+                # Update config
+                self.visualizer_model.setText(new_model[0])
+                self.cfg['REID_KEY'] = str(Path(new_model[0]).stem)
+                # save changes to yml
+                config.update(self.cfg)
+            else:
+                dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
+                if dialog.exec():
+                    del dialog
           
+    def update_nummatches(self):
+        try:
+            nummatches = int(self.nummatches.text())
+            if nummatches > 0:
+                self.cfg['DEFAULT_KNN'] = nummatches
+                config.update(self.cfg)
+        except ValueError:
+            pass
 
 

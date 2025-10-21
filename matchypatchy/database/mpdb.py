@@ -9,6 +9,7 @@ from pathlib import Path
 from random import randrange
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
+from matchypatchy.config import resource_path
 
 
 class MatchyPatchyDB():
@@ -84,14 +85,22 @@ class MatchyPatchyDB():
         s = ""
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
-        with open('schema', 'r') as file:
-            content = file.read()
 
-        match_schema = (content == s)
+        schema_path = resource_path('assets/schema.txt')
+        with open(schema_path, 'r') as file:
+            content = file.read()
+    
+        match_schema = (content==s)
         mpkey, chromakey = self.retrieve_key()
-        if match_schema and mpkey == chromakey:
-            return mpkey
+        if match_schema:
+            if mpkey == chromakey:
+                return mpkey
+            else:
+                print("Key mismatch for Image DB and Emb DB.")
+                return False
         else:
+            print("Schema of selected DB invalid.")
+            # print(s)
             return False
 
     def _command(self, command):
@@ -100,6 +109,7 @@ class MatchyPatchyDB():
         Meant for one-time use
         """
         try:
+            print(command)
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             cursor.execute(command)
@@ -108,7 +118,7 @@ class MatchyPatchyDB():
             db.close()
             return rows
         except sqlite3.Error as error:
-            logging.error("Failed to execute fetch.", error)
+            logging.error("Failed to execute command.", error)
             if db:
                 db.close()
             return None
@@ -246,8 +256,7 @@ class MatchyPatchyDB():
                   camera_id: Optional[int] = None,
                   sequence_id: Optional[int] = None,
                   external_id: Optional[int] = None,
-                  comment: Optional[str] = None,
-                  favorite: int = 0):
+                  comment: Optional[str] = None):
         """
         Media has 10 attributes not including id:
             id INTEGER PRIMARY KEY,
@@ -259,17 +268,16 @@ class MatchyPatchyDB():
             sequence_id INTEGER,
             external_id INTEGER,
             comment TEXT,
-            favorite INTEGER,
         """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO media
                         (filepath, ext, timestamp, station_id,
-                        camera_id, sequence_id, external_id, comment, favorite)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+                        camera_id, sequence_id, external_id, comment)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (filepath, ext, timestamp, station_id,
-                          sequence_id, camera_id, external_id, comment, favorite)
+                          camera_id, sequence_id, external_id, comment)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -290,9 +298,14 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_roi(self, media_id: int, frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
-                species_id: Optional[int] = None, viewpoint: Optional[str] = None, reviewed: int = 0,
-                individual_id: Optional[int] = None, emb: int = 0):
+    def add_roi(self, media_id: int,
+                frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
+                species_id: Optional[int] = None,
+                viewpoint: Optional[str] = None,
+                reviewed: int = 0,
+                favorite: int = 0,
+                individual_id: Optional[int] = None, 
+                emb: int = 0):
         # Note difference in variable order, foreign keys
 
         try:
@@ -300,10 +313,10 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                         species_id, viewpoint, reviewed, individual_id, emb)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+                         species_id, viewpoint, reviewed, favorite, individual_id, emb)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                          species_id, viewpoint, reviewed, individual_id, emb)
+                          species_id, viewpoint, reviewed, favorite, individual_id, emb)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -356,7 +369,7 @@ class MatchyPatchyDB():
     def add_thumbnail(self, table, fid, filepath):
         # Note difference in variable order, foreign keys
         try:
-            db = sqlite3.connect(self.filepath)
+            db = sqlite3.connect(self.filepath, timeout=2)
             cursor = db.cursor()
             command = f"""INSERT INTO {table}_thumbnails (fid, filepath) VALUES (?, ?);"""
             data_tuple = (fid, filepath)

@@ -33,8 +33,7 @@ from matchypatchy.algo.reid_thread import ReIDThread
 from matchypatchy.database.media import export_data
 
 
-#LOGO = os.path.join(os.path.dirname(__file__), "assets/logo.png")
-LOGO = os.path.normpath("assets/logo.png")
+LOGO = config.resource_path("assets/logo.png")
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
@@ -154,8 +153,8 @@ class DisplayBase(QWidget):
         button_configuration = QPushButton("Configuration")
         button_download_ml = QPushButton("Download Models")
         button_help = QPushButton("Help")
-        button_validate_db = QPushButton("Validate Database")
-        button_clear_data = QPushButton("Clear Data")
+        button_validate_db = QPushButton("")
+        button_clear_data = QPushButton("")
 
         other_layer.addWidget(button_configuration)
         other_layer.addWidget(button_download_ml)
@@ -166,8 +165,8 @@ class DisplayBase(QWidget):
         button_configuration.clicked.connect(self.edit_config)
         button_download_ml.clicked.connect(self.download_ml)
         button_help.clicked.connect(self.help)
-        button_validate_db.clicked.connect(self.validate_db)
-        button_clear_data.clicked.connect(self.clear_data)
+        # button_validate_db.clicked.connect(self.validate_db)
+        # button_clear_data.clicked.connect(self.clear_data)
 
         border_other.setLayout(other_layer)
         column_layout.addWidget(border_other, 1)
@@ -298,14 +297,14 @@ class DisplayBase(QWidget):
             # 2. ANIML (BBOX + SPECIES)
             dialog.set_max(100)
             dialog.set_counter(0)
-            self.animl_thread = AnimlThread(self.mpDB, mloptions['detector_key'], mloptions['classifier_key'])
+            self.animl_thread = AnimlThread(self.mpDB, mloptions['DETECTOR_KEY']) #, mloptions['classifier_key']) --- IGNORE ---
             self.animl_thread.prompt_update.connect(dialog.update_prompt)
             self.animl_thread.progress_update.connect(dialog.set_value)
 
             # 3. REID AND VIEWPOINT
             dialog.set_max(100)
             dialog.set_counter(0)
-            self.miew_thread = ReIDThread(self.mpDB, mloptions['reid_key'], mloptions['viewpoint_key'])
+            self.miew_thread = ReIDThread(self.mpDB, mloptions['REID_KEY'], mloptions['VIEWPOINT_KEY'])
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)
 
@@ -359,6 +358,7 @@ class DisplayBase(QWidget):
         dialog = ConfigPopup(self)
         if dialog.exec():
             del dialog
+        self.update_survey()
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)

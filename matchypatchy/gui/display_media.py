@@ -1,15 +1,17 @@
 """
 GUI Window for viewing images
 """
-
+import pandas as pd
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QFrame)
+                             QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt
+
+from matchypatchy.database.media import IMAGE_EXT
 
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.popup_roi import ROIPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
+from matchypatchy.gui.gui_assets import FilterBox, VerticalSeparator, StandardButton
 
 
 class DisplayMedia(QWidget):
@@ -25,28 +27,16 @@ class DisplayMedia(QWidget):
         first_layer = QHBoxLayout()
         # Home Button
         first_layer.addSpacing(10)
-        button_return = QPushButton("Home")
+        button_return = StandardButton("Home")
         button_return.clicked.connect(self.home)
-        button_return.setFixedWidth(100)
         first_layer.addWidget(button_return, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # Divider
-        line = QFrame()
-        line.setFrameStyle(QFrame.Shape.VLine | QFrame.Shadow.Sunken)
-        line.setLineWidth(0)
-        first_layer.addWidget(line)
+        button_match = StandardButton("Match")
+        button_match.clicked.connect(self.match)
+        first_layer.addWidget(button_match, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # Save
-        button_save = QPushButton("Save")
-        button_save.clicked.connect(self.save)
-        button_save.setFixedWidth(100)
-        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Undo
-        self.button_undo = QPushButton("Undo")
-        self.button_undo.clicked.connect(self.undo)
-        self.button_undo.setFixedWidth(100)
-        self.button_undo.setEnabled(False)
-        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Divider
+        first_layer.addWidget(VerticalSeparator())
         # Show Type
         first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.show_type = QComboBox()
@@ -56,39 +46,46 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Divider
-        line = QFrame()
-        line.setFrameStyle(QFrame.Shape.VLine | QFrame.Shadow.Sunken)
-        line.setLineWidth(0)
-        first_layer.addWidget(line)
+        first_layer.addWidget(VerticalSeparator())
 
         # Select All
-        self.button_select = QPushButton("Select All")
+        self.button_select = StandardButton("Select All")
         self.button_select.setCheckable(True)
         self.button_select.setChecked(False)
         self.button_select.clicked.connect(self.select_all)
-        self.button_select.setFixedWidth(100)
         first_layer.addWidget(self.button_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Edit Rows
-        self.button_edit = QPushButton("Edit Rows")
+        self.button_edit = StandardButton("Edit Rows")
         self.button_edit.clicked.connect(self.edit_row_multiple)
-        self.button_edit.setFixedWidth(100)
         self.button_edit.setEnabled(False)
         first_layer.addWidget(self.button_edit, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Duplicate
-        self.button_duplicate = QPushButton("Duplicate Rows")
+        self.button_duplicate = StandardButton("Duplicate Rows")
         self.button_duplicate.clicked.connect(self.duplicate)
-        self.button_duplicate.setFixedWidth(100)
         self.button_duplicate.setEnabled(False)
         first_layer.addWidget(self.button_duplicate, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Delete
-        self.button_delete = QPushButton("Delete Rows")
+        self.button_delete = StandardButton("Delete Rows")
         self.button_delete.clicked.connect(self.delete)
-        self.button_delete.setFixedWidth(100)
         self.button_delete.setEnabled(False)
         first_layer.addWidget(self.button_delete, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # Save
+        first_layer.addWidget(VerticalSeparator())
+        button_save = StandardButton("Save")
+        button_save.clicked.connect(self.save)
+        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Undo
+        self.button_undo = StandardButton("Undo")
+        self.button_undo.clicked.connect(self.undo)
+        self.button_undo.setEnabled(False)
+        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         first_layer.addStretch()
+
         layout.addLayout(first_layer)
+
+
 
         # FILTERS --------------------------------------------------------------
         second_layer = QHBoxLayout()
@@ -97,36 +94,26 @@ class DisplayMedia(QWidget):
         survey_label.setFixedWidth(50)
         second_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # REGION
-        self.region_select = QComboBox()
-        self.region_select.setFixedWidth(200)
         self.region_list_ordered = [(0, 'Region')]
-        self.region_select.addItems([el[1] for el in self.region_list_ordered])
+        self.region_select = FilterBox(self.region_list_ordered, 200)
         second_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # SURVEY
-        self.survey_select = QComboBox()
-        self.survey_select.setFixedWidth(200)
-        second_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.survey_list_ordered = [(0, 'Survey')]
-        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
+        self.survey_select = FilterBox(self.survey_list_ordered, 200)
+        second_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # STATION
-        self.station_select = QComboBox()
-        self.station_select.setFixedWidth(200)
-        second_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.valid_stations = None
         self.station_list_ordered = [(0, 'Station')]
-        self.station_select.addItems([el[1] for el in self.station_list_ordered])
-        # SPECIES
-        self.species_select = QComboBox()
-        self.species_select.setFixedWidth(200)
-        second_layer.addWidget(self.species_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.species_list_ordered = [(0, 'Species')]
-        self.species_select.addItems([el[1] for el in self.species_list_ordered])
+        self.station_select = FilterBox(self.station_list_ordered, 200)
+        second_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # VIEWPOINT
+        self.viewpoint_list_ordered = [(0, 'Viewpoint'), (1, 'Left'), (2, 'Right')]
+        self.viewpoint_select = FilterBox(self.viewpoint_list_ordered, 200)
+        second_layer.addWidget(self.viewpoint_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # INDIVIDUAL
-        self.individual_select = QComboBox()
-        self.individual_select.setFixedWidth(200)
-        second_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.individual_list_ordered = [(0, 'Individual')]
-        self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
+        self.individual_select = FilterBox(self.individual_list_ordered, 200)
+        second_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # UNIDENTIFIED
         unidentified = QPushButton("Unidentified")
         unidentified.setCheckable(True)
@@ -151,13 +138,13 @@ class DisplayMedia(QWidget):
         self.region_select.currentIndexChanged.connect(self.select_region)
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         self.station_select.currentIndexChanged.connect(self.select_station)
-        self.species_select.currentIndexChanged.connect(self.select_species)
+        self.viewpoint_select.currentIndexChanged.connect(self.select_viewpoint)
         self.individual_select.currentIndexChanged.connect(self.select_individual)
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
                         'active_station': self.station_list_ordered[self.station_select.currentIndex()],
-                        'active_species': self.species_list_ordered[self.species_select.currentIndex()],
+                        'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only}
@@ -179,6 +166,15 @@ class DisplayMedia(QWidget):
             self.parent._set_base_view()
         else:
             self.parent._set_base_view()
+
+    # Move to Match View
+    def match(self):
+        if len(self.media_table.edit_stack) > 0:
+            dialog = AlertPopup(self, prompt="There are unsaved changes. Please save before matching.")
+            if dialog.exec():
+                del dialog
+            return
+        self.parent._set_compare_view()
 
     # 1. RUN ON ENTRY
     def load_table(self):
@@ -215,7 +211,7 @@ class DisplayMedia(QWidget):
         self.region_select.blockSignals(True)
         self.survey_select.blockSignals(True)
         self.station_select.blockSignals(True)
-        self.species_select.blockSignals(True)
+        self.viewpoint_select.blockSignals(True)
         self.individual_select.blockSignals(True)
 
         self.region_select.clear()
@@ -235,10 +231,6 @@ class DisplayMedia(QWidget):
         # select all cameras for now
         self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
 
-        self.species_select.clear()
-        self.species_list_ordered = [(0, 'Species')] + list(self.mpDB.select('species', columns='id, common'))
-        self.species_select.addItems([el[1] for el in self.species_list_ordered])
-
         self.individual_select.clear()
         self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
@@ -246,7 +238,7 @@ class DisplayMedia(QWidget):
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
                         'active_station': self.station_list_ordered[self.station_select.currentIndex()],
-                        'active_species': self.species_list_ordered[self.species_select.currentIndex()],
+                        'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only}
@@ -256,10 +248,14 @@ class DisplayMedia(QWidget):
                 self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
                 self.individual_select.setCurrentIndex(prefilter['individual_id'])
 
+        # wipe previous selections
+        self.select_all(reset=True)
+
+        # unblock signals
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
         self.station_select.blockSignals(False)
-        self.species_select.blockSignals(False)
+        self.viewpoint_select.blockSignals(False)
         self.individual_select.blockSignals(False)
 
     # 3. RUN ON ENTRY
@@ -274,13 +270,22 @@ class DisplayMedia(QWidget):
         self.media_table.load_images()
 
     def change_type(self):
+        if len(self.media_table.edit_stack) > 0:
+            dialog = AlertPopup(self, prompt="There are unsaved changes. Are you sure you want to change view?")
+            cont = dialog.exec()
+            del dialog
+            if cont == QDialog.DialogCode.Rejected:
+                self.show_type.blockSignals(True)
+                self.show_type.setCurrentIndex(self.data_type)
+                self.show_type.blockSignals(False)
+                return
+
         self.data_type = self.show_type.currentIndex()
         # reload table
         data_available = self.load_table()
         if data_available:
             self.load_thumbnails()
         # Disable "Edit Rows" if not in ROI mode
-        print(f"[change type] type is {self.data_type} update buttons")
         self.update_buttons()
 
     def handle_table_change(self, edit):
@@ -308,63 +313,85 @@ class DisplayMedia(QWidget):
         else:
             self.button_undo.setEnabled(False)
 
-    def edit_row(self, id):
-        # EDIT ROI
-        if self.data_type == 1:
-            dialog = ROIPopup(self, id)
-            if dialog.exec():
-                del dialog
-                # reload data
-                data_available = self.load_table()
-                if data_available:
-                    self.load_thumbnails()
-
     def update_buttons(self):
         has_selection = len(self.media_table.selectedRows()) > 0
         # Only allow edit in ROI mode
-        self.button_edit.setEnabled(self.data_type == 1 and has_selection)
+        self.button_edit.setEnabled(has_selection)
+        #self.button_duplicate.setEnabled(has_selection)
         self.button_delete.setEnabled(has_selection)
 
+    def edit_row(self, row):
+        # EDIT ROI
+        ext = self.media_table.data_filtered.at[row, "ext"]
+        if self.data_type == 1:
+            if ext in IMAGE_EXT:
+                # only show single roi
+                data = self.media_table.data_filtered.iloc[[row]]
+                current_image_index = 0
+            else: 
+                # TODO Only show multiple frames if selected
+                # display frames as well as video
+                mid = int(self.media_table.data_filtered.at[row, "media_id"])
+                data = self.media_table.data_filtered[self.media_table.data_filtered['media_id'] == mid]
+                current_image_index = data.index.get_loc(row) + 1  # account for video row
+                video_row = data.iloc[[0]].copy()
+                for col in video_row.columns:
+                    # clear columns so row registers as video
+                    if col in ['frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']:
+                        video_row.at[video_row.index[0], col] = None
+                data = pd.concat([video_row, data], ignore_index=True)           
+        else:
+            # full image mode/video only mode
+            data = self.media_table.data_filtered.iloc[[row]]
+            current_image_index = 0
+
+        print(data)
+        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
+        if dialog.exec():
+            edit_stack = dialog.get_edit_stack()
+            edit_stack = self.media_table.transpose_edit_stack(edit_stack)
+            self.check_undo_button()
+            del dialog
+            # reload data
+            data_available = self.load_table()
+            if data_available:
+                self.load_thumbnails()
+
     def edit_row_multiple(self):
-        self.selected_rows = self.media_table.selectedRows()
-        if len(self.selected_rows) > 0:
-            selected_ids = [int(self.media_table.data_filtered.at[row, "id"]) for row in self.selected_rows]
-            dialog = MediaEditPopup(self, selected_ids)
-            if dialog.exec():
-                del dialog
-                # reload data
-                data_available = self.load_table()
-                if data_available:
-                    self.load_thumbnails()
-                self.media_table.table.clearSelection()
+        selected_rows = self.media_table.selectedRows()
+        data = self.media_table.data_filtered.iloc[selected_rows]
+        current_image_index = 0
 
-                self.update_buttons()
+        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
+        if dialog.exec():
+            edit_stack = dialog.get_edit_stack()
+            edit_stack = self.media_table.transpose_edit_stack(edit_stack)
+            self.check_undo_button()
+            del dialog
+            # reload data
+            data_available = self.load_table()
+            if data_available:
+                self.load_thumbnails()
+        self.update_buttons()
 
-    def select_all(self):
-        for row in range(self.media_table.table.rowCount()):
-            self.media_table.select_row(row, overwrite=self.button_select.isChecked())
+    def select_all(self, reset=False):
+        if reset:
+            for row in range(self.media_table.table.rowCount()):
+                self.media_table.select_row(row, overwrite=False)
+        else:  #toggle based on select all button
+            for row in range(self.media_table.table.rowCount()):
+                self.media_table.select_row(row, overwrite=self.button_select.isChecked())
 
     def check_selected_rows(self):
         self.selected_rows = self.media_table.selectedRows()
-        print("Selected rows:", self.selected_rows)
-        if self.data_type == 1:
-            if len(self.selected_rows) > 0:
-                self.button_edit.setEnabled(True)
-                self.button_duplicate.setEnabled(True)
-                self.button_delete.setEnabled(True)
-            else:
-                self.button_edit.setEnabled(False)
-                self.button_duplicate.setEnabled(False)
-                self.button_delete.setEnabled(False)
+        if len(self.selected_rows) > 0:
+            self.button_edit.setEnabled(True)
+            #self.button_duplicate.setEnabled(True)
+            self.button_delete.setEnabled(True)
         else:
-            if len(self.selected_rows) > 0:
-                # self.button_edit.setEnabled(True)
-                self.button_duplicate.setEnabled(True)
-                # self.button_delete.setEnabled(True)
-            else:
-                self.button_edit.setEnabled(False)
-                self.button_duplicate.setEnabled(False)
-                self.button_delete.setEnabled(False)
+            self.button_edit.setEnabled(False)
+            self.button_duplicate.setEnabled(False)
+            self.button_delete.setEnabled(False)
 
     def duplicate(self):
         if len(self.selected_rows) > 0:
@@ -446,6 +473,10 @@ class DisplayMedia(QWidget):
 
     def select_individual(self):
         self.filters['active_individual'] = self.individual_list_ordered[self.individual_select.currentIndex()]
+        self.filter_table()
+
+    def select_viewpoint(self):
+        self.filters['active_viewpoint'] = self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()]
         self.filter_table()
 
     def filter_surveys(self):

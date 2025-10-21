@@ -35,14 +35,13 @@ CREATE TABLE media (
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
-                        sequence_id INTEGER,
                         camera_id INTEGER,
+                        sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
-                        favorite INTEGER NOT NULL,
                         FOREIGN KEY (station_id) REFERENCES station (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id),
-                        FOREIGN KEY (camera_id) REFERENCES camera (id))
+                        FOREIGN KEY (camera_id) REFERENCES camera (id),
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id))
 INDEX: sqlite_autoindex_media_1
 None
 TABLE: roi
@@ -57,10 +56,11 @@ CREATE TABLE roi (
                         viewpoint INTEGER,
                         species_id INTEGER,
                         reviewed INTEGER NOT NULL,
+                        favorite INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb INTEGER,
-                        FOREIGN KEY(media_id) REFERENCES media (id)
-                        FOREIGN KEY(individual_id) REFERENCES individual (id)
+                        FOREIGN KEY(media_id) REFERENCES media (id),
+                        FOREIGN KEY(individual_id) REFERENCES individual (id),
                         FOREIGN KEY(species_id) REFERENCES species (id))
 TABLE: individual
 CREATE TABLE individual (
@@ -81,7 +81,9 @@ CREATE TABLE sequence (
 TABLE: camera
 CREATE TABLE camera (
                         id INTEGER PRIMARY KEY,
-                        name TEXT NOT NULL)
+                        name TEXT NOT NULL,
+                        station_id INTEGER NOT NULL,
+                        FOREIGN KEY (station_id) REFERENCES station (id))
 TABLE: media_thumbnails
 CREATE TABLE media_thumbnails (
                         id INTEGER PRIMARY KEY,

@@ -2,8 +2,6 @@
 Functions for managing ML models
 
 """
-import sys
-import os
 import yaml
 import logging
 import urllib.request
@@ -11,12 +9,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-
-def resource_path(relative_path):
-    """ Get path to resource whether running in dev or PyInstaller bundle """
-    if getattr(sys, 'frozen', False):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.abspath(relative_path)
+from matchypatchy.config import resource_path, load
 
 
 def update_model_yml():
@@ -25,12 +18,13 @@ def update_model_yml():
     """
     # download current version
     model_yml_path = resource_path("models.yml")
-    try:
-        urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", model_yml_path)
-        return True
-    except urllib.error.URLError:
-        logging.error("Unable to connect to server.")
-        return False
+    # TODO: re-enable when final list of models is ready
+    #try:
+    #    urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", model_yml_path)
+    #    return True
+    #except urllib.error.URLError:
+    #    logging.error("Unable to connect to server.")
+    #    return False
 
 
 def load(key=None):
@@ -42,7 +36,15 @@ def load(key=None):
         if key:
             return cfg[key]
         else:
-            return cfg
+          return cfg
+
+
+def is_valid_reid_model(basename):
+    models = load('REID_MODELS')
+    if basename in models:
+        return True
+    else:
+        return False
 
 
 def get_path(ML_DIR, key):
@@ -66,6 +68,7 @@ def get_class_path(ML_DIR, key):
     else:
         return None
 
+
 def get_config_path(ML_DIR, key):
     CONFIG_FILES = load('CONFIG_FILES')
     if key is None:
@@ -75,15 +78,18 @@ def get_config_path(ML_DIR, key):
         return path
     else:
         return None
-    
+
+
 def delete(ML_DIR, key):
     path = get_path(ML_DIR, key)
     if path:
         path.unlink()
 
+
 def download(ML_DIR, key):
     # read model directory
-    with open('models.yml', 'r') as cfg_file:
+    model_yml_path = resource_path("models.yml")
+    with open(model_yml_path, 'r') as cfg_file:
         ml_cfg = yaml.safe_load(cfg_file)
         models = ml_cfg['MODELS']
         name = models[key][0]
@@ -99,25 +105,9 @@ def download(ML_DIR, key):
                 logging.error("Unable to connect to server.")
                 return False
         if path.exists():  # validate that it downloaded
-            # if key is a classifier, get class list and config
-            if key in ml_cfg['CLASSIFIER_MODELS']:
-                class_path = ML_DIR / ml_cfg['CLASS_FILES'][key][0]
-                config_path = ML_DIR / ml_cfg['CONFIG_FILES'][key][0]
-                if not class_path.exists():
-                    try:
-                        urllib.request.urlretrieve(ml_cfg['CLASS_FILES'][key][1], path)
-                    except urllib.error.URLError:
-                        logging.error("Unable to connect to server.")
-                if not config_path.exists():
-                    try:
-                        urllib.request.urlretrieve(ml_cfg['CONFIG_FILES'][key][1], path)
-                    except urllib.error.URLError:
-                        logging.error("Unable to connect to server.")
-                if class_path.exists() and config_path.exists():
-                    # validate download
-                    return True
-                else:
-                    return False
+            return True
+        else:
+            return False
 
 
 class DownloadMLThread(QThread):

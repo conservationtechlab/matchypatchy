@@ -9,12 +9,11 @@ import logging
 import yaml
 
 
-def get_config_path():
-    CONFIG_PATH = 'config.yml'
+def resource_path(relative_path):
     """ Get path to resource whether running in dev or PyInstaller bundle """
     if getattr(sys, 'frozen', False):
-        return Path(os.path.join(sys._MEIPASS, CONFIG_PATH))
-    return Path(os.path.abspath(CONFIG_PATH))
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.abspath(relative_path)
 
 
 def initiate():
@@ -25,19 +24,28 @@ def initiate():
         'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
         'DB_DIR': str(HOME_DIR / 'Database'),
         'ML_DIR': str(HOME_DIR / 'Models'),
-        'FRAME_DIR': str(HOME_DIR / 'Frames'),
         'THUMBNAIL_DIR': str(HOME_DIR / 'Thumbnails'),
-        'VIDEO_FRAMES': 1
+        'VIDEO_FRAMES': 3,
+        'REID_KEY': None,
+        'VIEWPOINT_KEY': None,
+        'DETECTION_KEY': None,
+        'DEFAULT_KNN': 100
     }
-    CONFIG_PATH = get_config_path()
+    CONFIG_PATH = Path(resource_path('config.yml'))
     if CONFIG_PATH.exists():
         cfg = load()
-        #check remaining, save what' missing
-        for key in default_cfg.keys():
-            if key not in cfg:
-                cfg[key] = default_cfg[key]
-        with open(CONFIG_PATH, 'w') as cfg_file:
-            yaml.dump(cfg, cfg_file)
+        #start from empty
+        if cfg is None:
+            with open(CONFIG_PATH, 'w') as cfg_file:
+                yaml.dump(default_cfg, cfg_file)
+            cfg = default_cfg
+        else:
+            #check remaining, save what' missing
+            for key in default_cfg.keys():
+                if key not in cfg:
+                    cfg[key] = default_cfg[key]
+            with open(CONFIG_PATH, 'w') as cfg_file:
+                yaml.dump(cfg, cfg_file)
 
     else:
         with open(CONFIG_PATH, 'w') as cfg_file:
@@ -48,7 +56,6 @@ def initiate():
     Path(cfg['HOME_DIR']).mkdir(exist_ok=True)
     Path(cfg['DB_DIR']).mkdir(exist_ok=True)
     Path(cfg['ML_DIR']).mkdir(exist_ok=True)
-    Path(cfg['FRAME_DIR']).mkdir(exist_ok=True)
     Path(cfg['THUMBNAIL_DIR']).mkdir(exist_ok=True)
         
     # LOG CONFIG
@@ -59,7 +66,7 @@ def initiate():
 
 
 def load(key=None):
-    CONFIG_PATH = get_config_path()
+    CONFIG_PATH = resource_path('config.yml')
     # Load the config into a dict
     with open(CONFIG_PATH, 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
@@ -70,7 +77,7 @@ def load(key=None):
 
 
 def add(key_dict, quiet=False):
-    CONFIG_PATH = get_config_path()
+    CONFIG_PATH = resource_path('config.yml')
     # Load the config into a dict
     with open(CONFIG_PATH, 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
@@ -85,7 +92,7 @@ def add(key_dict, quiet=False):
 
 
 def update(new_cfg):
-    CONFIG_PATH = get_config_path()
+    CONFIG_PATH = resource_path('config.yml')
     # Update the yaml with new values
     with open(CONFIG_PATH, 'w') as cfg_file:
         yaml.dump(new_cfg, cfg_file)

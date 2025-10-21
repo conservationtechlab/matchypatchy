@@ -42,7 +42,7 @@ class MediaTable(QWidget):
         self.table.setColumnCount(17)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
                                               "Station", "Camera", "Sequence ID", "External ID",
-                                              "Viewpoint", "Species", "Common", "Individual", "Sex", "Age",
+                                              "Viewpoint", "Species", "Individual", "Sex", "Age",
                                               "Reviewed", "Favorite", "Comment"])
         # self.table.setSortingEnabled(True)  # NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
@@ -105,44 +105,45 @@ class MediaTable(QWidget):
                             6: "sequence_id",
                             7: "external_id",
                             8: "viewpoint",
-                            9: "binomen",
-                            10: "common",
-                            11: "name",
-                            12: "sex",
-                            13: "age",
-                            14: "reviewed",
-                            15: "favorite",
-                            16: "comment"}
+                            9: "common",
+                            10: "individual_id",
+                            11: "sex",
+                            12: "age",
+                            13: "reviewed",
+                            14: "favorite",
+                            15: "comment"}
+            
+            VIEWPOINT_COLUMN = 8
+            SPECIES_COLUMN = 9
+            SEX_COLUMN = 11
+            AGE_COLUMN = 12
 
-            self.table.setColumnCount(17)
+            self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
                                                   "Station", "Camera", "Sequence ID", "External ID",
-                                                  "Viewpoint", "Species", "Common", "Individual", "Sex", "Age",
+                                                  "Viewpoint", "Species", "Individual", "Sex", "Age",
                                                   "Reviewed", "Favorite", "Comment"])
             # adjust widths
             self.table.resizeColumnsToContents()
             for col in range(self.table.columnCount()):
-                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 50))
-            self.table.setColumnWidth(1, 100)
+                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
 
             # VIEWPOINT COMBOS
             combo_items = list(self.VIEWPOINTS.values())[1:]
-            self.table.setItemDelegateForColumn(8, ComboBoxDelegate(combo_items, self))
+            self.table.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
 
             # SPECIES COMBOBOX
             if not self.species_list.empty:
-                combo_items = [None] + self.species_list['binomen'].str.capitalize().to_list()
-                self.table.setItemDelegateForColumn(9, ComboBoxDelegate(combo_items, self))
                 combo_items = [None] + self.species_list['common'].str.capitalize().to_list()
-                self.table.setItemDelegateForColumn(10, ComboBoxDelegate(combo_items, self))
+                self.table.setItemDelegateForColumn(SPECIES_COLUMN, ComboBoxDelegate(combo_items, self))
 
             # SEX COMBOBOX
             combo_items = ['Unknown', 'Male', 'Female']
-            self.table.setItemDelegateForColumn(12, ComboBoxDelegate(combo_items, self))
+            self.table.setItemDelegateForColumn(SEX_COLUMN, ComboBoxDelegate(combo_items, self))
 
             # AGE COMBOBOX
             combo_items = ['Unknown', 'Juvenile', 'Subadult', 'Adult']
-            self.table.setItemDelegateForColumn(13, ComboBoxDelegate(combo_items, self))
+            self.table.setItemDelegateForColumn(AGE_COLUMN, ComboBoxDelegate(combo_items, self))
 
         # MEDIA
         elif self.data_type == 0:
@@ -155,17 +156,19 @@ class MediaTable(QWidget):
                             5: "camera",
                             6: "sequence_id",
                             7: "external_id",
-                            8: "favorite",
-                            9: "comment"}
-            self.table.setColumnCount(10)  # Columns: Thumbnail, Name, and Description
+                            8: "comment"}
+            self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
                                                   "Station", "Camera", "Sequence ID",
-                                                  "External ID", "Favorite", "Comment"])
+                                                  "External ID", "Comment"])
             # adjust widths
             self.table.resizeColumnsToContents()
             for col in range(self.table.columnCount()):
-                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 50))
-            self.table.setColumnWidth(1, 100)
+                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
+        
+        # FIX FIRST TWO COLUMNS
+        self.table.setColumnWidth(0, 30) # select
+        self.table.setColumnWidth(1, 100) # thumbnail
 
     # STEP 4 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
@@ -217,11 +220,11 @@ class MediaTable(QWidget):
             # no valid stations, empty dataframe
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
-        # Species Filter
-        if filters['active_species'][0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['species_id'] == filters['active_species'][0]]
-        elif filters['active_species'][0] is None:
-            self.data_filtered = self.data_filtered[self.data_filtered['species_id'].isna()]
+        # Viewpoint Filter
+        if filters['active_viewpoint'][0] > 0:
+            self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'] == filters['active_viewpoint'][0] - 1]
+        elif filters['active_viewpoint'][0] is None:
+            self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'].isna()]
 
         # Individual Filter
         if filters['active_individual'][0] > 0:
@@ -367,7 +370,8 @@ class MediaTable(QWidget):
                 new_value = self.species_list.loc[self.species_list['binomen'] == new, 'id'][0]
 
         # individual
-        elif reference == 'name' or reference == 'sex' or reference == 'age':
+        elif reference == 'individual_id' or reference == 'sex' or reference == 'age':
+           #  TODO handle load and change
             rid = self.data_filtered.at[row, 'individual_id']
             if rid is None:
                 dialog = AlertPopup(self, "Please tag the ROI with an individual first.")
@@ -396,10 +400,31 @@ class MediaTable(QWidget):
         self.apply_edits()
         self.refresh_table(popup=False)
 
+    def transpose_edit_stack(self, edit_stack):
+        """
+        Transpose edit stack from popup_roi to media_table format
+        """
+        for edit in edit_stack:
+            print(edit)
+            id = edit['id']
+            row = self.data_filtered.index[self.data_filtered['id'] == id].tolist()
+            column = list(self.columns.keys())[list(self.columns.values()).index(edit['reference'])]
+            if row:
+                row = row[0]
+                new_edit = {'row': row,
+                            'column': column,
+                            'id': id,
+                            'reference': edit['reference'],
+                            'previous_value': edit['previous_value'],
+                            'new_value': edit['new_value']}
+                print(new_edit)
+                self.edit_stack.append(new_edit)
+
     def undo(self):
         """
         Undo last edit and refresh table
         """
+        # TODO: handle multiple selection edits as one undo
         if len(self.edit_stack) > 0:
             last = self.edit_stack.pop()
             self.data_filtered.loc[last['row'], last['reference']] = last['previous_value']
@@ -414,8 +439,13 @@ class MediaTable(QWidget):
             if self.data_type == 1:
                 if edit['reference'] in {'station_id', 'sequence_id', 'external_id'}:
                     self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
-                elif edit['reference'] in {'name', 'age', 'sex'}:
-                    self.mpDB.edit_row("individual", id, replace_dict, allow_none=False, quiet=False)
+                elif edit['reference'] in {'age', 'sex'}:
+                    iid = self.data_filtered.loc[self.data_filtered['id'] == id, 'individual_id'].values[0]
+                    iid = int(iid) if pd.notna(iid) else None
+                    if iid is not None:
+                        self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
+                elif edit['reference'] in {'comment'}:
+                    self.mpDB.edit_row("media", id, replace_dict, allow_none=True, quiet=False)
                 else:
                     self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
             else:
@@ -440,8 +470,7 @@ class MediaTable(QWidget):
         return selected_rows
 
     def edit_row(self, row):
-        id = int(self.data_filtered.at[row, "id"])
-        self.parent.edit_row(id)
+        self.parent.edit_row(row)
 
 
 # COMBOBOX FOR VIEWPOINT, SPECIES, SEX

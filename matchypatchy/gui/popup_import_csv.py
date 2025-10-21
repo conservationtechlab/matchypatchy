@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
 from PyQt6.QtCore import Qt
 
 from matchypatchy.algo.import_thread import CSVImportThread
-from matchypatchy.gui.widget_combobox import ComboBoxSeparator
+from matchypatchy.gui.gui_assets import ComboBoxSeparator
 
 
 class ImportCSVPopup(QDialog):
@@ -26,7 +26,7 @@ class ImportCSVPopup(QDialog):
         self.selected_survey = self.survey_columns[0]
         self.selected_region = self.columns[0]
         self.selected_sequence_id = self.columns[0]
-        self.selected_camera_id = self.columns[0]
+        self.selected_camera = self.columns[0]
         self.selected_external_id = self.columns[0]
         self.selected_viewpoint = self.columns[0]
         self.selected_species = self.columns[0]

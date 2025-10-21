@@ -54,7 +54,7 @@ class LoadTableThread(QThread):
                 thumbnail_path = THUMBNAIL_NOTFOUND
             qtw = QImage(thumbnail_path)
 
-        # FilePath and Timestamp not editable
+        # filepath and Timestamp not editable
         elif column == 'filepath' or column == 'timestamp':
             qtw = QTableWidgetItem(roi[column])
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -87,11 +87,7 @@ class LoadTableThread(QThread):
                 qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
             else:
                 if roi['species_id'] is not None:
-                    print(f"species_id is {roi['species_id']}")
-                    print("species_list is\n", self.species_list)
-
                     species = self.species_list[self.species_list['id'] == roi['species_id']]
-                    print("filtered species is\n", species)
 
                     if not species.empty:
                         qtw = QTableWidgetItem(str(species[column].values[0]))
@@ -103,9 +99,10 @@ class LoadTableThread(QThread):
                     qtw = QTableWidgetItem("Unknown")
 
         # name not editable here
-        elif column == "name":
+        elif column == "individual_id":
             if roi['individual_id'] is not None:
-                qtw = QTableWidgetItem(str(roi[column]))
+                name = self.individual_list.loc[roi['individual_id'], 'name']
+                qtw = QTableWidgetItem(str(name))
             else:
                 qtw = QTableWidgetItem("Unknown")
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)

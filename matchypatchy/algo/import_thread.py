@@ -2,7 +2,7 @@
 QThreads for Importing Data
 
 """
-import os
+from pathlib import Path
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -21,12 +21,12 @@ class CSVImportThread(QThread):
         roi_counter = 0  # progressbar counter
         for filepath, group in self.unique_images:
             # check to see if file exists
-            if not os.path.exists(filepath):
+            if not Path(filepath).exists():
                 logging.warning(f"File {filepath} does not exist")
                 continue
 
             # get file extension
-            _, ext = os.path.splitext(os.path.basename(filepath))
+            ext = Path(filepath).suffix.lower()
 
             # get remaining information
             exemplar = group.head(1)
@@ -36,7 +36,6 @@ class CSVImportThread(QThread):
             survey_id = self.survey(exemplar)
             station_id = self.station(exemplar, survey_id)
             camera_id = self.camera(exemplar, station_id)
-
 
             # Optional data
             sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
@@ -55,7 +54,7 @@ class CSVImportThread(QThread):
                 media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{filepath}"')[0][0]
 
             for i, roi in group.iterrows():
-                # Frame number for videos, else 1 if image
+                # frame number for videos, else 1 if image
                 # WARNING! WILL HAVE TO DYNAMICALLY PULL FRAME WHEN RUNNING miewid
                 frame = roi["frame_number"] if "frame_number" in group.columns else 1
 
@@ -121,16 +120,17 @@ class CSVImportThread(QThread):
 
     def camera(self, exemplar, station_id):
         # get or create station
-        camera_name = exemplar[self.selected_columns["camera"]].item()
-        try:
-            camera_name = str(camera_name).strip()
-            camera_name = camera_name.replace("'", "''")
-            row_cond = f"name = '{camera_name}'"
-            rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
-            camera_id = rows[0][0]
-        except IndexError:
-            camera_id = self.mpDB.add_camera(str(camera_name), station_id)
-        return camera_id
+        if self.selected_columns["camera"] != "None":
+            camera_name = exemplar[self.selected_columns["camera"]].item()
+            try:
+                camera_name = str(camera_name).strip()
+                camera_name = camera_name.replace("'", "''")
+                row_cond = f"name = '{camera_name}'"
+                rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
+                camera_id = rows[0][0]
+            except IndexError:
+                camera_id = self.mpDB.add_camera(str(camera_name), station_id)
+            return camera_id
 
     def species(self, roi):
         if self.selected_columns["species"] != "None":
@@ -167,45 +167,47 @@ class FolderImportThread(QThread):
         self.data = data
         self.station_level = station_level
         self.default_station = None
-        self.animl_conversion = {"filepath": "FilePath",
-                                 "timestamp": "DateTime"}
 
     def run(self):
         for i, file in self.data.iterrows():
+            if not self.isInterruptionRequested():
+                filepath = file['filepath']
+                timestamp = file['datetime']
 
-            filepath = file[self.animl_conversion['filepath']]
-            timestamp = file[self.animl_conversion['timestamp']]
+                # check to see if file exists
+                if not Path(filepath).exists():
+                    logging.warning(f"File {filepath} does not exist")
+                    continue
 
-            # check to see if file exists
-            if not os.path.exists(filepath):
-                logging.warning(f"File {filepath} does not exist")
-                continue
+                # get file extension
+                ext = Path(filepath).suffix.lower()
 
-            # get file extension
-            _, ext = os.path.splitext(os.path.basename(filepath))
+                # get remaining information
+                if self.station_level > 0:
+                    station_name = Path(filepath).parts[self.station_level]
+                    try:
+                        station_id = self.mpDB.select("station", columns='id', row_cond=f'name="{station_name}"')[0][0]
+                    except IndexError:
+                        station_id = self.mpDB.add_station(str(station_name), None, None, int(self.active_survey[0]))
+                else:
+                    if not self.default_station:
+                        self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
+                    station_id = self.default_station
 
-            # get remaining information
-            if self.station_level > 0:
-                station_name = os.path.normpath(filepath).split(os.sep)[self.station_level]
-                try:
-                    station_id = self.mpDB.select("station", columns='id', row_cond=f'name="{station_name}"')[0][0]
-                except IndexError:
-                    station_id = self.mpDB.add_station(str(station_name), None, None, int(self.active_survey[0]))
-            else:
-                if not self.default_station:
-                    self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
-                station_id = self.default_station
+                # insert into table, force type
+                media_id = self.mpDB.add_media(filepath,
+                                               ext,
+                                               str(timestamp),
+                                               int(station_id),
+                                               camera_id=None,
+                                               sequence_id=None,
+                                               external_id=None,
+                                               comment=None)
+                if media_id == "duplicate_error":
+                    print(f"File {filepath} already in database, skipping")
+                    logging.info(f"File {filepath} already in database, skipping")
 
-            # insert into table, force type
-            media_id = self.mpDB.add_media(filepath, ext,
-                                           str(timestamp),
-                                           int(station_id),
-                                           camera_id=None,
-                                           sequence_id=None,
-                                           external_id=None,
-                                           comment=None)
-
-            self.progress_update.emit(i)
+                self.progress_update.emit(i)
 
         # finished adding media
         self.finished.emit()
