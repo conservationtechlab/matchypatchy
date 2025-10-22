@@ -595,6 +595,9 @@ class MatchyPatchyDB():
         client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         query = collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
+        # Check if query is empty, ie false positives
+        if len(query) == 0:
+            return {'ids': [[]], 'distances': [[]]}
         knn = collection.query(query_embeddings=query, n_results=k + 1)
         return knn
 
