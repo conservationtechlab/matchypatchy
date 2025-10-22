@@ -1,7 +1,6 @@
 """
 Class Definition for Query Object
 """
-from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
@@ -47,8 +46,8 @@ class QC_QueryContainer(QObject):
         if self.data_raw.empty:
             return False
 
-        self.individuals = db_roi.individual_roi_dict(self.data_raw)
-        self.individuals.pop(None, None)
+        self.individuals_raw = db_roi.individual_roi_dict(self.data_raw)
+        self.individuals_raw.pop(None, None)
         return True
 
     # STEP 2
@@ -62,6 +61,7 @@ class QC_QueryContainer(QObject):
         """
         # create backups for filtering
         self.data = self.data_raw.copy()
+        self.individuals = self.individuals_raw.copy()
 
         if filter_dict is not None and valid_stations is not None:
             # Region Filter (depends on prefilterd stations from MediaDisplay)
@@ -79,6 +79,14 @@ class QC_QueryContainer(QObject):
                 self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
             else:  # no valid stations, empty dataframe
                 self.parent.show_progress("No data to compare within filter.")
+
+            # Individual Filter
+            if filter_dict['active_individual'][0] > 0:
+                active_iid = filter_dict['active_individual'][0]
+                self.data = self.data[self.data['individual_id'] == int(active_iid)]
+                self.individuals = {active_iid: self.individuals_raw[active_iid]}
+
+        print(self.data)
 
         # compute viewpoints
         self.compute_viewpoints()
