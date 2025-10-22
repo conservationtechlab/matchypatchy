@@ -20,79 +20,83 @@ class CSVImportThread(QThread):
     def run(self):
         roi_counter = 0  # progressbar counter
         for filepath, group in self.unique_images:
-            # check to see if file exists
-            if not Path(filepath).exists():
-                logging.warning(f"File {filepath} does not exist")
-                continue
 
-            # get file extension
-            ext = Path(filepath).suffix.lower()
+            if not self.isInterruptionRequested():
+                # check to see if file exists
+                if not Path(filepath).exists():
+                    print(f"File {filepath} does not exist")
+                    continue
 
-            # get remaining information
-            exemplar = group.head(1)
-            # timestamp
-            timestamp = exemplar[self.selected_columns["timestamp"]].item()
+                # get file extension
+                ext = Path(filepath).suffix.lower()
 
-            survey_id = self.survey(exemplar)
-            station_id = self.station(exemplar, survey_id)
-            camera_id = self.camera(exemplar, station_id)
+                # get remaining information
+                exemplar = group.head(1)
+                # timestamp
+                timestamp = exemplar[self.selected_columns["timestamp"]].item()
 
-            # Optional data
-            sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
-            external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
-            comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
+                survey_id = self.survey(exemplar)
+                station_id = self.station(exemplar, survey_id)
+                camera_id = self.camera(exemplar, station_id)
 
-            media_id = self.mpDB.add_media(filepath, ext, 
-                                           timestamp, 
-                                           station_id,
-                                           camera_id=camera_id,
-                                           sequence_id=sequence_id,
-                                           external_id=external_id,
-                                           comment=comment)
-            # image already added
-            if media_id == "duplicate_error":
-                media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{filepath}"')[0][0]
+                # Optional data
+                sequence_id = int(exemplar[self.selected_columns["sequence_id"]].item()) if self.selected_columns["sequence_id"] != "None" else None
+                external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
+                comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
-            for i, roi in group.iterrows():
-                # frame number for videos, else 1 if image
-                # WARNING! WILL HAVE TO DYNAMICALLY PULL FRAME WHEN RUNNING miewid
-                frame = roi["frame_number"] if "frame_number" in group.columns else 1
+                media_id = self.mpDB.add_media(filepath,
+                                               ext, 
+                                               timestamp, 
+                                               station_id,
+                                               camera_id=camera_id,
+                                               sequence_id=sequence_id,
+                                               external_id=external_id,
+                                               comment=comment)
+                # image already added
+                if media_id == "duplicate_error":
+                    media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{filepath}"')[0][0]
 
-                if "bbox1" in roi:
-                    bbox_x = roi["bbox1"]
-                    bbox_y = roi["bbox2"]
-                    bbox_w = roi["bbox3"]
-                    bbox_h = roi["bbox4"]
-                elif "bbox_x" in roi:
-                    bbox_x = roi["bbox_x"]
-                    bbox_y = roi["bbox_y"]
-                    bbox_w = roi["bbox_w"]
-                    bbox_h = roi["bbox_h"]
-                else:  # add filterable empties
-                    bbox_x = -1
-                    bbox_y = -1
-                    bbox_w = -1
-                    bbox_h = -1
+                for i, roi in group.iterrows():
+                    # frame number for videos, else 1 if image
+                    # WARNING! WILL HAVE TO DYNAMICALLY PULL FRAME WHEN RUNNING miewid
+                    frame = roi["frame_number"] if "frame_number" in group.columns else 1
 
-                # species and individual
-                species_id = self.species(roi)
-                individual_id = self.individual(roi, species_id)
+                    if "bbox1" in roi:
+                        bbox_x = roi["bbox1"]
+                        bbox_y = roi["bbox2"]
+                        bbox_w = roi["bbox3"]
+                        bbox_h = roi["bbox4"]
+                    elif "bbox_x" in roi:
+                        bbox_x = roi["bbox_x"]
+                        bbox_y = roi["bbox_y"]
+                        bbox_w = roi["bbox_w"]
+                        bbox_h = roi["bbox_h"]
+                    else:  # add filterable empties
+                        bbox_x = -1
+                        bbox_y = -1
+                        bbox_w = -1
+                        bbox_h = -1
 
-                # viewpoint
-                viewpoint = roi[self.selected_columns["viewpoint"]] if self.selected_columns["viewpoint"] != "None" else None
+                    # species and individual
+                    species_id = self.species(roi)
+                    individual_id = self.individual(roi, species_id)
 
-                # set reviewed to 1 for named images
-                reviewed = 1 if individual_id is not None else 0
+                    # viewpoint
+                    viewpoint = roi[self.selected_columns["viewpoint"]] if self.selected_columns["viewpoint"] != "None" else None
 
-                # do not add emb_id, to be determined later
-                roi_id = self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                                           species_id, viewpoint=viewpoint, reviewed=reviewed,
-                                           individual_id=individual_id, emb=0)
-                roi_counter += 1
-                self.progress_update.emit(roi_counter)
+                    # set reviewed to 1 for named images
+                    reviewed = 1 if individual_id is not None else 0
 
-        # finished adding media
-        self.finished.emit()
+                    # do not add emb_id, to be determined later
+                    roi_id = self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
+                                            species_id, viewpoint=viewpoint, reviewed=reviewed,
+                                            individual_id=individual_id, emb=0)
+                    roi_counter += 1
+                    self.progress_update.emit(roi_counter)
+    
+        if not self.isInterruptionRequested():
+            # finished adding media
+            self.finished.emit()
 
     def survey(self, exemplar):
         # get active survey

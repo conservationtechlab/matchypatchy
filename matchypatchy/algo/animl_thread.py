@@ -7,6 +7,7 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from matchypatchy.database.media import fetch_roi_media
 from matchypatchy.algo import models
 from matchypatchy import config
 
@@ -46,7 +47,13 @@ class AnimlThread(QThread):
 
         self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station_id", "camera_id",
                                                   "sequence_id", "external_id", "comment"])
-        self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["id"]).to_dict()
+        
+        # select rois that do not have bbox
+        rois = fetch_roi_media(mpDB, reset_index=False)
+        self.rois = rois[rois['bbox_x'] == -1]
+        self.rois = self.rois.drop(columns=['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
+
+        self.to_process = len(self.media) + len(self.rois)
 
         self.md_filepath = models.get_path(self.ml_dir, DETECTOR_KEY)
         #self.classifier_filepath = models.get_path(self.ml_dir, classifier_key)
@@ -54,7 +61,7 @@ class AnimlThread(QThread):
         #self.config_filepath = models.get_config_path(self.ml_dir, classifier_key)
 
     def run(self):
-        if not self.media.empty:
+        if self.to_process > 0:
             self.prompt_update.emit("Extracting frames from videos...")
             self.get_frames()
             self.prompt_update.emit("Calculating bounding boxes...")
@@ -87,7 +94,6 @@ class AnimlThread(QThread):
                 media_id = image['id']
                 row = image.to_frame().T
 
-
                 detections = animl.detect(detector, row, animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
                                            confidence_threshold=self.confidence_threshold)
 
@@ -107,7 +113,36 @@ class AnimlThread(QThread):
                                       viewpoint=viewpoint, species_id=species_id,
                                       individual_id=individual_id, emb=0)
                     
-            self.progress_update.emit(round(100 * (i + 1) / len(self.media)))
+            self.progress_update.emit(round(100 * (i + 1) / self.to_process))
+
+        for i, image in self.rois.iterrows():
+            if not self.isInterruptionRequested():
+                media_id = image['media_id']
+                row = image.to_frame().T
+
+                detections = animl.detect(detector, row, animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
+                                           confidence_threshold=self.confidence_threshold)
+
+                detections = animl.parse_detections(detections, manifest=row)
+                detections = animl.get_animals(detections)
+
+                for _, roi in detections.iterrows():
+                    frame = roi['frame'] if 'frame' in roi.index else 0
+
+                    bbox_x = roi['bbox_x']
+                    bbox_y = roi['bbox_y']
+                    bbox_w = roi['bbox_w']
+                    bbox_h = roi['bbox_h']
+
+                    # do not add emb_id, to be determined later
+                    self.mpDB.edit_row('roi', image['id'], {
+                        "bbox_x": bbox_x,
+                        "bbox_y": bbox_y,
+                        "bbox_w": bbox_w,
+                        "bbox_h": bbox_h
+                    })
+                    
+            self.progress_update.emit(round(100 * (i + 1) / self.to_process))
 
 
     def get_species(self, label_col="code", binomen_col='species'):
