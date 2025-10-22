@@ -5,6 +5,7 @@ QThreads for Importing Data
 from pathlib import Path
 import logging
 from PyQt6.QtCore import QThread, pyqtSignal
+from matchypatchy.database.media import VIDEO_EXT
 
 
 class CSVImportThread(QThread):
@@ -56,10 +57,12 @@ class CSVImportThread(QThread):
                 if media_id == "duplicate_error":
                     media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{filepath}"')[0][0]
 
+                if ext in VIDEO_EXT:
+                    continue  # skip adding rois for videos
+
                 for i, roi in group.iterrows():
                     # frame number for videos, else 1 if image
-                    # WARNING! WILL HAVE TO DYNAMICALLY PULL FRAME WHEN RUNNING miewid
-                    frame = roi["frame_number"] if "frame_number" in group.columns else 1
+                    frame = roi["frame"] if "frame" in group.columns else 0
 
                     if "bbox1" in roi:
                         bbox_x = roi["bbox1"]
@@ -82,15 +85,20 @@ class CSVImportThread(QThread):
                     individual_id = self.individual(roi, species_id)
 
                     # viewpoint
-                    viewpoint = roi[self.selected_columns["viewpoint"]] if self.selected_columns["viewpoint"] != "None" else None
+                    viewpoint = int(roi[self.selected_columns["viewpoint"]]) if self.selected_columns["viewpoint"] != "None" else None
 
                     # set reviewed to 1 for named images
                     reviewed = 1 if individual_id is not None else 0
 
                     # do not add emb_id, to be determined later
-                    roi_id = self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                                            species_id, viewpoint=viewpoint, reviewed=reviewed,
-                                            individual_id=individual_id, emb=0)
+                    roi_id = self.mpDB.add_roi(media_id,
+                                               frame,
+                                               bbox_x, bbox_y, bbox_w, bbox_h,
+                                               species_id,
+                                               viewpoint=viewpoint,
+                                               reviewed=reviewed,
+                                               individual_id=individual_id,
+                                               emb=0)
                     roi_counter += 1
                     self.progress_update.emit(roi_counter)
     
@@ -102,7 +110,7 @@ class CSVImportThread(QThread):
         # get active survey
         if len(self.selected_columns['survey']) > 1:
             survey_name = self.selected_columns['survey'][1]
-            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"', quiet=False)[0][0]
+            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
         # get or create new survey
         else:
             survey_name = exemplar[self.selected_columns["survey"]].item()
