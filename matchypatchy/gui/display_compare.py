@@ -32,12 +32,14 @@ class DisplayCompare(QWidget):
 
     def __init__(self, parent):
         super().__init__()
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus) 
         self.parent = parent
         self.mpDB = parent.mpDB
         self.k = config.load('DEFAULT_KNN')  # default knn
         self.distance_metric = 'cosine'
         self.threshold = 50
         self.current_viewpoint = 'Any'
+        self.qc = False  # whether in QC mode
         
         # CREATE QUERY CONTAINER ==============================================
         self.QueryContainer = QueryContainer(self)
@@ -96,6 +98,14 @@ class DisplayCompare(QWidget):
         self.station_select = FilterBox(self.station_list_ordered, 140)
         self.station_select.currentIndexChanged.connect(self.select_station)
         first_layer.addWidget(self.station_select, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        # individual
+        self.individual_list_ordered = [(0, 'Individual')]
+        self.individual_select = FilterBox(self.individual_list_ordered, 140)
+        self.individual_select.currentIndexChanged.connect(self.select_individual)
+        self.individual_select.setVisible(False)  # Disabled until feature is implemented
+        first_layer.addWidget(self.individual_select, alignment=Qt.AlignmentFlag.AlignLeft)
+
 
         button_filter = QPushButton("Filter Images")
         button_filter.clicked.connect(self.filter_neighbors)
@@ -260,7 +270,15 @@ class DisplayCompare(QWidget):
         bottom_layer.addWidget(button_visualize)
         layout.addLayout(bottom_layer)
         self.setLayout(layout)
+
+        # remove focus from buttons to keep keyboard shortcuts working
+        self.set_no_focus()
         # ======================================================================
+
+    def set_no_focus(self):
+        for child in self.findChildren(QWidget):
+            if isinstance(child, (QPushButton)):
+                child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
     # ==========================================================================
     # GUI
@@ -306,6 +324,9 @@ class DisplayCompare(QWidget):
 
     # ON ENTRY
     def calculate_neighbors(self):
+        # Disable individual select until feature is implemented on QC
+        self.qc = False
+        self.individual_select.setVisible(False)
         self.k = config.load('DEFAULT_KNN')  # can be changed in configuration
         self.QueryContainer = QueryContainer(self)  #re-establish object
         emb_exist = self.QueryContainer.load_data()
@@ -332,8 +353,10 @@ class DisplayCompare(QWidget):
     def recalculate_by_individual(self):
         if not fetch_individual(self.mpDB).empty:
             self.QueryContainer = QC_QueryContainer(self)
+            self.qc = True
+            self.individual_select.setVisible(True)
             self.QueryContainer.load_data()
-            self.QueryContainer.filter()
+            self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
             self.change_query(0)
         else:
             self.warn(prompt="No data to compare, all available data from same sequence/capture.")
@@ -542,6 +565,7 @@ class DisplayCompare(QWidget):
         """
         self.region_select.blockSignals(True)
         self.survey_select.blockSignals(True)
+        self.individual_select.blockSignals(True)
 
         self.region_select.clear()
         self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
@@ -551,14 +575,21 @@ class DisplayCompare(QWidget):
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
 
+        # individual list hidden until feature is implemented on QC
+        self.individual_select.clear()
+        self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
+        self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
+
         self.filter_stations()
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_station': self.station_list_ordered[self.station_select.currentIndex()], }
+                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],
+                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],}
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
+        self.individual_select.blockSignals(False)
 
     def select_region(self):
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
@@ -571,6 +602,9 @@ class DisplayCompare(QWidget):
 
     def select_station(self):
         self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
+
+    def select_individual(self):
+        self.filters['active_individual'] = self.individual_list_ordered[self.individual_select.currentIndex()]
 
     def filter_surveys(self):
         # block signals while updating combobox
@@ -608,8 +642,12 @@ class DisplayCompare(QWidget):
     def filter_neighbors(self):
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_station': self.station_list_ordered[self.station_select.currentIndex()], }
-        self.calculate_neighbors()
+                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],
+                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],}
+        if self.qc:
+            self.recalculate_by_individual()
+        else:
+            self.calculate_neighbors()
 
     # ==========================================================================
     # IMAGE MANIPULATION
