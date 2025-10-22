@@ -347,13 +347,16 @@ class DisplayMedia(QWidget):
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
-            edit_stack = self.media_table.transpose_edit_stack(edit_stack)
-            self.check_undo_button()
             del dialog
-            # reload data
-            data_available = self.load_table()
-            if data_available:
-                self.load_thumbnails()
+
+            if edit_stack:
+                edit_stack = self.media_table.transpose_edit_stack(edit_stack)
+                self.check_undo_button()
+
+                # if changes made, reload table
+                data_available = self.load_table()
+                if data_available:
+                    self.load_thumbnails()
 
     def edit_row_multiple(self):
         selected_rows = self.media_table.selectedRows()
