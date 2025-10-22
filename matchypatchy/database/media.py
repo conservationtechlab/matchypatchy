@@ -66,6 +66,7 @@ def fetch_roi(mpDB):
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
                                                "species_id", "viewpoint", "reviewed", "favorite", "individual_id", "emb"])
+        rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
         rois = rois.replace({float('nan'): None})
         return rois
     else:
@@ -86,7 +87,7 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     else:
         media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
-    rois['viewpoint'] = rois["viewpoint"].astype(int, errors='ignore')
+    rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
     rois = rois.replace({float('nan'): None})
 
     if reset_index:
