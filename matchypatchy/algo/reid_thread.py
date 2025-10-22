@@ -97,6 +97,8 @@ class ReIDThread(QThread):
             for i in range(len(filtered_rois)):
                 if not self.isInterruptionRequested():
                     row = filtered_rois.iloc[i].to_frame().T
+                    if row.at[i, 'bbox_x'] == -1:
+                        continue
                     roi_id = row.at[i, 'roi_id']
                     emb = animl.extract_miew_embeddings(model, row)[0]
 
