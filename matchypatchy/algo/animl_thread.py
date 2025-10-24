@@ -70,7 +70,7 @@ class AnimlThread(QThread):
         #self.get_species()
 
     def get_frames(self):
-        self.media = animl.extract_frames2(self.media, frames=self.n_frames)
+        self.media = animl.extract_frames(self.media, frames=self.n_frames)
 
 
     def get_bbox(self):
@@ -144,7 +144,7 @@ class AnimlThread(QThread):
                     
             self.progress_update.emit(round(100 * (i + 1) / self.to_process))
 
-
+'''
     def get_species(self, label_col="code", binomen_col='species'):
         if self.classifier_filepath is None:
             # user opted to skip classification
@@ -178,5 +178,4 @@ class AnimlThread(QThread):
         for common, cl in classes.iterrows():
             binomen = cl[common, binomen_col]
             species_id = self.mpDB.add_species(binomen, common)
-            
-
+'''    
