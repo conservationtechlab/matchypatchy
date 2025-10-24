@@ -72,6 +72,8 @@ class MatchEmbeddingThread(QThread):
         if self.neighbor_dict:
             self.ranked_sequences = self.rank()
             #print("Ranked Sequences:", self.ranked_sequences)
+            # pad sequences
+            self.pad_sequences()
 
         self.progress_update.emit(100)
         self.neighbor_dict_return.emit(self.neighbor_dict)
@@ -153,7 +155,35 @@ class MatchEmbeddingThread(QThread):
             ranked_sequences = [x[0] for x in ranked_sequences]
 
         return ranked_sequences
+    
+    def pad_sequences(self):
+        """
+        For each remaining match, add the rest of the sequence to the match stack 
+        and move existing sequence matches to the appropriate position
+        """
+        for query in self.neighbor_dict.keys():
+            matched_rois = [item[0] for item in self.neighbor_dict[query]]
+            new_stack = []  # match stack after padding
+            to_remove = []
+            match_sequence_rois ={}
+            distances = {}
+            for i, match in enumerate(matched_rois):
+                match_sequence_id = self.rois.loc[self.rois['id'] == match, 'sequence_id'].values[0]
+                match_sequence_rois[match] = self.sequences[match_sequence_id]
+                distances[match] = self.neighbor_dict[query][i][1]
+                for roi in match_sequence_rois[match]:
+                    # check if match sequence appears later in match stack
+                    if roi in matched_rois[i+1:]:
+                        to_remove.append(roi)
+        
+            # rebuild match stack with padded sequences, using lowest distance match as anchor
+            for match in matched_rois:
+                if match not in to_remove:
+                    for roi in match_sequence_rois[match]:
+                        new_stack.append((roi, distances[match]))
 
+            # replace neighbor dict entry with new padded stack
+            self.neighbor_dict[query] = new_stack
 
     def remove_duplicate_matches(self, matches):
         """
