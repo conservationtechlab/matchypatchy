@@ -1,6 +1,7 @@
 """
 Class Definition for Query Object
 """
+from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
