@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ page.title }} | {{ site.title }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ "/assets/main.css" | relative_url }}">
+</head>
+<body>
+  <header>
+    <h1><a href="{{ "/" | relative_url }}">{{ site.title }}</a></h1>
+    <nav>
+      <a href="{{ "/" | relative_url }}">Home</a>
+      <a href="{{ "/blog/" | relative_url }}">Blog</a>
+      <!-- Add other navigation links here -->
+    </nav>
+  </header>
+
+  <main>
+    <article class="post">
+      <h2>{{ page.title }}</h2>
+      <p class="post-meta">
+        <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date: "%B %d, %Y" }}</time>
+        {% if page.categories %}
+          | Categories:
+          {% for cat in page.categories %}
+            <a href="{{ '/categories/' | append: cat | append: '/' | relative_url }}">{{ cat }}</a>{% unless forloop.last %}, {% endunless %}
+          {% endfor %}
+        {% endif %}
+      </p>
+      <div class="post-content">
+        {{ content }}
+      </div>
+    </article>
+  </main>
+
+  <footer>
+    <p>&copy; {{ site.time | date: "%Y" }} {{ site.title }}</p>
+  </footer>
+</body>
+</html>
