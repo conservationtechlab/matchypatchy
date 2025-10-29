@@ -17,6 +17,7 @@ from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.popup_pairx import PairXPopup
 from matchypatchy.gui.gui_assets import *
+from matchypatchy.gui.widget_filterbar import FilterBar
 
 from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
@@ -35,7 +36,7 @@ class DisplayCompare(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus) 
         self.parent = parent
         self.mpDB = parent.mpDB
-        self.k = config.load('DEFAULT_KNN')  # default knn
+        self.k = config.load('KNN')  # default knn
         self.distance_metric = 'cosine'
         self.threshold = 50
         self.current_viewpoint = 'Any'
@@ -77,35 +78,20 @@ class DisplayCompare(QWidget):
         button_recalc.clicked.connect(self.recalculate_by_individual)
         first_layer.addWidget(button_recalc)
 
-        # FILTERS --------------------------------------------------------------
+        # FILTERBAR --------------------------------------------------------------
         first_layer.addSpacing(10)
         first_layer.addWidget(VerticalSeparator()) 
         first_layer.addSpacing(10)
-        first_layer.addWidget(QLabel("Filter:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.filterbar = FilterBar(self, 140)
+        self.filterbar.viewpoint_visible(False)
+        self.filterbar.individual_visible(False)
+        self.filterbar.unidentified_visible(False)
+        self.filterbar.favorites_visible(False)
 
-        # Region
-        self.region_list_ordered = [(0, 'Region')]
-        self.region_select = FilterBox(self.region_list_ordered, 140)
-        self.region_select.currentIndexChanged.connect(self.select_region)
-        first_layer.addWidget(self.region_select, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Survey
-        self.survey_list_ordered = [(0, 'Survey')]
-        self.survey_select = FilterBox(self.survey_list_ordered, 140)
-        self.survey_select.currentIndexChanged.connect(self.select_survey)
-        first_layer.addWidget(self.survey_select, alignment=Qt.AlignmentFlag.AlignLeft)
-        # station
-        self.station_list_ordered = [(0, 'Station')]
-        self.station_select = FilterBox(self.station_list_ordered, 140)
-        self.station_select.currentIndexChanged.connect(self.select_station)
-        first_layer.addWidget(self.station_select, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        # individual
-        self.individual_list_ordered = [(0, 'Individual')]
-        self.individual_select = FilterBox(self.individual_list_ordered, 140)
-        self.individual_select.currentIndexChanged.connect(self.select_individual)
-        self.individual_select.setVisible(False)  # Disabled until feature is implemented
-        first_layer.addWidget(self.individual_select, alignment=Qt.AlignmentFlag.AlignLeft)
-
+        first_layer.addWidget(self.filterbar)
+        # get initial filters
+        self.filters = self.filterbar.get_filters()
+        self.valid_stations = self.filterbar.get_valid_stations()
 
         button_filter = QPushButton("Filter Images")
         button_filter.clicked.connect(self.filter_neighbors)
@@ -113,8 +99,6 @@ class DisplayCompare(QWidget):
 
         first_layer.addStretch()
         layout.addLayout(first_layer)
-
-        self.refresh_filters()
 
         # IMAGE COMPARISON =====================================================
         layout.addSpacing(20)
@@ -326,8 +310,8 @@ class DisplayCompare(QWidget):
     def calculate_neighbors(self):
         # Disable individual select until feature is implemented on QC
         self.qc = False
-        self.individual_select.setVisible(False)
-        self.k = config.load('DEFAULT_KNN')  # can be changed in configuration
+        self.filterbar.individual_visible(False)
+        self.k = config.load('KNN')  # can be changed in configuration
         self.QueryContainer = QueryContainer(self)  #re-establish object
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
@@ -354,7 +338,7 @@ class DisplayCompare(QWidget):
         if not fetch_individual(self.mpDB).empty:
             self.QueryContainer = QC_QueryContainer(self)
             self.qc = True
-            self.individual_select.setVisible(True)
+            self.filterbar.individual_visible(True)
             self.QueryContainer.load_data()
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
             self.change_query(0)
@@ -560,90 +544,12 @@ class DisplayCompare(QWidget):
     # FILTERS
     # ==========================================================================
     def refresh_filters(self):
-        """
-        Clear and Refresh Filters on Re-entry
-        """
-        self.region_select.blockSignals(True)
-        self.survey_select.blockSignals(True)
-        self.individual_select.blockSignals(True)
-
-        self.region_select.clear()
-        self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
-        self.region_select.addItems([el[1] for el in self.region_list_ordered])
-
-        self.survey_select.clear()
-        self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
-        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
-
-        # individual list hidden until feature is implemented on QC
-        self.individual_select.clear()
-        self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
-        self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
-
-        self.filter_stations()
-
-        self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
-                        'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],
-                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],}
-
-        self.region_select.blockSignals(False)
-        self.survey_select.blockSignals(False)
-        self.individual_select.blockSignals(False)
-
-    def select_region(self):
-        self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
-        self.filter_surveys()
-        self.filter_stations(survey_ids=list(self.valid_surveys.items()))
-
-    def select_survey(self):
-        self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
-        self.filter_stations(survey_ids=[self.filters['active_survey']])
-
-    def select_station(self):
-        self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
-
-    def select_individual(self):
-        self.filters['active_individual'] = self.individual_list_ordered[self.individual_select.currentIndex()]
-
-    def filter_surveys(self):
-        # block signals while updating combobox
-        self.survey_select.blockSignals(True)
-        self.survey_select.clear()
-        if self.region_select.currentIndex() > 0:
-            # get surveys in selected region
-            region_id = self.filters['active_region'][0]
-            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name", row_cond=f'region_id={region_id}'))
-        else:
-            # get all surveys
-            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name"))
-        # Update survey list to reflect active region
-        self.survey_list_ordered = [(0, 'Survey')] + [(k, v) for k, v in self.valid_surveys.items()]
-        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
-        self.survey_select.blockSignals(False)
-
-    def filter_stations(self, survey_ids=None):
-        # block signals while updating combobox
-        self.station_select.blockSignals(True)
-        self.station_select.clear()
-        if survey_ids:
-            survey_list = ",".join([str(s[0]) for s in survey_ids])
-            selection = f'survey_id IN ({survey_list})'
-
-            self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection, quiet=False))
-        else:
-            self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
-
-        # Update station list to reflect active survey
-        self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
-        self.station_select.addItems([el[1] for el in self.station_list_ordered])
-        self.station_select.blockSignals(False)
+        self.filterbar.refresh_filters()
 
     def filter_neighbors(self):
-        self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
-                        'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],
-                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],}
+        self.filters = self.filterbar.get_filters()
+        self.valid_stations = self.filterbar.get_valid_stations()
+
         if self.qc:
             self.recalculate_by_individual()
         else:

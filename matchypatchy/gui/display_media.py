@@ -11,7 +11,8 @@ from matchypatchy.database.media import IMAGE_EXT
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
-from matchypatchy.gui.gui_assets import FilterBox, VerticalSeparator, StandardButton
+from matchypatchy.gui.gui_assets import VerticalSeparator, StandardButton
+from matchypatchy.gui.widget_filterbar import FilterBar
 
 
 class DisplayMedia(QWidget):
@@ -86,46 +87,17 @@ class DisplayMedia(QWidget):
         layout.addLayout(first_layer)
 
 
-
         # FILTERS --------------------------------------------------------------
         second_layer = QHBoxLayout()
         second_layer.addSpacing(20)
-        survey_label = QLabel("Filter:")
-        survey_label.setFixedWidth(50)
-        second_layer.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # REGION
-        self.region_list_ordered = [(0, 'Region')]
-        self.region_select = FilterBox(self.region_list_ordered, 200)
-        second_layer.addWidget(self.region_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # SURVEY
-        self.survey_list_ordered = [(0, 'Survey')]
-        self.survey_select = FilterBox(self.survey_list_ordered, 200)
-        second_layer.addWidget(self.survey_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # STATION
-        self.valid_stations = None
-        self.station_list_ordered = [(0, 'Station')]
-        self.station_select = FilterBox(self.station_list_ordered, 200)
-        second_layer.addWidget(self.station_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # VIEWPOINT
-        self.viewpoint_list_ordered = [(0, 'Viewpoint'), (1, 'Left'), (2, 'Right')]
-        self.viewpoint_select = FilterBox(self.viewpoint_list_ordered, 200)
-        second_layer.addWidget(self.viewpoint_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # INDIVIDUAL
-        self.individual_list_ordered = [(0, 'Individual')]
-        self.individual_select = FilterBox(self.individual_list_ordered, 200)
-        second_layer.addWidget(self.individual_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # UNIDENTIFIED
-        unidentified = QPushButton("Unidentified")
-        unidentified.setCheckable(True)
-        unidentified.toggled.connect(self.select_unidentified)
-        self.unidentified_only = False
-        second_layer.addWidget(unidentified, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # FAVORITE
-        favorites = QPushButton("Favorites")
-        favorites.setCheckable(True)
-        favorites.toggled.connect(self.select_favorites)
-        self.favorites_only = False
-        second_layer.addWidget(favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        self.filterbar = FilterBar(self, 200)
+        second_layer.addWidget(self.filterbar, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.filters = self.filterbar.get_filters()  # get initial filters
+
+        button_filter = QPushButton("Filter Images")
+        button_filter.clicked.connect(self.filter_table)
+        second_layer.addWidget(button_filter)
 
         second_layer.addStretch()
         layout.addLayout(second_layer)
@@ -135,19 +107,6 @@ class DisplayMedia(QWidget):
         layout.addWidget(self.media_table, stretch=1)
         self.setLayout(layout)
 
-        self.region_select.currentIndexChanged.connect(self.select_region)
-        self.survey_select.currentIndexChanged.connect(self.select_survey)
-        self.station_select.currentIndexChanged.connect(self.select_station)
-        self.viewpoint_select.currentIndexChanged.connect(self.select_viewpoint)
-        self.individual_select.currentIndexChanged.connect(self.select_individual)
-
-        self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
-                        'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],
-                        'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
-                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
-                        'unidentified_only': self.unidentified_only,
-                        'favorites_only': self.favorites_only}
 
     # Return Home Button
     def home(self):
@@ -176,6 +135,31 @@ class DisplayMedia(QWidget):
             return
         self.parent._set_compare_view()
 
+    # FILTERS ------------------------------------------------------------------
+    def refresh_filters(self, prefilter=None):
+        """
+        Update Dropdown Lists, Fill Filter Dict
+        Allows refresh of dropdowns if re-entry into media view after updating database
+        """
+        # wipe previous selections
+        self.select_all(reset=True)
+
+        self.filterbar.refresh_filters(prefilter=prefilter)
+        self.filters = self.filterbar.get_filters()
+        self.valid_stations = self.filterbar.get_valid_stations()
+        print(self.filters)
+
+
+    def filter_table(self):
+        """
+        Filter the media table based on the selected options
+        Run after any setting is changed and filter button is pressed
+        """
+        self.filters = self.filterbar.get_filters()
+        self.valid_stations = self.filterbar.get_valid_stations()
+        self.media_table.filter()
+
+
     # 1. RUN ON ENTRY
     def load_table(self):
         # check if there are rois first
@@ -202,62 +186,8 @@ class DisplayMedia(QWidget):
             self.media_table.load_data(self.data_type)
             return True
 
-    def refresh_filters(self, prefilter=None):
-        """
-        Update Dropdown Lists, Fill Filter Dict
-        Allows refresh of dropdowns if re-entry into media view after updating database
-        """
-        # block signals while updating lists
-        self.region_select.blockSignals(True)
-        self.survey_select.blockSignals(True)
-        self.station_select.blockSignals(True)
-        self.viewpoint_select.blockSignals(True)
-        self.individual_select.blockSignals(True)
 
-        self.region_select.clear()
-        self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
-        self.region_select.addItems([el[1] for el in self.region_list_ordered])
-
-        self.survey_select.clear()
-        self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
-        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
-
-        self.station_select.clear()
-        self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
-        self.station_list_ordered = [(0, 'Station')] + list(self.valid_stations.items())
-        self.station_select.addItems([el[1] for el in self.station_list_ordered])
-
-        # select all cameras for now
-        self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
-
-        self.individual_select.clear()
-        self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
-        self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
-
-        self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
-                        'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
-                        'active_station': self.station_list_ordered[self.station_select.currentIndex()],
-                        'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
-                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
-                        'unidentified_only': self.unidentified_only,
-                        'favorites_only': self.favorites_only}
-
-        if prefilter:
-            if 'individual_id' in prefilter.keys():
-                self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
-                self.individual_select.setCurrentIndex(prefilter['individual_id'])
-
-        # wipe previous selections
-        self.select_all(reset=True)
-
-        # unblock signals
-        self.region_select.blockSignals(False)
-        self.survey_select.blockSignals(False)
-        self.station_select.blockSignals(False)
-        self.viewpoint_select.blockSignals(False)
-        self.individual_select.blockSignals(False)
-
-    # 3. RUN ON ENTRY
+    # 2. RUN ON ENTRY
     def load_thumbnails(self):
         """
         Load Thumbnails
@@ -429,84 +359,3 @@ class DisplayMedia(QWidget):
                 data_available = self.load_table()
                 if data_available:
                     self.load_thumbnails()
-
-    # Filters ------------------------------------------------------------------
-    def filter_table(self):
-        """
-        Filter the media table based on the selected options
-        Run after any setting is changed
-        """
-        self.media_table.filter()
-
-    def select_unidentified(self):
-        self.unidentified_only = not self.unidentified_only
-        self.filters['undientified_only'] = self.unidentified_only
-        self.filter_table()
-
-    def select_favorites(self):
-        self.favorites_only = not self.favorites_only
-        self.filters['favorites_only'] = self.favorites_only
-        self.filter_table()
-
-    def select_region(self):
-        self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
-        self.filter_surveys()
-        self.filter_stations(survey_ids=list(self.valid_surveys.items()))
-        self.filter_table()
-
-    def select_survey(self):
-        self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
-        if self.survey_select.currentIndex() == 0:
-            self.filter_stations()
-        else:
-            self.filter_stations(survey_ids=[self.filters['active_survey']])
-
-        self.filter_table()
-
-    def select_station(self):
-        self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
-        self.filter_table()
-
-    def select_species(self):
-        self.filters['active_species'] = self.species_list_ordered[self.species_select.currentIndex()]
-        self.filter_table()
-
-    def select_individual(self):
-        self.filters['active_individual'] = self.individual_list_ordered[self.individual_select.currentIndex()]
-        self.filter_table()
-
-    def select_viewpoint(self):
-        self.filters['active_viewpoint'] = self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()]
-        self.filter_table()
-
-    def filter_surveys(self):
-        # block signals while updating combobox
-        self.survey_select.blockSignals(True)
-        self.survey_select.clear()
-        if self.region_select.currentIndex() > 0:
-            # get surveys in selected region
-            region_id = self.filters['active_region'][0]
-            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name", row_cond=f'region_id={region_id}'))
-        else:
-            # get all surveys
-            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name"))
-        # Update survey list to reflect active region
-        self.survey_list_ordered = [(0, 'Survey')] + [(k, v) for k, v in self.valid_surveys.items()]
-        self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
-        self.survey_select.blockSignals(False)
-
-    def filter_stations(self, survey_ids=None):
-        # block signals while updating combobox
-        self.station_select.blockSignals(True)
-        self.station_select.clear()
-        if survey_ids:
-            survey_list = ",".join([str(s[0]) for s in survey_ids])
-            selection = f'survey_id IN ({survey_list})'
-
-            self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection, quiet=False))
-        else:
-            self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
-        # Update station list to reflect active survey
-        self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
-        self.station_select.addItems([el[1] for el in self.station_list_ordered])
-        self.station_select.blockSignals(False)

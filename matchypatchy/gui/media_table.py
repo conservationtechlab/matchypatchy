@@ -31,6 +31,7 @@ class MediaTable(QWidget):
         self.image_loader_thread = None
         self.data_type = 1
         self.VIEWPOINTS = models.load('VIEWPOINTS')
+        self.thumbnail_size = 99
 
         self.edit_stack = []
 
@@ -168,7 +169,7 @@ class MediaTable(QWidget):
         
         # FIX FIRST TWO COLUMNS
         self.table.setColumnWidth(0, 30) # select
-        self.table.setColumnWidth(1, 100) # thumbnail
+        self.table.setColumnWidth(1, self.thumbnail_size) # thumbnail
 
     # STEP 4 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
@@ -207,7 +208,8 @@ class MediaTable(QWidget):
         # map
         filters = self.parent.filters
         self.valid_stations = self.parent.valid_stations
-        self.valid_cameras = self.parent.valid_cameras
+       # self.valid_cameras =  # select all cameras for now
+        self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
 
         # Location Filter (depends on prefilterd stations from MediaDisplay)
         if self.valid_stations:
@@ -257,7 +259,7 @@ class MediaTable(QWidget):
             # disconnect edit function while refreshing to prevent needless calls
             self.table.setRowCount(n_rows)
             for row in range(n_rows):
-                self.table.setRowHeight(row, 100)
+                self.table.setRowHeight(row, self.thumbnail_size)
 
             # set station delegate post filter
             station_delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
