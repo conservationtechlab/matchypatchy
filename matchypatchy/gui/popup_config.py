@@ -13,7 +13,7 @@ from PyQt6.QtCore import Qt
 from matchypatchy import config
 from matchypatchy.algo.utils import is_cuda_available
 from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.gui_assets import HorizontalSeparator
+from matchypatchy.gui.gui_assets import HorizontalSeparator, VerticalSeparator
 
 from matchypatchy.algo.models import get_path, is_valid_reid_model
 
@@ -29,6 +29,7 @@ class ConfigPopup(QDialog):
         self.cfg = config.load()
         self.ml_dir = Path(config.load('ML_DIR'))
         self.column1_width = 120
+        self.edit_width = 80
 
         layout = QVBoxLayout()
 
@@ -69,6 +70,30 @@ class ConfigPopup(QDialog):
         visualizer_layout.addWidget(button_visualizer_model)
         layout.addLayout(visualizer_layout)
 
+        # Sequence
+        sequence_layout = QHBoxLayout()
+        sequence_duration_label = QLabel("Sequence Length (s):")
+        sequence_duration_label.setToolTip("Maximum duration of the sequence in seconds.")
+        sequence_duration_label.setFixedWidth(self.column1_width)
+        sequence_layout.addWidget(sequence_duration_label)
+        self.sequence_duration = QLineEdit()
+        self.sequence_duration.setFixedWidth(self.edit_width)
+        self.sequence_duration.setText(str(self.cfg['SEQUENCE_DURATION']))
+        self.sequence_duration.textChanged.connect(self.update_sequence)
+        sequence_layout.addWidget(self.sequence_duration, alignment=Qt.AlignmentFlag.AlignLeft)
+        sequence_layout.addWidget(VerticalSeparator())
+        sequence_n_label = QLabel("Images per Sequence:")
+        sequence_n_label.setToolTip("Max number of images in each sequence.")
+        #sequence_n_label.setFixedWidth(self.column1_width)
+        sequence_layout.addWidget(sequence_n_label)
+        self.sequence_n = QLineEdit()
+        self.sequence_n.setFixedWidth(self.edit_width)
+        self.sequence_n.setText(str(self.cfg['SEQUENCE_N']))
+        self.sequence_n.textChanged.connect(self.update_sequence)
+        sequence_layout.addWidget(self.sequence_n, alignment=Qt.AlignmentFlag.AlignLeft)
+        sequence_layout.addStretch()
+        layout.addLayout(sequence_layout)
+
         # NUM MATCHES
         nummatches_layout = QHBoxLayout()
         nummatches_label = QLabel("Max # of Matches:")
@@ -76,8 +101,8 @@ class ConfigPopup(QDialog):
         nummatches_label.setFixedWidth(self.column1_width)
         nummatches_layout.addWidget(nummatches_label)
         self.nummatches = QLineEdit()
-        self.nummatches.setFixedWidth(100)
-        self.nummatches.setText(str(self.cfg['DEFAULT_KNN']))
+        self.nummatches.setFixedWidth(self.edit_width)
+        self.nummatches.setText(str(self.cfg['KNN']))
         nummatches_layout.addWidget(self.nummatches, alignment=Qt.AlignmentFlag.AlignLeft)
         self.nummatches.textChanged.connect(self.update_nummatches)
         layout.addLayout(nummatches_layout)
@@ -168,14 +193,15 @@ class ConfigPopup(QDialog):
 
             if valid:
                 # Update home dir
-                self.cfg['HOME_DIR'] = str(new_project)
+                global HOME_DIR
+                HOME_DIR = Path(new_project)
                 self.cfg['DB_DIR'] = str(new_db)
 
                 # Update config
                 self.cfg['LOG_PATH'] = new_project + "/matchypatchy.log"
                 logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
                 logging.info("HOME_DIR CHANGED")
-                logging.info('HOME_DIR: ' + self.cfg['HOME_DIR'])
+                logging.info('HOME_DIR: ' + str(HOME_DIR))
 
                 # Check or create ML, Thumbnail and Frame folders
                 new_ml= Path(new_project) / "Models"
@@ -218,9 +244,19 @@ class ConfigPopup(QDialog):
         try:
             nummatches = int(self.nummatches.text())
             if nummatches > 0:
-                self.cfg['DEFAULT_KNN'] = nummatches
+                self.cfg['KNN'] = nummatches
                 config.update(self.cfg)
         except ValueError:
             pass
 
+    def update_sequence(self):
+        try:
+            duration = int(self.sequence_duration.text())
+            n = int(self.sequence_n.text())
+            if duration > 0:
+                self.cfg['SEQUENCE_DURATION'] = duration
+                self.cfg['SEQUENCE_N'] = n
+                config.update(self.cfg)
+        except ValueError:
+            pass
 
