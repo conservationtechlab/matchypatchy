@@ -28,6 +28,15 @@ and exported easily.
 
 When running MatchyPatchy for the first time, there are a few things to take care of first.
 
+<!-- Survey Popup -->
+
+### Project Directory
+On first launch, MatchyPatchy will create a folder called "MatchyPatchy-Share" 
+that houses the database, any AI models you download, and exported data. 
+
+You can select a different MatchyPatchy-Share folder in Configuration - Project Directory. 
+If you rename the folder, you must update the path in Configuration - Project Directory.
+
 ### Surveys
 MatchyPatchy organizes sets of camera trap data by survey. To add camera trap
 data to MatchyPatchy, you must first create a survey. Press the <b>"+"</b> 
@@ -35,6 +44,8 @@ button to add a new survey. A popup will appear. Input the Name of the survey,
 the geographical Region the survey occured in, and the Start and End Year of the 
 survey period. You can view surveys by selecting <b>"Manage Surveys"</b>. A popup
 with the list of durveys will appear, allowing you to add, edit, and delete surveys.
+
+<!-- Survey Popup -->
 
 ### Stations
 MatchyPatchy assumes that camera trap images were collected from particular camera
@@ -75,12 +86,56 @@ MatchyPatchy supports importing raw data from a folder, as well as from a .csv.
 The .csv can contain preprocessed information such as bounding boxes, timestamps, etc.
 
 ### From a Folder
+To import a folder of images, select Step 1. Import from Folder and select the 
+desired folder in the browser popup. Then select the level in the folder tree 
+that refers to the camera trap Station and then press okay.
 
+MatchyPatchy can import multiple stations at 
+once if they are all contained in a single higher-level directory. However, all of the
+Station folders must be at the same depth within the directory.  Select the level
+that corresponds to Station from the example path and then press OK.
+
+<!--file tree example -->
 
 ### From a .CSV
+You can import a pre-processed spreadsheet that contains information about the images.
+MatchyPatchy can accept the following information as columns:
+
+- filepath (full path required)
+- timestamp (required)
+- station (required)  
+- 
+
+The names in the spreadsheet do not have to be identical to the ones above. 
+Once you select a .csv file to import MatchyPatchy will ask you to associate 
+columns in the .csv file to the information it can accept. The full filepaths 
+to the images that can be accessed from your machine, timestamps, and
+station names are required fields. If your .csv does not contain a column that 
+conveys the optional information, leave the column selection to "None".
 
 ## 2. Process
-This step will run selected AI algorithms on the data. 
+After importing images by either selecting a folder or .csv file, you must 
+then process the data with AI. MatchyPatchy looks for models in the MatchyPatchy-Share/models
+folder. You can download models from our server 
+
+### Calculate Sequence 
+You can optionally check "Calculate Sequence" 
+
+### Detector Model
+If you imported from a folder or if you did *not* import bounding boxes in the .csv file, 
+you must first use MegaDetector to automatically extract Regions of Interest (ROIs) 
+that closely crop to the animal. 
+
+### Match Embedding
+In order to calculate potential matches, each ROI has to processed with an 
+embedding extractor such as MiewIDv3. 
+
+### Viewpoint
+For some species, we offer a viewpoint model that determines whether the animal
+is facing left or right. MatchyPatchy will then only offer potential matches 
+with the same viewpoint or if no viewpoint is selected for one of the 
+Viewpoint can be manually input or edited in the Media page. 
+
 
 ## 3. Validate
 Before beginning the matching process, we recommend validating the AI output.
@@ -88,9 +143,28 @@ This step will bring you to a table that lists all of the animals identified in
 the images or videos, as well as associated metadata.
 
 ## 4. Match
+Once you have validated that each ROI contains a single animal and that all station
+names and viewpoints are correct, select Step 4. Match from the Home page or from within
+the Media page. 
+
+By default, MatchyPatchy calculates the cosine distance between each embedding vector
+and presents only potential matches with a distance below than 0.5. You can change 
+this threshold using the slider (or input a number directly), as well as calculate
+the L2 distance instead. MatchyPatchy will only show potential matches that are of the 
+same viewpoint of the animal, and are not from the same sequence or individual already. 
+
+When you believe the image on the right side is a match for the query image on the left,
+select the "Match" button in the center or by pressing "M" on your keyboard. 
+If the match image does not have an individual ID, a popup will appear to allow 
+you to create a new name. If you can tell the animal's sex and age from the images, 
+you can input that information at this time as well.
+
+Move through each potential match by pressing the << and >> buttons or the 
+Left and Right arrow keys on the keyboard. Once you have determined which potential
+matches are confirmed for 
 
 ## 5. Export
-
+You can export the entire database by selecting Step 5. Export. 
 
 # <a name="quality-control"></a>Quality Control
 
