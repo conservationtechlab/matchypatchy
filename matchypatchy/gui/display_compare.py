@@ -65,9 +65,11 @@ class DisplayCompare(QWidget):
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self.threshold_slider.setRange(0, 100)  # Set range from 1 to 100
         self.threshold_slider.setValue(self.threshold)  # Set initial value
-        self.threshold_slider.valueChanged.connect(self.change_threshold)
+        self.threshold_slider.valueChanged.connect(self.change_threshold_slider)
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.threshold_label = QLabel(f"{self.threshold / 100:.2f}")
+        self.threshold_label = QLineEdit(f"{self.threshold / 100:.2f}")
+        self.threshold_label.setFixedWidth(60)
+        self.threshold_label.textChanged.connect(self.change_threshold_manual)
         first_layer.addWidget(self.threshold_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         button_recalc = QPushButton("Recalculate Matches")
@@ -288,23 +290,38 @@ class DisplayCompare(QWidget):
             del dialog
 
     def change_metric(self):
+        """
+        Select L2 or Cosine distance metric, update threshold slider appropriately
+        """
         self.distance_metric = self.option_distance_metric.currentText().lower()
         if self.distance_metric == 'l2':
             self.threshold_slider.setValue(70)
+        else:
+            self.threshold_slider.setValue(50)
 
-    def change_threshold(self):
+    def change_threshold_slider(self):
         # set new threshold value
         # Must recalculate neighbors to activate
         self.threshold = self.threshold_slider.value()
-        slider_handle_position = self.threshold_slider.mapToGlobal(QPoint(self.threshold_slider.width() *
-                                                                         (self.threshold - self.threshold_slider.minimum()) //
-                                                                         (self.threshold_slider.maximum() - self.threshold_slider.minimum()), 0))
-        if self.distance_metric == 'Cosine':
-           # QToolTip.showText(slider_handle_position, f"{self.threshold / 100}", self.threshold_slider)
+        if self.distance_metric == 'cosine':
             self.threshold_label.setText(f"{self.threshold / 100:.2f}")
         else:
-           # QToolTip.showText(slider_handle_position, f"{self.threshold:d}", self.threshold_slider)
             self.threshold_label.setText(f"{self.threshold:d}")
+
+    def change_threshold_manual(self):
+        try:
+            if self.distance_metric == 'cosine':
+                val = float(self.threshold_label.text())
+                if 0.0 <= val <= 1.0:
+                    self.threshold = int(val * 100)
+                    self.threshold_slider.setValue(self.threshold)
+            else:
+                val = int(self.threshold_label.text())
+                if 0 <= val <= 100:
+                    self.threshold = val
+                    self.threshold_slider.setValue(self.threshold)
+        except ValueError:
+            pass  # ignore invalid input
 
     # ON ENTRY
     def calculate_neighbors(self):

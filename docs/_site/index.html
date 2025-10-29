@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>MatchyPatchy User Manual | MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment.</title>
+<meta name="generator" content="Jekyll v3.10.0" />
+<meta property="og:title" content="MatchyPatchy User Manual" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment." />
+<meta property="og:description" content="MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment." />
+<link rel="canonical" href="http://localhost:4000/" />
+<meta property="og:url" content="http://localhost:4000/" />
+<meta property="og:site_name" content="MatchyPatchy User Manual" />
+<meta property="og:type" content="website" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","description":"MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment.","headline":"MatchyPatchy User Manual","name":"MatchyPatchy User Manual","url":"http://localhost:4000/"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="MatchyPatchy User Manual" /></head>
+
+<body>
+    <!-- Header -->
+    <header class="site-header" role="banner">
+        <div class="header-wrapper">
+            <!-- logo goes here -->
+            <a class="site-title" rel="author" href="/">MatchyPatchy User Manual</a>
+            <nav class="site-nav">
+                <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="layout">
+        <!-- Sidebar navigation -->
+        <aside class="sidebar">
+        <h2>Navigation</h2>
+        <nav>
+        <a href="#installation">Installation</a>
+        <a href="#getting-started">Getting Started</a>
+        <a href="#usage">Using MatchyPatchy</a>
+        <a href="#quality-control">Quality Control</a>
+        <a href="#export">Export and Sharing</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+        <a href="release-notes">Release Notes</a>
+        <a href="/contact/">Contact</a>
+        </nav>
+        </aside>
+        <!-- Main Content -->
+        <main class="page-content" aria-label="Content">
+            <div class="wrapper">
+                <div class="home">
+                    <h1 id="installation"><a name="installation"></a>Installation</h1>
+
+<p>Download Installer:</p>
+<table>
+<tr><td>Windows</td><td>LINK</td></tr>
+<tr><td>MacOS</td><td>LINK</td></tr>
+<tr><td>Ubuntu</td><td>LINK</td></tr>
+</table>
+
+<p>Once the installer is downloaded, click “”</p>
+
+<p>Requirements:</p>
+
+<h1 id="getting-started"><a name="getting-started"></a>Getting Started</h1>
+
+<p>Welcome to the MatchyPatchy User Manual! This manual is designed to help you 
+get started with MatchyPatchy, a desktop application for aiding in camera 
+trap-based re-identification for accurate population assessment. MatchyPatchy
+supports both images and video, and the database that is created can be shared 
+and exported easily.</p>
+
+<p>When running MatchyPatchy for the first time, there are a few things to take care of first.</p>
+
+<h3 id="surveys">Surveys</h3>
+<p>MatchyPatchy organizes sets of camera trap data by survey. To add camera trap
+data to MatchyPatchy, you must first create a survey. Press the <b>”+”</b> 
+button to add a new survey. A popup will appear. Input the Name of the survey, 
+the geographical Region the survey occured in, and the Start and End Year of the 
+survey period. You can view surveys by selecting <b>“Manage Surveys”</b>. A popup
+with the list of durveys will appear, allowing you to add, edit, and delete surveys.</p>
+
+<h3 id="stations">Stations</h3>
+<p>MatchyPatchy assumes that camera trap images were collected from particular camera
+stations. When importing data from a folder, MatchyPatchy will attempt to determine
+the station name from the folder structure. This requires that the folder hierarchy
+is consistent across stations, i.e. that the station name is at the same “depth”
+throughout. When importing from a .csv file, make sure there is a column that provides
+station information.</p>
+
+<h3 id="ai-models">AI Models</h3>
+<p>In order to predict potential matches, MatchyPatchy requires MegaDetector and 
+a matching algorithm suitable for your species of interest. We also recommend a 
+viewpoint detection algorithm to prescreen for impossible matches between different 
+sides of the animal. You can download models 
+from our server by selecting the <b>Download Models</b> option on the homescreen.
+MatchyPatchy downloads the models into the <i>MatchyPatchy-Share/models</i> directory.</p>
+
+<p><u>Available models:</u></p>
+<table>
+<tr><td>MegaDetector v5a</td><td>Standard MegaDetector model</td></tr>
+<tr><td>MegaDetector v5b</td><td>Standard MegaDetector model</td></tr>
+<tr><td>MiewID v3</td><td>Matching algorithm good for big cats, whales, ...</td></tr>
+<tr><td>Big Cat Viewpoint</td></tr>
+</table>
+
+<p>Once you have added a survey, organized the data by station, and downloaded the 
+required models, you are ready to start using MatchyPatchy!</p>
+
+<h1 id="using-matchypatchy"><a name="usage"></a>Using MatchyPatchy</h1>
+
+<p>To begin using MatchyPatchy to match individuals, select a survey to add camera 
+trap data to, or create a new survey. Then follow the steps in the middle column
+of the home screen.</p>
+
+<h2 id="1-import-data">1. Import Data</h2>
+<p>MatchyPatchy supports importing raw data from a folder, as well as from a .csv.
+The .csv can contain preprocessed information such as bounding boxes, timestamps, etc.</p>
+
+<h3 id="from-a-folder">From a Folder</h3>
+
+<h3 id="from-a-csv">From a .CSV</h3>
+
+<h2 id="2-process">2. Process</h2>
+<p>This step will run selected AI algorithms on the data.</p>
+
+<h2 id="3-validate">3. Validate</h2>
+<p>Before beginning the matching process, we recommend validating the AI output.
+This step will bring you to a table that lists all of the animals identified in
+the images or videos, as well as associated metadata.</p>
+
+<h2 id="4-match">4. Match</h2>
+<p>Once you have validated that each ROI contains a single animal and that all station
+names and viewpoints are correct, select Step 4. Match from the Home page or from within
+the Media page.</p>
+
+<p>By default, MatchyPatchy calculates the cosine distance between each embedding vector
+and presents only potential matches with a distance below than 0.5. You can change 
+this threshold using the slider (or input a number directly), as well as calculate
+the L2 distance instead. MatchyPatchy will only show potential matches that are of the 
+same viewpoint of the animal, and are not from the same sequence or individual already.</p>
+
+<p>When you believe the image on the right side is a match for the query image on the left,
+select the “Match” button in the center or by pressing “M” on your keyboard. 
+If the match image does not have an individual ID, a popup will appear to allow 
+you to create a new name. If you can tell the animal’s sex and age from the images, 
+you can input that information at this time as well.</p>
+
+<p>Move through each</p>
+
+<h2 id="5-export">5. Export</h2>
+<p>You can export the entire database by selecting Step 5. Export.</p>
+
+<h1 id="quality-control"><a name="quality-control"></a>Quality Control</h1>
+
+<p>After you have identified every image, you can verify the labels by selecting 
+<b>4. Match</b> from the home screen and then selecting <b>Query by Individual</b>.
+This will place every named individual in the query cue and put every example image
+for that individual in both the query and match sides. This allows you to compare 
+each example of an individual against each other example to confirm that all belong
+to that individual.</p>
+
+<!-- screenshot -->
+
+<h1 id="export-and-sharing"><a name="export"></a>Export and Sharing</h1>
+
+<p>You can export the database as a spreadsheet by navigating to the home screen and 
+selecting <b>5. Export</b>.</p>
+
+<h3 id="sharing-a-database">Sharing a Database</h3>
+
+<h1 id="troubleshooting"><a name="troubleshooting"></a>Troubleshooting</h1>
+<h3 id="importing-from-a-folder">Importing from a Folder</h3>
+
+<hr />
+
+<h2 class="post-list-heading">Release Notes</h2>
+<ul class="post-list"><li><span class="post-meta">Oct 13, 2025</span>
+    <h3>
+ <a class="post-link" href="/jekyll/update/2025/10/13/welcome-to-jekyll.html">v1.0.0</a>
+    </h3></li></ul>
+
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- Footer -->
+    <footer class="site-footer h-card">
+        <data class="u-url" href="/"></data>
+        <div class="footer-wrapper">
+
+            <h2 class="footer-heading">MatchyPatchy</h2>
+
+            <div class="footer-col-wrapper">
+                <div class="footer-col footer-col-1">
+                    <ul class="contact-list">
+                    <li>San Diego Zoo Wildlife Alliance</li>
+                    <li>©2025</li></ul>
+                </div>
+
+                <div class="footer-col footer-col-2"><ul class="social-media-list">
+                    <li class="p-name"><a href="/contact/">Contact</a></li>
+                    <li><a href="https://github.com/conservationtechlab"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">conservationtechlab</span></a></li></ul>
+                </div>
+
+            <div class="footer-col footer-col-3">
+                <p>MatchyPatchy is a desktop application for aiding in camera trap-based 
+                    re-identification for accurate population assessment. </p>
+            </div>
+
+        </div></div>
+    </footer>
+</body>
+
+</html>
