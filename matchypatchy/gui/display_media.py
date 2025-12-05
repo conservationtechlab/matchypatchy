@@ -105,6 +105,11 @@ class DisplayMedia(QWidget):
         # display rois or media
         self.media_table = MediaTable(self)
         layout.addWidget(self.media_table, stretch=1)
+
+        # Count Label 
+        self.count_label = QLabel("")
+        layout.addWidget(self.count_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         self.setLayout(layout)
 
 
@@ -158,7 +163,7 @@ class DisplayMedia(QWidget):
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
         self.media_table.filter()
-
+        self.update_count_label()
 
     # 1. RUN ON ENTRY
     def load_table(self):
@@ -198,6 +203,9 @@ class DisplayMedia(QWidget):
         """
         self.media_table.load_images()
 
+    def update_count_label(self):
+        self.count_label.setText(f"Total Media: {len(self.media_table.data_filtered)}")
+
     def change_type(self):
         if len(self.media_table.edit_stack) > 0:
             dialog = AlertPopup(self, prompt="There are unsaved changes. Are you sure you want to change view?")
@@ -216,6 +224,7 @@ class DisplayMedia(QWidget):
             self.load_thumbnails()
         # Disable "Edit Rows" if not in ROI mode
         self.update_buttons()
+        self.update_count_label()
 
     def handle_table_change(self, edit):
         """Slot to receive updates from QTableWidget"""
