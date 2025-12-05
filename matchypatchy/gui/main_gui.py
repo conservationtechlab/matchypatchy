@@ -23,6 +23,9 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_config import ConfigPopup
 from matchypatchy.gui.popup_ml import MLDownloadPopup
 from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
+from matchypatchy.gui.popup_survey import SurveyPopup
+from matchypatchy.gui.popup_station import StationPopup
+from matchypatchy.gui.popup_species import SpeciesPopup
 
 from matchypatchy.database.media import export_data
 
@@ -65,7 +68,7 @@ class MainWindow(QMainWindow):
         # FILE
         file = menuBar.addMenu("File")
         edit = menuBar.addMenu("Edit")
-        view = menuBar.addMenu("View")
+        #view = menuBar.addMenu("View")
         help = menuBar.addMenu("Help")
 
         file.addAction("New")
@@ -96,9 +99,13 @@ class MainWindow(QMainWindow):
 
         # EDIT
         edit_survey = QAction("Surveys", self)
+        edit_survey.triggered.connect(self.manage_survey)
         edit_station = QAction("Stations", self)
+        edit_station.triggered.connect(self.manage_station)
         edit_species = QAction("Species", self)
+        edit_species.triggered.connect(self.manage_species)
         edit_media = QAction("Media", self)
+        edit_media.triggered.connect(self.manage_media)
         edit_configuration = QAction("Configuration", self)
         edit_configuration.triggered.connect(self.edit_config)
 
@@ -108,7 +115,6 @@ class MainWindow(QMainWindow):
         edit.addAction(edit_media)
         edit.addSeparator()
         edit.addAction(edit_configuration)
-
 
         # VIEW
 
@@ -183,6 +189,26 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             del dialog
         self.Base.update_survey()
+
+    def manage_survey(self):
+        dialog = SurveyPopup(self)
+        if dialog.exec():
+            self.Base.update_survey()
+            del dialog
+
+    def manage_station(self):
+        self.Base.select_survey()
+        dialog = StationPopup(self, active_survey=self.Base.active_survey)
+        if dialog.exec():
+            del dialog
+
+    def manage_species(self):
+        dialog = SpeciesPopup(self)
+        if dialog.exec():
+            del dialog
+
+    def manage_media(self):
+        self._set_media_view()
 
 
     # VIEW =====================================================================

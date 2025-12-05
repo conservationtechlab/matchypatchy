@@ -8,12 +8,12 @@ from matchypatchy.gui.popup_alert import AlertPopup
 
 
 class StationPopup(QDialog):
-    def __init__(self, parent):
+    def __init__(self, parent, active_survey):
         super().__init__(parent)
         self.setWindowTitle("Manage stations")
         self.mpDB = parent.mpDB
-        self.survey_id = parent.active_survey
-
+        self.survey_id = active_survey
+        
         layout = QVBoxLayout()
         # station LIST
         self.list = QListWidget()

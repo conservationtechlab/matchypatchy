@@ -42,7 +42,6 @@ class DisplayBase(QWidget):
         container = QWidget()
         container.setObjectName("mainBorderWidget")
         layout = QVBoxLayout()
-        container.setStyleSheet("QPushButton { font-size: 16px; }")
 
         self.label = QLabel("Welcome To MatchyPatchy")
         self.label.setObjectName("Title")
@@ -61,7 +60,7 @@ class DisplayBase(QWidget):
         layout.addStretch()
         
         column_layout = QHBoxLayout()
-        column_layout.addSpacing(100)  # add padding to left side
+        column_layout.addSpacing(120)  # add padding to left side
         column_layout.addStretch()
 
 
@@ -113,12 +112,13 @@ class DisplayBase(QWidget):
         # Survey
         survey_layout = QHBoxLayout()
         survey_label = QLabel("Survey:")
+        survey_label.setStyleSheet("font-size: 16px;")
         survey_layout.addWidget(survey_label, 0)
         self.survey_select = QComboBox()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
         survey_layout.addWidget(self.survey_select, 1)
         button_survey_new = QPushButton("Manage Surveys")
-        button_survey_new.clicked.connect(self.new_survey)
+        button_survey_new.clicked.connect(self.manage_survey)
         survey_layout.addWidget(button_survey_new, 1)
         db_layer.addLayout(survey_layout)
 
@@ -141,14 +141,14 @@ class DisplayBase(QWidget):
         column_layout.addWidget(border_db, 1)
         column_layout.addSpacing(20)  # gap between sections
 
-        column_layout.addSpacing(100)  # add spacing to right side
+        column_layout.addSpacing(120)  # add spacing to right side
         column_layout.addStretch()
 
         layout.addLayout(column_layout)
         layout.addSpacing(50)  # add spacing to bottom
         layout.addStretch()
 
-        self.setStyleSheet("QPushButton, QComboBox { height: 40px; }"
+        self.setStyleSheet("QPushButton, QComboBox { height: 40px; font-size: 16px;}"
                            "#QLabel_Base { font-size: 16px; }")
         container.setLayout(layout)
         main_layout = QVBoxLayout()
@@ -168,7 +168,7 @@ class DisplayBase(QWidget):
         if self.survey_list_ordered:
             self.survey_select.addItems([el[1] for el in survey_names])
 
-    def new_survey(self):
+    def manage_survey(self):
         dialog = SurveyPopup(self)
         if dialog.exec():
             self.update_survey()
@@ -184,7 +184,7 @@ class DisplayBase(QWidget):
 
     def manage_station(self):
         self.select_survey()
-        dialog = StationPopup(self)
+        dialog = StationPopup(self, self.active_survey)
         if dialog.exec():
             del dialog
 
