@@ -13,6 +13,7 @@ from matchypatchy import config
 
 import animl
 
+MEGADETECTORv1000_SIZE = 960
 
 class BuildManifestThread(QThread):
     """
@@ -80,8 +81,8 @@ class AnimlThread(QThread):
             self.prompt_update.emit("No detector selected, skipping detection...")
             return
         # load detector
-        elif self.DETECTOR_KEY == "MegaDetector v5a" or self.DETECTOR_KEY == "MegaDetector v5b":
-            detector = animl.load_detector(self.md_filepath, "MDV5")
+        else:
+            detector = animl.load_detector(self.md_filepath)
 
         # viewpoint, individual TBD
         viewpoint = None
@@ -94,8 +95,11 @@ class AnimlThread(QThread):
                 media_id = image['id']
                 row = image.to_frame().T
 
-                detections = animl.detect(detector, row, animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
-                                           confidence_threshold=self.confidence_threshold)
+                detections = animl.detect(detector, 
+                                          row, 
+                                          MEGADETECTORv1000_SIZE,
+                                          MEGADETECTORv1000_SIZE,
+                                          confidence_threshold=self.confidence_threshold)
 
                 detections = animl.parse_detections(detections, manifest=row)
                 detections = animl.get_animals(detections)
@@ -115,13 +119,17 @@ class AnimlThread(QThread):
                     
             self.progress_update.emit(round(100 * (i + 1) / self.to_process))
 
+        # Process existing rois without bbox
         for i, image in self.rois.iterrows():
             if not self.isInterruptionRequested():
                 media_id = image['media_id']
                 row = image.to_frame().T
 
-                detections = animl.detect(detector, row, animl.MEGADETECTORv5_SIZE, animl.MEGADETECTORv5_SIZE,
-                                           confidence_threshold=self.confidence_threshold)
+                detections = animl.detect(detector,
+                                          row,
+                                          MEGADETECTORv1000_SIZE,
+                                          MEGADETECTORv1000_SIZE,
+                                          confidence_threshold=self.confidence_threshold)
 
                 detections = animl.parse_detections(detections, manifest=row)
                 detections = animl.get_animals(detections)
