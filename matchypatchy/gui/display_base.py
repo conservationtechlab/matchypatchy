@@ -22,9 +22,7 @@ from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_species import SpeciesPopup
 from matchypatchy.gui.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.popup_import_folder import ImportFolderPopup
-from matchypatchy.gui.popup_ml import MLDownloadPopup, MLOptionsPopup
-from matchypatchy.gui.popup_config import ConfigPopup
-from matchypatchy.gui.popup_readme import READMEPopup
+from matchypatchy.gui.popup_ml import MLOptionsPopup
 
 from matchypatchy.algo.sequence_thread import SequenceThread
 from matchypatchy.algo.animl_thread import AnimlThread
@@ -44,12 +42,13 @@ class DisplayBase(QWidget):
         container = QWidget()
         container.setObjectName("mainBorderWidget")
         layout = QVBoxLayout()
+        container.setStyleSheet("QPushButton { font-size: 16px; }")
 
         self.label = QLabel("Welcome To MatchyPatchy")
         self.label.setObjectName("Title")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setFixedHeight(20)
-        self.label.setStyleSheet("""#Title {font-size: 20px;}""")
+        self.label.setStyleSheet("""#Title {font-size: 22px;}""")
         layout.addWidget(self.label)
         layout.addSpacing(20)
 
@@ -60,49 +59,11 @@ class DisplayBase(QWidget):
         self.logo.setPixmap(QPixmap.fromImage(logo_img))
         layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addStretch()
-
+        
         column_layout = QHBoxLayout()
         column_layout.addSpacing(100)  # add padding to left side
+        column_layout.addStretch()
 
-        # DB MANAGEMENT --------------------------------------------------------
-        border_db = QWidget()
-        border_db.setObjectName("borderWidget")
-        border_db.setStyleSheet("#borderWidget { border: 1px solid gray; }")
-        db_layer = QVBoxLayout()
-        db_label = QLabel("Database Management")
-        db_label.setObjectName("QLabel_Base")
-        db_layer.addWidget(db_label, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Survey
-        survey_layout = QHBoxLayout()
-        survey_label = QLabel("Survey:")
-        survey_layout.addWidget(survey_label, 0)
-        self.survey_select = QComboBox()
-        self.survey_select.currentIndexChanged.connect(self.select_survey)
-        survey_layout.addWidget(self.survey_select, 1)
-        button_survey_new = QPushButton("Manage Surveys")
-        button_survey_new.clicked.connect(self.new_survey)
-        survey_layout.addWidget(button_survey_new, 1)
-        db_layer.addLayout(survey_layout)
-
-        button_station_manage = QPushButton("Manage Stations")
-        button_species_manage = QPushButton("Manage Species")
-        button_media_manage = QPushButton("Manage Media")
-        button_individual_manage = QPushButton("Manage Individuals")
-
-        button_station_manage.clicked.connect(self.new_station)
-        button_species_manage.clicked.connect(self.manage_species)
-        button_media_manage.clicked.connect(self.validate)
-        button_individual_manage.clicked.connect(self.manage_individual)
-
-        db_layer.addWidget(button_station_manage)
-        db_layer.addWidget(button_species_manage)
-        db_layer.addWidget(button_media_manage)
-        db_layer.addWidget(button_individual_manage)
-
-        border_db.setLayout(db_layer)
-        column_layout.addWidget(border_db, 1)
-        column_layout.addSpacing(20)  # gap between sections
 
         # MAIN PROCESS ---------------------------------------------------------
         border_import = QWidget()
@@ -138,42 +99,54 @@ class DisplayBase(QWidget):
 
         border_import.setLayout(import_layer)
         column_layout.addWidget(border_import, 1)
-        column_layout.addSpacing(20)
+        column_layout.addSpacing(40)
 
-        # OTHER ----------------------------------------------------------------
-        border_other = QWidget()
-        border_other.setObjectName("borderWidget")
-        border_other.setStyleSheet("#borderWidget { border: 1px solid gray; }")
-        other_layer = QVBoxLayout()
-        other_label = QLabel("Other Options")
-        other_label.setObjectName("QLabel_Base")
-        other_layer.addWidget(other_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        # DB MANAGEMENT --------------------------------------------------------
+        border_db = QWidget()
+        border_db.setObjectName("borderWidget")
+        border_db.setStyleSheet("#borderWidget { border: 1px solid gray; }")
+        db_layer = QVBoxLayout()
+        db_label = QLabel("Database Management")
+        db_label.setObjectName("QLabel_Base")
+        db_layer.addWidget(db_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # ML models
-        button_configuration = QPushButton("Configuration")
-        button_download_ml = QPushButton("Download Models")
-        button_help = QPushButton("Help")
-        button_validate_db = QPushButton("")
-        button_clear_data = QPushButton("")
+        # Survey
+        survey_layout = QHBoxLayout()
+        survey_label = QLabel("Survey:")
+        survey_layout.addWidget(survey_label, 0)
+        self.survey_select = QComboBox()
+        self.survey_select.currentIndexChanged.connect(self.select_survey)
+        survey_layout.addWidget(self.survey_select, 1)
+        button_survey_new = QPushButton("Manage Surveys")
+        button_survey_new.clicked.connect(self.new_survey)
+        survey_layout.addWidget(button_survey_new, 1)
+        db_layer.addLayout(survey_layout)
 
-        other_layer.addWidget(button_configuration)
-        other_layer.addWidget(button_download_ml)
-        other_layer.addWidget(button_help)
-        other_layer.addWidget(button_validate_db)
-        other_layer.addWidget(button_clear_data)
+        button_station_manage = QPushButton("Manage Stations")
+        button_species_manage = QPushButton("Manage Species")
+        button_media_manage = QPushButton("Manage Media")
+        button_individual_manage = QPushButton("Manage Individuals")
 
-        button_configuration.clicked.connect(self.edit_config)
-        button_download_ml.clicked.connect(self.download_ml)
-        button_help.clicked.connect(self.help)
-        # button_validate_db.clicked.connect(self.validate_db)
-        # button_clear_data.clicked.connect(self.clear_data)
+        button_station_manage.clicked.connect(self.manage_station)
+        button_species_manage.clicked.connect(self.manage_species)
+        button_media_manage.clicked.connect(self.validate)
+        button_individual_manage.clicked.connect(self.manage_individual)
 
-        border_other.setLayout(other_layer)
-        column_layout.addWidget(border_other, 1)
+        db_layer.addWidget(button_station_manage)
+        db_layer.addWidget(button_species_manage)
+        db_layer.addWidget(button_media_manage)
+        db_layer.addWidget(button_individual_manage)
+
+        border_db.setLayout(db_layer)
+        column_layout.addWidget(border_db, 1)
+        column_layout.addSpacing(20)  # gap between sections
+
         column_layout.addSpacing(100)  # add spacing to right side
+        column_layout.addStretch()
 
         layout.addLayout(column_layout)
         layout.addSpacing(50)  # add spacing to bottom
+        layout.addStretch()
 
         self.setStyleSheet("QPushButton, QComboBox { height: 40px; }"
                            "#QLabel_Base { font-size: 16px; }")
@@ -209,7 +182,7 @@ class DisplayBase(QWidget):
             self.active_survey = (0, None)
             return False
 
-    def new_station(self):
+    def manage_station(self):
         self.select_survey()
         dialog = StationPopup(self)
         if dialog.exec():
@@ -354,21 +327,6 @@ class DisplayBase(QWidget):
     # ==========================================================================
     # OTHER OPTIONS
     # ==========================================================================
-    def edit_config(self):
-        dialog = ConfigPopup(self)
-        if dialog.exec():
-            del dialog
-        self.update_survey()
-
-    def download_ml(self):
-        dialog = MLDownloadPopup(self)
-        if dialog.exec():
-            del dialog
-
-    def help(self):
-        dialog = READMEPopup(self)
-        if dialog.exec():
-            del dialog
 
     def validate_db(self):
         valid = self.mpDB.validate()

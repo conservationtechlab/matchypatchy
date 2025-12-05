@@ -25,6 +25,7 @@ class MediaTable(QWidget):
         self.mpDB = parent.mpDB
         self.parent = parent
         self.data = pd.DataFrame()
+        self.data_filtered = pd.DataFrame()
         self.species_list = pd.DataFrame()
         self.individual_list = pd.DataFrame()
         self.thumbnails = dict()
@@ -71,6 +72,7 @@ class MediaTable(QWidget):
         self.fetch()
         self.format_table()
         if not self.data.empty:
+            self.data_filtered = self.data.copy()
             return True
         else:
             # no media, give warning, go home
@@ -246,6 +248,7 @@ class MediaTable(QWidget):
         # refresh table contents
         self.refresh_table()
 
+    # triggered by filter() finishing
     def refresh_table(self, popup=True):
         """
         Add rows to table

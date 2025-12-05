@@ -20,6 +20,8 @@ from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
 from matchypatchy.gui.display_compare import DisplayCompare
 from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.popup_config import ConfigPopup
+from matchypatchy.gui.popup_ml import MLDownloadPopup
 from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
 
 from matchypatchy.database.media import export_data
@@ -43,11 +45,11 @@ class MainWindow(QMainWindow):
         container.setFocus()
 
         # Create Page Views
-        self.Intro = DisplayBase(self)
+        self.Base = DisplayBase(self)
         self.Media = DisplayMedia(self)
         self.Compare = DisplayCompare(self)
         self.pages = QStackedLayout()
-        self.pages.addWidget(self.Intro)
+        self.pages.addWidget(self.Base)
         self.pages.addWidget(self.Media)
         self.pages.addWidget(self.Compare)
 
@@ -88,19 +90,25 @@ class MainWindow(QMainWindow):
         file_export.triggered.connect(self.export)
         file.addAction(file_export)
 
+        file_download_model = QAction("Download Models", self)
+        file_download_model.triggered.connect(self.download_ml)
+        file.addAction(file_download_model)
+
         # EDIT
-        edit_preferences = QAction("Preferences", self)
         edit_survey = QAction("Surveys", self)
         edit_station = QAction("Stations", self)
         edit_species = QAction("Species", self)
         edit_media = QAction("Media", self)
+        edit_configuration = QAction("Configuration", self)
+        edit_configuration.triggered.connect(self.edit_config)
 
         edit.addAction(edit_survey)
         edit.addAction(edit_station)
         edit.addAction(edit_species)
         edit.addAction(edit_media)
         edit.addSeparator()
-        edit.addAction(edit_preferences)
+        edit.addAction(edit_configuration)
+
 
         # VIEW
 
@@ -119,7 +127,7 @@ class MainWindow(QMainWindow):
     # PAGE VIEWS ---------------------------------------------------------------
     def _set_base_view(self):
         self.pages.setCurrentIndex(0)
-        self.Intro.setFocus()
+        self.Base.setFocus()
 
     def _set_media_view(self, filters: Optional[dict]=None):
         self.pages.setCurrentIndex(1)
@@ -128,6 +136,7 @@ class MainWindow(QMainWindow):
         data_loaded = self.Media.load_table()
         if data_loaded:
             self.Media.load_thumbnails()
+            self.Media.update_count_label()
 
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)
@@ -162,7 +171,18 @@ class MainWindow(QMainWindow):
             if dialog.exec():
                 del dialog
 
+    def download_ml(self):
+        dialog = MLDownloadPopup(self)
+        if dialog.exec():
+            del dialog
+
+
     # EDIT =====================================================================
+    def edit_config(self):
+        dialog = ConfigPopup(self)
+        if dialog.exec():
+            del dialog
+        self.Base.update_survey()
 
 
     # VIEW =====================================================================
