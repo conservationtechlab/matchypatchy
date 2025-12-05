@@ -32,7 +32,7 @@ class MediaTable(QWidget):
         self.image_loader_thread = None
         self.data_type = 1
         self.VIEWPOINTS = models.load('VIEWPOINTS')
-        self.thumbnail_size = 99
+        self.thumbnail_size = 150
 
         self.edit_stack = []
 
@@ -126,10 +126,6 @@ class MediaTable(QWidget):
                                                   "Station", "Camera", "Sequence ID", "External ID",
                                                   "Viewpoint", "Species", "Individual", "Sex", "Age",
                                                   "Reviewed", "Favorite", "Comment"])
-            # adjust widths
-            self.table.resizeColumnsToContents()
-            for col in range(self.table.columnCount()):
-                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
 
             # VIEWPOINT COMBOS
             combo_items = list(self.VIEWPOINTS.values())[1:]
@@ -164,14 +160,17 @@ class MediaTable(QWidget):
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
                                                   "Station", "Camera", "Sequence ID",
                                                   "External ID", "Comment"])
-            # adjust widths
-            self.table.resizeColumnsToContents()
-            for col in range(self.table.columnCount()):
+        # adjust widths
+        self.table.resizeColumnsToContents()
+        for col in range(self.table.columnCount()):
+            if col == 0:
+                self.table.setColumnWidth(0, 40) # select
+            elif col == 1:
+                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 150))
+            else:
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
-        
-        # FIX FIRST TWO COLUMNS
-        self.table.setColumnWidth(0, 30) # select
-        self.table.setColumnWidth(1, self.thumbnail_size) # thumbnail
+       
+
 
     # STEP 4 - CALLED BY MAIN GUI IF DATA FOUND
     def load_images(self):
@@ -181,7 +180,7 @@ class MediaTable(QWidget):
         """
         loading_bar = AlertPopup(self, "Loading images...", progressbar=True, cancel_only=True)
         loading_bar.show()
-        self.image_loader_thread = LoadThumbnailThread(self.mpDB, self.data, self.data_type)
+        self.image_loader_thread = LoadThumbnailThread(self.mpDB, self.data, self.data_type, self.thumbnail_size)
         self.image_loader_thread.progress_update.connect(loading_bar.set_counter)
         self.image_loader_thread.loaded_images.connect(self.add_thumbnail_paths)
         self.image_loader_thread.done.connect(self.filter)

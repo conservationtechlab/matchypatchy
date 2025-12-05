@@ -20,12 +20,12 @@ class LoadThumbnailThread(QThread):
     loaded_images = pyqtSignal(list)
     done = pyqtSignal()
 
-    def __init__(self, mpDB, data, data_type=1):
+    def __init__(self, mpDB, data, data_type=1, size=150):
         super().__init__()
         self.mpDB = mpDB
         self.data = data
         self.data_type = data_type
-        self.size = 99
+        self.size = size
         if self.data_type == 1:
             self.existing_filepaths = dict(self.mpDB.select("roi_thumbnails", "fid, filepath"))
         else:

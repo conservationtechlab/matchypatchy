@@ -8,7 +8,7 @@ from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider)
-from PyQt6.QtCore import Qt, QPoint
+from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.widget_media import MediaWidget, VideoViewer
 from matchypatchy.gui.widget_image_adjustment import ImageAdjustBar
