@@ -5,7 +5,6 @@ Thread Class for Processing Viewpoint and Miew Embedding
 from numpy import argmax
 from pathlib import Path
 import pandas as pd
-import torchvision.transforms as transforms
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -13,8 +12,8 @@ from matchypatchy.algo import models
 from matchypatchy import config
 from matchypatchy.database.media import fetch_roi
 
-from matchypatchy.pairx.core import explain
-from matchypatchy.pairx import xai_dataset
+#from matchypatchy.pairx.core import explain
+#from matchypatchy.pairx import xai_dataset
 
 import animl
 
@@ -65,16 +64,13 @@ class ReIDThread(QThread):
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
 
-            device = animl.get_device()
-            model = animl.load_classifier(self.viewpoint_filepath, 2, device=device)
+            model = animl.load_classifier(self.viewpoint_filepath)
             dataloader = animl.manifest_dataloader(filtered_rois, crop=True)
 
             for i, batch in enumerate(dataloader):
                 if not self.isInterruptionRequested():
-                    data = batch[0]
-                    data = data.to(device)
-                    output = model(data)
-                    output = output.detach().cpu().numpy()
+                    image = batch[0]
+                    output = model.run(None, {model.get_inputs()[0].name: image})[0]
                     value = argmax(animl.softmax(output), axis=1)[0]
 
                     # TODO: Utilize probability for captures/sequences
@@ -108,8 +104,7 @@ class ReIDThread(QThread):
                     self.progress_update.emit(round(100 * i/len(filtered_rois)))
 
 
-
-# TODO: load model once?
+# TODO: REMOVE TORCHVISION DEPENDENCY
 class PairXThread(QThread):
     explained_img = pyqtSignal(list)  # Signal to update the alert prompt
     done = pyqtSignal()

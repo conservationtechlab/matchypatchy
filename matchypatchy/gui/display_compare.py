@@ -608,9 +608,9 @@ class DisplayCompare(QWidget):
     def press_visualize_button(self):
         query = self.QueryContainer.get_info(self.QueryContainer.current_query_rid)
         match = self.QueryContainer.get_info(self.QueryContainer.current_match_rid)
-        dialog = PairXPopup(self, query, match)
-        if dialog.exec():
-            del dialog
+       # dialog = PairXPopup(self, query, match)
+       # if dialog.exec():
+       #     del dialog
 
     # ==========================================================================
     # FAVORITE

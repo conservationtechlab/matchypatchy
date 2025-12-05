@@ -2,7 +2,7 @@ from matchypatchy import algo
 from matchypatchy import config
 from matchypatchy import database
 from matchypatchy import gui
-from matchypatchy import pairx
+#from matchypatchy import pairx
 
 from matchypatchy.algo import (AnimlThread, BuildManifestThread,
                                CSVImportThread, DownloadMLThread,
@@ -46,16 +46,16 @@ from matchypatchy.gui import (AboutPopup, AlertPopup, ClickableSlider,
                               popup_pairx, popup_readme, popup_species,
                               popup_station, popup_survey, widget_filterbar,
                               widget_image_adjustment, widget_media,)
-from matchypatchy.pairx import (CMAPS, COLORS, XAIDataset, calculate_residuals,
-                                choose_canonizer, core,
-                                display_image_with_heatmap, draw_color_maps,
-                                draw_matches, draw_matches_and_color_maps,
-                                explain, get_feature_matches,
-                                get_img_pair_from_paths,
-                                get_intermediate_feature_maps_and_embedding,
-                                get_intermediate_relevances,
-                                get_pixel_relevance, get_pixel_relevances,
-                                pairx, xai_dataset,)
+#from matchypatchy.pairx import (CMAPS, COLORS, XAIDataset, calculate_residuals,
+#                                choose_canonizer, core,
+#                                display_image_with_heatmap, draw_color_maps,
+#                                draw_matches, draw_matches_and_color_maps,
+#                                explain, get_feature_matches,
+#                                get_img_pair_from_paths,
+#                                get_intermediate_feature_maps_and_embedding,
+#                                get_intermediate_relevances,
+#                                get_pixel_relevance, get_pixel_relevances,
+#                                pairx, xai_dataset,)
 
 __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'CMAPS', 'COLORS', 'COLUMNS', 'CSVImportThread', 'ClickableSlider',
