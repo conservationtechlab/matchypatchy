@@ -22,6 +22,8 @@ class MatchyPatchyDB():
             self.key = '{:05}'.format(randrange(1, 10 ** 5))
             setup_database(self.key, self.filepath)
             setup_chromadb(self.key, self.chroma_filepath)
+            id = self.add_region("Default Region")
+            self.add_survey("Default Survey", id, None, None)
 
     def update_paths(self, DB_PATH):
         filepath = Path(DB_PATH) / 'matchypatchy.db'
