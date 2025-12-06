@@ -1,16 +1,14 @@
 """
 QThread for saving thumbnails to temp dir for media table
 """
-import os
 import pandas as pd
 
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QTableWidgetItem
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 
-
-THUMBNAIL_NOTFOUND = QImage(os.path.join(os.path.dirname(__file__), "assets/thumbnail_notfound.png"))
-# TODO THUMBNAIL_NOTFOUND = QImage(os.path.normpath("assets/logo.png"))
+from matchypatchy.algo.thumbnails import THUMBNAIL_NOTFOUND
+from matchypatchy.config import resource_path
 
 
 class LoadTableThread(QThread):
@@ -51,7 +49,7 @@ class LoadTableThread(QThread):
         elif column == 'thumbnail':
             thumbnail_path = roi['thumbnail_path']
             if not thumbnail_path:
-                thumbnail_path = THUMBNAIL_NOTFOUND
+                thumbnail_path = resource_path(THUMBNAIL_NOTFOUND)
             qtw = QImage(thumbnail_path)
 
         # filepath and Timestamp not editable

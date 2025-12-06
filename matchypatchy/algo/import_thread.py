@@ -4,8 +4,11 @@ QThreads for Importing Data
 """
 from pathlib import Path
 import logging
+
 from PyQt6.QtCore import QThread, pyqtSignal
-from matchypatchy.database.media import VIDEO_EXT
+
+from matchypatchy import config
+from matchypatchy.algo.thumbnails import save_media_thumbnail, save_roi_thumbnail
 
 
 class CSVImportThread(QThread):
@@ -16,6 +19,7 @@ class CSVImportThread(QThread):
         self.mpDB = mpDB
         self.unique_images = unique_images
         self.selected_columns = selected_columns
+        self.thumbnail_dir = config.load('THUMBNAIL_DIR')
         print(selected_columns)
 
     def run(self):
@@ -53,12 +57,13 @@ class CSVImportThread(QThread):
                                                sequence_id=sequence_id,
                                                external_id=external_id,
                                                comment=comment)
-                # image already added
+                # image already added, get correct media_id
                 if media_id == "duplicate_error":
                     media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{filepath}"')[0][0]
-
-                if ext in VIDEO_EXT:
-                    continue  # skip adding rois for videos
+                # save thumbnail for new media
+                else:
+                    media_thumbnail = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
+                    self.mpDB.add_thumbnail("media", media_id, media_thumbnail)
 
                 for i, roi in group.iterrows():
                     # frame number for videos, else 1 if image
@@ -99,6 +104,11 @@ class CSVImportThread(QThread):
                                                reviewed=reviewed,
                                                individual_id=individual_id,
                                                emb=0)
+                    
+                    # save thumbnails
+                    roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                    self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
+
                     roi_counter += 1
                     self.progress_update.emit(roi_counter)
     
@@ -167,7 +177,6 @@ class CSVImportThread(QThread):
             individual_id = None
         return individual_id
 
-
 # FOLDER IMPORT ================================================================
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
@@ -179,6 +188,7 @@ class FolderImportThread(QThread):
         self.data = data
         self.station_level = station_level
         self.default_station = None
+        self.thumbnail_dir = config.load('THUMBNAIL_DIR')
 
     def run(self):
         for i, file in self.data.iterrows():
@@ -218,6 +228,10 @@ class FolderImportThread(QThread):
                 if media_id == "duplicate_error":
                     print(f"File {filepath} already in database, skipping")
                     logging.info(f"File {filepath} already in database, skipping")
+                # save thumbnail
+                else:
+                    thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
+                    self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
 
                 self.progress_update.emit(i)
 

@@ -10,9 +10,8 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.algo import models
-from matchypatchy.algo.thumbnail_thread import LoadThumbnailThread
 from matchypatchy.algo.table_thread import LoadTableThread
-from matchypatchy.database.media import fetch_media, fetch_roi_media
+from matchypatchy.database.media import fetch_media, fetch_media_thumbnails, fetch_roi_media, fetch_roi_thumbnails
 from matchypatchy.database.species import fetch_species, fetch_individual
 from matchypatchy.gui.popup_alert import AlertPopup
 
@@ -72,7 +71,7 @@ class MediaTable(QWidget):
         self.fetch()
         self.format_table()
         if not self.data.empty:
-            self.data_filtered = self.data.copy()
+            self.filter()
             return True
         else:
             # no media, give warning, go home
@@ -88,9 +87,15 @@ class MediaTable(QWidget):
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
+            self.thumbnails = fetch_roi_thumbnails(self.mpDB)
+            print(self.thumbnails)
+            self.data = pd.merge(self.data, self.thumbnails, on="id")
         # MEDIA
         elif self.data_type == 0:
             self.data = fetch_media(self.mpDB)
+            self.thumbnails = fetch_media_thumbnails(self.mpDB)
+            self.data = pd.merge(self.data, self.thumbnails, on="id")
+            
         # return empty
         else:
             self.data = pd.DataFrame()
@@ -169,30 +174,7 @@ class MediaTable(QWidget):
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 150))
             else:
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
-       
-
-
-    # STEP 4 - CALLED BY MAIN GUI IF DATA FOUND
-    def load_images(self):
-        """
-        Load images if data is available
-        Does not run if load_data returns false to MediaDisplay
-        """
-        loading_bar = AlertPopup(self, "Loading images...", progressbar=True, cancel_only=True)
-        loading_bar.show()
-        self.image_loader_thread = LoadThumbnailThread(self.mpDB, self.data, self.data_type, self.thumbnail_size)
-        self.image_loader_thread.progress_update.connect(loading_bar.set_counter)
-        self.image_loader_thread.loaded_images.connect(self.add_thumbnail_paths)
-        self.image_loader_thread.done.connect(self.filter)
-
-        loading_bar.rejected.connect(self.image_loader_thread.requestInterruption)
-        self.image_loader_thread.start()
-
-        # captures emitted temp thumbnail path to data, saves to table
-    def add_thumbnail_paths(self, thumbnail_paths):
-        self.data = pd.merge(self.data, pd.DataFrame(thumbnail_paths, columns=["id", "thumbnail_path"]), on="id")
-
-    # STEP 5 - Triggered by load_images() finishing
+    
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia

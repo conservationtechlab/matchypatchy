@@ -139,10 +139,8 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
         self.Media.refresh_filters(filters)
-        data_loaded = self.Media.load_table()
-        if data_loaded:
-            self.Media.load_thumbnails()
-            self.Media.update_count_label()
+        self.Media.load_table()
+        self.Media.update_count_label()
 
     def _set_compare_view(self):
         self.pages.setCurrentIndex(2)

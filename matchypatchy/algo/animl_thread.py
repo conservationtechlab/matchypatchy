@@ -7,6 +7,7 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from matchypatchy.algo.thumbnails import save_roi_thumbnail
 from matchypatchy.database.media import fetch_roi_media
 from matchypatchy.algo import models
 from matchypatchy import config
@@ -39,6 +40,7 @@ class AnimlThread(QThread):
         self.mpDB = mpDB
         self.ml_dir = Path(config.load('ML_DIR'))
         self.n_frames = config.load('VIDEO_FRAMES')
+        self.thumbnail_dir = config.load('THUMBNAIL_DIR')
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
 
@@ -113,12 +115,18 @@ class AnimlThread(QThread):
                     bbox_h = roi['bbox_h']
 
                     # do not add emb_id, to be determined later
-                    self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
+                    roi_id = self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
                                       viewpoint=viewpoint, species_id=species_id,
                                       individual_id=individual_id, emb=0)
                     
+                    # save thumbnails
+                    roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, 
+                                                       image['filepath'], image['ext'], frame,
+                                                       bbox_x, bbox_y, bbox_w, bbox_h)
+                    self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
+                    
             self.progress_update.emit(round(100 * (i + 1) / self.to_process))
-
+    
         # Process existing rois without bbox
         for i, image in self.rois.iterrows():
             if not self.isInterruptionRequested():

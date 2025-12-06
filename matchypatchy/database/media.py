@@ -95,6 +95,33 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     return rois
 
 
+def fetch_roi_thumbnails(mpDB):
+    """
+    Get roi thumbnail paths
+    """
+    thumbnails = mpDB.select("roi_thumbnails", columns="fid, filepath")
+    if thumbnails:
+        thumbnails = pd.DataFrame(thumbnails, columns=["id", "thumbnail_path"])
+    else:
+        thumbnails = pd.DataFrame(columns=["id", "thumbnail_path"])
+    thumbnails = thumbnails.replace({float('nan'): None})
+    
+    return thumbnails
+
+
+def fetch_media_thumbnails(mpDB):
+    """
+    Get media thumbnail paths
+    """
+    thumbnails = mpDB.select("media_thumbnails", columns="fid, filepath")
+    if thumbnails:
+        thumbnails = pd.DataFrame(thumbnails, columns=["id", "thumbnail_path"])
+    else:
+        thumbnails = pd.DataFrame(columns=["id", "thumbnail_path"])
+    thumbnails = thumbnails.replace({float('nan'): None})
+    return thumbnails
+
+
 def export_data(mpDB):
     """
     Fetch Info for Media Table
