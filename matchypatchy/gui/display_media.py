@@ -95,7 +95,7 @@ class DisplayMedia(QWidget):
         second_layer.addWidget(self.filterbar, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.filters = self.filterbar.get_filters()  # get initial filters
 
-        button_filter = QPushButton("Filter Images")
+        button_filter = QPushButton("Apply Filters")
         button_filter.clicked.connect(self.filter_table)
         second_layer.addWidget(button_filter)
 
@@ -152,8 +152,7 @@ class DisplayMedia(QWidget):
         self.filterbar.refresh_filters(prefilter=prefilter)
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
-        print(self.filters)
-
+        # print(self.filters)
 
     def filter_table(self):
         """
@@ -191,18 +190,6 @@ class DisplayMedia(QWidget):
             self.media_table.load_data(self.data_type)
             return True
 
-
-    # 2. RUN ON ENTRY
-    def load_thumbnails(self):
-        """
-        Load Thumbnails
-
-        Only run if self.media_table.load_data() returns true
-        self.media_table.load_images() will trigger a self filter
-        and a self refresh upon completion
-        """
-        self.media_table.load_images()
-
     def update_count_label(self):
         self.count_label.setText(f"Total Media: {len(self.media_table.data_filtered)}")
 
@@ -219,9 +206,7 @@ class DisplayMedia(QWidget):
 
         self.data_type = self.show_type.currentIndex()
         # reload table
-        data_available = self.load_table()
-        if data_available:
-            self.load_thumbnails()
+        self.load_table()
         # Disable "Edit Rows" if not in ROI mode
         self.update_buttons()
         self.update_count_label()

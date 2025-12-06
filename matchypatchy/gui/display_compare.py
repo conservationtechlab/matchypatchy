@@ -76,7 +76,7 @@ class DisplayCompare(QWidget):
         button_recalc.clicked.connect(self.calculate_neighbors)
         first_layer.addWidget(button_recalc)
 
-        button_recalc = QPushButton("Query by Individual")
+        button_recalc = QPushButton("Quality Control by Individual")
         button_recalc.clicked.connect(self.recalculate_by_individual)
         first_layer.addWidget(button_recalc)
 
@@ -95,7 +95,7 @@ class DisplayCompare(QWidget):
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
 
-        button_filter = QPushButton("Filter Images")
+        button_filter = QPushButton("Apply Filters")
         button_filter.clicked.connect(self.filter_neighbors)
         first_layer.addWidget(button_filter)
 

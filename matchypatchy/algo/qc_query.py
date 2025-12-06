@@ -87,8 +87,6 @@ class QC_QueryContainer(QObject):
                 self.data = self.data[self.data['individual_id'] == int(active_iid)]
                 self.individuals = {active_iid: self.individuals_raw[active_iid]}
 
-        print(self.data)
-
         # compute viewpoints
         self.compute_viewpoints()
 

@@ -352,7 +352,7 @@ class MetadataPanel(QWidget):
                 self.sex.setDisabled(True)
             else:
                 name_index = self.name.findText(self.individuals.loc[iid, 'name'])
-                print(name_index, self.individuals.loc[iid, 'name'])
+                # print(name_index, self.individuals.loc[iid, 'name'])
                 self.name.setCurrentIndex(name_index)
                 self.sex.setDisabled(False)
                 self.age.setDisabled(False)
@@ -518,7 +518,7 @@ class MetadataPanel(QWidget):
                         'reference': 'common',
                         'previous_value': self.data[self.data["id"] == id]["species_id"].item(),
                         'new_value': selected_species[0]}
-                print(edit)
+                # print(edit)
                 self.edit_stack.append(edit)
 
     def change_viewpoint(self):
