@@ -105,6 +105,7 @@ class ReIDThread(QThread):
 
 
 # TODO: REMOVE TORCHVISION DEPENDENCY
+"""
 class PairXThread(QThread):
     explained_img = pyqtSignal(list)  # Signal to update the alert prompt
     done = pyqtSignal()
@@ -136,7 +137,8 @@ class PairXThread(QThread):
         return explained_imgs
     
     def get_bbox(self, roi):
-        """
+        '''
         Return the bbox coordinates for a given roi row
-        """
+        '''
         return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
+"""

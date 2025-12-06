@@ -7,7 +7,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QDialogButtonBox, QProgressBar, QPushButton)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.algo.reid_thread import PairXThread
+#from matchypatchy.algo.reid_thread import PairXThread
 from matchypatchy.algo import models
 
 from matchypatchy.gui.widget_media import ImageWidget
@@ -68,12 +68,11 @@ class PairXPopup(QDialog):
 
     def explain(self):
         self.progress.show()
-        self.pairx_thread = PairXThread(self.query, self.match, self.model)
-        self.pairx_thread.explained_img.connect(self.capture_explained_img)
-        self.pairx_thread.finished.connect(self.display_images)  # do not continue until finished
-        self.pairx_thread.finished.connect(self.progress.hide)
-        self.pairx_thread.start()
-
+        #self.pairx_thread = PairXThread(self.query, self.match, self.model)
+        #self.pairx_thread.explained_img.connect(self.capture_explained_img)
+        #self.pairx_thread.finished.connect(self.display_images)  # do not continue until finished
+        #self.pairx_thread.finished.connect(self.progress.hide)
+        #self.pairx_thread.start()
     def load_model(self):
         self.reid_filepath = models.get_path(Path(config.load('ML_DIR')), config.load('REID_KEY'))
         if self.reid_filepath:
