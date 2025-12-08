@@ -29,7 +29,6 @@ class ImportCSVPopup(QDialog):
         self.selected_camera = self.columns[0]
         self.selected_external_id = self.columns[0]
         self.selected_viewpoint = self.columns[0]
-        self.selected_species = self.columns[0]
         self.selected_individual = self.columns[0]
         self.selected_comment = self.columns[0]
 
@@ -145,16 +144,6 @@ class ImportCSVPopup(QDialog):
         layout.addLayout(viewpoint_layout)
         layout.addSpacing(5)
 
-        # Species
-        species_layout = QHBoxLayout()
-        species_layout.addWidget(QLabel("Species:"))
-        self.species = QComboBox()
-        self.species.addItems(self.columns)
-        self.species.currentTextChanged.connect(self.select_species)
-        species_layout.addWidget(self.species)
-        layout.addLayout(species_layout)
-        layout.addSpacing(5)
-
         # Individual
         individual_layout = QHBoxLayout()
         individual_layout.addWidget(QLabel("Individual:"))
@@ -264,13 +253,6 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
 
-    def select_species(self):
-        try:
-            self.selected_species = self.columns[self.species.currentIndex()]
-            return True
-        except IndexError:
-            return False
-
     def select_individual(self):
         try:
             self.selected_individual = self.columns[self.individual.currentIndex()]
@@ -309,7 +291,6 @@ class ImportCSVPopup(QDialog):
                 "sequence_id": self.selected_sequence_id,
                 "external_id": self.selected_external_id,
                 "viewpoint": self.selected_viewpoint,
-                "species": self.selected_species,
                 "individual": self.selected_individual,
                 "comment": self.selected_comment}
 

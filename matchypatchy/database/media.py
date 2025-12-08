@@ -7,7 +7,7 @@ IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
 COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
-           "comment", "viewpoint", "species_id", "individual_id"]
+           "comment", "viewpoint", "individual_id"]
 
 
 def fetch_media(mpDB, ids=None):
@@ -65,7 +65,7 @@ def fetch_roi(mpDB):
     manifest = mpDB.select("roi")
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
-                                               "species_id", "viewpoint", "reviewed", "favorite", "individual_id", "emb"])
+                                               "viewpoint", "reviewed", "favorite", "individual_id", "emb"])
         rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
         rois = rois.replace({float('nan'): None})
         return rois
@@ -77,7 +77,7 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                'reviewed', 'favorite', 'media_id', 'species_id', 'individual_id', 'emb',
+                'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
                 'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                 'comment',  'binomen', 'common', 'name', 'sex', 'age']
     """
@@ -122,11 +122,27 @@ def fetch_media_thumbnails(mpDB):
     return thumbnails
 
 
+def fetch_individual(mpDB):
+    """
+    Fetches Individual Table, Converts to DataFrame
+
+    Args
+        - mpDB
+    Returns
+        - dataframe of individual table
+    """
+    individual = mpDB.select("individual")
+    if individual:
+        return pd.DataFrame(individual, columns=["id", "name", "sex", "age"]).set_index("id")
+    else:  # return empty
+        return pd.DataFrame(columns=["id", "name", "sex", "age"]).set_index("id")
+
+
 def export_data(mpDB):
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                'reviewed', 'favorite', 'media_id', 'species_id', 'individual_id', 'emb',
+                'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
                 'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                 'comment', 'binomen', 'common', 'name', 'sex', 'age',
                 'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']

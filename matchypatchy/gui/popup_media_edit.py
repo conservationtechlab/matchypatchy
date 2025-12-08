@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (QWidget, QDialog, QVBoxLayout, QHBoxLayout, QComboB
                              QLabel, QTextEdit, QDialogButtonBox, QPushButton)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.gui.popup_species import SpeciesFillPopup
 from matchypatchy.gui.popup_individual import IndividualFillPopup
 from matchypatchy.gui.widget_media import MediaWidget
 from matchypatchy.gui.popup_alert import AlertPopup
@@ -14,7 +13,6 @@ from matchypatchy.gui.gui_assets import HorizontalSeparator
 
 from matchypatchy.algo.models import load
 import matchypatchy.database.media as db_roi
-from matchypatchy.database.species import fetch_individual
 from matchypatchy.database.location import fetch_station_names_from_id
 
 
@@ -30,7 +28,6 @@ class MediaEditPopup(QDialog):
         self.crop = crop
         self.current_image_index = current_image_index
         self.individuals = []
-        self.species_list = []
 
         # Layout ---------------------------------------------------------------
         container_layout = QVBoxLayout()
@@ -274,19 +271,6 @@ class MetadataPanel(QWidget):
         age_layout.addWidget(self.age, stretch=1)
         metadata_layout.addLayout(age_layout)
         metadata_layout.addSpacing(vertical_gap)
-        # Species - EDITABLE
-        species_layout = QHBoxLayout()
-        species_label = QLabel("Species: ")
-        species_label.setFixedWidth(horizontal_gap)
-        species_layout.addWidget(species_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.species = QComboBox()
-        self.species.currentIndexChanged.connect(self.change_species)
-        species_layout.addWidget(self.species, stretch=1)
-        self.button_add_species = QPushButton("+")
-        self.button_add_species.pressed.connect(self.new_species)
-        species_layout.addWidget(self.button_add_species)
-        metadata_layout.addLayout(species_layout)
-        metadata_layout.addSpacing(vertical_gap)
         # Viewpoint - EDITABLE
         viewpoint_layout = QHBoxLayout()
         viewpoint_label = QLabel("Viewpoint: ")
@@ -319,20 +303,14 @@ class MetadataPanel(QWidget):
         self.name.blockSignals(True)
         self.age.blockSignals(True)
         self.sex.blockSignals(True)
-        self.species.blockSignals(True)
         self.viewpoint.blockSignals(True)
         self.comment.blockSignals(True)
 
         # update lists
-        self.individuals = fetch_individual(self.mpDB)
+        self.individuals = db_roi.fetch_individual(self.mpDB)
         self.name.clear()
         self.name_list = ["Unknown"] + [el for el in self.individuals["name"]]
         self.name.addItems(self.name_list)
-
-        species = self.mpDB.select("species", "id, common")
-        self.species.clear()
-        self.species_list = [(0, 'Unknown')] + species
-        self.species.addItems([el[1] for el in self.species_list])
 
         self.timestamp_data.setText(str(self.data.iloc[current_image_index]["timestamp"]))
         survey_info = fetch_station_names_from_id(self.mpDB, self.data.iloc[current_image_index]["station_id"])
@@ -396,19 +374,6 @@ class MetadataPanel(QWidget):
                 else:
                     self.age.setCurrentIndex(self.age.findText(str(current_age)))
 
-            # Species
-            self.species.setDisabled(False)
-            self.button_add_species.setDisabled(False)
-            current_species = self.data.iloc[current_image_index]["common"] if {"common"}.issubset(self.data.columns) else 0
-            if current_species == 0:
-                # media only, no species column
-                self.species.setCurrentIndex(0)
-                self.species.setDisabled(True)
-                self.button_add_species.setDisabled(True)
-            elif current_species == None:
-                self.species.setCurrentIndex(0)
-            else:
-                self.species.setCurrentIndex(self.species.findText(str(current_species)))
 
             # Viewpoint
             self.viewpoint.clear()
@@ -439,10 +404,8 @@ class MetadataPanel(QWidget):
             self.name.setDisabled(True)
             self.sex.setDisabled(True)
             self.age.setDisabled(True)
-            self.species.setDisabled(True)
             self.viewpoint.setDisabled(True)
             self.add_individual.setDisabled(True)
-            self.button_add_species.setDisabled(True)
 
         # Comment
         self.comment.setText(str(self.data.iloc[current_image_index]["comment"]))
@@ -451,7 +414,6 @@ class MetadataPanel(QWidget):
         self.name.blockSignals(False)
         self.age.blockSignals(False)
         self.sex.blockSignals(False)
-        self.species.blockSignals(False)
         self.viewpoint.blockSignals(False)
         self.comment.blockSignals(False)
 
@@ -510,17 +472,6 @@ class MetadataPanel(QWidget):
                 #print(edit)
                 self.edit_stack.append(edit)
 
-    def change_species(self):
-        selected_species = self.species_list[self.species.currentIndex()]
-        if selected_species[0] > 0:
-            for id in self.ids:
-                edit = {'id': id,
-                        'reference': 'common',
-                        'previous_value': self.data[self.data["id"] == id]["species_id"].item(),
-                        'new_value': selected_species[0]}
-                # print(edit)
-                self.edit_stack.append(edit)
-
     def change_viewpoint(self):
         viewpoint_keys = list(self.VIEWPOINTS.keys())
         if len(self.ids) > 1:
@@ -550,7 +501,6 @@ class MetadataPanel(QWidget):
         dialog = IndividualFillPopup(self)
         if dialog.exec():
             individual_id = self.mpDB.add_individual(dialog.get_name(),
-                                                     dialog.get_species_id(),
                                                      dialog.get_sex(),
                                                      dialog.get_age())
             for rid in self.ids:
@@ -558,14 +508,3 @@ class MetadataPanel(QWidget):
         # reload data
         self.refresh_values(self.parent.current_image_index)
         self.name.setCurrentIndex(self.name.count() - 1)  # select new individual
-
-    def new_species(self):
-        dialog = SpeciesFillPopup(self)
-        if dialog.exec():
-            species_id = self.mpDB.add_species(dialog.get_binomen(),
-                                               dialog.get_common())
-            for rid in self.ids:
-                self.mpDB.edit_row('roi', rid, {"species_id": species_id})
-        # reload data
-        self.refresh_values(self.parent.current_image_index)
-        self.species.setCurrentIndex(self.species.count() - 1)  # select new species

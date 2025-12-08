@@ -25,7 +25,6 @@ from matchypatchy.gui.popup_ml import MLDownloadPopup
 from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
 from matchypatchy.gui.popup_survey import SurveyPopup
 from matchypatchy.gui.popup_station import StationPopup
-from matchypatchy.gui.popup_species import SpeciesPopup
 
 from matchypatchy.database.media import export_data
 
@@ -81,10 +80,6 @@ class MainWindow(QMainWindow):
         #file_import_station.triggered.connect(lambda: self.import_popup('station'))
         #file_import.addAction(file_import_station)
 
-        #file_import_species = QAction("Species", self)
-        #file_import_species.triggered.connect(lambda: self.import_popup('species'))
-        #file_import.addAction(file_import_species)
-
         #file_import_media = QAction("Media", self)
         #file_import_media.triggered.connect(lambda: self.import_popup('media'))
         #file_import.addAction(file_import_media)
@@ -102,8 +97,6 @@ class MainWindow(QMainWindow):
         edit_survey.triggered.connect(self.manage_survey)
         edit_station = QAction("Stations", self)
         edit_station.triggered.connect(self.manage_station)
-        edit_species = QAction("Species", self)
-        edit_species.triggered.connect(self.manage_species)
         edit_media = QAction("Media", self)
         edit_media.triggered.connect(self.manage_media)
         edit_configuration = QAction("Configuration", self)
@@ -111,7 +104,6 @@ class MainWindow(QMainWindow):
 
         edit.addAction(edit_survey)
         edit.addAction(edit_station)
-        edit.addAction(edit_species)
         edit.addAction(edit_media)
         edit.addSeparator()
         edit.addAction(edit_configuration)
@@ -197,11 +189,6 @@ class MainWindow(QMainWindow):
     def manage_station(self):
         self.Base.select_survey()
         dialog = StationPopup(self, active_survey=self.Base.active_survey)
-        if dialog.exec():
-            del dialog
-
-    def manage_species(self):
-        dialog = SpeciesPopup(self)
         if dialog.exec():
             del dialog
 

@@ -22,9 +22,9 @@ from matchypatchy.algo.qc_query import (QC_QueryContainer,)
 from matchypatchy.algo.query import (QueryContainer,)
 from matchypatchy.algo.reid_thread import (ReIDThread,)
 from matchypatchy.algo.sequence_thread import (SequenceThread,)
-from matchypatchy.algo.table_thread import (LoadTableThread,
-                                            THUMBNAIL_NOTFOUND,)
-from matchypatchy.algo.thumbnails import (THUMBNAIL_SIZE, get_frame,
+from matchypatchy.algo.table_thread import (LoadTableThread,)
+from matchypatchy.algo.thumbnails import (THUMBNAIL_NOTFOUND, THUMBNAIL_SIZE,
+                                          check_missing_thumbnails, get_frame,
                                           save_media_thumbnail,
                                           save_roi_thumbnail,)
 
@@ -33,9 +33,9 @@ __all__ = ['AnimlThread', 'BuildManifestThread', 'CSVImportThread',
            'MEGADETECTORv1000_SIZE', 'MatchEmbeddingThread',
            'QC_QueryContainer', 'QueryContainer', 'ReIDThread',
            'SequenceThread', 'THUMBNAIL_NOTFOUND', 'THUMBNAIL_SIZE',
-           'animl_thread', 'delete', 'download', 'get_class_path',
-           'get_config_path', 'get_frame', 'get_path', 'import_thread',
-           'is_valid_reid_model', 'load', 'match_thread', 'models', 'qc_query',
-           'query', 'reid_thread', 'save_media_thumbnail',
-           'save_roi_thumbnail', 'sequence_thread', 'table_thread',
-           'thumbnails', 'update_model_yml']
+           'animl_thread', 'check_missing_thumbnails', 'delete', 'download',
+           'get_class_path', 'get_config_path', 'get_frame', 'get_path',
+           'import_thread', 'is_valid_reid_model', 'load', 'match_thread',
+           'models', 'qc_query', 'query', 'reid_thread',
+           'save_media_thumbnail', 'save_roi_thumbnail', 'sequence_thread',
+           'table_thread', 'thumbnails', 'update_model_yml']

@@ -11,9 +11,8 @@ from matchypatchy.gui import popup_import_folder
 from matchypatchy.gui import popup_individual
 from matchypatchy.gui import popup_media_edit
 from matchypatchy.gui import popup_ml
-from matchypatchy.gui import popup_pairx
+#from matchypatchy.gui import popup_pairx
 from matchypatchy.gui import popup_readme
-from matchypatchy.gui import popup_species
 from matchypatchy.gui import popup_station
 from matchypatchy.gui import popup_survey
 from matchypatchy.gui import widget_filterbar
@@ -36,10 +35,9 @@ from matchypatchy.gui.popup_individual import (IndividualFillPopup,
                                                IndividualPopup,)
 from matchypatchy.gui.popup_media_edit import (MediaEditPopup, MetadataPanel,)
 from matchypatchy.gui.popup_ml import (MLDownloadPopup, MLOptionsPopup,)
-from matchypatchy.gui.popup_pairx import (PairXPopup,)
+#from matchypatchy.gui.popup_pairx import (PairXPopup,)
 from matchypatchy.gui.popup_readme import (AboutPopup, LicensePopup,
                                            READMEPopup,)
-from matchypatchy.gui.popup_species import (SpeciesFillPopup, SpeciesPopup,)
 from matchypatchy.gui.popup_station import (StationFillPopup, StationPopup,)
 from matchypatchy.gui.popup_survey import (SurveyFillPopup, SurveyPopup,)
 from matchypatchy.gui.widget_filterbar import (FilterBar, FilterBox,)
@@ -55,14 +53,13 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
            'LOGO', 'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
            'MainWindow', 'MediaEditPopup', 'MediaTable', 'MediaWidget',
-           'MetadataPanel', 'PairXPopup', 'READMEPopup', 'SpeciesFillPopup',
-           'SpeciesPopup', 'StandardButton', 'StationFillPopup',
-           'StationPopup', 'SurveyFillPopup', 'SurveyPopup',
-           'ThreePointSlider', 'VerticalSeparator', 'VideoPlayerBar',
-           'VideoViewer', 'VideoWidget', 'display_base', 'display_compare',
-           'display_media', 'gui_assets', 'main_display', 'main_gui',
-           'media_table', 'popup_alert', 'popup_config', 'popup_import_csv',
-           'popup_import_folder', 'popup_individual', 'popup_media_edit',
-           'popup_ml', 'popup_pairx', 'popup_readme', 'popup_species',
+           'MetadataPanel', 'PairXPopup', 'READMEPopup', 'StandardButton',
+           'StationFillPopup', 'StationPopup', 'SurveyFillPopup',
+           'SurveyPopup', 'ThreePointSlider', 'VerticalSeparator',
+           'VideoPlayerBar', 'VideoViewer', 'VideoWidget', 'display_base',
+           'display_compare', 'display_media', 'gui_assets', 'main_display',
+           'main_gui', 'media_table', 'popup_alert', 'popup_config',
+           'popup_import_csv', 'popup_import_folder', 'popup_individual',
+           'popup_media_edit', 'popup_ml', 'popup_pairx', 'popup_readme',
            'popup_station', 'popup_survey', 'widget_filterbar',
            'widget_image_adjustment', 'widget_media']

@@ -1,5 +1,5 @@
 '''
-Popup to add or edit species
+Popup to add or edit config settings
 '''
 import os
 import logging

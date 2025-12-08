@@ -67,29 +67,19 @@ def setup_database(key, filepath):
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
                         viewpoint INTEGER,
-                        species_id INTEGER,
                         reviewed INTEGER NOT NULL,
                         favorite INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb INTEGER,
                         FOREIGN KEY(media_id) REFERENCES media (id),
-                        FOREIGN KEY(individual_id) REFERENCES individual (id),
-                        FOREIGN KEY(species_id) REFERENCES species (id));''')
+                        FOREIGN KEY(individual_id) REFERENCES individual (id));''')
 
     # INDIVIDUAL
     cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
                         id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
-                        species_id INTEGER,
                         sex TEXT,
-                        age TEXT,
-                        FOREIGN KEY(species_id) REFERENCES species (id));''')
-
-    # SPECIES
-    cursor.execute('''CREATE TABLE IF NOT EXISTS species (
-                        id INTEGER PRIMARY KEY,
-                        binomen TEXT NOT NULL,
-                        common TEXT NOT NULL );''')
+                        age TEXT);''')
 
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (

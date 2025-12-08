@@ -230,13 +230,8 @@ class QC_QueryContainer(QObject):
         Display relevant metadata in comparison label box
         """
         location = fetch_station_names_from_id(self.mpDB, roi['station_id'])
-        if roi['species_id'] is not None:
-            binomen, common = self.mpDB.select("station", "binomen, common", row_cond=f"id={roi['species_id']}")[0]
-        else:
-            common = 'Not Specified'
 
         roi = roi.rename(index={"name": "Name",
-                                "species_id": "Species",
                                 "sex": "Sex",
                                 "age": "Age",
                                 "filepath": "File Path",
@@ -246,13 +241,12 @@ class QC_QueryContainer(QObject):
                                 "sequence_id": "Sequence ID",
                                 "viewpoint": "Viewpoint"})
 
-        info_dict = roi[['Name', 'Species', 'Sex', 'Age', 'File Path', 'Timestamp', 'Station',
+        info_dict = roi[['Name', 'Sex', 'Age', 'File Path', 'Timestamp', 'Station',
                         'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
                 
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
-        info_dict['Species'] = common
 
         # convert viewpoint to human-readable (0=Left, 1=Right)
         VIEWPOINT = load('VIEWPOINTS')

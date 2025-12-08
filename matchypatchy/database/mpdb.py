@@ -102,7 +102,7 @@ class MatchyPatchyDB():
                 return False
         else:
             print("Schema of selected DB invalid.")
-            # print(s)
+            print(s)
             return False
 
     def _command(self, command):
@@ -199,36 +199,10 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_species(self, binomen: str, common: str):
-        """
-        Add species with
-            - binomen (str) NOT NULL: Scientific name
-            - common (str) NOT NULL: common name
-        """
-        try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
-            command = """INSERT INTO species
-                        (binomen, common)
-                        VALUES (?, ?);"""
-            data_tuple = (binomen, common)
-            cursor.execute(command, data_tuple)
-            id = cursor.lastrowid
-            db.commit()
-            db.close()
-            return id
-        except sqlite3.Error as error:
-            logging.error("Failed to add species: ", error)
-            if db:
-                db.close()
-            return None
-
-    def add_individual(self, name: str, species_id: Optional[int] = None,
-                       sex: Optional[str] = None, age: Optional[str] = None):
+    def add_individual(self, name: str, sex: Optional[str] = None, age: Optional[str] = None):
         """
         Add an individual with
             - name (str)
-            - species_id (int)
             - sex (str)
             - age (str)
         """
@@ -236,9 +210,9 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO individual
-                        (name, species_id, sex, age)
-                        VALUES (?, ?, ?, ?);"""
-            data_tuple = (name, species_id, sex, age)
+                        (name, sex, age)
+                        VALUES (?, ?, ?);"""
+            data_tuple = (name, sex, age)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -302,7 +276,6 @@ class MatchyPatchyDB():
 
     def add_roi(self, media_id: int,
                 frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
-                species_id: Optional[int] = None,
                 viewpoint: Optional[str] = None,
                 reviewed: int = 0,
                 favorite: int = 0,
@@ -315,10 +288,10 @@ class MatchyPatchyDB():
             cursor = db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                         species_id, viewpoint, reviewed, favorite, individual_id, emb)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+                         viewpoint, reviewed, favorite, individual_id, emb)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                          species_id, viewpoint, reviewed, favorite, individual_id, emb)
+                          viewpoint, reviewed, favorite, individual_id, emb)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
@@ -487,16 +460,14 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                         roi.media_id, roi.species_id, roi.individual_id, emb, filepath, ext, timestamp,
-                         station_id, sequence_id, camera_id, external_id, comment, favorite, binomen, common, name, sex, age"""
+                         roi.media_id, roi.individual_id, emb, filepath, ext, timestamp,
+                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                            LEFT JOIN species ON roi.species_id = species.id
                                             LEFT JOIN individual ON roi.individual_id = individual.id
                                             WHERE {row_cond};"""
             else:
                 command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                            LEFT JOIN species ON roi.species_id = species.id
                                             LEFT JOIN individual ON roi.individual_id = individual.id;"""
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]

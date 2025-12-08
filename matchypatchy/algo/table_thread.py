@@ -22,7 +22,6 @@ class LoadTableThread(QThread):
         self.valid_stations = parent.valid_stations
         self.valid_cameras = parent.valid_cameras
         self.VIEWPOINTS = parent.VIEWPOINTS
-        self.species_list = parent.species_list
         self.individual_list = parent.individual_list
         self.columns = parent.columns
 
@@ -76,25 +75,6 @@ class LoadTableThread(QThread):
 
             vp_value = self.VIEWPOINTS.get(vp_key, "None")
             qtw = QTableWidgetItem(vp_value)
-
-        # Species ID
-        elif column == 'binomen' or column == 'common':
-            if self.species_list.empty:
-                # can't edit if no species in table
-                qtw = QTableWidgetItem()
-                qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            else:
-                if roi['species_id'] is not None:
-                    species = self.species_list[self.species_list['id'] == roi['species_id']]
-
-                    if not species.empty:
-                        qtw = QTableWidgetItem(str(species[column].values[0]))
-                    else:
-                        print("Species not found — setting to 'Unknown'")
-                        qtw = QTableWidgetItem("Unknown")
-
-                else:
-                    qtw = QTableWidgetItem("Unknown")
 
         # name not editable here
         elif column == "individual_id":

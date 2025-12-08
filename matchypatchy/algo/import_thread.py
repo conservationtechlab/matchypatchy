@@ -85,9 +85,8 @@ class CSVImportThread(QThread):
                         bbox_w = -1
                         bbox_h = -1
 
-                    # species and individual
-                    species_id = self.species(roi)
-                    individual_id = self.individual(roi, species_id)
+                    # individual
+                    individual_id = self.individual(roi)
 
                     # viewpoint
                     viewpoint = int(roi[self.selected_columns["viewpoint"]]) if self.selected_columns["viewpoint"] != "None" else None
@@ -99,7 +98,6 @@ class CSVImportThread(QThread):
                     roi_id = self.mpDB.add_roi(media_id,
                                                frame,
                                                bbox_x, bbox_y, bbox_w, bbox_h,
-                                               species_id,
                                                viewpoint=viewpoint,
                                                reviewed=reviewed,
                                                individual_id=individual_id,
@@ -154,28 +152,18 @@ class CSVImportThread(QThread):
                 camera_id = self.mpDB.add_camera(str(camera_name), station_id)
             return camera_id
 
-    def species(self, roi):
-        if self.selected_columns["species"] != "None":
-            species_name = roi[self.selected_columns["species"]]
-            try:
-                species_id = self.mpDB.select("species", columns="id", row_cond=f'common="{species_name}"')[0][0]
-            except IndexError:
-                species_id = self.mpDB.add_species("Taxon not specified", str(species_name))
-        else:  # no species
-            species_id = None
-        return species_id
-
-    def individual(self, roi, species_id):
+    def individual(self, roi):
         # individual
         if self.selected_columns["individual"] != "None":
             individual = roi[self.selected_columns["individual"]]
             try:
                 individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{individual}"')[0][0]
             except IndexError:
-                individual_id = self.mpDB.add_individual(species_id, str(individual))
+                individual_id = self.mpDB.add_individual(str(individual))
         else:  # no individual id, need review
             individual_id = None
         return individual_id
+
 
 # FOLDER IMPORT ================================================================
 class FolderImportThread(QThread):

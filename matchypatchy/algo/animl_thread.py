@@ -1,5 +1,5 @@
 """
-Thread Class for Processing BBox and Species Classification
+Thread Class for Processing BBox
 
 """
 from pathlib import Path
@@ -59,9 +59,6 @@ class AnimlThread(QThread):
         self.to_process = len(self.media) + len(self.rois)
 
         self.md_filepath = models.get_path(self.ml_dir, DETECTOR_KEY)
-        #self.classifier_filepath = models.get_path(self.ml_dir, classifier_key)
-        #self.class_filepath = models.get_class_path(self.ml_dir, classifier_key)
-        #self.config_filepath = models.get_config_path(self.ml_dir, classifier_key)
 
     def run(self):
         if self.to_process > 0:
@@ -69,8 +66,6 @@ class AnimlThread(QThread):
             self.get_frames()
             self.prompt_update.emit("Calculating bounding boxes...")
             self.get_bbox()
-        #self.progress_update.emit("Predicting species...")
-        #self.get_species()
 
     def get_frames(self):
         self.media = animl.extract_frames(self.media, frames=self.n_frames)
@@ -89,7 +84,6 @@ class AnimlThread(QThread):
         # viewpoint, individual TBD
         viewpoint = None
         individual_id = None
-        species_id = None
 
         # 2 GET BOXES
         for i, image in self.media.iterrows():
@@ -115,9 +109,11 @@ class AnimlThread(QThread):
                     bbox_h = roi['bbox_h']
 
                     # do not add emb_id, to be determined later
-                    roi_id = self.mpDB.add_roi(media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                                      viewpoint=viewpoint, species_id=species_id,
-                                      individual_id=individual_id, emb=0)
+                    roi_id = self.mpDB.add_roi(media_id, frame,
+                                               bbox_x, bbox_y, bbox_w, bbox_h,
+                                               viewpoint=viewpoint,
+                                               individual_id=individual_id,
+                                               emb=0)
                     
                     # save thumbnails
                     roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, 
@@ -159,39 +155,3 @@ class AnimlThread(QThread):
                     })
                     
             self.progress_update.emit(round(100 * (i + 1) / self.to_process))
-
-'''
-    def get_species(self, label_col="code", binomen_col='species'):
-        if self.classifier_filepath is None:
-            # user opted to skip classification
-            return
-
-        classes = pd.read_csv(self.class_filepath).set_index(label_col)
-        self.add_species_list(classes, binomen_col)
-
-        info = "roi.id, media_id, filepath, frame, species_id, bbox_x, bbox_y, bbox_w, bbox_h"
-        rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
-        rois = pd.DataFrame(rois, columns=columns)
-
-        filtered_rois = rois[rois["species_id"].isna()]
-
-        # if there are unlabeled rois
-        if not filtered_rois.empty:
-            filtered_rois = animl.classify_mp(filtered_rois, self.config_filepath)
-            for i, row in filtered_rois.iterrows():
-                if not self.isInterruptionRequested():
-                    prediction = row['prediction']
-                    # get species_id for prediction
-                    try:
-                        species_id = self.mpDB.select("species", columns='id', row_cond=f'common="{prediction}"')[0][0]
-                    except IndexError:
-                        binomen = classes.loc[prediction, binomen_col]
-                        species_id = self.mpDB.add_species(binomen, prediction)
-                    # update species_id
-                    self.mpDB.edit_row('roi', row['id'], {"species_id": species_id})
-
-    def add_species_list(self, classes, binomen_col):
-        for common, cl in classes.iterrows():
-            binomen = cl[common, binomen_col]
-            species_id = self.mpDB.add_species(binomen, common)
-'''    

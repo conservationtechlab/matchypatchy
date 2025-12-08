@@ -22,8 +22,7 @@ from matchypatchy.gui.widget_filterbar import FilterBar
 from matchypatchy.algo.query import QueryContainer
 from matchypatchy.algo.qc_query import QC_QueryContainer
 
-from matchypatchy.database.species import fetch_individual
-from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT
+from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
 from matchypatchy import config
 
 
@@ -398,7 +397,6 @@ class DisplayCompare(QWidget):
             dialog = IndividualFillPopup(self)
             if dialog.exec():
                 individual_id = self.mpDB.add_individual(dialog.get_name(),
-                                                         dialog.get_species_id(),
                                                          dialog.get_sex(),
                                                          dialog.get_age())
                 # update query and match
@@ -532,7 +530,7 @@ class DisplayCompare(QWidget):
                                 <td>{spacer}</td>
                                 <td>File Name:</td><td>{os.path.basename(info_dict['File Path'])}</td>
                             </tr><tr>
-                                <td>Species:</td><td>{info_dict['Species']}</td>
+                                <td>Viewpoint:</td><td>{info_dict['Viewpoint']}</td>
                                 <td>{spacer}</td>
                                 <td>Timestamp:</td><td>{info_dict['Timestamp']}</td>
                             </tr><tr>
@@ -544,12 +542,10 @@ class DisplayCompare(QWidget):
                                 <td>{spacer}</td>
                                 <td>Survey:</td><td>{info_dict['Survey']}</td>
                             </tr><tr>                                
-                                <td>Viewpoint:</td><td>{info_dict['Viewpoint']}</td>
+                                <td>Sequence ID:</td><td>{info_dict['Sequence ID']}</td>
                                 <td>{spacer}</td>
                                 <td>Station:</td><td>{info_dict['Station']}</td>
                             </tr><tr>
-                                <td>Sequence ID:</td><td>{info_dict['Sequence ID']}</td>
-                                <td>{spacer}</td>
                                 <td>Comment:</td><td>{info_dict['Comment']}</td>
                             </tr>
                             </table>

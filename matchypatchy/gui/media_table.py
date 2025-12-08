@@ -11,8 +11,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.algo import models
 from matchypatchy.algo.table_thread import LoadTableThread
-from matchypatchy.database.media import fetch_media, fetch_media_thumbnails, fetch_roi_media, fetch_roi_thumbnails
-from matchypatchy.database.species import fetch_species, fetch_individual
+from matchypatchy.database.media import *
 from matchypatchy.gui.popup_alert import AlertPopup
 
 
@@ -25,7 +24,6 @@ class MediaTable(QWidget):
         self.parent = parent
         self.data = pd.DataFrame()
         self.data_filtered = pd.DataFrame()
-        self.species_list = pd.DataFrame()
         self.individual_list = pd.DataFrame()
         self.thumbnails = dict()
         self.image_loader_thread = None
@@ -43,7 +41,7 @@ class MediaTable(QWidget):
         self.table.setColumnCount(17)  # Columns: Thumbnail, Name, and Description
         self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
                                               "Station", "Camera", "Sequence ID", "External ID",
-                                              "Viewpoint", "Species", "Individual", "Sex", "Age",
+                                              "Viewpoint", "Individual", "Sex", "Age",
                                               "Reviewed", "Favorite", "Comment"])
         # self.table.setSortingEnabled(True)  # NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
@@ -82,13 +80,12 @@ class MediaTable(QWidget):
         """
         Select all media, store in dataframe
         """
-        self.species_list = fetch_species(self.mpDB)
         self.individual_list = fetch_individual(self.mpDB)
+        #TODO check missing thumbnails
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
             self.thumbnails = fetch_roi_thumbnails(self.mpDB)
-            print(self.thumbnails)
             self.data = pd.merge(self.data, self.thumbnails, on="id")
         # MEDIA
         elif self.data_type == 0:
@@ -113,33 +110,26 @@ class MediaTable(QWidget):
                             6: "sequence_id",
                             7: "external_id",
                             8: "viewpoint",
-                            9: "common",
-                            10: "individual_id",
-                            11: "sex",
-                            12: "age",
-                            13: "reviewed",
-                            14: "favorite",
-                            15: "comment"}
+                            9: "individual_id",
+                            10: "sex",
+                            11: "age",
+                            12: "reviewed",
+                            13: "favorite",
+                            14: "comment"}
             
             VIEWPOINT_COLUMN = 8
-            SPECIES_COLUMN = 9
-            SEX_COLUMN = 11
-            AGE_COLUMN = 12
+            SEX_COLUMN = 10
+            AGE_COLUMN = 11
 
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
                                                   "Station", "Camera", "Sequence ID", "External ID",
-                                                  "Viewpoint", "Species", "Individual", "Sex", "Age",
+                                                  "Viewpoint", "Individual", "Sex", "Age",
                                                   "Reviewed", "Favorite", "Comment"])
 
             # VIEWPOINT COMBOS
             combo_items = list(self.VIEWPOINTS.values())[1:]
             self.table.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
-
-            # SPECIES COMBOBOX
-            if not self.species_list.empty:
-                combo_items = [None] + self.species_list['common'].str.capitalize().to_list()
-                self.table.setItemDelegateForColumn(SPECIES_COLUMN, ComboBoxDelegate(combo_items, self))
 
             # SEX COMBOBOX
             combo_items = ['Unknown', 'Male', 'Female']
@@ -337,24 +327,6 @@ class MediaTable(QWidget):
             else:
                 new_value = int(key)
 
-        # species
-        elif reference == 'common':
-            reference = 'species_id'
-            previous_value = self.data_filtered.at[row, reference]
-            new = self.table.item(row, column).text()
-            if new is None:
-                new_value = None
-            else:
-                new_value = self.species_list.loc[self.species_list['common'] == new, 'id'][0]
-        elif reference == 'binomen':
-            reference = 'species_id'
-            previous_value = self.data_filtered.at[row, reference]
-            new = self.table.item(row, column).text()
-            if new is None:
-                new_value = None
-            else:
-                new_value = self.species_list.loc[self.species_list['binomen'] == new, 'id'][0]
-
         # individual
         elif reference == 'individual_id' or reference == 'sex' or reference == 'age':
             rid = self.data_filtered.at[row, 'individual_id']
@@ -458,7 +430,7 @@ class MediaTable(QWidget):
         self.parent.edit_row(row)
 
 
-# COMBOBOX FOR VIEWPOINT, SPECIES, SEX
+# COMBOBOX FOR VIEWPOINT, SEX, AGE ---------------------------------------------
 class ComboBoxDelegate(QStyledItemDelegate):
     """Custom delegate to use QComboBox for editing"""
     itemSelected = pyqtSignal(int, int, int)

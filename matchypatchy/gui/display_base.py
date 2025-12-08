@@ -19,7 +19,6 @@ from matchypatchy.gui.popup_survey import SurveyPopup
 from matchypatchy.gui.popup_station import StationPopup
 from matchypatchy.gui.popup_individual import IndividualPopup
 from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.popup_species import SpeciesPopup
 from matchypatchy.gui.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.popup_ml import MLOptionsPopup
@@ -123,19 +122,19 @@ class DisplayBase(QWidget):
         db_layer.addLayout(survey_layout)
 
         button_station_manage = QPushButton("Manage Stations")
-        button_species_manage = QPushButton("Manage Species")
         button_media_manage = QPushButton("Manage Media")
         button_individual_manage = QPushButton("Manage Individuals")
+        button_download_models = QPushButton("Download ML Models")
 
         button_station_manage.clicked.connect(self.manage_station)
-        button_species_manage.clicked.connect(self.manage_species)
         button_media_manage.clicked.connect(self.validate)
         button_individual_manage.clicked.connect(self.manage_individual)
+        button_download_models.clicked.connect(self.parent.download_ml)
 
         db_layer.addWidget(button_station_manage)
-        db_layer.addWidget(button_species_manage)
         db_layer.addWidget(button_media_manage)
         db_layer.addWidget(button_individual_manage)
+        db_layer.addWidget(button_download_models)
 
         border_db.setLayout(db_layer)
         column_layout.addWidget(border_db, 1)
@@ -185,11 +184,6 @@ class DisplayBase(QWidget):
     def manage_station(self):
         self.select_survey()
         dialog = StationPopup(self, self.active_survey)
-        if dialog.exec():
-            del dialog
-
-    def manage_species(self):
-        dialog = SpeciesPopup(self)
         if dialog.exec():
             del dialog
 
@@ -267,7 +261,7 @@ class DisplayBase(QWidget):
             self.sequence_thread.prompt_update.connect(dialog.update_prompt)
             self.sequence_thread.start()
 
-            # 2. ANIML (BBOX + SPECIES)
+            # 2. ANIML (BBOX)
             dialog.set_max(100)
             dialog.set_counter(0)
             self.animl_thread = AnimlThread(self.mpDB, mloptions['DETECTOR_KEY']) #, mloptions['classifier_key']) --- IGNORE ---

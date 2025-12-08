@@ -2,11 +2,9 @@
 Create a new Individual Fillable Form
 
 individual (id INTEGER PRIMARY KEY,
-            species_id INTEGER,
             name TEXT NOT NULL,
             sex TEXT,
-            age TEXT,
-            FOREIGN KEY(species_id) REFERENCES species (id));'''
+            age TEXT);'''
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem,
                              QLabel, QLineEdit, QDialogButtonBox, QPushButton)
@@ -82,12 +80,12 @@ class IndividualPopup(QDialog):
 
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
 
-        id, name, species_id, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
 
-        dialog = IndividualFillPopup(self, species_id=species_id, name=name, sex=sex, age=age)
+        id, name, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
+
+        dialog = IndividualFillPopup(self, name=name, sex=sex, age=age)
         if dialog.exec():
             replace_dict = {"name": dialog.get_name(),
-                            "species_id": dialog.get_species_id(),
                             "sex": dialog.get_sex(),
                             "age": dialog.get_age()}
             self.mpDB.edit_row("individual", id, replace_dict)
@@ -107,17 +105,11 @@ class IndividualPopup(QDialog):
 
 
 class IndividualFillPopup(QDialog):
-    def __init__(self, parent, species_id=None, name=None, sex=None, age=None):
+    def __init__(self, parent, name=None, sex=None, age=None):
         super().__init__(parent)
-        self.species_id = species_id
         self.mpDB = parent.mpDB
         self.setWindowTitle("Edit Individual")
         layout = QVBoxLayout()
-
-        # species
-        self.species_combo = QComboBox()
-        layout.addWidget(self.species_combo)
-        self.set_species_options()
 
         # name
         layout.addWidget(QLabel('Name'))
@@ -153,14 +145,6 @@ class IndividualFillPopup(QDialog):
 
         self.setLayout(layout)
 
-    def set_species_options(self):
-        options = self.mpDB.select("species", columns="id, common")
-        self.species_list = [(None, "Species")] + list(options)
-        self.species_combo.addItems([el[1] for el in self.species_list])
-        if self.species_id is not None:
-            set_to_index = next((i for i, t in enumerate(self.species_list) if t[0] == self.species_id), None)
-            self.species_combo.setCurrentIndex(set_to_index)
-
     def checkInput(self):
         self.okButton.setEnabled(bool(self.get_name()))
 
@@ -172,10 +156,6 @@ class IndividualFillPopup(QDialog):
     
     def get_age(self):
         return self.age.currentText()
-
-    def get_species_id(self):
-        # return id only
-        return self.species_list[self.species_combo.currentIndex()][0]
 
     def accept_verify(self):
         if self.get_name():
