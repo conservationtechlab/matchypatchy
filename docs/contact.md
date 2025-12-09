@@ -1,0 +1,4 @@
+---
+layout: default
+---
+Contact page
