@@ -14,6 +14,8 @@ from matchypatchy.gui.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.gui_assets import VerticalSeparator, StandardButton
 from matchypatchy.gui.widget_filterbar import FilterBar
 
+# TODO: fix select all
+
 
 class DisplayMedia(QWidget):
     def __init__(self, parent, data_type=1):
@@ -41,7 +43,7 @@ class DisplayMedia(QWidget):
         # Show Type
         first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.show_type = QComboBox()
-        self.show_type.addItems(["Full Images", "ROIs Only"])
+        self.show_type.addItems(["Full Images", "ROIs"])
         self.show_type.setCurrentIndex(self.data_type)
         self.show_type.currentIndexChanged.connect(self.change_type)
         first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -278,9 +280,7 @@ class DisplayMedia(QWidget):
                 self.check_undo_button()
 
                 # if changes made, reload table
-                data_available = self.load_table()
-                if data_available:
-                    self.load_thumbnails()
+                self.load_table()
 
     def edit_row_multiple(self):
         selected_rows = self.media_table.selectedRows()
@@ -294,10 +294,10 @@ class DisplayMedia(QWidget):
             self.check_undo_button()
             del dialog
             # reload data
-            data_available = self.load_table()
-            if data_available:
-                self.load_thumbnails()
+            self.load_table()
+        
         self.update_buttons()
+        self.update_count_label()
 
     def select_all(self, reset=False):
         if reset:
@@ -348,8 +348,7 @@ class DisplayMedia(QWidget):
                 del dialog
                 # Clear selection and update UI
                 self.media_table.table.clearSelection()
+                # Reload updated data
+                self.load_table()
                 self.update_buttons()
-                # Reload updated data and thumbnails
-                data_available = self.load_table()
-                if data_available:
-                    self.load_thumbnails()
+                self.update_count_label()

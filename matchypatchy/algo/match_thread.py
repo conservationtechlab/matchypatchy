@@ -24,7 +24,7 @@ class MatchEmbeddingThread(QThread):
         super().__init__()
         self.mpDB = mpDB
         self.rois = rois.drop(['frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 
-                               'comment', 'binomen', 'common', 'name', 'sex', 'age'], axis=1).reset_index()
+                               'comment', 'name', 'sex', 'age'], axis=1).reset_index()
         self.sequences = sequences
         self.n = len(sequences)
         self.k = k

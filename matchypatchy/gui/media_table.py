@@ -39,7 +39,7 @@ class MediaTable(QWidget):
         # Create QTableWidget
         self.table = QTableWidget()
         self.table.setColumnCount(17)  # Columns: Thumbnail, Name, and Description
-        self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
+        self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
                                               "Station", "Camera", "Sequence ID", "External ID",
                                               "Viewpoint", "Individual", "Sex", "Age",
                                               "Reviewed", "Favorite", "Comment"])
@@ -122,7 +122,7 @@ class MediaTable(QWidget):
             AGE_COLUMN = 11
 
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
-            self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
+            self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
                                                   "Station", "Camera", "Sequence ID", "External ID",
                                                   "Viewpoint", "Individual", "Sex", "Age",
                                                   "Reviewed", "Favorite", "Comment"])
@@ -152,7 +152,7 @@ class MediaTable(QWidget):
                             7: "external_id",
                             8: "comment"}
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
-            self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "File Path", "Timestamp",
+            self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
                                                   "Station", "Camera", "Sequence ID",
                                                   "External ID", "Comment"])
         # adjust widths

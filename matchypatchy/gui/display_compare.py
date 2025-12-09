@@ -528,7 +528,7 @@ class DisplayCompare(QWidget):
                             <tr>
                                 <td>Name:</td><td>{info_dict['Name']}</td>
                                 <td>{spacer}</td>
-                                <td>File Name:</td><td>{os.path.basename(info_dict['File Path'])}</td>
+                                <td>File Name:</td><td>{os.path.basename(info_dict['Filepath'])}</td>
                             </tr><tr>
                                 <td>Viewpoint:</td><td>{info_dict['Viewpoint']}</td>
                                 <td>{spacer}</td>

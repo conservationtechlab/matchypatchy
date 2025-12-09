@@ -234,14 +234,14 @@ class QC_QueryContainer(QObject):
         roi = roi.rename(index={"name": "Name",
                                 "sex": "Sex",
                                 "age": "Age",
-                                "filepath": "File Path",
+                                "filepath": "Filepath",
                                 "comment": "Comment",
                                 "timestamp": "Timestamp",
                                 "station_id": "Station",
                                 "sequence_id": "Sequence ID",
                                 "viewpoint": "Viewpoint"})
 
-        info_dict = roi[['Name', 'Sex', 'Age', 'File Path', 'Timestamp', 'Station',
+        info_dict = roi[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
                         'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
                 
         info_dict['Station'] = location['station_name']
