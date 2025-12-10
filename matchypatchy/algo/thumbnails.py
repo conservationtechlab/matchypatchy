@@ -11,7 +11,7 @@ from PyQt6.QtCore import Qt, QRect
 from matchypatchy.config import resource_path
 
 
-THUMBNAIL_NOTFOUND = "assets/thumbnail_notfound.png"
+THUMBNAIL_NOTFOUND = "assets/graphics/thumbnail_notfound.png"
 THUMBNAIL_SIZE = 150
 
 def save_media_thumbnail(thumbnail_dir, filepath, ext):

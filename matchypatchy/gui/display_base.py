@@ -30,7 +30,7 @@ from matchypatchy.algo.reid_thread import ReIDThread
 from matchypatchy.database.media import export_data
 
 
-LOGO = config.resource_path("assets/logo.png")
+LOGO = config.resource_path("assets/graphics/logo.png")
 
 class DisplayBase(QWidget):
     def __init__(self, parent):
