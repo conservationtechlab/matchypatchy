@@ -30,7 +30,11 @@ from matchypatchy.algo.reid_thread import ReIDThread
 from matchypatchy.database.media import export_data
 
 
+
+
 class DisplayBase(QWidget):
+    LOGO = config.resource_path("assets/graphics/logo.png")
+
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
@@ -51,8 +55,7 @@ class DisplayBase(QWidget):
         self.logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
         self.logo.setFixedSize(600, 400)
         self.logo.setObjectName("borderWidget")
-        LOGO = config.resource_path("assets/logo.png")
-        logo_img = QImage(LOGO)
+        logo_img = QImage(self.LOGO)
         self.logo.setPixmap(QPixmap.fromImage(logo_img))
         layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addStretch()

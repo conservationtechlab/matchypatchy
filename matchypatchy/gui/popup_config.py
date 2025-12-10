@@ -17,7 +17,7 @@ from matchypatchy.gui.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.algo.models import get_path, is_valid_reid_model
 
 
-ICON_PENCIL = config.resource_path("assets/fluent_pencil_icon.png")
+ICON_PENCIL = config.resource_path("assets/graphics/fluent_pencil_icon.png")
 
 class ConfigPopup(QDialog):
     def __init__(self, parent):

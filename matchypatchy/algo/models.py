@@ -17,7 +17,7 @@ def update_model_yml():
     Downloads the most recent version of the models.yml file from SDZWA server and updates internal file
     """
     # download current version
-    model_yml_path = resource_path("models.yml")
+    model_yml_path = resource_path("assets/models.yml")
     # TODO: re-enable when final list of models is ready
     #try:
     #    urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", model_yml_path)
@@ -29,7 +29,7 @@ def update_model_yml():
 
 def load(key=None):
     # load the yaml file
-    model_yml_path = resource_path("models.yml")
+    model_yml_path = resource_path("assets/models.yml")
 
     with open(model_yml_path, 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
@@ -88,7 +88,7 @@ def delete(ML_DIR, key):
 
 def download(ML_DIR, key):
     # read model directory
-    model_yml_path = resource_path("models.yml")
+    model_yml_path = resource_path("assets/models.yml")
     with open(model_yml_path, 'r') as cfg_file:
         ml_cfg = yaml.safe_load(cfg_file)
         models = ml_cfg['MODELS']
