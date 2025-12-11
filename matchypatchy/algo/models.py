@@ -19,12 +19,12 @@ def update_model_yml():
     # download current version
     model_yml_path = resource_path("assets/models.yml")
     # TODO: re-enable when final list of models is ready
-    #try:
-    #    urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/2ajbcn5twyqvfd13521erp36qqrjxdel.yml", model_yml_path)
-    #    return True
-    #except urllib.error.URLError:
-    #    logging.error("Unable to connect to server.")
-    #    return False
+    try:
+        urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml", model_yml_path)
+        return True
+    except urllib.error.URLError:
+        logging.error("Unable to connect to server.")
+        return False
 
 
 def load(key=None):
@@ -98,12 +98,13 @@ def download(ML_DIR, key):
         path = ML_DIR / Path(name)
 
         if not path.exists():  # check to see if it already exists first
-            try:
-                urllib.request.urlretrieve(url, path)
-                return True
-            except urllib.error.URLError:
-                logging.error("Unable to connect to server.")
-                return False
+            for url in url if isinstance(url, list) else [url]:
+                try:
+                    urllib.request.urlretrieve(url, path)
+                    return True
+                except urllib.error.URLError:
+                    logging.error("Unable to connect to server.")
+                    return False
         if path.exists():  # validate that it downloaded
             return True
         else:
