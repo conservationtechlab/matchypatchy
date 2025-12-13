@@ -223,7 +223,9 @@ class QC_QueryContainer(QObject):
             return self.data.loc[rid, column]
 
     def current_distance(self):
+        #TODO: FIX THIS FUNCTION TO RETURN DISTANCE
         return 0
+        
 
     def roi_metadata(self, roi):
         """
@@ -269,4 +271,4 @@ class QC_QueryContainer(QObject):
 
     def unmatch(self):
         # Set current match id to none
-        self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': None}, quiet=False)
+        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None}, quiet=False)
