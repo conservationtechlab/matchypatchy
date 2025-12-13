@@ -51,6 +51,10 @@ class DisplayCompare(QWidget):
         button_home = StandardButton("Home")
         button_home.clicked.connect(lambda: self.home(warn=False))
         first_layer.addWidget(button_home)
+
+        button_validate = QPushButton("View Data")
+        button_validate.pressed.connect(self.validate)
+        first_layer.addWidget(button_validate)
         first_layer.addWidget(VerticalSeparator()) 
 
         # OPTIONS
@@ -102,14 +106,16 @@ class DisplayCompare(QWidget):
         layout.addLayout(first_layer)
 
         # IMAGE COMPARISON =====================================================
-        layout.addSpacing(20)
+        #layout.addSpacing(20)
         image_layout = QHBoxLayout()
 
         # QUERY ----------------------------------------------------------------
         query_layout = QVBoxLayout()
         query_label = QLabel("Query")
+        query_label.setStyleSheet("font-size: 18px;")
         query_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         query_layout.addWidget(query_label)
+        query_layout.addSpacing(5)
         # Options
         query_options = QHBoxLayout()
         query_options.addStretch()
@@ -184,8 +190,10 @@ class DisplayCompare(QWidget):
         # MATCH ----------------------------------------------------------------
         match_layout = QVBoxLayout()
         match_label = QLabel("Match")
+        match_label.setStyleSheet("font-size: 18px;")
         match_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         match_layout.addWidget(match_label)
+        match_layout.addSpacing(5)
         # OptionsVIEWPOINT_DICT
         match_options = QHBoxLayout()
         match_options.addStretch()
@@ -243,17 +251,16 @@ class DisplayCompare(QWidget):
 
         # BOTTOM LAYER =========================================================
         # Buttons
-        bottom_layer = QHBoxLayout()
-        button_validate = QPushButton("View Data")
-        button_validate.pressed.connect(self.validate)
+        #bottom_layer = QHBoxLayout()
 
-        button_visualize = QPushButton("Visualize Match")
-        button_visualize.pressed.connect(self.press_visualize_button)
+
+        #button_visualize = QPushButton("Visualize Match")
+        #button_visualize.pressed.connect(self.press_visualize_button)
 
         # Add buttons to the layout
-        bottom_layer.addWidget(button_validate)
-        bottom_layer.addWidget(button_visualize)
-        layout.addLayout(bottom_layer)
+        #bottom_layer.addWidget(button_validate)
+        #bottom_layer.addWidget(button_visualize)
+        #layout.addLayout(bottom_layer)
         self.setLayout(layout)
 
         # remove focus from buttons to keep keyboard shortcuts working
@@ -577,7 +584,10 @@ class DisplayCompare(QWidget):
 
         NOTE: Redraws query and match
         """
-        dialog = MediaEditPopup(self, rid)
+        data = self.QueryContainer.get_info(rid)
+        data["id"] = rid
+        data = data.to_frame().T
+        dialog = MediaEditPopup(self, data, data_type=1)
         if dialog.exec():
             del dialog
             # reload data

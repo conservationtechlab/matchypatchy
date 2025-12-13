@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
         file_export.triggered.connect(self.export)
         file.addAction(file_export)
 
-        file_download_model = QAction("Download Models", self)
+        file_download_model = QAction("Download ML Models", self)
         file_download_model.triggered.connect(self.download_ml)
         file.addAction(file_download_model)
 
