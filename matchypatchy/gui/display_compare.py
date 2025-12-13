@@ -87,7 +87,7 @@ class DisplayCompare(QWidget):
         first_layer.addSpacing(10)
         first_layer.addWidget(VerticalSeparator()) 
         first_layer.addSpacing(10)
-        self.filterbar = FilterBar(self, 140)
+        self.filterbar = FilterBar(self, 120)
         self.filterbar.viewpoint_visible(False)
         self.filterbar.individual_visible(False)
         self.filterbar.unidentified_visible(False)
