@@ -3,12 +3,12 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules, collect_dat
 
 datas= [("/home/kyra/matchypatchy/README.md", "."),
         ("/home/kyra/matchypatchy/LICENSE", "."),
-        ("/home/kyra/matchypatchy/models.yml", "."),
-        ("/home/kyra/matchypatchy/config.yml", "."),
+        ("/home/kyra/matchypatchy/ABOUT.md", "."),
+        ("/home/kyra/matchypatchy/assets/models.yml", "./assets"),
         ("/home/kyra/matchypatchy/assets/schema.txt", "./assets"),
-        ("/home/kyra/matchypatchy/assets/logo.png", "./assets"),
-        ("/home/kyra/matchypatchy/assets/fluent_pencil_icon.png", "./assets"),
-        ("/home/kyra/matchypatchy/assets/thumbnail_notfound.png", "./assets"),
+        ("/home/kyra/matchypatchy/assets/graphics/logo.png", "./assets/graphics"),
+        ("/home/kyra/matchypatchy/assets/graphics/fluent_pencil_icon.png", "./assets/graphics"),
+        ("/home/kyra/matchypatchy/assets/graphics/thumbnail_notfound.png", "./assets/graphics"),
         ]
 binaries = []
 hiddenimports = []
@@ -34,16 +34,13 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='MatchyPatchy',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -51,4 +48,13 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     onefile=True,
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='mp_installer',
 )

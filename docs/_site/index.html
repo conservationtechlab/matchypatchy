@@ -62,9 +62,14 @@
 
 <p>Once the installer is downloaded, click “”</p>
 
-<p>Requirements:
-For use with Nvida GPU, first install CUDA <a href=""></a></p>
+<p>Requirements:</p>
 
+<p>For use with Nvida GPU, first <a href="https://developer.nvidia.com/cuda-downloads">install CUDA</a>.</p>
+
+<p><br /></p>
+<hr />
+
+<p><br /></p>
 <h1 id="getting-started"><a name="getting-started"></a>Getting Started</h1>
 
 <p>Welcome to the MatchyPatchy User Manual! This manual is designed to help you 
@@ -112,8 +117,9 @@ i.e. that the station name is at the same “depth” throughout the given direc
 a matching algorithm suitable for your species of interest. We also recommend a 
 viewpoint detection algorithm to prescreen for impossible matches between different 
 sides of the animal. You can download models 
-from our server by selecting the File &gt; <b>Download Models</b> option from the menubar.
-MatchyPatchy downloads the models into the <i>MatchyPatchy-Share/models</i> directory.</p>
+from our server by pressing the <b>“Download ML Models”</b> button or by selecting the 
+File &gt; <b>Download ML Models</b> option from the menubar. MatchyPatchy downloads the 
+models into the <i>MatchyPatchy-Share/models</i> directory.</p>
 
 <p><u>Available models:</u></p>
 <table>
@@ -125,15 +131,17 @@ MatchyPatchy downloads the models into the <i>MatchyPatchy-Share/models</i> dire
 <p>Once you have added a survey, organized the data by station, and downloaded the 
 required models, you are ready to start using MatchyPatchy!</p>
 
+<p><br /></p>
 <hr />
 
+<p><br /></p>
 <h1 id="using-matchypatchy"><a name="usage"></a>Using MatchyPatchy</h1>
 
 <p>To begin using MatchyPatchy to match individuals, select a survey to add camera 
 trap data to, or create a new survey. Then follow the steps in the left column
-of the home screen.</p>
+of the Home page.</p>
 
-<!-- homepage screenshot -->
+<p><img src="/assets/screenshots/home_page.png" style="display: block; margin: auto;" /></p>
 
 <h2 id="1-import-data">1. Import Data</h2>
 <p>MatchyPatchy supports importing raw data from a folder, as well as from a .csv.
@@ -151,12 +159,12 @@ that corresponds to Station from the example path and then press OK.</p>
 
 <!--file tree example -->
 
-<h3 id="from-a-csv">From a .CSV</h3>
+<h3 id="from-a-csv-file">From a .CSV File</h3>
 <p>You can import a pre-processed spreadsheet that contains information about the images.
 MatchyPatchy can accept the following information as columns:</p>
 
 <ul>
-  <li>filepath (full path required)</li>
+  <li>filepath (full local path required)</li>
   <li>timestamp (required)</li>
   <li>station (required)</li>
   <li></li>
@@ -169,11 +177,14 @@ to the images that can be accessed from your machine, timestamps, and
 station names are required fields. If your .csv does not contain a column that 
 conveys the optional information, leave the column selection to “None”.</p>
 
+<p><br /></p>
 <h2 id="2-process">2. Process</h2>
 <p>After importing images by either selecting a folder or .csv file, you must 
 then process the data with AI. MatchyPatchy looks for models in the MatchyPatchy-Share/models
 folder. You can download models from our server by selecting File &gt; Download Models 
 from the menubar.</p>
+
+<p><img src="/assets/screenshots/process.png" style="display: block; margin: auto;" /></p>
 
 <h3 id="calculate-sequence">Calculate Sequence</h3>
 <p>You can optionally check “Calculate Sequence” which will group images together based on 
@@ -186,31 +197,35 @@ length in seconds can be changed in Edit &gt; Configuration</p>
 you must first use MegaDetector to automatically extract Regions of Interest (ROIs) 
 that closely crop to the animal.</p>
 
-<h3 id="match-embedding">Match Embedding</h3>
+<h3 id="re-identification-model">Re-Identification Model</h3>
 <p>In order to calculate potential matches, each ROI has to processed with an 
 embedding extractor such as MiewIDv3.</p>
 
 <h3 id="viewpoint">Viewpoint</h3>
 <p>For some species, we offer a viewpoint model that determines whether the animal
-is facing left or right. MatchyPatchy will then only offer potential matches 
-with the same viewpoint or if no viewpoint is selected for one of the 
+is facing left or right. MatchyPatchy only offers potential matches 
+with the same viewpoint, or if viewpoint information is missing.
 Viewpoint can be manually input or edited in the Media page.</p>
 
+<p><br /></p>
 <h2 id="3-validate">3. Validate</h2>
-<!-- Media Table Screen -->
 
 <p>Before beginning the matching process, we recommend validating the AI output.
 This step will bring you to a table that lists all of the animals identified in
 the images or videos, as well as associated metadata. From here you can verify that 
-each ROI contains a single animal. You can return to the Home screen or continue
-to the Match screen by pressing the corresponding buttons.</p>
+each ROI contains a single animal. You can return to the Home page or continue
+to the Match page by pressing the corresponding buttons.</p>
 
 <p>To view the full images, select “Full Images” from the <b>“Show:”</b> dropdown menu.</p>
+
+<p><img src="/assets/screenshots/media_page.png" style="display: block; margin: auto;" /></p>
 
 <h3 id="editing-the-table">Editing the Table</h3>
 <p>You can edit the table directly by double-clicking a cell and inputing the desired value.
 Certain fields are not editable, such as Filepath and Station (marked with * below).
-You can edit a row by double-clicking on the row number to the left. This will show
+Station names can be changed via the “Manage Stations” button on the Home page.</p>
+
+<p>You can edit a row by double-clicking on the row number to the left. This will show
 a popup that contains the image and metadata, including editable fields.</p>
 
 <p>You can edit multiple images at once by checking the boxes under the “Select” column
@@ -229,91 +244,215 @@ Filters</b>.</p>
 
 <p>The ROIs contain the following information:</p>
 
-<p><u>Filepath*</u><br />
-The local filepath</p>
+<table>
+<tr>
+<td>Filepath*</td>
+<td>The local filepath</td></tr>
 
-<p><u>Timestamp*</u><br /></p>
+<tr><td>Timestamp*</td>
+<td></td></tr>
 
-<p><u>Station*</u><br /></p>
+<tr><td>Station*</td>
+<td></td></tr>
 
-<p><u>Camera*</u><br /></p>
+<tr><td>Camera*</td>
+<td></td></tr>
 
-<p><u>Sequence ID*</u><br /></p>
+<tr><td>Sequence ID*</td>
+<td></td></tr>
 
-<p><u>External ID*</u><br />
-This refers</p>
+<tr><td>External ID*</td>
+<td>This refers to a unique identifier to associate the image with its entry in 
+another database or software.</td></tr>
 
-<p><u>Viewpoint</u><br /></p>
+<tr><td>Viewpoint</td>
+<td></td></tr>
 
-<p><u>Individual</u><br /></p>
+<tr><td>Individual</td>
+<td></td></tr>
 
-<p><u>Sex</u><br /></p>
+<tr><td>Sex</td>
+<td></td></tr>
 
-<p><u>Age</u><br /></p>
+<tr><td>Age</td>
+<td></td></tr>
 
-<p><u>Reviewed</u><br />
-If checked, this ROI was given an ID from the Match screen.</p>
+<tr><td>Reviewed</td>
+<td>If checked, this ROI was given an ID from the Match page.</td></tr>
 
-<p><u>Favorite</u><br />
-If checked, this ROI was marked for future lookup and quality control.</p>
+<tr><td>Favorite</td>
+<td>If checked, this ROI was marked for future lookup and quality control.</td></tr>
 
-<p><u>Comment</u><br />
-This is an editable text field in which you can input any extra information or comments.</p>
+<tr><td>Comment</td>
+<td>This is an editable text field in which you can input any extra information or comments.</td></tr>
+</table>
 
 <p>The Full Images contain the following information:</p>
 
+<table>
+<tr>
+<td>Filepath*</td>
+<td>The local filepath</td></tr>
+
+<tr><td>Timestamp*</td>
+<td></td></tr>
+
+<tr><td>Station*</td>
+<td></td></tr>
+
+<tr><td>Camera*</td>
+<td></td></tr>
+
+<tr><td>Sequence ID*</td>
+<td></td></tr>
+
+<tr><td>External ID*</td>
+<td>This refers to a unique identifier to associate the image with its entry in 
+another database or software.</td></tr>
+
+<tr><td>Comment</td>
+<td>This is an editable text field in which you can input any extra information or comments.</td></tr>
+</table>
+
+<p><br /></p>
 <h2 id="4-match">4. Match</h2>
-<!-- Match Screen -->
+<!-- Match page -->
+
 <p>Once you have validated that each ROI contains a single animal and that all station
 names and viewpoints are correct, select Step 4. Match from the Home page or from within
-the Media page.</p>
+the Media page. This will take you to the Match page, shown below.</p>
 
+<p><img src="/assets/screenshots/match_page.png" style="display: block; margin: auto;" /></p>
+
+<p>The left side of the screen shows an unidentfied Query ROI and its metadata, 
+while the right side shows one of the potential Match ROIs based on the chosen
+Match Embedding model. MatchyPatchy will show potential matches that are of the 
+same viewpoint of the animal, and are not from the same sequence or individual 
+already. Potential match sequences are sorted by the distance between the two 
+ROIs in their vector space in increasing order, with priority given to previously 
+identified images.</p>
+
+<h3 id="navigation">Navigation</h3>
+
+<p>The number of matches for the query sequence and currently displayed match index 
+are displayed above the match image. 
+Move through each potential match for the given query image by pressing 
+the <b>«</b> and <b>»</b> buttons on the Match (right) side or the Left and 
+Right arrow keys on the keyboard.</p>
+
+<p>The box on the far right displays the calculated distance between the two images.
+The smaller the number, the more likely a match.</p>
+
+<p>You can toggle the viewpoint filter to display only left-side or only right-side
+images, assuming viewpoint had been determined for each image prior. You can select 
+all viewpoints by moving the toggle back to the center.</p>
+
+<p><img src="/assets/screenshots/match.png" style="display: block; margin: auto;" /></p>
+
+<p><br />
+Once you have determined which potential matches are confirmed for that sequence, 
+you can move to the next sequence.  Move
+through sequences by pressing the <b>«</b> and <b>»</b> buttons on the left 
+“Query Image:” side or the Up and Down arrow keys on the keyboard. If there are 
+more than one image in a query sequence, you can move through those images by pressing 
+the <b>«</b> and <b>»</b> arrows on the “Sequence:” side.</p>
+
+<p><img src="/assets/screenshots/query.png" style="display: block; margin: auto;" /></p>
+
+<h3 id="making-a-match">Making a Match</h3>
+
+<p>When you believe the image on the right side is a match for the query image on the left,
+select the <b>“Match”</b> button in the center or by pressing “M” on your keyboard. 
+If the match image does not have an individual ID, a popup will appear to allow 
+you to create a new name. If you can tell the animal’s sex and age from the images, 
+you can select that information from the dropdowns at this time as well.</p>
+
+<p><img src="/assets/screenshots/new_match.png" style="display: block; margin: auto;" /></p>
+
+<p>After selecting “OK”, both the Query and Match metadata will update to reflect 
+the new information.</p>
+
+<p>If the Match ROI has already been identified, pressing the “Match” button will 
+apply that name to the Query ROI.</p>
+
+<p>The “Match” button will turn green if the Query and Match ROIs belong to the same 
+individual. Pressing “Match” while it is green will unmatch the images and reset 
+the Query ROI’s identification to None.</p>
+
+<h3 id="distance-metrics">Distance Metrics</h3>
 <p>By default, MatchyPatchy calculates the cosine distance between each embedding vector
 and presents only potential matches with a distance below than 0.5. You can change 
 this threshold using the slider (or input a number directly), as well as calculate
-the L2 distance instead. MatchyPatchy will only show potential matches that are of the 
-same viewpoint of the animal, and are not from the same sequence or individual already.
-Potential match sequences are sorted by distances, with priority given to previously
-identified ROIs.</p>
+the L2 distance instead. Press <b>“Recalculate Matches”</b> to use a different distance 
+metric and/or threshold.</p>
 
-<p>When you believe the image on the right side is a match for the query image on the left,
-select the “Match” button in the center or by pressing “M” on your keyboard. 
-If the match image does not have an individual ID, a popup will appear to allow 
-you to create a new name. If you can tell the animal’s sex and age from the images, 
-you can input that information at this time as well.</p>
+<p>At any point, you can press <b>“Recalculate Matches”</b> to filter out all confirmed 
+matches that have been made so far.</p>
 
-<p>Move through each potential match by pressing the « and » buttons on the Match (right) side
-or the Left and Right arrow keys on the keyboard. Once you have determined which potential
-matches are confirmed for that sequence, you can move to the next sequence.  Move
-through sequences by pressing the « and » buttons on the Query (left) side or 
-the Up and Down arrow keys on the keyboard. At any point, you can press “Recalculate 
-Matches” to filter out all confirmed matches that have been made so far.</p>
+<p><img src="/assets/screenshots/distance.png" style="display: block; margin: auto;" /></p>
 
+<h3 id="quality-control-by-individual">Quality Control by Individual</h3>
+
+<p>You can enter Quality Control mode by pressing the <b>“Quality Control by Individual”</b>
+button. See <a href="#quality-control">Quality Control</a> for more information.</p>
+
+<h3 id="filters">Filters</h3>
+
+<p>You can restrict the search space by a specifc Region, Survey, or even Station.
+Select the desired filter(s) from the dropdown and press <b>“Apply Filters”</b> to 
+recalculate matches within the bounds of those filters.</p>
+
+<p><img src="/assets/screenshots/match_filters.png" style="display: block; margin: auto;" /></p>
+
+<h3 id="image-adjustments">Image Adjustments</h3>
+
+<p>You can adjust the Brightness, Sharpness and Contrast using the sliders below each
+image. To reset the image to its original state, press <b>“Reset”</b>.</p>
+
+<p>To edit the image metadata, press <b>“Edit Image”</b>.</p>
+
+<p>You can open the image in your default image viewer by pressing <b>“Open Image”</b>.</p>
+
+<p>You can mark the image as a “Favorite” by pressing the <b>♥</b> button.</p>
+
+<p><br /></p>
 <h2 id="5-export">5. Export</h2>
-<p>You can export the entire database as a .csv by selecting Step 5. Export. See 
-<a href="#export">Export and Sharing</a> for more information.</p>
+<p>You can export the entire database as a .csv by selecting <b>Step 5. Export</b> on the
+Home page. The .csv file will include local filepaths, timestamps, Survey and Station information,
+bounding boxes, and any Individual information that was added from the Match page.</p>
 
 <h3 id="sharing-a-database">Sharing a Database</h3>
 <p>You can move and share the entire MatchyPatchy-Share directory. Be sure to set 
 the correct path to the directory by selecting Edit &gt; Configuration - Project Directory.
-MatchyPatchy will verify that the</p>
+MatchyPatchy will verify that the database within the directory is compatible with
+the current version of MatchyPatchy.</p>
 
+<p><br /></p>
 <hr />
 
+<p><br /></p>
 <h1 id="quality-control"><a name="quality-control"></a>Quality Control</h1>
 
 <p>After you have identified every image, you can verify the labels by selecting 
-<b>4. Match</b> from the home screen and then selecting <b>Query by Individual</b>.
+<b>4. Match</b> from the Home page and then selecting <b>Quality Control by Individual</b>.
 This will place every named individual in the query cue and put every example image
 for that individual in both the query and match sides. This allows you to compare 
 each example of an individual against each other example to confirm that all belong
 to that individual. It is recommended that viewpoint is determined for all ROIs 
 prior to starting Quality Control.</p>
 
+<p>If an ROI on the Query (left) side is determined to be of a different individual,
+pressing the <b>“Match”</b> button or the “M” key will unmatch it from that individual ID.</p>
+
+<p>In Quality Control mode, a new filter for Individual will appear, allowing you
+to select specific individuals to view and verify.</p>
+
 <!-- screenshot -->
 
+<p><br /></p>
 <hr />
 
+<p><br /></p>
 <h1 id="troubleshooting"><a name="troubleshooting"></a>Troubleshooting</h1>
 <h3 id="importing-from-a-folder">Importing from a Folder</h3>
 
@@ -327,8 +466,10 @@ prior to starting Quality Control.</p>
 
 <p>Individuals</p>
 
+<p><br /></p>
 <hr />
 
+<p><br /></p>
 <h2 class="post-list-heading">Release Notes</h2>
 <ul class="post-list"><li><span class="post-meta">Oct 13, 2025</span>
     <h3>
