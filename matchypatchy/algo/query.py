@@ -371,7 +371,5 @@ class QueryContainer(QObject):
     def unmatch(self):
         """
         Unmatch the current query ROI from the matched ROI
-
-        TODO: HOW TO HANDLE?
         """
-        self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': None}, quiet=False)
+        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None}, quiet=False)
