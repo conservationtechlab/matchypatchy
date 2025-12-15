@@ -88,7 +88,7 @@ class ImportCSVPopup(QDialog):
         self.setLayout(layout)
 
     def _create_field_layout(self, label_text, field_name, items, is_required=False, 
-                            use_separator=False, connect_handler=None):
+                            use_separator=False):
         """
         Helper method to create a field layout with label and combobox.
         
@@ -98,7 +98,6 @@ class ImportCSVPopup(QDialog):
             items: List of items for the combobox
             is_required: Whether to show red asterisk
             use_separator: Whether to use ComboBoxSeparator instead of QComboBox
-            connect_handler: Optional custom handler, otherwise uses generic handler
         
         Returns:
             QHBoxLayout containing the field widgets
@@ -124,11 +123,8 @@ class ImportCSVPopup(QDialog):
         # Store reference
         self.combo_boxes[field_name] = combo
         
-        # Connect handler
-        if connect_handler:
-            combo.currentTextChanged.connect(connect_handler)
-        else:
-            combo.currentTextChanged.connect(lambda: self._generic_select_handler(field_name))
+        # Connect to generic handler using default parameter to capture current value
+        combo.currentTextChanged.connect(lambda _, field=field_name: self._generic_select_handler(field))
         
         field_layout.addWidget(combo)
         return field_layout
