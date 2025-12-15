@@ -12,14 +12,7 @@ COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "e
 
 def fetch_media(mpDB, ids=None):
     """
-    Fetches stations associated with given survey, checks that they have unique names
-    (8) columns; (2) keys
-
-    Args
-        - mpDB
-        - survey_id (int): requested survey id
-    Returns
-        - an inverted dictionary in order to match manifest station names to table id
+    Fetches all media info, converts to dataframe
     """
     if ids:
         ids_str = ', '.join(map(str, ids))
@@ -37,30 +30,9 @@ def fetch_media(mpDB, ids=None):
         return pd.DataFrame()
 
 
-def load_selected_media(self):
-        """
-        Fetch all columns from both `roi` and `media` tables for the selected ROI IDs.
-        """
-        ids_str = ', '.join(map(str, self.ids))
-
-        # Use all_media to get a complete view of each ROI
-        data, col_names = self.mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
-
-        # Create DataFrame
-        df = pd.DataFrame(data, columns=col_names)
-        df = df.replace({float('nan'): None}).reset_index(drop=True)
-
-        return df
-
-
 def fetch_roi(mpDB):
     """
     Fetches roi table, converts to dataframe
-
-    Args
-        - mpDB
-    Returns
-        - an inverted dictionary in order to match manifest station names to table id
     """
     manifest = mpDB.select("roi")
     if manifest:
@@ -75,11 +47,11 @@ def fetch_roi(mpDB):
 
 def fetch_roi_media(mpDB, rids=None, reset_index=True):
     """
-    Fetch Info for Media Table
+    Fetch Combined Roi and Media Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
                 'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-                'comment',  'binomen', 'common', 'name', 'sex', 'age']
+                'comment', 'name', 'sex', 'age']
     """
     if rids:
         ids_str = ', '.join(map(str, rids))
@@ -95,42 +67,8 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     return rois
 
 
-def fetch_roi_thumbnails(mpDB):
-    """
-    Get roi thumbnail paths
-    """
-    thumbnails = mpDB.select("roi_thumbnails", columns="fid, filepath")
-    if thumbnails:
-        thumbnails = pd.DataFrame(thumbnails, columns=["id", "thumbnail_path"])
-    else:
-        thumbnails = pd.DataFrame(columns=["id", "thumbnail_path"])
-    thumbnails = thumbnails.replace({float('nan'): None})
-    
-    return thumbnails
-
-
-def fetch_media_thumbnails(mpDB):
-    """
-    Get media thumbnail paths
-    """
-    thumbnails = mpDB.select("media_thumbnails", columns="fid, filepath")
-    if thumbnails:
-        thumbnails = pd.DataFrame(thumbnails, columns=["id", "thumbnail_path"])
-    else:
-        thumbnails = pd.DataFrame(columns=["id", "thumbnail_path"])
-    thumbnails = thumbnails.replace({float('nan'): None})
-    return thumbnails
-
-
 def fetch_individual(mpDB):
-    """
-    Fetches Individual Table, Converts to DataFrame
-
-    Args
-        - mpDB
-    Returns
-        - dataframe of individual table
-    """
+    """Fetches Individual Table, Converts to DataFrame"""
     individual = mpDB.select("individual")
     if individual:
         return pd.DataFrame(individual, columns=["id", "name", "sex", "age"]).set_index("id")
@@ -142,9 +80,9 @@ def export_data(mpDB):
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-                'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-                'comment', 'binomen', 'common', 'name', 'sex', 'age',
+               'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
+               'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
+               'comment', 'name', 'sex', 'age',
                 'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
     """
     media, column_names = mpDB.all_media()
@@ -160,20 +98,16 @@ def export_data(mpDB):
         return None
 
 
-def get_bbox(roi):
-    """
-    Return the bbox coordinates for a given roi row
-    """
+def get_roi_bbox(roi):
+    """Return the bbox coordinates for a given roi row"""
     if {'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'}.issubset(roi.columns) and \
         roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']].notnull().all(axis=None):
         return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
     return None
 
 
-def get_frame(roi):
-    """
-    Return the frame for a given roi row
-    """
+def get_roi_frame(roi):
+    """Return the frame for a given roi row"""
     if {'frame'}.issubset(roi.columns):
         return roi['frame'].values[0]
     return None
