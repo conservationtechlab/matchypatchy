@@ -3,16 +3,16 @@ Widget for displaying list of Media
 """
 import pandas as pd
 
-from PyQt6.QtWidgets import (QTableWidget, QVBoxLayout, QWidget, QComboBox,
-                             QLabel, QHeaderView, QStyledItemDelegate)
-
+from PyQt6.QtWidgets import (QTableWidget, QVBoxLayout, QWidget, QLabel, QHeaderView)
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.algo import models
+from matchypatchy.algo.models import load_model
 from matchypatchy.algo.table_thread import LoadTableThread
-from matchypatchy.database.media import *
+from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
+from matchypatchy.database.thumbnails import fetch_media_thumbnails, fetch_roi_thumbnails
 from matchypatchy.gui.popup_alert import AlertPopup
+from matchypatchy.gui.gui_assets import ComboBoxDelegate
 
 
 class MediaTable(QWidget):
@@ -26,16 +26,14 @@ class MediaTable(QWidget):
         self.data_filtered = pd.DataFrame()
         self.individual_list = pd.DataFrame()
         self.thumbnails = dict()
-        self.image_loader_thread = None
         self.data_type = 1
-        self.VIEWPOINTS = models.load('VIEWPOINTS')
+        self.VIEWPOINTS = load_model('VIEWPOINTS')
         self.thumbnail_size = 150
 
         self.edit_stack = []
 
         # Set up layout
         layout = QVBoxLayout()
-
         # Create QTableWidget
         self.table = QTableWidget()
         self.table.setColumnCount(17)  # Columns: Thumbnail, Name, and Description
@@ -43,24 +41,25 @@ class MediaTable(QWidget):
                                               "Station", "Camera", "Sequence ID", "External ID",
                                               "Viewpoint", "Individual", "Sex", "Age",
                                               "Reviewed", "Favorite", "Comment"])
-        # self.table.setSortingEnabled(True)  # NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
+        # self.table.setSortingEnabled(True)  # TODO: NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.table.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.table.cellChanged.connect(self.update_entry)  # allow user editing
         self.table.cellChanged.connect(self.handle_checkbox_change)  # select change
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-
         # Add table to the layout
         layout.addWidget(self.table)
         self.setLayout(layout)
 
-        # Connect table.cellchanged to parent
+        # Connect table.cellchanged to Media View
         self.update_signal.connect(parent.handle_table_change)
 
     # RUN ON ENTRY -------------------------------------------------------------
     def load_data(self, data_type):
         """
-        Fetch table, load images and save as thumbnails to TEMP_DIR
+        Fetch table, format, and filter data
+        data_type: 0 = media, 1 = rois
+        Returns True if data loaded, False if no media
         """
         # clear old view
         self.data_type = data_type
@@ -79,9 +78,10 @@ class MediaTable(QWidget):
     def fetch(self):
         """
         Select all media, store in dataframe
+        Merge with thumbnails table
         """
         self.individual_list = fetch_individual(self.mpDB)
-        #TODO check missing thumbnails
+        # TODO check missing thumbnails
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
@@ -92,7 +92,6 @@ class MediaTable(QWidget):
             self.data = fetch_media(self.mpDB)
             self.thumbnails = fetch_media_thumbnails(self.mpDB)
             self.data = pd.merge(self.data, self.thumbnails, on="id")
-            
         # return empty
         else:
             self.data = pd.DataFrame()
@@ -116,31 +115,27 @@ class MediaTable(QWidget):
                             12: "reviewed",
                             13: "favorite",
                             14: "comment"}
-            
-            VIEWPOINT_COLUMN = 8
-            SEX_COLUMN = 10
-            AGE_COLUMN = 11
 
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
                                                   "Station", "Camera", "Sequence ID", "External ID",
                                                   "Viewpoint", "Individual", "Sex", "Age",
                                                   "Reviewed", "Favorite", "Comment"])
-
+            VIEWPOINT_COLUMN = 8
+            SEX_COLUMN = 10
+            AGE_COLUMN = 11
             # VIEWPOINT COMBOS
             combo_items = list(self.VIEWPOINTS.values())[1:]
             self.table.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
-
             # SEX COMBOBOX
             combo_items = ['Unknown', 'Male', 'Female']
             self.table.setItemDelegateForColumn(SEX_COLUMN, ComboBoxDelegate(combo_items, self))
-
             # AGE COMBOBOX
             combo_items = ['Unknown', 'Juvenile', 'Subadult', 'Adult']
             self.table.setItemDelegateForColumn(AGE_COLUMN, ComboBoxDelegate(combo_items, self))
 
-        # MEDIA
-        elif self.data_type == 0:
+        # MEDIA (data_type == 0)
+        else:
             # corresponding mpDB column names
             self.columns = {0: "select",
                             1: "thumbnail",
@@ -158,13 +153,13 @@ class MediaTable(QWidget):
         # adjust widths
         self.table.resizeColumnsToContents()
         for col in range(self.table.columnCount()):
-            if col == 0:
-                self.table.setColumnWidth(0, 40) # select
-            elif col == 1:
-                self.table.setColumnWidth(col, max(self.table.columnWidth(col), 150))
+            if col == 0:  # select
+                self.table.setColumnWidth(0, 40)
+            elif col == 1:  # thumbnail
+                self.table.setColumnWidth(col, max(self.table.columnWidth(col), self.thumbnail_size))
             else:
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
-    
+
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
@@ -178,10 +173,10 @@ class MediaTable(QWidget):
         self.data_filtered = self.data.copy()
         # include user edits to current data_filtered:
         self.apply_edits()
-        # map
+        # map parent filters and valid stations/cameras to local variables
         filters = self.parent.filters
         self.valid_stations = self.parent.valid_stations
-       # self.valid_cameras =  # select all cameras for now
+        # self.valid_cameras =  # select all cameras for now
         self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
 
         # Location Filter (depends on prefilterd stations from MediaDisplay)
@@ -222,11 +217,10 @@ class MediaTable(QWidget):
     # triggered by filter() finishing
     def refresh_table(self, popup=True):
         """
-        Add rows to table
+        Add rows to table by creating LoadTableThread to generate QTableWidgetItems
         """
         # clear old contents and prep for filtered data
         self.table.clearContents()
-
         # if there are any left
         n_rows = self.data_filtered.shape[0]
         if n_rows:
@@ -255,7 +249,7 @@ class MediaTable(QWidget):
     # Set Table Entries --------------------------------------------------------
     def add_cell(self, row, column, qtw):
         """
-        Adds Row to Table with Items from self.data_filtered
+        Connect LoadTableThread signal to add cell to table
         """
         self.table.blockSignals(True)
         if column == 1:
@@ -267,12 +261,14 @@ class MediaTable(QWidget):
             self.table.setItem(row, column, qtw)
 
     def get_checkstate_int(self, item):
+        """Get integer value from checkstate of checkbox item"""
         if (item == Qt.CheckState.Checked):
             return 1
         else:
             return 0
 
     def invert_checkstate(self, item):
+        """Invert checkstate of checkbox item"""
         if item.checkState() == Qt.CheckState.Checked:
             item.setCheckState(Qt.CheckState.Unchecked)
         else:
@@ -295,7 +291,6 @@ class MediaTable(QWidget):
                 self.select_row(row, overwrite=checked)
                 self.parent.check_selected_rows()
 
-    # UPDATE CELL ENTRY
     def update_entry(self, row, column):
         """
         Allows user to edit entry in table
@@ -428,35 +423,3 @@ class MediaTable(QWidget):
 
     def edit_row(self, row):
         self.parent.edit_row(row)
-
-
-# COMBOBOX FOR VIEWPOINT, SEX, AGE ---------------------------------------------
-class ComboBoxDelegate(QStyledItemDelegate):
-    """Custom delegate to use QComboBox for editing"""
-    itemSelected = pyqtSignal(int, int, int)
-
-    def __init__(self, items, parent=None):
-        super().__init__(parent)
-        self.items = items  # ComboBox items
-
-    def createEditor(self, parent, option, index):
-        """Create and return the ComboBox editor"""
-        combo = QComboBox(parent)
-        combo.addItems(self.items)
-        return combo
-
-    def setEditorData(self, editor, index):
-        """Set the current value in the editor"""
-        current_text = index.data()
-        combo_index = editor.findText(current_text)  # Find matching index
-        if combo_index >= 0:
-            editor.setCurrentIndex(combo_index)
-
-    def setModelData(self, editor, model, index):
-        """Save the selected value to the model"""
-        selected_text = editor.currentText()
-        selected_index = editor.currentIndex()  # 🔥 Get the current index
-        self.itemSelected.emit(index.row(), index.column(), selected_index)
-
-        # Save selected text in table model
-        model.setData(index, selected_text)

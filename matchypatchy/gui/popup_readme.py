@@ -1,5 +1,5 @@
 """
-View README
+View README, ABOUT, and LICENSE popups
 
 """
 from matchypatchy import config

@@ -28,18 +28,16 @@ class DisplayMedia(QWidget):
 
         # First Layer ----------------------------------------------------------
         first_layer = QHBoxLayout()
-        # Home Button
+        # Change Views
         first_layer.addSpacing(10)
         button_return = StandardButton("Home")
         button_return.clicked.connect(self.home)
         first_layer.addWidget(button_return, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        button_match = StandardButton("Match")
-        button_match.clicked.connect(self.match)
-        first_layer.addWidget(button_match, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        # Divider
+        button_compare = StandardButton("Compare")
+        button_compare.clicked.connect(self.compare)
+        first_layer.addWidget(button_compare, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         first_layer.addWidget(VerticalSeparator())
+
         # Show Type
         first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.show_type = QComboBox()
@@ -47,8 +45,6 @@ class DisplayMedia(QWidget):
         self.show_type.setCurrentIndex(self.data_type)
         self.show_type.currentIndexChanged.connect(self.change_type)
         first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        # Divider
         first_layer.addWidget(VerticalSeparator())
 
         # Select All
@@ -85,9 +81,7 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addStretch()
-
         layout.addLayout(first_layer)
-
 
         # FILTERS --------------------------------------------------------------
         second_layer = QHBoxLayout()
@@ -108,15 +102,14 @@ class DisplayMedia(QWidget):
         self.media_table = MediaTable(self)
         layout.addWidget(self.media_table, stretch=1)
 
-        # Count Label 
+        # Count Label at Bottom
         self.count_label = QLabel("")
         layout.addWidget(self.count_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.setLayout(layout)
 
-
-    # Return Home Button
     def home(self):
+        """Return to Base View"""
         if len(self.media_table.edit_stack) > 0:
             dialog = AlertPopup(self, prompt="There are unsaved changes. Are you sure you want to return home?")
             if dialog.exec():
@@ -124,25 +117,22 @@ class DisplayMedia(QWidget):
                 del dialog
             else:
                 return
-        # stop thumbnail loader thread and unlock db
-        if self.media_table.image_loader_thread is not None and self.media_table.image_loader_thread.isRunning():
-            self.media_table.image_loader_thread.requestInterruption()
-            self.media_table.image_loader_thread.wait()
-            self.media_table.loading_bar.close()
-            self.parent._set_base_view()
         else:
             self.parent._set_base_view()
 
-    # Move to Match View
-    def match(self):
+    def compare(self):
+        """Go to Compare View"""
         if len(self.media_table.edit_stack) > 0:
             dialog = AlertPopup(self, prompt="There are unsaved changes. Please save before matching.")
             if dialog.exec():
                 del dialog
             return
-        self.parent._set_compare_view()
+        else:
+            self.parent._set_compare_view()
 
-    # FILTERS ------------------------------------------------------------------
+    # =========================================================================
+    # FILTERS
+    # =========================================================================
     def refresh_filters(self, prefilter=None):
         """
         Update Dropdown Lists, Fill Filter Dict
@@ -166,21 +156,26 @@ class DisplayMedia(QWidget):
         self.media_table.filter()
         self.update_count_label()
 
+    # =========================================================================
+    # MEDIA TABLE HANDLERS
+    # =========================================================================
     # 1. RUN ON ENTRY
     def load_table(self):
+        """Load media/roi data into table based on current data_type"""
         # check if there are rois first
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
 
         if media_n == 0:
+            # no media at all
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
                 self.home()
                 del dialog
             return False
-
         else:
             if self.data_type == 1 and roi_n == 0:
+                # no rois, default to full images
                 self.data_type = 0
                 dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
                 if dialog.exec():
@@ -193,9 +188,11 @@ class DisplayMedia(QWidget):
             return True
 
     def update_count_label(self):
+        """Set count label at bottom of media table"""
         self.count_label.setText(f"Total Media: {len(self.media_table.data_filtered)}")
 
     def change_type(self):
+        """Change between full image and ROI view"""
         if len(self.media_table.edit_stack) > 0:
             dialog = AlertPopup(self, prompt="There are unsaved changes. Are you sure you want to change view?")
             cont = dialog.exec()
@@ -223,29 +220,32 @@ class DisplayMedia(QWidget):
         self.check_undo_button()
 
     def save(self):
-        # Undo last edit
+        """Save changes to the media table"""
         self.media_table.save_changes()
         self.check_undo_button()
 
     def undo(self):
-        # Undo last edit
+        """Undo last edit"""
         self.media_table.undo()
         self.check_undo_button()
 
     def check_undo_button(self):
+        """Enable/Disable Undo button based on edit stack"""
         if len(self.media_table.edit_stack) > 0:
             self.button_undo.setEnabled(True)
         else:
             self.button_undo.setEnabled(False)
 
     def update_buttons(self):
+        """Enable/Disable Edit, Duplicate, Delete buttons based on selection and mode"""
         has_selection = len(self.media_table.selectedRows()) > 0
         # Only allow edit in ROI mode
         self.button_edit.setEnabled(has_selection)
-        #self.button_duplicate.setEnabled(has_selection)
+        # self.button_duplicate.setEnabled(has_selection)
         self.button_delete.setEnabled(has_selection)
 
     def edit_row(self, row):
+        """Edit a single row"""
         # EDIT ROI
         ext = self.media_table.data_filtered.at[row, "ext"]
         if self.data_type == 1:
@@ -253,7 +253,7 @@ class DisplayMedia(QWidget):
                 # only show single roi
                 data = self.media_table.data_filtered.iloc[[row]]
                 current_image_index = 0
-            else: 
+            else:
                 # TODO Only show multiple frames if selected
                 # display frames as well as video
                 mid = int(self.media_table.data_filtered.at[row, "media_id"])
@@ -264,12 +264,12 @@ class DisplayMedia(QWidget):
                     # clear columns so row registers as video
                     if col in ['frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']:
                         video_row.at[video_row.index[0], col] = None
-                data = pd.concat([video_row, data], ignore_index=True)           
+                data = pd.concat([video_row, data], ignore_index=True)
         else:
             # full image mode/video only mode
             data = self.media_table.data_filtered.iloc[[row]]
             current_image_index = 0
-    
+
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
@@ -283,6 +283,7 @@ class DisplayMedia(QWidget):
                 self.load_table()
 
     def edit_row_multiple(self):
+        """Edit multiple selected rows"""
         selected_rows = self.media_table.selectedRows()
         data = self.media_table.data_filtered.iloc[selected_rows]
         current_image_index = 0
@@ -295,23 +296,25 @@ class DisplayMedia(QWidget):
             del dialog
             # reload data
             self.load_table()
-        
+        # update buttons and count
         self.update_buttons()
         self.update_count_label()
 
     def select_all(self, reset=False):
+        """Select all rows in the media table"""
         if reset:
             for row in range(self.media_table.table.rowCount()):
                 self.media_table.select_row(row, overwrite=False)
-        else:  #toggle based on select all button
+        else:  # toggle based on select all button
             for row in range(self.media_table.table.rowCount()):
                 self.media_table.select_row(row, overwrite=self.button_select.isChecked())
 
     def check_selected_rows(self):
+        """Enable/Disable Edit, Duplicate, Delete buttons based on selection"""
         self.selected_rows = self.media_table.selectedRows()
         if len(self.selected_rows) > 0:
             self.button_edit.setEnabled(True)
-            #self.button_duplicate.setEnabled(True)
+            # self.button_duplicate.setEnabled(True)
             self.button_delete.setEnabled(True)
         else:
             self.button_edit.setEnabled(False)
@@ -332,6 +335,7 @@ class DisplayMedia(QWidget):
                 del dialog
 
     def delete(self):
+        """Delete selected rows from database"""
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"""Are you sure you want to delete {len(self.selected_rows)} files? This cannot be undone.""", title="Warning")
             if dialog.exec():

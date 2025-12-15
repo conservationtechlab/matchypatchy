@@ -61,6 +61,7 @@ class ImportFolderPopup(QDialog):
 
     # 1. Run Thread on entry
     def build_manifest(self):
+        """Start thread to build manifest from folder"""
         # show progress bar
         self.progress_bar.setRange(0, 0)
         self.build_thread = BuildManifestThread(self.directory)
@@ -69,6 +70,7 @@ class ImportFolderPopup(QDialog):
 
     # 2. Receive data from thread, check if valid
     def get_manifest(self, manifest):
+        """Receive manifest from thread, proceed or alert no images found"""
         self.progress_bar.hide()
         self.data = manifest
 
@@ -79,8 +81,9 @@ class ImportFolderPopup(QDialog):
             if dialog.exec():
                 self.reject()
 
-    # 3. Offer
+    # 3. Offer Station Options
     def get_options(self):
+        """Offer options for station level selection"""
         self.label.setText("Select a level in the directory hierarchy that corresponds to station, if available:")
         self.station.show()
         self.buttonBox.show()

@@ -1,5 +1,5 @@
 """
-Creat or edit station
+Popups to create or edit station
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QListWidget, QLineEdit, QLabel, QDialogButtonBox)
@@ -13,7 +13,7 @@ class StationPopup(QDialog):
         self.setWindowTitle("Manage stations")
         self.mpDB = parent.mpDB
         self.survey_id = active_survey
-        
+
         layout = QVBoxLayout()
         # station LIST
         self.list = QListWidget()
@@ -23,7 +23,6 @@ class StationPopup(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-
         button_new = QPushButton("New")
         self.button_edit = QPushButton("Edit")
         self.button_del = QPushButton("Delete")
@@ -48,16 +47,18 @@ class StationPopup(QDialog):
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
-
+        # initial load
         self.update()
 
     def set_editdel(self):
+        """Set edit/delete button enabled state"""
         # currentRow() returns -1 if nothing selected
         flag = bool(self.list.currentRow() + 1)
         self.button_edit.setEnabled(flag)
         self.button_del.setEnabled(flag)
 
     def update(self):
+        """Update station list from DB"""
         self.list.clear()
         cond = f'survey_id={self.survey_id[0]}'
         self.station_list_ordered = self.mpDB.select("station", columns="id, name", row_cond=cond)
@@ -67,6 +68,7 @@ class StationPopup(QDialog):
         self.set_editdel()
 
     def add(self):
+        """Add new station"""
         dialog = StationFillPopup(self)
         if dialog.exec():
             self.mpDB.add_station(dialog.get_name(), dialog.get_lat(),
@@ -75,6 +77,7 @@ class StationPopup(QDialog):
         self.stations = self.update()
 
     def edit(self):
+        """Edit selected station"""
         selected_station = self.list.currentRow()
         id = self.station_list_ordered[selected_station][0]
         cond = f'id={id}'
@@ -87,6 +90,7 @@ class StationPopup(QDialog):
         self.stations = self.update()
 
     def delete(self):
+        """Delete selected station"""
         selected = self.list.currentItem().text()
         dialog = AlertPopup(self, f'Are you sure you want to delete {selected}?')
         if dialog.exec():
@@ -100,9 +104,7 @@ class StationFillPopup(QDialog):
     def __init__(self, parent, name="", lat="", long=""):
         super().__init__(parent)
         self.setWindowTitle("Edit station")
-
         layout = QVBoxLayout()
-
         title = QLabel(f'Edit station for {parent.survey_id[1]}',
                        objectName='title', alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
