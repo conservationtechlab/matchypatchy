@@ -20,17 +20,23 @@ class ImportCSVPopup(QDialog):
         self.columns = ["None"] + list(self.data.columns)
         self.survey_columns = [str(parent.active_survey[1])] + list(self.data.columns)
 
-        self.selected_filepath = self.columns[0]
-        self.selected_timestamp = self.columns[0]
-        self.selected_station = self.columns[0]
-        self.selected_survey = self.survey_columns[0]
-        self.selected_region = self.columns[0]
-        self.selected_sequence_id = self.columns[0]
-        self.selected_external_id = self.columns[0]
-        self.selected_viewpoint = self.columns[0]
-        self.selected_species = self.columns[0]
-        self.selected_individual = self.columns[0]
-        self.selected_comment = self.columns[0]
+        # Initialize selected fields using a dictionary for cleaner code
+        self.selected_fields = {
+            'filepath': self.columns[0],
+            'timestamp': self.columns[0],
+            'station': self.columns[0],
+            'survey': self.survey_columns[0],
+            'region': self.columns[0],
+            'sequence_id': self.columns[0],
+            'external_id': self.columns[0],
+            'viewpoint': self.columns[0],
+            'species': self.columns[0],
+            'individual': self.columns[0],
+            'comment': self.columns[0]
+        }
+        
+        # Store references to combo boxes for easy access
+        self.combo_boxes = {}
 
         self.setWindowTitle("Import from CSV")
         layout = QVBoxLayout()
@@ -40,128 +46,29 @@ class ImportCSVPopup(QDialog):
         layout.addWidget(self.label)
         layout.addSpacing(5)
 
-        # Filepath
-        filepath_layout = QHBoxLayout()
-        filepath_layout.addWidget(QLabel("Filepath:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        filepath_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.filepath = QComboBox()
-        self.filepath.addItems(self.columns)
-        self.filepath.currentTextChanged.connect(self.select_filepath)
-        filepath_layout.addWidget(self.filepath)
-        layout.addLayout(filepath_layout)
-        layout.addSpacing(5)
+        # Define field configurations: (label, field_name, is_required, use_separator)
+        field_configs = [
+            ("Filepath:", "filepath", True, False),
+            ("Timestamp:", "timestamp", True, False),
+            ("Survey:", "survey", True, True),  # Special: uses separator
+            ("Station:", "station", True, False),
+            ("Region:", "region", False, False),
+            ("Sequence ID:", "sequence_id", False, False),
+            ("External ID:", "external_id", False, False),
+            ("Viewpoint:", "viewpoint", False, False),
+            ("Species:", "species", False, False),
+            ("Individual:", "individual", False, False),
+            ("Comment:", "comment", False, False),
+        ]
 
-        # Timestamp
-        timestamp_layout = QHBoxLayout()
-        timestamp_layout.addWidget(QLabel("Timestamp:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        timestamp_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.timestamp = QComboBox()
-        self.timestamp.addItems(self.columns)
-        self.timestamp.currentTextChanged.connect(self.select_timestamp)
-        timestamp_layout.addWidget(self.timestamp)
-        layout.addLayout(timestamp_layout)
-        layout.addSpacing(5)
-
-        # Survey
-        survey_layout = QHBoxLayout()
-        survey_layout.addWidget(QLabel("Survey:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        survey_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.survey = ComboBoxSeparator()
-        self.survey.addItem(str(parent.active_survey[1]))
-        self.survey.add_separator()
-        self.survey.addItems(self.columns)
-        self.survey.currentTextChanged.connect(self.select_survey)
-        survey_layout.addWidget(self.survey)
-        layout.addLayout(survey_layout)
-        layout.addSpacing(5)
-
-        # station
-        station_layout = QHBoxLayout()
-        station_layout.addWidget(QLabel("Station:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        station_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.station = QComboBox()
-        self.station.addItems(self.columns)
-        self.station.currentTextChanged.connect(self.select_station)
-        station_layout.addWidget(self.station)
-        layout.addLayout(station_layout)
-        layout.addSpacing(5)
-
-        # Region
-        region_layout = QHBoxLayout()
-        region_layout.addWidget(QLabel("Region:"))
-        self.region = QComboBox()
-        self.region.addItems(self.columns)
-        self.region.currentTextChanged.connect(self.select_region)
-        region_layout.addWidget(self.region)
-        layout.addLayout(region_layout)
-        layout.addSpacing(5)
-
-        # Sequence
-        sequence_layout = QHBoxLayout()
-        sequence_layout.addWidget(QLabel("Sequence ID:"))
-        self.sequence_id = QComboBox()
-        self.sequence_id.addItems(self.columns)
-        self.sequence_id.currentTextChanged.connect(self.select_sequence)
-        sequence_layout.addWidget(self.sequence_id)
-        layout.addLayout(sequence_layout)
-        layout.addSpacing(5)
-
-        # External ID
-        external_layout = QHBoxLayout()
-        external_layout.addWidget(QLabel("External ID:"))
-        self.external_id = QComboBox()
-        self.external_id.addItems(self.columns)
-        self.external_id.currentTextChanged.connect(self.select_external)
-        external_layout.addWidget(self.external_id)
-        layout.addLayout(external_layout)
-        layout.addSpacing(5)
-
-        # Viewpoint
-        viewpoint_layout = QHBoxLayout()
-        viewpoint_layout.addWidget(QLabel("Viewpoint:"))
-        self.viewpoint = QComboBox()
-        self.viewpoint.addItems(self.columns)
-        self.viewpoint.currentTextChanged.connect(self.select_viewpoint)
-        viewpoint_layout.addWidget(self.viewpoint)
-        layout.addLayout(viewpoint_layout)
-        layout.addSpacing(5)
-
-        # Species
-        species_layout = QHBoxLayout()
-        species_layout.addWidget(QLabel("Species:"))
-        self.species = QComboBox()
-        self.species.addItems(self.columns)
-        self.species.currentTextChanged.connect(self.select_species)
-        species_layout.addWidget(self.species)
-        layout.addLayout(species_layout)
-        layout.addSpacing(5)
-
-        # Individual
-        individual_layout = QHBoxLayout()
-        individual_layout.addWidget(QLabel("Individual:"))
-        self.individual = QComboBox()
-        self.individual.addItems(self.columns)
-        self.individual.currentTextChanged.connect(self.select_individual)
-        individual_layout.addWidget(self.individual)
-        layout.addLayout(individual_layout)
-        layout.addSpacing(5)
-
-        # Comment
-        comment_layout = QHBoxLayout()
-        comment_layout.addWidget(QLabel("Comment:"))
-        self.comment = QComboBox()
-        self.comment.addItems(self.columns)
-        self.comment.currentTextChanged.connect(self.select_sequence)
-        comment_layout.addWidget(self.comment)
-        layout.addLayout(comment_layout)
+        # Create all field layouts using the helper method
+        for label_text, field_name, is_required, use_separator in field_configs:
+            items = self.survey_columns if field_name == 'survey' else self.columns
+            field_layout = self._create_field_layout(
+                label_text, field_name, items, is_required, use_separator
+            )
+            layout.addLayout(field_layout)
+            layout.addSpacing(5)
 
         # Ok/Cancel
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
@@ -180,91 +87,118 @@ class ImportCSVPopup(QDialog):
 
         self.setLayout(layout)
 
-    # would this be better as a switch statement? probably
-    def select_filepath(self):
-        try:
-            self.selected_filepath = self.columns[self.filepath.currentIndex()]
-            self.check_ok_button()
-            return True
-        except IndexError:
-            return False
-
-    def select_timestamp(self):
-        try:
-            self.selected_timestamp = self.columns[self.timestamp.currentIndex()]
-            self.check_ok_button()
-            return True
-        except IndexError:
-            return False
-
-    def select_survey(self):
-        if self.survey.currentIndex() == 0:
-            self.selected_survey = ["active_survey", self.survey_columns[self.survey.currentIndex()]]
-            return True
+    def _create_field_layout(self, label_text, field_name, items, is_required=False, 
+                            use_separator=False, connect_handler=None):
+        """
+        Helper method to create a field layout with label and combobox.
+        
+        Args:
+            label_text: Text for the label
+            field_name: Key for storing the combobox reference
+            items: List of items for the combobox
+            is_required: Whether to show red asterisk
+            use_separator: Whether to use ComboBoxSeparator instead of QComboBox
+            connect_handler: Optional custom handler, otherwise uses generic handler
+        
+        Returns:
+            QHBoxLayout containing the field widgets
+        """
+        field_layout = QHBoxLayout()
+        field_layout.addWidget(QLabel(label_text))
+        
+        if is_required:
+            asterisk = QLabel("*")
+            asterisk.setStyleSheet("QLabel { color : red; }")
+            field_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
+        
+        # Create combobox
+        if use_separator:
+            combo = ComboBoxSeparator()
+            combo.addItem(items[0])
+            combo.add_separator()
+            combo.addItems(items[1:])
         else:
-            try:
-                self.selected_survey = self.survey_columns[self.survey.currentIndex()]
+            combo = QComboBox()
+            combo.addItems(items)
+        
+        # Store reference
+        self.combo_boxes[field_name] = combo
+        
+        # Connect handler
+        if connect_handler:
+            combo.currentTextChanged.connect(connect_handler)
+        else:
+            combo.currentTextChanged.connect(lambda: self._generic_select_handler(field_name))
+        
+        field_layout.addWidget(combo)
+        return field_layout
+
+    def _generic_select_handler(self, field_name):
+        """
+        Generic handler for field selection that works for most fields.
+        
+        Args:
+            field_name: The key in selected_fields dictionary
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            combo = self.combo_boxes[field_name]
+            
+            # Special handling for survey field
+            if field_name == 'survey':
+                if combo.currentIndex() == 0:
+                    self.selected_fields['survey'] = ["active_survey", self.survey_columns[0]]
+                else:
+                    self.selected_fields['survey'] = self.survey_columns[combo.currentIndex()]
                 self.check_ok_button()
                 return True
-            except IndexError:
-                return False
+            
+            # Standard handling for other fields
+            self.selected_fields[field_name] = self.columns[combo.currentIndex()]
+            
+            # Check button state for required fields
+            if field_name in ['filepath', 'timestamp', 'station']:
+                self.check_ok_button()
+            
+            return True
+        except IndexError:
+            return False
+
+    # Legacy methods for backward compatibility - they now delegate to generic handler
+    def select_filepath(self):
+        return self._generic_select_handler('filepath')
+
+    def select_timestamp(self):
+        return self._generic_select_handler('timestamp')
+
+    def select_survey(self):
+        return self._generic_select_handler('survey')
 
     def select_station(self):
-        try:
-            self.selected_station = self.columns[self.station.currentIndex()]
-            self.check_ok_button()
-            return True
-        except IndexError:
-            return False
+        return self._generic_select_handler('station')
 
     def select_region(self):
-        try:
-            self.selected_region = self.columns[self.region.currentIndex()]
-            return True
-        except IndexError:
-            return False
+        return self._generic_select_handler('region')
 
     def select_sequence(self):
-        try:
-            self.selected_sequence_id = self.columns[self.sequence_id.currentIndex()]
-            return True
-        except IndexError:
-            return False
+        return self._generic_select_handler('sequence_id')
 
     def select_external(self):
-        try:
-            self.selected_external_id = self.columns[self.external_id.currentIndex()]
-            return True
-        except IndexError:
-            return False
+        return self._generic_select_handler('external_id')
 
     def select_viewpoint(self):
-        try:
-            self.selected_viewpoint = self.columns[self.viewpoint.currentIndex()]
-            return True
-        except IndexError:
-            return False
+        return self._generic_select_handler('viewpoint')
 
     def select_species(self):
-        try:
-            self.selected_species = self.columns[self.species.currentIndex()]
-            return True
-        except IndexError:
-            return False
+        return self._generic_select_handler('species')
 
     def select_individual(self):
-        try:
-            self.selected_individual = self.columns[self.individual.currentIndex()]
-            return True
-        except IndexError:
-            return False
+        return self._generic_select_handler('individual')
 
     def select_comment(self):
-        try:
-            self.selected_comment = self.columns[self.comment.currentIndex()]
-            return True
-        except IndexError:
-            return False
+        return self._generic_select_handler('comment')
 
     def check_ok_button(self):
         """
@@ -273,24 +207,16 @@ class ImportCSVPopup(QDialog):
         Must include filepath, timestamp, station
         """
         self.select_survey()
-        if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
-           (self.selected_station != "None") and (self.selected_survey != "None"):
+        if (self.selected_fields['filepath'] != "None" and 
+            self.selected_fields['timestamp'] != "None" and
+            self.selected_fields['station'] != "None" and 
+            self.selected_fields['survey'] != "None"):
             self.okButton.setEnabled(True)
         else:
             self.okButton.setEnabled(False)
 
     def collate_selections(self):
-        return {"filepath": self.selected_filepath,
-                "timestamp": self.selected_timestamp,
-                "survey": self.selected_survey,
-                "station": self.selected_station,
-                "region": self.selected_region,
-                "sequence_id": self.selected_sequence_id,
-                "external_id": self.selected_external_id,
-                "viewpoint": self.selected_viewpoint,
-                "species": self.selected_species,
-                "individual": self.selected_individual,
-                "comment": self.selected_comment}
+        return self.selected_fields.copy()
 
     def import_manifest(self):
         """
