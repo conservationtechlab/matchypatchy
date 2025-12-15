@@ -19,7 +19,9 @@ def resource_path(relative_path):
 
 
 def initiate():
-    # check if cfg exists, load
+    """
+    Initiate configuration file with default values if not present
+    """
     default_cfg = {
         'HOME_DIR': str(HOME_DIR),
         'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
@@ -71,6 +73,7 @@ def initiate():
 
 
 def load_cfg(key=None):
+    """Load configuration file, return whole dict or particular key"""
     CONFIG_PATH = HOME_DIR / '.config.yml'
     # Load the config into a dict
     with open(CONFIG_PATH, 'r') as cfg_file:
@@ -82,6 +85,7 @@ def load_cfg(key=None):
 
 
 def add(key_dict, quiet=False):
+    """Add new key(s) to config file"""
     CONFIG_PATH = HOME_DIR / '.config.yml'
     # Load the config into a dict
     with open(CONFIG_PATH, 'r') as cfg_file:
@@ -97,6 +101,7 @@ def add(key_dict, quiet=False):
 
 
 def update(new_cfg):
+    """Update config file with new values from dict"""
     CONFIG_PATH = HOME_DIR / '.config.yml'
     # Update the yaml with new values
     with open(CONFIG_PATH, 'w') as cfg_file:
