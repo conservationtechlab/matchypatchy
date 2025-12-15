@@ -52,7 +52,6 @@ class ImportCSVPopup(QDialog):
         filepath_layout.addWidget(self.filepath)
         layout.addLayout(filepath_layout)
         layout.addSpacing(5)
-
         # Timestamp
         timestamp_layout = QHBoxLayout()
         timestamp_layout.addWidget(QLabel("Timestamp:"))
@@ -65,7 +64,6 @@ class ImportCSVPopup(QDialog):
         timestamp_layout.addWidget(self.timestamp)
         layout.addLayout(timestamp_layout)
         layout.addSpacing(5)
-
         # Survey
         survey_layout = QHBoxLayout()
         survey_layout.addWidget(QLabel("Survey:"))
@@ -80,8 +78,7 @@ class ImportCSVPopup(QDialog):
         survey_layout.addWidget(self.survey)
         layout.addLayout(survey_layout)
         layout.addSpacing(5)
-
-        # station
+        # Station
         station_layout = QHBoxLayout()
         station_layout.addWidget(QLabel("Station:"))
         asterisk = QLabel("*")
@@ -93,7 +90,6 @@ class ImportCSVPopup(QDialog):
         station_layout.addWidget(self.station)
         layout.addLayout(station_layout)
         layout.addSpacing(5)
-
         # Region
         region_layout = QHBoxLayout()
         region_layout.addWidget(QLabel("Region:"))
@@ -103,7 +99,6 @@ class ImportCSVPopup(QDialog):
         region_layout.addWidget(self.region)
         layout.addLayout(region_layout)
         layout.addSpacing(5)
-
         # Camera
         camera_layout = QHBoxLayout()
         camera_layout.addWidget(QLabel("Camera:"))
@@ -113,7 +108,6 @@ class ImportCSVPopup(QDialog):
         camera_layout.addWidget(self.camera)
         layout.addLayout(camera_layout)
         layout.addSpacing(5)
-
         # Sequence
         sequence_layout = QHBoxLayout()
         sequence_layout.addWidget(QLabel("Sequence ID:"))
@@ -123,7 +117,6 @@ class ImportCSVPopup(QDialog):
         sequence_layout.addWidget(self.sequence_id)
         layout.addLayout(sequence_layout)
         layout.addSpacing(5)
-
         # External ID
         external_layout = QHBoxLayout()
         external_layout.addWidget(QLabel("External ID:"))
@@ -133,7 +126,6 @@ class ImportCSVPopup(QDialog):
         external_layout.addWidget(self.external_id)
         layout.addLayout(external_layout)
         layout.addSpacing(5)
-
         # Viewpoint
         viewpoint_layout = QHBoxLayout()
         viewpoint_layout.addWidget(QLabel("Viewpoint:"))
@@ -143,7 +135,6 @@ class ImportCSVPopup(QDialog):
         viewpoint_layout.addWidget(self.viewpoint)
         layout.addLayout(viewpoint_layout)
         layout.addSpacing(5)
-
         # Individual
         individual_layout = QHBoxLayout()
         individual_layout.addWidget(QLabel("Individual:"))
@@ -153,7 +144,6 @@ class ImportCSVPopup(QDialog):
         individual_layout.addWidget(self.individual)
         layout.addLayout(individual_layout)
         layout.addSpacing(5)
-
         # Comment
         comment_layout = QHBoxLayout()
         comment_layout.addWidget(QLabel("Comment:"))
@@ -282,6 +272,7 @@ class ImportCSVPopup(QDialog):
             self.okButton.setEnabled(False)
 
     def collate_selections(self):
+        """Collate selected columns into a dictionary"""
         return {"filepath": self.selected_filepath,
                 "timestamp": self.selected_timestamp,
                 "survey": self.selected_survey,

@@ -8,11 +8,10 @@ Display Pages:
     1. DisplayMedia
     2. DisplayCompare
 """
-import sys
 import logging
 from typing import Optional
 
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction, QGuiApplication
 
@@ -28,13 +27,13 @@ from matchypatchy.gui.popup_station import StationPopup
 
 from matchypatchy.database.media import export_data
 
+
 class MainWindow(QMainWindow):
     def __init__(self, mpDB):
         super().__init__()
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
         screen_resolution = QGuiApplication.primaryScreen().geometry()
-        #print(screen_resolution)
         self.setMinimumSize(1200, 900)
         # resize to full screen if small screen
         if screen_resolution.width() < 1600:
@@ -45,7 +44,6 @@ class MainWindow(QMainWindow):
         # Create container
         container = QWidget(self)
         container.setFocus()
-
         # Create Page Views
         self.Base = DisplayBase(self)
         self.Media = DisplayMedia(self)
@@ -54,7 +52,6 @@ class MainWindow(QMainWindow):
         self.pages.addWidget(self.Base)
         self.pages.addWidget(self.Media)
         self.pages.addWidget(self.Compare)
-
         # Set the layout for the window
         container.setLayout(self.pages)
         self._set_base_view()
@@ -127,7 +124,7 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(0)
         self.Base.setFocus()
 
-    def _set_media_view(self, filters: Optional[dict]=None):
+    def _set_media_view(self, filters: Optional[dict] = None):
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
         self.Media.refresh_filters(filters)
@@ -139,7 +136,7 @@ class MainWindow(QMainWindow):
         self.Compare.setFocus()
         self.Compare.refresh_filters()
         self.Compare.calculate_neighbors()
- 
+
     # FILE =====================================================================
     def new(self):
         pass
@@ -155,7 +152,7 @@ class MainWindow(QMainWindow):
         if data is not None:
             file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
             if file_path:
-              # add csv if user didnt enter
+                # add csv if user didnt enter
                 if not file_path.endswith(".csv"):
                     file_path += ".csv"
 
@@ -171,7 +168,6 @@ class MainWindow(QMainWindow):
         dialog = MLDownloadPopup(self)
         if dialog.exec():
             del dialog
-
 
     # EDIT =====================================================================
     def edit_config(self):
@@ -195,48 +191,23 @@ class MainWindow(QMainWindow):
     def manage_media(self):
         self._set_media_view()
 
-
     # VIEW =====================================================================
-    
-        
+
     # HELP =====================================================================
     def about(self):
+        """Open About Popup"""
         dialog = AboutPopup(self)
         if dialog.exec():
             del dialog
 
     def help(self):
+        """Open README Popup"""
         dialog = READMEPopup(self)
         if dialog.exec():
             del dialog
 
     def license(self):
+        """Open License Popup"""
         dialog = LicensePopup(self)
         if dialog.exec():
             del dialog
-
-
-# ==============================================================================
-# MAIN FUNCTION 
-# ==============================================================================
-def main_display(mpDB, warning=None):
-    """
-    Launch GUI
-
-    Args:
-        mpDB: matchypatchy database object
-    """
-    app = QApplication(sys.argv)
-    window = MainWindow(mpDB)
-    window.show()
-    
-    if warning:
-        dialog = AlertPopup(window, prompt=warning)
-        if dialog.exec():
-            del dialog
-
-    sys.exit(app.exec())
-
-
-if __name__ == "__main__":
-    main_display()

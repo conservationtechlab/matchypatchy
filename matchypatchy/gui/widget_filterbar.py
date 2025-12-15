@@ -1,11 +1,17 @@
+"""
+Filterbar Widget for MatchyPatchy GUI
+"""
 
-from PyQt6.QtWidgets import (QWidget, QLabel, QHBoxLayout, QSizePolicy, 
-                             QCheckBox, QComboBox)
+from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QSizePolicy, QCheckBox, QComboBox
 from PyQt6.QtGui import QStandardItemModel
 from PyQt6.QtCore import Qt
 
 
 class FilterBar(QWidget):
+    """
+    Filter bar widget for selecting filters in MatchyPatchy GUI
+    Default combobox size is 200px, can be adjusted via size parameter.
+    """
     def __init__(self, parent, size=200):
         super().__init__(parent)
         self.mpDB = parent.mpDB
@@ -14,7 +20,6 @@ class FilterBar(QWidget):
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
 
         layout = QHBoxLayout()
-
         # Filter label
         layout.addWidget(QLabel("Filter:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
@@ -38,7 +43,7 @@ class FilterBar(QWidget):
         self.viewpoint_select = FilterBox(self.viewpoint_list_ordered, self.size)
         self.viewpoint_select.currentIndexChanged.connect(self.select_viewpoint)
         layout.addWidget(self.viewpoint_select, alignment=Qt.AlignmentFlag.AlignLeft)
-        # individual
+        # Individual
         self.individual_list_ordered = [(0, 'Individual')]
         self.individual_select = FilterBox(self.individual_list_ordered, self.size)
         self.individual_select.currentIndexChanged.connect(self.select_individual)
@@ -85,13 +90,12 @@ class FilterBar(QWidget):
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
                         'active_station': self.station_list_ordered[self.station_select.currentIndex()],
                         'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
-                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],}
-        
+                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()]}
+
         if prefilter:
             if 'individual_id' in prefilter.keys():
                 self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
                 self.individual_select.setCurrentIndex(prefilter['individual_id'])
-
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
@@ -123,6 +127,7 @@ class FilterBar(QWidget):
         self.favorites_only = not self.favorites_only
 
     def filter_surveys(self):
+        """Filter surveys based on active region"""
         # block signals while updating combobox
         self.survey_select.blockSignals(True)
         self.survey_select.clear()
@@ -139,13 +144,13 @@ class FilterBar(QWidget):
         self.survey_select.blockSignals(False)
 
     def filter_stations(self, survey_ids=None):
+        """Filter stations based on active survey(s)"""
         # block signals while updating combobox
         self.station_select.blockSignals(True)
         self.station_select.clear()
         if survey_ids:
             survey_list = ",".join([str(s[0]) for s in survey_ids])
             selection = f'survey_id IN ({survey_list})'
-
             self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection, quiet=False))
         else:
             self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
@@ -156,30 +161,33 @@ class FilterBar(QWidget):
         self.station_select.blockSignals(False)
 
     def get_filters(self):
+        """Return current filter selections as a dictionary"""
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
                         'active_station': self.station_list_ordered[self.station_select.currentIndex()],
                         'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
-                        'favorites_only': self.favorites_only,}
+                        'favorites_only': self.favorites_only}
         return self.filters
 
     def get_valid_stations(self):
         return self.valid_stations
-    
+
     def viewpoint_visible(self, visible: bool):
+        """Set viewpoint combobox visibility"""
         self.viewpoint_select.setVisible(visible)
 
     def individual_visible(self, visible: bool):
+        """Set individual combobox visibility"""
         self.individual_select.setVisible(visible)
 
     def unidentified_visible(self, visible: bool):
-        # unidentified checkbox visibility
+        """Set unidentified checkbox visibility"""
         self.unidentified.setVisible(visible)
 
     def favorites_visible(self, visible: bool):
-        # favorites checkbox visibility
+        """Set favorites checkbox visibility"""
         self.favorites.setVisible(visible)
 
 

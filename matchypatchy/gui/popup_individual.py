@@ -19,8 +19,7 @@ class IndividualPopup(QDialog):
         self.mpDB = parent.mpDB
 
         layout = QVBoxLayout()
-
-        # INDIVIDUALS
+        # Individuals Table
         self.list = QTableWidget()
         self.list.setColumnCount(2)
         self.list.setHorizontalHeaderLabels(['Name', 'Number of Images'])
@@ -53,48 +52,50 @@ class IndividualPopup(QDialog):
         self.update()
 
     def set_editview(self):
+        """Enable/disable edit and view buttons based on selection"""
         # currentRow() returns -1 if nothing selected
         flag = bool(self.list.currentRow() + 1)
         self.button_edit.setEnabled(flag)
         self.button_view.setEnabled(flag)
 
     def update(self):
+        """Update table with individuals from database"""
         self.individuals = self.mpDB._command("""SELECT individual.name, individual.id, COUNT(roi.individual_id) AS count
                                                  FROM individual LEFT JOIN roi ON roi.individual_id = individual.id
                                                  GROUP BY roi.individual_id;""")
+        # get unidentified count
         self.nulls = self.mpDB.select("roi", "COUNT(*)", row_cond="individual_id IS NULL")[0][0]
         self.list.setRowCount(len(self.individuals) + 1)
-
+        # Add unidentified row
         self.list.setItem(0, 0, QTableWidgetItem("Unidentified"))
         self.list.setItem(0, 1, QTableWidgetItem(str(self.nulls)))
-
         # Add data to rows
         for row in range(len(self.individuals)):
             self.list.setItem(row + 1, 0, QTableWidgetItem(self.individuals[row][0]))
             self.list.setItem(row + 1, 1, QTableWidgetItem(str(self.individuals[row][2])))
 
     def edit(self):
+        """Edit selected individual"""
         # cannot edit unidentified
         if self.list.currentRow() == 0:
             return
 
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
-
-
         id, name, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
-
+        # open edit dialog with current values
         dialog = IndividualFillPopup(self, name=name, sex=sex, age=age)
         if dialog.exec():
             replace_dict = {"name": dialog.get_name(),
                             "sex": dialog.get_sex(),
                             "age": dialog.get_age()}
+            # update database
             self.mpDB.edit_row("individual", id, replace_dict)
         del dialog
         # refetch data
-        self.stations = self.update()
+        self.individuals = self.update()
 
     def view(self):
-        # set to media view filtered by individual
+        """Go to media view filtered by individual"""
         if self.list.currentRow() == 0:
             filters = {"individual_id": 0}
         else:
@@ -111,24 +112,21 @@ class IndividualFillPopup(QDialog):
         self.setWindowTitle("Edit Individual")
         layout = QVBoxLayout()
 
-        # name
+        # Name
         layout.addWidget(QLabel('Name'))
         self.name = QLineEdit()
         self.name.setText(name)
         layout.addWidget(self.name)
-
-        # sex
+        # Sex
         layout.addWidget(QLabel('Sex'))
         self.sex = QComboBox()
         self.sex.addItems(['Unknown', 'Male', 'Female'])
         layout.addWidget(self.sex)
-
         # Age
         layout.addWidget(QLabel('Age'))
         self.age = QComboBox()
         self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
         layout.addWidget(self.age)
-
 
         self.name.textChanged.connect(self.checkInput)
         self.sex.currentIndexChanged.connect(self.checkInput)
@@ -153,7 +151,7 @@ class IndividualFillPopup(QDialog):
 
     def get_sex(self):
         return self.sex.currentText()
-    
+
     def get_age(self):
         return self.age.currentText()
 

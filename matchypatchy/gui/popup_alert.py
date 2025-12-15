@@ -1,6 +1,6 @@
 '''
 Alert Popup displaying simple text and OK/Cancel buttons
-ProgressBar Popup
+Options for progress bar and cancel-only mode.
 '''
 from PyQt6.QtWidgets import QVBoxLayout, QDialogButtonBox, QLabel, QDialog, QProgressBar
 from PyQt6.QtCore import Qt
@@ -15,6 +15,7 @@ class AlertPopup(QDialog):
                              alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.prompt)
 
+        # progress bar
         if progressbar:
             self.counter = 0
             self.min = 0
@@ -29,15 +30,16 @@ class AlertPopup(QDialog):
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
 
+        # disable OK button if cancel_only
         if cancel_only:
             ok_button = buttonBox.button(QDialogButtonBox.StandardButton.Ok)
             ok_button.setEnabled(False)  # Disable the OK button
 
         layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
-
         self.setLayout(layout)
 
     def update_prompt(self, prompt):
+        """Update the prompt text"""
         self.prompt.setText(prompt)
 
     def set_min(self, min):
