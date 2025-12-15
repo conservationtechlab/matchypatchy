@@ -1,5 +1,5 @@
 """
-Thread Class for Processing Sequence
+QThread Class for Processing Sequence
 
 Pair_ID should be given in advance since there is likely
 some mismatch between camera timestamps and they won't be exactly the same
@@ -11,7 +11,7 @@ from datetime import timedelta
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.media import fetch_media
-from matchypatchy.config import load
+from matchypatchy.config import load_cfg
 
 
 class SequenceThread(QThread):
@@ -22,8 +22,8 @@ class SequenceThread(QThread):
         super().__init__()
         self.mpDB = mpDB
         self.flag = flag
-        self.max_time = timedelta(seconds=int(load('SEQUENCE_DURATION')))
-        self.max_n = int(load('SEQUENCE_N'))
+        self.max_time = timedelta(seconds=int(load_cfg('SEQUENCE_DURATION')))
+        self.max_n = int(load_cfg('SEQUENCE_N'))
 
         self.media = fetch_media(self.mpDB)
         self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')
@@ -52,17 +52,16 @@ class SequenceThread(QThread):
                     else:
                         current_sequence = [image]
 
-            if not self.isInterruptionRequested():
-                # Append the last group
-                if current_sequence:
-                    sequences.append(current_sequence)
+            # Append the last group
+            if current_sequence:
+                sequences.append(current_sequence)
 
-                # update media entries
-                for _, group in enumerate(sequences):
-                    # create a sequence id
-                    sequence_id = self.mpDB.add_sequence()
-                    for image in group:
-                        self.mpDB.edit_row('media', image['id'], {"sequence_id": sequence_id})
+            # update media entries
+            for _, group in enumerate(sequences):
+                # create a sequence id
+                sequence_id = self.mpDB.add_sequence()
+                for image in group:
+                    self.mpDB.edit_row('media', image['id'], {"sequence_id": sequence_id})
 
         # if not calculating sequence, each media entry gets own sequence_id
         else:
