@@ -7,7 +7,7 @@ from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QTableWidgetItem
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 
-from matchypatchy.algo.thumbnails import THUMBNAIL_NOTFOUND
+from matchypatchy.database.thumbnails import THUMBNAIL_NOTFOUND
 from matchypatchy.config import resource_path
 
 

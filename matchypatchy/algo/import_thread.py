@@ -7,8 +7,8 @@ import logging
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy import config
-from matchypatchy.algo.thumbnails import save_media_thumbnail, save_roi_thumbnail
+from matchypatchy.config import load_cfg
+from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail
 
 
 class CSVImportThread(QThread):
@@ -19,8 +19,7 @@ class CSVImportThread(QThread):
         self.mpDB = mpDB
         self.unique_images = unique_images
         self.selected_columns = selected_columns
-        self.thumbnail_dir = config.load('THUMBNAIL_DIR')
-        print(selected_columns)
+        self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
 
     def run(self):
         roi_counter = 0  # progressbar counter
@@ -49,10 +48,11 @@ class CSVImportThread(QThread):
                 external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
                 comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
+                # insert into table
                 media_id = self.mpDB.add_media(filepath,
-                                               ext, 
-                                               timestamp, 
-                                               station_id,
+                                               ext,
+                                               timestamp,
+                                               station_id=station_id,
                                                camera_id=camera_id,
                                                sequence_id=sequence_id,
                                                external_id=external_id,
@@ -102,19 +102,19 @@ class CSVImportThread(QThread):
                                                reviewed=reviewed,
                                                individual_id=individual_id,
                                                emb=0)
-                    
                     # save thumbnails
                     roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
 
                     roi_counter += 1
                     self.progress_update.emit(roi_counter)
-    
+
         if not self.isInterruptionRequested():
             # finished adding media
             self.finished.emit()
 
     def survey(self, exemplar):
+        """Get or create survey"""
         # get active survey
         if len(self.selected_columns['survey']) > 1:
             survey_name = self.selected_columns['survey'][1]
@@ -130,7 +130,7 @@ class CSVImportThread(QThread):
         return survey_id
 
     def station(self, exemplar, survey_id):
-        # get or create station
+        """Get or create station"""
         station_name = exemplar[self.selected_columns["station"]].item()
         try:
             station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
@@ -139,7 +139,7 @@ class CSVImportThread(QThread):
         return station_id
 
     def camera(self, exemplar, station_id):
-        # get or create station
+        """Get or create camera"""
         if self.selected_columns["camera"] != "None":
             camera_name = exemplar[self.selected_columns["camera"]].item()
             try:
@@ -153,7 +153,7 @@ class CSVImportThread(QThread):
             return camera_id
 
     def individual(self, roi):
-        # individual
+        """Get or create individual ID"""
         if self.selected_columns["individual"] != "None":
             individual = roi[self.selected_columns["individual"]]
             try:
@@ -176,7 +176,7 @@ class FolderImportThread(QThread):
         self.data = data
         self.station_level = station_level
         self.default_station = None
-        self.thumbnail_dir = config.load('THUMBNAIL_DIR')
+        self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
 
     def run(self):
         for i, file in self.data.iterrows():

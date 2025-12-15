@@ -1,20 +1,21 @@
 """
-Thread Class for Processing BBox
+QThread Class for Processing BBox, Frames, BuildFileManifest with ANIML
 
 """
-from pathlib import Path
+import animl
 import pandas as pd
+from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.algo.thumbnails import save_roi_thumbnail
+from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.database.media import fetch_roi_media
 from matchypatchy.algo import models
 from matchypatchy import config
 
-import animl
 
 MEGADETECTORv1000_SIZE = 960
+
 
 class BuildManifestThread(QThread):
     """
@@ -35,30 +36,27 @@ class AnimlThread(QThread):
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, DETECTOR_KEY): #, classifier_key):
+    def __init__(self, mpDB, DETECTOR_KEY):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = Path(config.load('ML_DIR'))
-        self.n_frames = config.load('VIDEO_FRAMES')
-        self.thumbnail_dir = config.load('THUMBNAIL_DIR')
+        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        self.n_frames = config.load_cfg('VIDEO_FRAMES')
+        self.thumbnail_dir = config.load_cfg('THUMBNAIL_DIR')
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
+        self.md_filepath = models.get_path(self.ml_dir, DETECTOR_KEY)
 
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
-
         self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station_id", "camera_id",
                                                   "sequence_id", "external_id", "comment"])
-        
         # select rois that do not have bbox
         rois = fetch_roi_media(mpDB, reset_index=False)
-        self.rois = rois[rois['bbox_x'] == -1]
+        self.rois = rois[rois['bbox_x'] == -1]  # imported without bbox
         self.rois = self.rois.drop(columns=['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
-
+        # count total to process for progress bar
         self.to_process = len(self.media) + len(self.rois)
-
-        self.md_filepath = models.get_path(self.ml_dir, DETECTOR_KEY)
 
     def run(self):
         if self.to_process > 0:
@@ -68,10 +66,11 @@ class AnimlThread(QThread):
             self.get_bbox()
 
     def get_frames(self):
+        """Extract frames from video media using ANIML"""
         self.media = animl.extract_frames(self.media, frames=self.n_frames)
 
-
     def get_bbox(self):
+        """Get bounding boxes for media and rois without bbox using ANIML detector"""
         # SKIP if no detector selected
         if self.DETECTOR_KEY is None:
             print("No detector selected, skipping detection...")
@@ -91,8 +90,8 @@ class AnimlThread(QThread):
                 media_id = image['id']
                 row = image.to_frame().T
 
-                detections = animl.detect(detector, 
-                                          row, 
+                detections = animl.detect(detector,
+                                          row,
                                           MEGADETECTORv1000_SIZE,
                                           MEGADETECTORv1000_SIZE,
                                           confidence_threshold=self.confidence_threshold)
@@ -114,15 +113,13 @@ class AnimlThread(QThread):
                                                viewpoint=viewpoint,
                                                individual_id=individual_id,
                                                emb=0)
-                    
                     # save thumbnails
-                    roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, 
+                    roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
                                                        image['filepath'], image['ext'], frame,
                                                        bbox_x, bbox_y, bbox_w, bbox_h)
                     self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
-                    
             self.progress_update.emit(round(100 * (i + 1) / self.to_process))
-    
+
         # Process existing rois without bbox
         for i, image in self.rois.iterrows():
             if not self.isInterruptionRequested():
@@ -153,5 +150,4 @@ class AnimlThread(QThread):
                         "bbox_w": bbox_w,
                         "bbox_h": bbox_h
                     })
-                    
             self.progress_update.emit(round(100 * (i + 1) / self.to_process))

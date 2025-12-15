@@ -10,7 +10,7 @@ from matchypatchy.algo.models import load
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
-# TODO: sequences for videos 
+# TODO: sequences for videos
 class QueryContainer(QObject):
     thread_signal = pyqtSignal(bool)
 
@@ -59,7 +59,7 @@ class QueryContainer(QObject):
         # no embeddings
         else:
             return False
-        
+
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
         """
@@ -92,9 +92,11 @@ class QueryContainer(QObject):
 
         self.sequences = db_roi.sequence_roi_dict(self.data)
 
-
     # RUN ON ENTRY IF LOAD_DATA
     def calculate_neighbors(self):
+        """
+        Start MatchEmbeddingThread to calculate neighbors
+        """
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.data, self.sequences,
                                                  k=self.k, metric=self.metric, threshold=self.threshold)
         self.match_thread.progress_update.connect(self.parent.progress.set_counter)
@@ -105,16 +107,20 @@ class QueryContainer(QObject):
         self.match_thread.start()
 
     def capture_neighbor_dict(self, neighbor_dict):
-        # capture neighbor_dict from MatchEmbeddingThread
+        """Capture neighbor_dict from MatchEmbeddingThread"""
         self.neighbor_dict = neighbor_dict
 
     def capture_ranked_sequences(self, ranked_sequences):
-        # capture ranked_sequences from MatchEmbeddingThread
+        """Capture ranked_sequences from MatchEmbeddingThread"""
         self.ranked_sequences = ranked_sequences
         # set number of queries to validate
         self.n_queries = len(self.ranked_sequences)
 
     def finish_calculating(self):
+        """
+        Finish calculating neighbors, compute viewpoints
+        Triggered when MatchEmbeddingThread finishes
+        """
         if self.neighbor_dict:
             # compute viewpoints
             self.compute_viewpoints()
@@ -125,9 +131,7 @@ class QueryContainer(QObject):
             self.thread_signal.emit(False)
 
     def set_query(self, n):
-        """
-        Set the Query side to a particular (n) image in the list
-        """
+        """Set the Query side to a particular (n) image in the list"""
         # wrap around
         if n < 0:
             n = self.n_queries - 1
@@ -187,6 +191,9 @@ class QueryContainer(QObject):
 
     # VIEWPOINT ----------------------------------------------------------------
     def compute_viewpoints(self):
+        """
+        Compute Human-Readable Viewpoints for Query
+        """
         self.viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
 
         for sequence_id, rois in self.sequences.items():
@@ -200,6 +207,7 @@ class QueryContainer(QObject):
                         self.viewpoints[value][sequence_id] = []
 
     def compute_match_viewpoints(self):
+        """Compute Human-Readable Viewpoints for Matches"""
         self.match_viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
 
         for sequence_id, matches in self.neighbor_dict.items():
@@ -214,28 +222,24 @@ class QueryContainer(QObject):
                         self.match_viewpoints[value][sequence_id] = []
 
     def show_all_query_image(self):
-        """
-        Show All Viewpoints for Query
-        """
+        """Show All Viewpoints for Query"""
         self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
         self.set_within_query_sequence(0)
 
     def toggle_viewpoint(self, selected_viewpoint):
-        """
-        Flip between viewpoints in paired images within a sequence
-        """
+        """Flip between viewpoints in paired images within a sequence"""
         self.selected_viewpoint = selected_viewpoint
         self.update_viewpoint_current_query()
         self.update_viewpoint_matching_images()
 
     def update_viewpoint_current_query(self):
-        # Sets Query to Display Only Selected Viewpoint
+        """Sets Query to Display Only Selected Viewpoint"""
         self.empty_query = False
         if self.selected_viewpoint == 'Any':
             self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
         else:
             self.current_query_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
-
+        # Set to first in sequence
         if self.current_query_rois:
             self.set_within_query_sequence(0)
         else:
@@ -245,7 +249,7 @@ class QueryContainer(QObject):
             self.set_within_query_sequence(0)
 
     def update_viewpoint_matching_images(self):
-        # Sets Match to Display Only Selected Viewpoint
+        """Sets Match to Display Only Selected Viewpoint"""
         self.empty_match = False
         if self.selected_viewpoint == 'Any':
             self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
@@ -266,27 +270,26 @@ class QueryContainer(QObject):
 
     # RETURN INFO --------------------------------------------------------------------
     def is_existing_match(self):
+        """Return whether current query and match have same individual_id"""
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None
 
     def both_unnamed(self):
-        """
-        Both are unnamed
-        """
+        """Return whether both current query and match are unnamed"""
         return self.data.loc[self.current_match_rid, "individual_id"] is None and \
             self.data.loc[self.current_query_rid, "individual_id"] is None
 
     def current_distance(self):
-        # return distance between current sequence and matchs
+        """Return distance between current sequence and matchs"""
         return self.neighbor_dict[self.current_sequence_id][self.current_match][1]
 
-    # Accessing Info
     def get_info(self, rid, column=None):
+        """Get info from data table for given rid and column"""
         if column is None:  # return whole row
             return self.data.loc[rid]
         elif column == 'bbox':
             # Return the bbox coordinates for current query
-            return db_roi.get_bbox(self.data.loc[[rid]])
+            return db_roi.get_roi_bbox(self.data.loc[[rid]])
         elif column == 'metadata':
             return self.roi_metadata(self.data.loc[rid])
         else:
@@ -310,7 +313,7 @@ class QueryContainer(QObject):
 
         info_dict = roi[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
                         'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
-                
+
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
@@ -326,24 +329,19 @@ class QueryContainer(QObject):
 
     # MATCH FUNCTIONS ----------------------------------------------------------
     def new_iid(self, individual_id):
-        """
-        Update records for roi after confirming a match
-        """
+        """Update records for roi after confirming a match"""
         for roi in self.current_query_rois:
             self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
 
         self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
 
     def merge(self):
-        """
-        Merge two individuals after match
-        """
+        """Merge two individuals after match"""
         query = self.data.loc[self.current_query_rid]
         match = self.data.loc[self.current_match_rid]
 
         query_iid = query['individual_id']
         match_iid = match['individual_id']
-
 
         # both are named
         if query_iid is not None:
@@ -369,7 +367,5 @@ class QueryContainer(QObject):
             self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
 
     def unmatch(self):
-        """
-        Unmatch the current query ROI from the matched ROI
-        """
+        """Unmatch the current query ROI from the matched ROI"""
         self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None}, quiet=False)

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.config import resource_path, load
+from matchypatchy.config import resource_path
 
 
 def update_model_yml():
@@ -27,8 +27,8 @@ def update_model_yml():
         return False
 
 
-def load(key=None):
-    # load the yaml file
+def load_model(key=None):
+    """Loads ML model configuration from models.yml, returns full dict or specific key"""
     model_yml_path = resource_path("assets/models.yml")
 
     with open(model_yml_path, 'r') as cfg_file:
@@ -36,11 +36,12 @@ def load(key=None):
         if key:
             return cfg[key]
         else:
-          return cfg
+            return cfg
 
 
 def is_valid_reid_model(basename):
-    models = load('REID_MODELS')
+    """Checks if given basename is a valid reid model"""
+    models = ('REID_MODELS')
     if basename in models:
         return True
     else:
@@ -48,7 +49,8 @@ def is_valid_reid_model(basename):
 
 
 def get_path(ML_DIR, key):
-    MODELS = load('MODELS')
+    """Gets path to ML model in ML_DIR"""
+    MODELS = load_model('MODELS')
     if key is None:
         return None
     path = ML_DIR / MODELS[key][0]
@@ -58,36 +60,15 @@ def get_path(ML_DIR, key):
         return None
 
 
-def get_class_path(ML_DIR, key):
-    CLASS_FILES = load('CLASS_FILES')
-    if key is None:
-        return None
-    path = ML_DIR / CLASS_FILES[key][0]
-    if path.exists():
-        return path
-    else:
-        return None
-
-
-def get_config_path(ML_DIR, key):
-    CONFIG_FILES = load('CONFIG_FILES')
-    if key is None:
-        return None
-    path = ML_DIR / CONFIG_FILES[key][0]
-    if path.exists():
-        return path
-    else:
-        return None
-
-
 def delete(ML_DIR, key):
+    """Deletes ML model from ML_DIR"""
     path = get_path(ML_DIR, key)
     if path:
         path.unlink()
 
 
 def download(ML_DIR, key):
-    # read model directory
+    """Downloads ML model to ML_DIR"""
     model_yml_path = resource_path("assets/models.yml")
     with open(model_yml_path, 'r') as cfg_file:
         ml_cfg = yaml.safe_load(cfg_file)

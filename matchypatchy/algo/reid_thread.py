@@ -2,6 +2,7 @@
 Thread Class for Processing Viewpoint and Miew Embedding
 
 """
+import animl
 from numpy import argmax
 from pathlib import Path
 import pandas as pd
@@ -14,8 +15,6 @@ from matchypatchy.database.media import fetch_roi
 
 #from matchypatchy.pairx.core import explain
 #from matchypatchy.pairx import xai_dataset
-
-import animl
 
 
 class ReIDThread(QThread):
@@ -31,7 +30,8 @@ class ReIDThread(QThread):
         self.viewpoint_filepath = models.get_path(self.ml_dir, VIEWPOINT_KEY)
 
     def run(self):
-        # must be fetched after start() to chain with animl
+        """Process viewpoint and embeddings for ROIs"""
+        # ROIS must be fetched after start() to chain with animl
         self.rois = fetch_roi(self.mpDB)
 
         if self.rois.empty:
@@ -56,10 +56,12 @@ class ReIDThread(QThread):
             self.done.emit()
 
     def get_viewpoint(self):
-        # user did not select a viewpoint model
+        """Process viewpoint for ROIs"""
+        # if no viewpoint model selected, skip
         if self.viewpoint_filepath is None:
             return
 
+        # filter rois without viewpoint
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
@@ -77,14 +79,16 @@ class ReIDThread(QThread):
                     # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
                     roi_id = filtered_rois.at[i, 'roi_id']
                     self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
+                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
     def get_embeddings(self):
-        # Process only those that have not yet been processed
+        """Process embeddings for ROIs"""
+        # If no reid model selected, skip
         if self.reid_filepath is None:
             self.prompt_update.emit("No Re-ID model selected, skipping embedding extraction...")
             return
 
+        # filter rois without embeddings
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
@@ -101,7 +105,7 @@ class ReIDThread(QThread):
                     self.mpDB.add_emb(roi_id, emb)
                     self.mpDB.edit_row("roi", roi_id, {"emb": 1}, quiet=False)
 
-                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
+                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
 
 # TODO: REMOVE TORCHVISION DEPENDENCY

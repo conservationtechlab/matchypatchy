@@ -37,7 +37,7 @@ def initiate():
 
     CONFIG_PATH = HOME_DIR / '.config.yml'
     if CONFIG_PATH.exists():
-        cfg = load()
+        cfg = load_cfg()
 
         # start from empty
         if cfg is None:
@@ -70,7 +70,7 @@ def initiate():
     return cfg
 
 
-def load(key=None):
+def load_cfg(key=None):
     CONFIG_PATH = HOME_DIR / '.config.yml'
     # Load the config into a dict
     with open(CONFIG_PATH, 'r') as cfg_file:
