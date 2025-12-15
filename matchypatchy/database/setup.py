@@ -8,6 +8,7 @@ from datetime import datetime
 
 
 def setup_database(key, filepath):
+    """Set up SQLite database with required tables"""
     # Connect to SQLite database
     db = sqlite3.connect(filepath)
     cursor = db.cursor()
@@ -113,6 +114,7 @@ def setup_database(key, filepath):
 
 
 def setup_chromadb(key, filepath):
+    """Set up ChromaDB vector database for embeddings"""
     client = chromadb.PersistentClient(str(filepath))
     client.create_collection(
         name="embedding_collection",
