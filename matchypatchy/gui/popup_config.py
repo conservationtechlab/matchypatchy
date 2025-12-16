@@ -176,7 +176,6 @@ class ConfigPopup(QDialog):
 
     def command(self):
         """Execute custom command on database."""
-        # TODO: validate command syntax
         new_cmd = self.command_line.text()
         self.mpDB._command(new_cmd)
 

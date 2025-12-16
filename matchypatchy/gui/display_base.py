@@ -209,29 +209,41 @@ class DisplayBase(QWidget):
     # STEP 1: Import from CSV
     def import_csv(self):
         """Add media from a CSV manifest"""
-        self.select_survey()
-        manifest = QFileDialog.getOpenFileName(self, "Open File",
-                                               os.path.expanduser('~'),
-                                               ("CSV Files (*.csv)"))[0]
-        if manifest:
-            logging.info(f"Importing from manifest: {manifest}")
-            dialog = ImportCSVPopup(self, manifest)
+        survey_selected = self.select_survey()
+        if not survey_selected:
+            dialog = AlertPopup(self, "Please select a survey before importing.")
             if dialog.exec():
                 del dialog
+            return
+        else:
+            manifest = QFileDialog.getOpenFileName(self, "Open File",
+                                                   os.path.expanduser('~'),
+                                                   ("CSV Files (*.csv)"))[0]
+            if manifest:
+                logging.info(f"Importing from manifest: {manifest}")
+                dialog = ImportCSVPopup(self, manifest)
+                if dialog.exec():
+                    del dialog
 
     # STEP 1: Import from FOLDER
     def import_folder(self):
         """Add media from a folder"""
-        self.select_survey()
-        directory = QFileDialog.getExistingDirectory(self, "Open File",
-                                                     os.path.expanduser('~'),
-                                                     QFileDialog.Option.ShowDirsOnly)
-        if directory:
-            dialog = ImportFolderPopup(self, directory)
-            logging.info(f"Importing from directory: {directory}")
-            if dialog.exec() == QDialog.DialogCode.Rejected:
-                self.import_folder()
-            del dialog
+        survey_selected = self.select_survey()
+        if not survey_selected:
+            dialog = AlertPopup(self, "Please select a survey before importing.")
+            if dialog.exec():
+                del dialog
+            return
+        else:
+            directory = QFileDialog.getExistingDirectory(self, "Open File",
+                                                         os.path.expanduser('~'),
+                                                         QFileDialog.Option.ShowDirsOnly)
+            if directory:
+                dialog = ImportFolderPopup(self, directory)
+                logging.info(f"Importing from directory: {directory}")
+                if dialog.exec() == QDialog.DialogCode.Rejected:
+                    self.import_folder()
+                del dialog
 
     # STEP 2: Process Button
     def select_models(self):
