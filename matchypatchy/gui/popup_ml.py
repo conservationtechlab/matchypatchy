@@ -116,8 +116,8 @@ class MLOptionsPopup(QDialog):
     """
     def __init__(self, parent):
         super().__init__(parent)
-        self.ml_dir = Path(config.load('ML_DIR'))
-        self.ml_cfg = models.load()
+        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        self.ml_cfg = models.load_model()
         self.available_models = self.discover_models()
 
         self.setWindowTitle('Model Options')

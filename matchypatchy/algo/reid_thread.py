@@ -25,7 +25,7 @@ class ReIDThread(QThread):
     def __init__(self, mpDB, REID_KEY, VIEWPOINT_KEY):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = Path(config.load('ML_DIR'))
+        self.ml_dir = Path(config.load_cfg('ML_DIR'))
         self.reid_filepath = models.get_path(self.ml_dir, REID_KEY)
         self.viewpoint_filepath = models.get_path(self.ml_dir, VIEWPOINT_KEY)
 

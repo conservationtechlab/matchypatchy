@@ -6,7 +6,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
 
-from matchypatchy.algo.models import load
+from matchypatchy.algo.models import load_model
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
@@ -22,7 +22,7 @@ class QueryContainer(QObject):
         self.k = parent.k
         self.threshold = parent.threshold
         self.filter_dict = dict()
-        self.VIEWPOINT_DICT = load('VIEWPOINTS')
+        self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
         self.neighbor_dict = dict()
         self.ranked_sequences = []

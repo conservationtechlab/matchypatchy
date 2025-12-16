@@ -5,7 +5,7 @@ from PyQt6.QtCore import QObject
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
-from matchypatchy.algo.models import load
+from matchypatchy.algo.models import load_model
 
 
 class QC_QueryContainer(QObject):
@@ -20,7 +20,7 @@ class QC_QueryContainer(QObject):
         self.neighbor_dict = dict()
         self.nearest_dict = dict()
         self.ranked_sequences = []
-        self.VIEWPOINT_DICT = load('VIEWPOINTS')
+        self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
         self.current_query = 0
         self.current_match = 0
@@ -251,7 +251,7 @@ class QC_QueryContainer(QObject):
         info_dict['Region'] = location['region_name']
 
         # convert viewpoint to human-readable (0=Left, 1=Right)
-        VIEWPOINT = load('VIEWPOINTS')
+        VIEWPOINT = load_model('VIEWPOINTS')
         if info_dict['Viewpoint'] is None:
             info_dict['Viewpoint'] = 'None'
         else:  # BUG: Typecasting issue, why is viewpoint returning a float?
