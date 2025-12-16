@@ -78,12 +78,16 @@ CREATE TABLE camera (
 TABLE: media_thumbnails
 CREATE TABLE media_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        fid INTEGER NOT NULL,
+                        fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES media (id))
+INDEX: sqlite_autoindex_media_thumbnails_1
+None
 TABLE: roi_thumbnails
 CREATE TABLE roi_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        fid INTEGER NOT NULL,
+                        fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES roi (id))
+INDEX: sqlite_autoindex_roi_thumbnails_1
+None

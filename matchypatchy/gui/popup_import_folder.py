@@ -16,9 +16,6 @@ from matchypatchy.algo.animl_thread import BuildManifestThread
 from matchypatchy.algo.import_thread import FolderImportThread
 
 
-# TODO: disable ok while importing, cancel thread
-# TODO: input foldername
-
 class ImportFolderPopup(QDialog):
     def __init__(self, parent, directory):
         super().__init__(parent)
@@ -100,6 +97,7 @@ class ImportFolderPopup(QDialog):
         # assert bbox in manifest.columns
         self.progress_bar.setRange(0, len(self.data))
         self.progress_bar.show()
+        self.buttonBox.setDisabled(True)
 
         station_level = 0 if self.station.currentIndex() == 0 else self.station.currentIndex() - 1
 

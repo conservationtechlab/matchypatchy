@@ -213,13 +213,9 @@ class FolderImportThread(QThread):
                                                sequence_id=None,
                                                external_id=None,
                                                comment=None)
-                if media_id == "duplicate_error":
-                    print(f"File {filepath} already in database, skipping")
-                    logging.info(f"File {filepath} already in database, skipping")
                 # save thumbnail
-                else:
-                    thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
-                    self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
+                thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
+                self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
 
                 self.progress_update.emit(i)
 
