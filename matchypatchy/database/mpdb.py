@@ -264,8 +264,8 @@ class MatchyPatchyDB():
 
         # filepath already exists
         except sqlite3.IntegrityError as error:
-            if error.sqlite_errorname == "SQLITE_CONSTRAINT_UNIQUE":
-                logging.error("Failed to add media, already exists in database.")
+            if 'UNIQUE constraint failed: media.filepath' in error.args[0]:
+                logging.error(f"Failed to add {filepath}, already exists in database.")
                 if db:
                     db.close()
                 return "duplicate_error"
@@ -374,8 +374,21 @@ class MatchyPatchyDB():
             db.commit()
             db.close()
             return id
+        
+        # filepath already exists
+        except sqlite3.IntegrityError as error:
+            if 'UNIQUE constraint failed: media_thumbnails.fid' in error.args[0]:
+                logging.error("Failed to add thumbnail, already exists in database.")
+                if db:
+                    db.close()
+                return "duplicate_error"
+            if 'UNIQUE constraint failed: roi_thumbnails.fid' in error.args[0]:
+                logging.error("Failed to add thumbnail, already exists in database.")
+                if db:
+                    db.close()
+                return "duplicate_error"
         except sqlite3.Error as error:
-            logging.error("Failed to add sequence: ", error)
+            logging.error("Failed to add thumbnail: ", error)
             if db:
                 db.close()
             return None

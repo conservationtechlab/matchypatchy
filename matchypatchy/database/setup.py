@@ -96,13 +96,13 @@ def setup_database(key, filepath):
     # THUMBNAILS
     cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        fid INTEGER NOT NULL,
+                        fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES media (id));''')
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        fid INTEGER NOT NULL,
+                        fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES roi (id));''')
 
