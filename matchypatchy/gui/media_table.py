@@ -8,9 +8,10 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.algo.models import load_model
+from matchypatchy.config import load_cfg
 from matchypatchy.algo.table_thread import LoadTableThread
 from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
-from matchypatchy.database.thumbnails import fetch_media_thumbnails, fetch_roi_thumbnails
+from matchypatchy.database import thumbnails
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.gui_assets import ComboBoxDelegate
 
@@ -29,6 +30,7 @@ class MediaTable(QWidget):
         self.data_type = 1
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         self.thumbnail_size = 150
+        self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
 
         self.edit_stack = []
 
@@ -41,7 +43,7 @@ class MediaTable(QWidget):
                                               "Station", "Camera", "Sequence ID", "External ID",
                                               "Viewpoint", "Individual", "Sex", "Age",
                                               "Reviewed", "Favorite", "Comment"])
-        # self.table.setSortingEnabled(True)  # TODO: NEED TO FIGURE OUT HOW TO SORT data_filtered FIRST
+        # self.table.setSortingEnabled(True)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.table.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.table.cellChanged.connect(self.update_entry)  # allow user editing
@@ -81,16 +83,39 @@ class MediaTable(QWidget):
         Merge with thumbnails table
         """
         self.individual_list = fetch_individual(self.mpDB)
-        # TODO check missing thumbnails
+        # check for missing thumbnails and add
+        missing_thumbnails = thumbnails.check_missing_thumbnails(self.mpDB, data_type=self.data_type)
+
         # ROIS
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
-            self.thumbnails = fetch_roi_thumbnails(self.mpDB)
+            # add missing thumbnails
+            if missing_thumbnails:
+                for roi_id in missing_thumbnails:
+                    filepath = self.data.loc[self.data['id'] == roi_id, 'filepath'].values[0]
+                    ext = self.data.loc[self.data['id'] == roi_id, 'ext'].values[0]
+                    frame = self.data.loc[self.data['id'] == roi_id, 'frame'].values[0]
+                    bbox_x = self.data.loc[self.data['id'] == roi_id, 'bbox_x'].values[0]
+                    bbox_y = self.data.loc[self.data['id'] == roi_id, 'bbox_y'].values[0]
+                    bbox_w = self.data.loc[self.data['id'] == roi_id, 'bbox_w'].values[0]
+                    bbox_h = self.data.loc[self.data['id'] == roi_id, 'bbox_h'].values[0]
+                    thumbnail_path = thumbnails.save_roi_thumbnail(self.thumbnail_dir, filepath, ext,
+                                                                   frame, bbox_x, bbox_y, bbox_w, bbox_h)
+            # load thumbnails
+            self.thumbnails = thumbnails.fetch_roi_thumbnails(self.mpDB)
             self.data = pd.merge(self.data, self.thumbnails, on="id")
         # MEDIA
         elif self.data_type == 0:
             self.data = fetch_media(self.mpDB)
-            self.thumbnails = fetch_media_thumbnails(self.mpDB)
+            # add missing thumbnails
+            if missing_thumbnails:
+                for media_id in missing_thumbnails:
+                    filepath = self.data.loc[self.data['id'] == media_id, 'filepath'].values[0]
+                    ext = self.data.loc[self.data['id'] == media_id, 'ext'].values[0]
+                    thumbnail_path = thumbnails.save_media_thumbnail(self.thumbnail_dir, filepath, ext)
+                    self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
+            # load thumbnails
+            self.thumbnails = thumbnails.fetch_media_thumbnails(self.mpDB)
             self.data = pd.merge(self.data, self.thumbnails, on="id")
         # return empty
         else:
@@ -376,7 +401,6 @@ class MediaTable(QWidget):
         """
         Undo last edit and refresh table
         """
-        # TODO: handle multiple selection edits as one undo
         if len(self.edit_stack) > 0:
             last = self.edit_stack.pop()
             self.data_filtered.loc[last['row'], last['reference']] = last['previous_value']
