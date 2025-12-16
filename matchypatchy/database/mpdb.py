@@ -121,6 +121,11 @@ class MatchyPatchyDB():
             db.commit()
             db.close()
             return rows
+        except sqlite3.OperationalError as error:
+            logging.error("Operational error executing command.", error)
+            if db:
+                db.close()
+            return None
         except sqlite3.Error as error:
             logging.error("Failed to execute command.", error)
             if db:
@@ -615,6 +620,12 @@ class MatchyPatchyDB():
         client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         collection.add(embeddings=[embedding], ids=[str(id)])
+
+    def delete_emb(self, id):
+        """Delete embedding from chroma vector database"""
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
+        collection = client.get_collection(name="embedding_collection")
+        collection.delete(ids=[str(id)])
 
     def knn(self, query_id, k=3):
         """Get k nearest neighbors of a query ROI from chroma vector database"""
