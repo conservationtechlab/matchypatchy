@@ -13,8 +13,8 @@ from matchypatchy.algo import models
 from matchypatchy import config
 from matchypatchy.database.media import fetch_roi
 
-#from matchypatchy.pairx.core import explain
-#from matchypatchy.pairx import xai_dataset
+# from matchypatchy.pairx.core import explain
+# from matchypatchy.pairx import xai_dataset
 
 
 class ReIDThread(QThread):
@@ -75,7 +75,6 @@ class ReIDThread(QThread):
                     output = model.run(None, {model.get_inputs()[0].name: image})[0]
                     value = argmax(animl.softmax(output), axis=1)[0]
 
-                    # TODO: Utilize probability for captures/sequences
                     # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
                     roi_id = filtered_rois.at[i, 'roi_id']
                     self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
@@ -108,7 +107,6 @@ class ReIDThread(QThread):
                     self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
 
-# TODO: REMOVE TORCHVISION DEPENDENCY
 """
 class PairXThread(QThread):
     explained_img = pyqtSignal(list)  # Signal to update the alert prompt
@@ -134,7 +132,7 @@ class PairXThread(QThread):
 
         img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(device, self.query, self.match,
                                                                                (440,440), self.img_transforms)
-        explained_imgs = explain(device, img_0, img_1, 
+        explained_imgs = explain(device, img_0, img_1,
                                  img_np_0, img_np_1,
                                  self.model, ["backbone.blocks.3"],
                                  k_lines=20, k_colors=10)

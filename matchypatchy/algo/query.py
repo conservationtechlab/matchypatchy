@@ -10,7 +10,6 @@ from matchypatchy.algo.models import load_model
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
-# TODO: sequences for videos
 class QueryContainer(QObject):
     thread_signal = pyqtSignal(bool)
 
@@ -319,7 +318,7 @@ class QueryContainer(QObject):
         info_dict['Region'] = location['region_name']
 
         # convert viewpoint to human-readable (0=Left, 1=Right)
-        VIEWPOINT = load('VIEWPOINTS')
+        VIEWPOINT = load_model('VIEWPOINTS')
         if info_dict['Viewpoint'] is None:
             info_dict['Viewpoint'] = 'None'
         else:  # BUG: Typecasting issue, why is viewpoint returning a float?
