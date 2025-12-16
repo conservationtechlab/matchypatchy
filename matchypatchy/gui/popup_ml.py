@@ -20,8 +20,8 @@ class MLDownloadPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         # update model yml
-        # TODO update_confirmed = models.update_model_yml()
-        # logging.info(f"Model yaml update attempt: {update_confirmed}")
+        update_confirmed = models.update_model_yml()
+        logging.info(f"Model yaml update attempt: {update_confirmed}")
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
         self.ml_cfg = models.load_model()
         self.models = self.ml_cfg['MODELS']
@@ -100,7 +100,7 @@ class MLDownloadPopup(QDialog):
         self.build_thread.start()
 
     def cancel(self):
-        # TODO: delete any partially downloaded models
+        # delete any partially downloaded models
         # for key in self.checked_models:
         #     models.delete(self.ml_dir, key)
         self.reject()

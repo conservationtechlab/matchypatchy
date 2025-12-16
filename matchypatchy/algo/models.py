@@ -18,7 +18,6 @@ def update_model_yml():
     """
     # download current version
     model_yml_path = resource_path("assets/models.yml")
-    # TODO: re-enable when final list of models is ready
     try:
         urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml", model_yml_path)
         return True
