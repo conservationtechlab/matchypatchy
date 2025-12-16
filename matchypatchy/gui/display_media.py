@@ -14,8 +14,6 @@ from matchypatchy.gui.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.gui_assets import VerticalSeparator, StandardButton
 from matchypatchy.gui.widget_filterbar import FilterBar
 
-# TODO: fix select all
-
 
 class DisplayMedia(QWidget):
     def __init__(self, parent, data_type=1):
@@ -50,8 +48,7 @@ class DisplayMedia(QWidget):
         # Select All
         self.button_select = StandardButton("Select All")
         self.button_select.setCheckable(True)
-        self.button_select.setChecked(False)
-        self.button_select.clicked.connect(self.select_all)
+        self.button_select.pressed.connect(self.set_button_select)
         first_layer.addWidget(self.button_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Edit Rows
         self.button_edit = StandardButton("Edit Rows")
@@ -139,7 +136,7 @@ class DisplayMedia(QWidget):
         Allows refresh of dropdowns if re-entry into media view after updating database
         """
         # wipe previous selections
-        self.select_all(reset=True)
+        self.select_all(overwrite=False)
 
         self.filterbar.refresh_filters(prefilter=prefilter)
         self.filters = self.filterbar.get_filters()
@@ -300,14 +297,17 @@ class DisplayMedia(QWidget):
         self.update_buttons()
         self.update_count_label()
 
-    def select_all(self, reset=False):
+    def set_button_select(self):
+        """Handle Select All button press, invert selection"""
+        if self.button_select.isChecked():
+            self.select_all(overwrite=False)
+        else:
+            self.select_all(overwrite=True)
+
+    def select_all(self, overwrite=False):
         """Select all rows in the media table"""
-        if reset:
-            for row in range(self.media_table.table.rowCount()):
-                self.media_table.select_row(row, overwrite=False)
-        else:  # toggle based on select all button
-            for row in range(self.media_table.table.rowCount()):
-                self.media_table.select_row(row, overwrite=self.button_select.isChecked())
+        for row in range(self.media_table.table.rowCount()):
+            self.media_table.select_row(row, overwrite=overwrite)
 
     def check_selected_rows(self):
         """Enable/Disable Edit, Duplicate, Delete buttons based on selection"""
