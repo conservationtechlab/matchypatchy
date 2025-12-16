@@ -64,7 +64,7 @@ class PairXPopup(QDialog):
         #self.pairx_thread.start()
 
     def load_model(self):
-        self.reid_filepath = models.get_path(Path(config.load('ML_DIR')), config.load('REID_KEY'))
+        self.reid_filepath = models.get_path(Path(config.load_cfg('ML_DIR')), config.load_cfg('REID_KEY'))
         if self.reid_filepath:
             self.model = animl.load_miew(self.reid_filepath)
             return True

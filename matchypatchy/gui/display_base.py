@@ -54,7 +54,7 @@ class DisplayBase(QWidget):
         self.logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
         self.logo.setFixedSize(600, 400)
         self.logo.setObjectName("borderWidget")
-        logo_img = QImage(LOGO)
+        logo_img = QImage(self.LOGO)
         self.logo.setPixmap(QPixmap.fromImage(logo_img))
         layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addStretch()
