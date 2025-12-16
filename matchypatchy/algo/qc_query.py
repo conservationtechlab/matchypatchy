@@ -224,7 +224,6 @@ class QC_QueryContainer(QObject):
 
     def current_distance(self):
         """Return distance between current sequence and matchs"""
-        #TODO: FIX THIS FUNCTION TO RETURN DISTANCE, may require saving pairs of distances
         return 0
 
     def roi_metadata(self, roi):
