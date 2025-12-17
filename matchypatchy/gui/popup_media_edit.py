@@ -338,7 +338,6 @@ class MetadataPanel(QWidget):
                 self.sex.setDisabled(True)
             else:
                 name_index = self.name.findText(self.individuals.loc[iid, 'name'])
-                # print(name_index, self.individuals.loc[iid, 'name'])
                 self.name.setCurrentIndex(name_index)
                 self.sex.setDisabled(False)
                 self.age.setDisabled(False)
@@ -489,7 +488,6 @@ class MetadataPanel(QWidget):
         else:
             selected_viewpoint = viewpoint_keys[self.viewpoint.currentIndex() + 1]
         for id in self.ids:
-            print(f"selected_viewpoint: {selected_viewpoint}")
             if selected_viewpoint == 'Any':
                 continue  # invalid selection, no change
             elif selected_viewpoint == 'None':

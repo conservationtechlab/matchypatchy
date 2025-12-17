@@ -107,13 +107,14 @@ class MatchyPatchyDB():
             print(s)
             return False
 
-    def _command(self, command):
+    def _command(self, command, quiet=True):
         """
         Execute a specific sql query to fetch data
         Meant for one-time use
         """
         try:
-            print(command)
+            if not quiet:
+                print(command)
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             cursor.execute(command)

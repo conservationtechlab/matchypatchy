@@ -102,7 +102,7 @@ class ReIDThread(QThread):
                     emb = animl.extract_miew_embeddings(model, row)[0]
 
                     self.mpDB.add_emb(roi_id, emb)
-                    self.mpDB.edit_row("roi", roi_id, {"emb": 1}, quiet=False)
+                    self.mpDB.edit_row("roi", roi_id, {"emb": 1})
 
                     self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
