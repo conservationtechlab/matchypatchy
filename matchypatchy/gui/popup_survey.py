@@ -73,7 +73,7 @@ class SurveyPopup(QDialog):
         """Add a new survey"""
         dialog = SurveyFillPopup(self)
         if dialog.exec():
-            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'", quiet=False)
+            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'")
             if not region_id:
                 region_id = self.mpDB.add_region(dialog.get_region())
             else:
@@ -109,7 +109,7 @@ class SurveyPopup(QDialog):
                             "region_id": region_id,
                             "year_start": dialog.get_year_start(),
                             "year_end": dialog.get_year_end()}
-            self.mpDB.edit_row("survey", id, replace_dict, quiet=False)
+            self.mpDB.edit_row("survey", id, replace_dict)
         del dialog
         self.surveys = self.update()
 

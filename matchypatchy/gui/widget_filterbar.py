@@ -151,7 +151,7 @@ class FilterBar(QWidget):
         if survey_ids:
             survey_list = ",".join([str(s[0]) for s in survey_ids])
             selection = f'survey_id IN ({survey_list})'
-            self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection, quiet=False))
+            self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection))
         else:
             self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
 

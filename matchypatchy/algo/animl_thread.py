@@ -74,7 +74,6 @@ class AnimlThread(QThread):
         """Get bounding boxes for media and rois without bbox using ANIML detector"""
         # SKIP if no detector selected
         if self.DETECTOR_KEY is None:
-            print("No detector selected, skipping detection...")
             self.prompt_update.emit("No detector selected, skipping detection...")
             return
         # load detector

@@ -28,7 +28,7 @@ class CSVImportThread(QThread):
             if not self.isInterruptionRequested():
                 # check to see if file exists
                 if not Path(filepath).exists():
-                    print(f"File {filepath} does not exist")
+                    logging.warning(f"File {filepath} does not exist, skipping import...")
                     continue
 
                 # get file extension

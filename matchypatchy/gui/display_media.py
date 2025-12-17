@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt
 
 from matchypatchy.database.media import IMAGE_EXT
-
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.popup_alert import AlertPopup
 from matchypatchy.gui.popup_media_edit import MediaEditPopup
@@ -137,11 +136,11 @@ class DisplayMedia(QWidget):
         """
         # wipe previous selections
         self.select_all(overwrite=False)
-
         self.filterbar.refresh_filters(prefilter=prefilter)
+        # get current filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
-        # print(self.filters)
+
 
     def filter_table(self):
         """
