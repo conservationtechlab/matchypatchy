@@ -7,10 +7,10 @@ Download MatchyPatchy:
 <table>
 <tr><td>Windows</td><td>LINK</td></tr>
 <tr><td>MacOS</td><td>LINK</td></tr>
-<tr><td>Ubuntu</td><td>LINK</td></tr>
+<tr><td>Ubuntu</td><td>22.04</td><td>24.04</td></tr>
 </table>
 
-Once the installer is downloaded, click ""
+The app may take several second to start up. 
 
 Requirements:
 
@@ -115,6 +115,7 @@ MatchyPatchy can accept the following information as columns:
 
 - filepath (full local path required)
 - timestamp (required)
+- survey (required)
 - station (required)  
 - 
 
@@ -136,13 +137,19 @@ from the menubar.
 
 ### Calculate Sequence 
 You can optionally check "Calculate Sequence" which will group images together based on 
-Station and timestamp.  By default, sequences will have no more than 3 images per 
+Station and timestamp. By default, sequences will have no more than 3 images per 
 sequence that occur within 60 seconds. The default images per sequence and sequence
 length in seconds can be changed in Edit > Configuration
 
+Videos will each be given their own sequence ID number. A set number of frames will be 
+extracted from each video to be processed by the Detector and Re-Identification models.
+These frames will also be assigned that sequence ID and will behave similarly to a 
+sequence of images. The default number of extracted frames is 3 and can be changed
+in Edit > Configuration. 
+
 ### Detector Model
 If you imported from a folder or if you did *not* import bounding boxes in the .csv file, 
-you must first use MegaDetector to automatically extract Regions of Interest (ROIs) 
+you must first use an object detector like MegaDetector to automatically extract Regions of Interest (ROIs) 
 that closely crop to the animal. 
 
 ### Re-Identification Model
@@ -197,7 +204,7 @@ The ROIs contain the following information:
 <table>
 <tr>
 <td>Filepath*</td>
-<td>The local filepath</td></tr>
+<td>The local filepath to the images</td></tr>
 
 <tr><td>Timestamp*</td>
 <td></td></tr>
@@ -373,10 +380,6 @@ You can export the entire database as a .csv by selecting <b>Step 5. Export</b> 
 Home page. The .csv file will include local filepaths, timestamps, Survey and Station information,
 bounding boxes, and any Individual information that was added from the Match page. 
 
-
-
-
-
 ### Sharing a Database
 You can move and share the entire MatchyPatchy-Share directory. Be sure to set 
 the correct path to the directory by selecting Edit > Configuration - Project Directory.
@@ -402,13 +405,14 @@ pressing the <b>"Match"</b> button or the "M" key will unmatch it from that indi
 In Quality Control mode, a new filter for Individual will appear, allowing you
 to select specific individuals to view and verify. 
 
+In Quality Control mode, "Recalculate Matches" will ...
 
 <!-- screenshot -->
 
 <br>
 <hr>
 <br>
-# <a name="troubleshooting"></a>Troubleshooting
+# <a name="troubleshooting"></a>Troubleshooting and FAQ
 ### Importing from a Folder
 
 
@@ -422,6 +426,9 @@ Media
 
 Individuals
 
+
+<b><u>How do I use my own Detector/Re-Identification Model?</u></b>
+Currently, MatchyPatchy only supports 
 
 
 <br>
