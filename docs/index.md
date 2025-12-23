@@ -14,7 +14,20 @@ The app may take several second to start up.
 
 Requirements:
 
+MatchyPatchy requires Python >= 3.12. <a href>Download Python</a>.<br>
 For use with Nvida GPU, first <a href="https://developer.nvidia.com/cuda-downloads">install CUDA</a>.
+
+
+## Install via GitHub
+
+1. Go to the MatchyPatchy GitHub <a href>repo</a>.
+2. Clone the repository to your local machine.
+3. In a terminal, navigate to the cloned repository.
+   > cd matchypatchy
+4. Using pip, install dependencies. We recommend using a virtual environment.
+   > pip install -r requirements.txt
+5. Launch MatchyPatchy from the terminal
+   > python -m matchypatchy
 
 <br>
 <hr>
@@ -113,11 +126,17 @@ that corresponds to Station from the example path and then press OK.
 You can import a pre-processed spreadsheet that contains information about the images.
 MatchyPatchy can accept the following information as columns:
 
-- filepath (full local path required)
-- timestamp (required)
-- survey (required)
-- station (required)  
-- 
+- Filepath (full local path required)
+- Timestamp (required)
+- Survey (required)
+- Station (required)  
+- Region
+- Camera
+- Sequence ID
+- External ID
+- Viewpoint
+- Individual
+- Comment
 
 The names in the spreadsheet do not have to be identical to the ones above. 
 Once you select a .csv file to import MatchyPatchy will ask you to associate 
@@ -125,6 +144,9 @@ columns in the .csv file to the information it can accept. The full filepaths
 to the images that can be accessed from your machine, timestamps, and
 station names are required fields. If your .csv does not contain a column that 
 conveys the optional information, leave the column selection to "None".
+
+For more information about these fields, see <a href="#table-information"> media 
+table information</a>.
 
 <br>
 ## 2. Process
@@ -190,49 +212,49 @@ and pressing <b>"Edit"</b>. To select all images, press "Select All".
 NOTE: To save any changes, press the <b>Save</b> button.  
 To undo changes before saving, press the <b>Undo</b> button.
 
-### Filtering the Table
-You can filter images by Region, Survey, Station and Viewpoint by selecting them from
-the dropdown. You can also filter for unidentified ROIs or favorited media by 
-checking the boxes next to those options. To apply selected filters, press <b>Apply 
-Filters</b>.
+To duplicate a media file or ROI, check the box under "Select" for the desired row(s) 
+and press the <b>"Duplicate"</b> button. 
 
+To delete a media file or ROI, check the box under "Select" for the desired 
+row(s) and press the <b>"Delete"</b> button. 
 
 ### Table Information
 
 The ROIs contain the following information:
 
+<a name="#table-info"></a>
 <table>
 <tr>
 <td>Filepath*</td>
-<td>The local filepath to the images</td></tr>
+<td>The local filepath to the image.</td></tr>
 
 <tr><td>Timestamp*</td>
-<td></td></tr>
+<td>Exif CreateDate if available, otherwise FileModifyDate.</td></tr>
 
 <tr><td>Station*</td>
-<td></td></tr>
+<td>The station (site) name or code that the file was taken at. </td></tr>
 
 <tr><td>Camera*</td>
-<td></td></tr>
+<td>The specific camera trap that is the source of the image.</td></tr>
 
 <tr><td>Sequence ID*</td>
-<td></td></tr>
+<td>A unique numerical id that refers to a specific sequence of images or frames from a video.</td></tr>
 
 <tr><td>External ID*</td>
 <td>This refers to a unique identifier to associate the image with its entry in 
 another database or software.</td></tr>
 
 <tr><td>Viewpoint</td>
-<td></td></tr>
+<td>The side of the body facing the camera, "Left" or "Right".</td></tr>
 
 <tr><td>Individual</td>
-<td></td></tr>
+<td>The name or code that identifies the individual.</td></tr>
 
 <tr><td>Sex</td>
-<td></td></tr>
+<td>"Male", "Female", or "Unknown".</td></tr>
 
 <tr><td>Age</td>
-<td></td></tr>
+<td>Approximate age, "juvenile", "Sub-adult", "Adult" or "Unknown".</td></tr>
 
 <tr><td>Reviewed</td>
 <td>If checked, this ROI was given an ID from the Match page.</td></tr>
@@ -249,19 +271,19 @@ The Full Images contain the following information:
 <table>
 <tr>
 <td>Filepath*</td>
-<td>The local filepath</td></tr>
+<td>The local filepath to the image.</td></tr>
 
 <tr><td>Timestamp*</td>
-<td></td></tr>
+<td>Exif CreateDate if available, otherwise FileModifyDate.</td></tr>
 
 <tr><td>Station*</td>
-<td></td></tr>
+<td>The station (site) name or code that the file was taken at. </td></tr>
 
 <tr><td>Camera*</td>
-<td></td></tr>
+<td>The specific camera trap that is the source of the image.</td></tr>
 
 <tr><td>Sequence ID*</td>
-<td></td></tr>
+<td>A unique numerical id that refers to a specific sequence of images or frames from a video.</td></tr>
 
 <tr><td>External ID*</td>
 <td>This refers to a unique identifier to associate the image with its entry in 
@@ -270,6 +292,16 @@ another database or software.</td></tr>
 <tr><td>Comment</td>
 <td>This is an editable text field in which you can input any extra information or comments.</td></tr>
 </table>
+
+
+### Filtering the Table
+You can filter images by Region, Survey, Station and Viewpoint by selecting them from
+the dropdown. You can also filter for unidentified ROIs or favorited media by 
+checking the boxes next to those options. To apply selected filters, press <b>Apply 
+Filters</b>.
+
+<img src="/assets/screenshots/media_filters.png" style="display: block; margin: auto;" />
+
 
 <br>
 ## 4. Match

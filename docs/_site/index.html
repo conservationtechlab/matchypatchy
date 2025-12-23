@@ -57,14 +57,37 @@
 <table>
 <tr><td>Windows</td><td>LINK</td></tr>
 <tr><td>MacOS</td><td>LINK</td></tr>
-<tr><td>Ubuntu</td><td>LINK</td></tr>
+<tr><td>Ubuntu</td><td>22.04</td><td>24.04</td></tr>
 </table>
 
-<p>Once the installer is downloaded, click “”</p>
+<p>The app may take several second to start up.</p>
 
 <p>Requirements:</p>
 
-<p>For use with Nvida GPU, first <a href="https://developer.nvidia.com/cuda-downloads">install CUDA</a>.</p>
+<p>MatchyPatchy requires Python &gt;= 3.12. <a href="">Download Python</a>.<br />
+For use with Nvida GPU, first <a href="https://developer.nvidia.com/cuda-downloads">install CUDA</a>.</p>
+
+<h2 id="install-via-github">Install via GitHub</h2>
+
+<ol>
+  <li>Go to the MatchyPatchy GitHub <a href="">repo</a>.</li>
+  <li>Clone the repository to your local machine.</li>
+  <li>In a terminal, navigate to the cloned repository.
+    <blockquote>
+      <p>cd matchypatchy</p>
+    </blockquote>
+  </li>
+  <li>Using pip, install dependencies. We recommend using a virtual environment.
+    <blockquote>
+      <p>pip install -r requirements.txt</p>
+    </blockquote>
+  </li>
+  <li>Launch MatchyPatchy from the terminal
+    <blockquote>
+      <p>python -m matchypatchy</p>
+    </blockquote>
+  </li>
+</ol>
 
 <p><br /></p>
 <hr />
@@ -164,10 +187,17 @@ that corresponds to Station from the example path and then press OK.</p>
 MatchyPatchy can accept the following information as columns:</p>
 
 <ul>
-  <li>filepath (full local path required)</li>
-  <li>timestamp (required)</li>
-  <li>station (required)</li>
-  <li></li>
+  <li>Filepath (full local path required)</li>
+  <li>Timestamp (required)</li>
+  <li>Survey (required)</li>
+  <li>Station (required)</li>
+  <li>Region</li>
+  <li>Camera</li>
+  <li>Sequence ID</li>
+  <li>External ID</li>
+  <li>Viewpoint</li>
+  <li>Individual</li>
+  <li>Comment</li>
 </ul>
 
 <p>The names in the spreadsheet do not have to be identical to the ones above. 
@@ -176,6 +206,9 @@ columns in the .csv file to the information it can accept. The full filepaths
 to the images that can be accessed from your machine, timestamps, and
 station names are required fields. If your .csv does not contain a column that 
 conveys the optional information, leave the column selection to “None”.</p>
+
+<p>For more information about these fields, see <a href="#table-information"> media 
+table information</a>.</p>
 
 <p><br /></p>
 <h2 id="2-process">2. Process</h2>
@@ -188,13 +221,19 @@ from the menubar.</p>
 
 <h3 id="calculate-sequence">Calculate Sequence</h3>
 <p>You can optionally check “Calculate Sequence” which will group images together based on 
-Station and timestamp.  By default, sequences will have no more than 3 images per 
+Station and timestamp. By default, sequences will have no more than 3 images per 
 sequence that occur within 60 seconds. The default images per sequence and sequence
 length in seconds can be changed in Edit &gt; Configuration</p>
 
+<p>Videos will each be given their own sequence ID number. A set number of frames will be 
+extracted from each video to be processed by the Detector and Re-Identification models.
+These frames will also be assigned that sequence ID and will behave similarly to a 
+sequence of images. The default number of extracted frames is 3 and can be changed
+in Edit &gt; Configuration.</p>
+
 <h3 id="detector-model">Detector Model</h3>
 <p>If you imported from a folder or if you did <em>not</em> import bounding boxes in the .csv file, 
-you must first use MegaDetector to automatically extract Regions of Interest (ROIs) 
+you must first use an object detector like MegaDetector to automatically extract Regions of Interest (ROIs) 
 that closely crop to the animal.</p>
 
 <h3 id="re-identification-model">Re-Identification Model</h3>
@@ -234,48 +273,49 @@ and pressing <b>“Edit”</b>. To select all images, press “Select All”.</p
 <p>NOTE: To save any changes, press the <b>Save</b> button.<br />
 To undo changes before saving, press the <b>Undo</b> button.</p>
 
-<h3 id="filtering-the-table">Filtering the Table</h3>
-<p>You can filter images by Region, Survey, Station and Viewpoint by selecting them from
-the dropdown. You can also filter for unidentified ROIs or favorited media by 
-checking the boxes next to those options. To apply selected filters, press <b>Apply 
-Filters</b>.</p>
+<p>To duplicate a media file or ROI, check the box under “Select” for the desired row(s) 
+and press the <b>“Duplicate”</b> button.</p>
+
+<p>To delete a media file or ROI, check the box under “Select” for the desired 
+row(s) and press the <b>“Delete”</b> button.</p>
 
 <h3 id="table-information">Table Information</h3>
 
 <p>The ROIs contain the following information:</p>
 
+<p><a name="#table-info"></a></p>
 <table>
 <tr>
 <td>Filepath*</td>
-<td>The local filepath</td></tr>
+<td>The local filepath to the image.</td></tr>
 
 <tr><td>Timestamp*</td>
-<td></td></tr>
+<td>Exif CreateDate if available, otherwise FileModifyDate.</td></tr>
 
 <tr><td>Station*</td>
-<td></td></tr>
+<td>The station (site) name or code that the file was taken at. </td></tr>
 
 <tr><td>Camera*</td>
-<td></td></tr>
+<td>The specific camera trap that is the source of the image.</td></tr>
 
 <tr><td>Sequence ID*</td>
-<td></td></tr>
+<td>A unique numerical id that refers to a specific sequence of images or frames from a video.</td></tr>
 
 <tr><td>External ID*</td>
 <td>This refers to a unique identifier to associate the image with its entry in 
 another database or software.</td></tr>
 
 <tr><td>Viewpoint</td>
-<td></td></tr>
+<td>The side of the body facing the camera, "Left" or "Right".</td></tr>
 
 <tr><td>Individual</td>
-<td></td></tr>
+<td>The name or code that identifies the individual.</td></tr>
 
 <tr><td>Sex</td>
-<td></td></tr>
+<td>"Male", "Female", or "Unknown".</td></tr>
 
 <tr><td>Age</td>
-<td></td></tr>
+<td>Approximate age, "juvenile", "Sub-adult", "Adult" or "Unknown".</td></tr>
 
 <tr><td>Reviewed</td>
 <td>If checked, this ROI was given an ID from the Match page.</td></tr>
@@ -292,19 +332,19 @@ another database or software.</td></tr>
 <table>
 <tr>
 <td>Filepath*</td>
-<td>The local filepath</td></tr>
+<td>The local filepath to the image.</td></tr>
 
 <tr><td>Timestamp*</td>
-<td></td></tr>
+<td>Exif CreateDate if available, otherwise FileModifyDate.</td></tr>
 
 <tr><td>Station*</td>
-<td></td></tr>
+<td>The station (site) name or code that the file was taken at. </td></tr>
 
 <tr><td>Camera*</td>
-<td></td></tr>
+<td>The specific camera trap that is the source of the image.</td></tr>
 
 <tr><td>Sequence ID*</td>
-<td></td></tr>
+<td>A unique numerical id that refers to a specific sequence of images or frames from a video.</td></tr>
 
 <tr><td>External ID*</td>
 <td>This refers to a unique identifier to associate the image with its entry in 
@@ -313,6 +353,14 @@ another database or software.</td></tr>
 <tr><td>Comment</td>
 <td>This is an editable text field in which you can input any extra information or comments.</td></tr>
 </table>
+
+<h3 id="filtering-the-table">Filtering the Table</h3>
+<p>You can filter images by Region, Survey, Station and Viewpoint by selecting them from
+the dropdown. You can also filter for unidentified ROIs or favorited media by 
+checking the boxes next to those options. To apply selected filters, press <b>Apply 
+Filters</b>.</p>
+
+<p><img src="/assets/screenshots/media_filters.png" style="display: block; margin: auto;" /></p>
 
 <p><br /></p>
 <h2 id="4-match">4. Match</h2>
@@ -447,13 +495,15 @@ pressing the <b>“Match”</b> button or the “M” key will unmatch it from t
 <p>In Quality Control mode, a new filter for Individual will appear, allowing you
 to select specific individuals to view and verify.</p>
 
+<p>In Quality Control mode, “Recalculate Matches” will …</p>
+
 <!-- screenshot -->
 
 <p><br /></p>
 <hr />
 
 <p><br /></p>
-<h1 id="troubleshooting"><a name="troubleshooting"></a>Troubleshooting</h1>
+<h1 id="troubleshooting-and-faq"><a name="troubleshooting"></a>Troubleshooting and FAQ</h1>
 <h3 id="importing-from-a-folder">Importing from a Folder</h3>
 
 <h3 id="database-management">Database Management</h3>
@@ -465,6 +515,9 @@ to select specific individuals to view and verify.</p>
 <p>Media</p>
 
 <p>Individuals</p>
+
+<p><b><u>How do I use my own Detector/Re-Identification Model?</u></b>
+Currently, MatchyPatchy only supports</p>
 
 <p><br /></p>
 <hr />
