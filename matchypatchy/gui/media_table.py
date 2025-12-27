@@ -43,12 +43,20 @@ class MediaTable(QWidget):
                                               "Station", "Camera", "Sequence ID", "External ID",
                                               "Viewpoint", "Individual", "Sex", "Age",
                                               "Reviewed", "Favorite", "Comment"])
-        # self.table.setSortingEnabled(True)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
+        # Connect sorting
+        self.sort_order = dict(zip(range(self.table.columnCount()),
+                                   [Qt.SortOrder.AscendingOrder]*self.table.columnCount()))
+        self.table.setSortingEnabled(False)
+        self.table.horizontalHeader().setSortIndicatorShown(True)
+        self.table.horizontalHeader().setSectionsClickable(True)
+        self.table.horizontalHeader().sectionClicked.connect(self.sort)
+        # Connect double click to edit row
         self.table.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.table.cellChanged.connect(self.update_entry)  # allow user editing
         self.table.cellChanged.connect(self.handle_checkbox_change)  # select change
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+
         # Add table to the layout
         layout.addWidget(self.table)
         self.setLayout(layout)
@@ -66,6 +74,7 @@ class MediaTable(QWidget):
         # clear old view
         self.data_type = data_type
         self.table.clearContents()
+        self.table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         # fetch data
         self.fetch()
         self.format_table()
@@ -133,7 +142,7 @@ class MediaTable(QWidget):
                             2: "filepath",
                             3: "timestamp",
                             4: "station",
-                            5: "camera",
+                            5: "camera_id",
                             6: "sequence_id",
                             7: "external_id",
                             8: "viewpoint",
@@ -170,7 +179,7 @@ class MediaTable(QWidget):
                             2: "filepath",
                             3: "timestamp",
                             4: "station",
-                            5: "camera",
+                            5: "camera_id",
                             6: "sequence_id",
                             7: "external_id",
                             8: "comment"}
@@ -273,6 +282,23 @@ class MediaTable(QWidget):
                 loading_bar.show()
 
             self.table_loader_thread.start()
+
+    def sort(self, column):
+        """
+        Sort table by column and order
+        """
+        reference = self.columns[column]
+        ascending = self.sort_order[column] == Qt.SortOrder.AscendingOrder
+        self.data_filtered.sort_values(by=reference, ascending=ascending, inplace=True)
+        self.data_filtered.reset_index(inplace=True, drop=True)
+        self.refresh_table()
+
+        # invert sort order for next click
+        self.sort_order[column] = (Qt.SortOrder.DescendingOrder
+                                   if self.sort_order[column] == Qt.SortOrder.AscendingOrder
+                                   else Qt.SortOrder.AscendingOrder)
+        # update the arrow indicator shown in the header
+        self.table.horizontalHeader().setSortIndicator(column, self.sort_order[column])
 
     # Set Table Entries --------------------------------------------------------
     def add_cell(self, row, column, qtw):
