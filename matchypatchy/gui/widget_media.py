@@ -174,6 +174,9 @@ class ImageWidget(QLabel):
 
         Connected to sliders in imageadjustmentbar widget
         """
+        # Reload original image
+        self.pil_image = Image.open(self.image_path)
+
         enhancer = ImageEnhance.Brightness(self.pil_image)
         self.pil_image = enhancer.enhance(brightness)
         enhancer = ImageEnhance.Contrast(self.pil_image)

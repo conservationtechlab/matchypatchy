@@ -102,12 +102,6 @@ class ImageAdjustBar(QWidget):
         self.sharpness_factor = 1.0
         self.mediawidget.image_widget.reset()
 
-    def reset_sliders(self):
-        """Reset sliders to default positions without changing image"""
-        self.slider_brightness.setValue(50)
-        self.slider_contrast.setValue(50)
-        self.slider_sharpness.setValue(50)
-
     def press_favorite(self):
         """Press favorite button, connect to Compare View"""
         current_rid = self.display.get_rid(self.side)
