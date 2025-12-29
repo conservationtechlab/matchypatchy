@@ -52,7 +52,6 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
            'DisplayMedia', 'FilterBar', 'FilterBox', 'HorizontalSeparator',
            'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
-<<<<<<< HEAD
            'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
            'MainWindow', 'MediaEditPopup', 'MediaTable', 'MediaWidget',
            'MetadataPanel', 'PairXPopup', 'READMEPopup', 'StandardButton',
@@ -65,7 +64,6 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
            'popup_media_edit', 'popup_ml', 'popup_pairx', 'popup_readme',
            'popup_station', 'popup_survey', 'widget_filterbar',
            'widget_image_adjustment', 'widget_media']
-=======
            'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow',
            'MediaEditPopup', 'MediaTable', 'MediaWidget', 'MetadataPanel',
            'PairXPopup', 'READMEPopup', 'StandardButton', 'StationFillPopup',
@@ -78,4 +76,3 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
            'popup_ml', 'popup_pairx', 'popup_readme', 'popup_station',
            'popup_survey', 'widget_filterbar', 'widget_image_adjustment',
            'widget_media']
->>>>>>> da65254 (update gui docstrings)

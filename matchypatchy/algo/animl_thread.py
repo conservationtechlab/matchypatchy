@@ -14,7 +14,6 @@ from matchypatchy.algo import models
 from matchypatchy import config
 
 
-
 MEGADETECTORv1000_SIZE = 960
 
 

@@ -30,11 +30,6 @@ from matchypatchy.database.media import export_data
 from matchypatchy import config
 
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> da65254 (update gui docstrings)
 class DisplayBase(QWidget):
     LOGO = config.resource_path("assets/graphics/logo.png")
 
