@@ -14,6 +14,7 @@ from matchypatchy import config
 
 import animl
 
+
 MEGADETECTORv1000_SIZE = 960
 
 class BuildManifestThread(QThread):

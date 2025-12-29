@@ -10,7 +10,7 @@ Jaguar/
 examples/
 Models/
 MatchyPatchy-Share/
-
+assets/dll/
 # Distribution / packaging
 .Python
 build/

@@ -19,7 +19,7 @@ from matchypatchy.gui import widget_filterbar
 from matchypatchy.gui import widget_image_adjustment
 from matchypatchy.gui import widget_media
 
-from matchypatchy.gui.display_base import (DisplayBase, LOGO,)
+from matchypatchy.gui.display_base import (DisplayBase,)
 from matchypatchy.gui.display_compare import (DisplayCompare,)
 from matchypatchy.gui.display_media import (DisplayMedia,)
 from matchypatchy.gui.gui_assets import (ClickableSlider, ComboBoxSeparator,
@@ -51,7 +51,7 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
            'DisplayMedia', 'FilterBar', 'FilterBox', 'HorizontalSeparator',
            'ICON_PENCIL', 'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
-           'LOGO', 'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
+           'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
            'MainWindow', 'MediaEditPopup', 'MediaTable', 'MediaWidget',
            'MetadataPanel', 'PairXPopup', 'READMEPopup', 'StandardButton',
            'StationFillPopup', 'StationPopup', 'SurveyFillPopup',
