@@ -4,7 +4,6 @@ Popup to add or edit config settings
 import os
 import logging
 from pathlib import Path
-import onnxruntime as ort
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
@@ -110,7 +109,9 @@ class ConfigPopup(QDialog):
         cuda_label = QLabel("CUDA Available:")
         cuda_label.setFixedWidth(self.column1_width)
         cuda_layout.addWidget(cuda_label)
-        cuda = True if "CUDAExecutionProvider" in ort.get_available_providers() else False
+        import onnxruntime as ort
+        cuda = ort.get_available_providers()
+        #cuda = True if "CUDAExecutionProvider" in ort.get_available_providers() else False
         cuda_available = QLabel(f"{cuda}")
         cuda_available.setStyleSheet("color: green;" if cuda else "color: red;")
         cuda_layout.addWidget(cuda_available, alignment=Qt.AlignmentFlag.AlignLeft)
