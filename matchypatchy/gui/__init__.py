@@ -36,7 +36,7 @@ from matchypatchy.gui.popup_individual import (IndividualFillPopup,
                                                IndividualPopup,)
 from matchypatchy.gui.popup_media_edit import (MediaEditPopup, MetadataPanel,)
 from matchypatchy.gui.popup_ml import (MLDownloadPopup, MLOptionsPopup,)
-#from matchypatchy.gui.popup_pairx import (PairXPopup,)
+# from matchypatchy.gui.popup_pairx import (PairXPopup,)
 from matchypatchy.gui.popup_readme import (AboutPopup, LicensePopup,
                                            READMEPopup,)
 from matchypatchy.gui.popup_station import (StationFillPopup, StationPopup,)
@@ -52,18 +52,6 @@ __all__ = ['AboutPopup', 'AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
            'DisplayMedia', 'FilterBar', 'FilterBox', 'HorizontalSeparator',
            'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
-           'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup',
-           'MainWindow', 'MediaEditPopup', 'MediaTable', 'MediaWidget',
-           'MetadataPanel', 'PairXPopup', 'READMEPopup', 'StandardButton',
-           'StationFillPopup', 'StationPopup', 'SurveyFillPopup',
-           'SurveyPopup', 'ThreePointSlider', 'VerticalSeparator',
-           'VideoPlayerBar', 'VideoViewer', 'VideoWidget', 'display_base',
-           'display_compare', 'display_media', 'gui_assets', 'main_display',
-           'main_gui', 'media_table', 'popup_alert', 'popup_config',
-           'popup_import_csv', 'popup_import_folder', 'popup_individual',
-           'popup_media_edit', 'popup_ml', 'popup_pairx', 'popup_readme',
-           'popup_station', 'popup_survey', 'widget_filterbar',
-           'widget_image_adjustment', 'widget_media']
            'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow',
            'MediaEditPopup', 'MediaTable', 'MediaWidget', 'MetadataPanel',
            'PairXPopup', 'READMEPopup', 'StandardButton', 'StationFillPopup',

@@ -342,12 +342,20 @@ class DisplayMedia(QWidget):
                     if self.data_type == 0:
                         id = int(self.media_table.data_filtered.at[row, "media_id"])
                         rois = self.media_table.data[self.media_table.data['media_id'] == id]
+                        embs = rois['emb_id']
                         self.mpDB.delete('media', f'id={id}')
                         for i, row in rois.iterrows():
                             self.mpDB.delete('roi', f"id={row['id']}")
+                        for emb in embs:
+                            if emb is not None:
+                                self.mpDB.delete_emb(id=emb)
+
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
+                        emb = int(self.media_table.data_filtered.at[row, "emb_id"])
                         self.mpDB.delete('roi', f'id={id}')
+                        if emb is not None:
+                            self.mpDB.delete_emb(id=emb)
                 del dialog
                 # Clear selection and update UI
                 self.media_table.table.clearSelection()
