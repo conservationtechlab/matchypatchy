@@ -124,9 +124,10 @@ class SurveyPopup(QDialog):
             self.mpDB.delete("survey", f'id={id}')
             # also delete associated media and roi
             for m in media:
-                rois = self.mpDB.select("roi", columns="id", row_cond=f'media_id={m[0]}')
+                rois = self.mpDB.select("roi", columns="emb_id", row_cond=f'media_id={m[0]}')
                 for r in rois:
-                    self.mpDB.delete_emb(r[0])
+                    if r[0] is not None:
+                        self.mpDB.delete_emb(r[0])
                 self.mpDB.delete("roi", f'media_id={m[0]}')
                 self.mpDB.delete("media", f'id={m[0]}')
         del dialog
