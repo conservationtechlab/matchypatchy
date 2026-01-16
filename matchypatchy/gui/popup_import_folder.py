@@ -10,13 +10,11 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QProgressBar,
 from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.widget_combobox import ComboBoxSeparator
+from matchypatchy.gui.gui_assets import ComboBoxSeparator
 
 from matchypatchy.algo.animl_thread import BuildManifestThread
 from matchypatchy.algo.import_thread import FolderImportThread
 
-
-# TODO: disable ok while importing, cancel thread
 
 class ImportFolderPopup(QDialog):
     def __init__(self, parent, directory):
@@ -60,6 +58,7 @@ class ImportFolderPopup(QDialog):
 
     # 1. Run Thread on entry
     def build_manifest(self):
+        """Start thread to build manifest from folder"""
         # show progress bar
         self.progress_bar.setRange(0, 0)
         self.build_thread = BuildManifestThread(self.directory)
@@ -68,6 +67,7 @@ class ImportFolderPopup(QDialog):
 
     # 2. Receive data from thread, check if valid
     def get_manifest(self, manifest):
+        """Receive manifest from thread, proceed or alert no images found"""
         self.progress_bar.hide()
         self.data = manifest
 
@@ -78,14 +78,15 @@ class ImportFolderPopup(QDialog):
             if dialog.exec():
                 self.reject()
 
-    # 3. Offer
+    # 3. Offer Station Options
     def get_options(self):
+        """Offer options for station level selection"""
         self.label.setText("Select a level in the directory hierarchy that corresponds to station, if available:")
         self.station.show()
         self.buttonBox.show()
 
         # get potential station
-        example = self.data.loc[0, 'FilePath']
+        example = self.data.loc[0, 'filepath']
         self.station.addItems(list(Path(example).parts)[1:])
 
     # 4. Import manifest into media table
@@ -96,12 +97,14 @@ class ImportFolderPopup(QDialog):
         # assert bbox in manifest.columns
         self.progress_bar.setRange(0, len(self.data))
         self.progress_bar.show()
+        self.buttonBox.setDisabled(True)
 
         station_level = 0 if self.station.currentIndex() == 0 else self.station.currentIndex() - 1
 
         logging.info(f"Adding {len(self.data)} files to Database")
 
         self.import_thread = FolderImportThread(self.mpDB, self.active_survey, self.data, station_level)
+        self.rejected.connect(self.import_thread.requestInterruption)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.accept)
         self.import_thread.start()

@@ -1,0 +1,157 @@
+
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>MatchyPatchy User Manual | MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment.</title>
+<meta name="generator" content="Jekyll v3.10.0" />
+<meta property="og:title" content="MatchyPatchy User Manual" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment." />
+<meta property="og:description" content="MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment." />
+<link rel="canonical" href="http://localhost:4000/" />
+<meta property="og:url" content="http://localhost:4000/" />
+<meta property="og:site_name" content="MatchyPatchy User Manual" />
+<meta property="og:type" content="website" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","description":"MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment.","headline":"MatchyPatchy User Manual","name":"MatchyPatchy User Manual","url":"http://localhost:4000/"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="MatchyPatchy User Manual" /></head>
+
+<body>
+    <!-- Header -->
+    <header class="site-header" role="banner">
+        <div class="header-wrapper">
+            <!-- logo goes here -->
+            <a class="site-title" rel="author" href="/">MatchyPatchy User Manual</a>
+            <nav class="site-nav">
+                <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="layout">
+        <!-- Sidebar navigation -->
+        <aside class="sidebar">
+        <h2>Navigation</h2>
+        <nav>
+        <a href="#bounding-box">Bounding Box</a>
+        <a href="#camera">Camera</a>
+        <a href="#capture">Capture</a>
+        <a href="#detector">Detector</a>
+        <a href="#distance-metric">Distance Metric</a>
+        <a href="#distance-threshold">Distance Threshold</a>
+        <a href="#embedding">Embedding</a>
+        <a href="#individual">Individual</a>
+        <a href="#model">Model</a>
+        <a href="#region">Region</a>
+        <a href="#roi">ROI</a>
+        <a href="#sequence">Sequence</a>
+        <a href="#station">Station</a>
+        <a href="#survey">Survey</a>     
+        <a href="#viewpoint">Viewpoint</a>
+        </nav>
+        </aside>
+        <!-- Main Content -->
+        <main class="page-content" aria-label="Content">
+            <div class="wrapper">
+                <div class="home">
+                    <h1 id="bounding-box-">Bounding Box <a name="bounding-box"></a></h1>
+<p>The coordinates of a rectangle that define an ROI within an image.
+The coordinates are relative to the size of the image (between 0 and 1) 
+and are given as:
+bbox_x - the x coordinate of the top-left corner of the rectangle
+bbox_y - the y coordinate of the top-left corner of the rectangle
+bbox_w - the width of the box as a proportion of the whole image
+bbox_h - the height of the box as a proportion of the whole image</p>
+
+<h1 id="camera-">Camera <a name="camera"></a></h1>
+<p>A physical camera trap device deployed at a Station.</p>
+
+<h1 id="capture-">Capture <a name="capture"></a></h1>
+
+<h1 id="detector-">Detector <a name="detector"></a></h1>
+<p>A machine-learning model that is capable of detecting the animals in raw camera trap images (e.g. MegaDetector).</p>
+
+<h1 id="distance-metric-">Distance Metric <a name="distance-metric"></a></h1>
+<p>A method for quantifying the dissimilarity of two vectors.</p>
+
+<h2 id="cosine-distance">Cosine Distance</h2>
+<p>The cosine of the angle between the vectors, or the dot product of the vectors divided by the product of their lengths.</p>
+
+<h2 id="l2-distance">L2 Distance</h2>
+<p>Also known as the Euclidean distance, the straight-line distance between two vectors in n-dimensional space.</p>
+
+<h2 id="distance-threshold-">Distance Threshold <a name="distance-threshold"></a></h2>
+<p>The upper-bound of the chosen distance metric that will include an image in the match stack
+as a potential match when its distance to the query image is below the threshold.</p>
+
+<h1 id="embedding-">Embedding <a name="embedding"></a></h1>
+<p>The output of the re-identification model that describes the image as a single vector.</p>
+
+<h1 id="individual-">Individual <a name="individual"></a></h1>
+<p>A single, distinct, self-contained living entity. An individual can be given a name,
+and has attributes sex and age at a given point in time.</p>
+
+<h1 id="model-">Model <a name="model"></a></h1>
+<p>In machine learning, a complex algorithm that transforms data of one kind (e.g. a .png image)
+into another kind (e.g. a 2,180-point vector) after learning patterns of associations through 
+many examples.</p>
+
+<h1 id="region-">Region <a name="region"></a></h1>
+<p>A geographical region that may host one or more Surveys (e.g. “Northest Peru”).</p>
+
+<h1 id="roi-">ROI <a name="roi"></a></h1>
+<p>A “Region of Interest” within an image that is defined by a bounding box and typically contains
+an animal and minimal background.</p>
+
+<h1 id="sequence-">Sequence <a name="sequence"></a></h1>
+<p>A set of images taken in quick succession at a specific location.
+A sequence can also refer to the frames of a video.</p>
+
+<h1 id="station-">Station <a name="station"></a></h1>
+<p>A specific location within the geological bounds of a Survey that contains one or more camera traps.</p>
+
+<h1 id="survey-">Survey <a name="survey"></a></h1>
+<p>A camera trap study in a particular geographical Region over a specific period of time
+that encompasses a set of cameras at specific Station locations.</p>
+
+<h1 id="viewpoint-">Viewpoint <a name="viewpoint"></a></h1>
+<p>The visible side of the animal’s body in an image as seen from the camera.</p>
+
+
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- Footer -->
+    <footer class="site-footer h-card">
+        <data class="u-url" href="/"></data>
+        <div class="footer-wrapper">
+
+            <h2 class="footer-heading">MatchyPatchy</h2>
+
+            <div class="footer-col-wrapper">
+                <div class="footer-col footer-col-1">
+                    <ul class="contact-list">
+                    <li>San Diego Zoo Wildlife Alliance</li>
+                    <li>©2025</li></ul>
+                </div>
+
+                <div class="footer-col footer-col-2"><ul class="social-media-list">
+                    <li class="p-name"><a href="/contact/">Contact</a></li>
+                    <li><a href="https://github.com/conservationtechlab"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">conservationtechlab</span></a></li></ul>
+                </div>
+
+            <div class="footer-col footer-col-3">
+                <p>MatchyPatchy is a desktop application for aiding in camera trap-based 
+                    re-identification for accurate population assessment. </p>
+            </div>
+
+        </div></div>
+    </footer>
+</body>
+
+</html>

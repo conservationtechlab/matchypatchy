@@ -1,0 +1,564 @@
+
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1"><!-- Begin Jekyll SEO tag v2.8.0 -->
+<title>MatchyPatchy User Manual | MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment.</title>
+<meta name="generator" content="Jekyll v3.10.0" />
+<meta property="og:title" content="MatchyPatchy User Manual" />
+<meta property="og:locale" content="en_US" />
+<meta name="description" content="MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment." />
+<meta property="og:description" content="MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment." />
+<link rel="canonical" href="http://localhost:4000/" />
+<meta property="og:url" content="http://localhost:4000/" />
+<meta property="og:site_name" content="MatchyPatchy User Manual" />
+<meta property="og:type" content="website" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","description":"MatchyPatchy is a desktop application for aiding in camera trap-based re-identification for accurate population assessment.","headline":"MatchyPatchy User Manual","name":"MatchyPatchy User Manual","url":"http://localhost:4000/"}</script>
+<!-- End Jekyll SEO tag -->
+<link rel="stylesheet" href="/assets/main.css"><link type="application/atom+xml" rel="alternate" href="http://localhost:4000/feed.xml" title="MatchyPatchy User Manual" /></head>
+
+<body>
+    <!-- Header -->
+    <header class="site-header" role="banner">
+        <div class="header-wrapper">
+            <!-- logo goes here -->
+            <a class="site-title" rel="author" href="/">MatchyPatchy User Manual</a>
+            <nav class="site-nav">
+                <div class="trigger"><a class="page-link" href="/about/">About</a></div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <div class="layout">
+        <!-- Sidebar navigation -->
+        <aside class="sidebar">
+        <h2>Navigation</h2>
+        <nav>
+        <a href="#installation">Installation</a>
+        <a href="#getting-started">Getting Started</a>
+        <a href="#usage">Using MatchyPatchy</a>
+        <a href="#quality-control">Quality Control</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+        <a href="glossary">Glossary</a>
+        <a href="release-notes">Release Notes</a>
+        <a href="/contact/">Contact</a>
+        </nav>
+        </aside>
+        <!-- Main Content -->
+        <main class="page-content" aria-label="Content">
+            <div class="wrapper">
+                <div class="home">
+                    <h1 id="installation"><a name="installation"></a>Installation</h1>
+
+<p>Download MatchyPatchy:</p>
+<table>
+<tr><td>Windows</td><td>LINK</td></tr>
+<tr><td>MacOS</td><td>LINK</td></tr>
+<tr><td>Ubuntu</td><td>22.04</td><td>24.04</td></tr>
+</table>
+
+<p>The app may take several second to start up.</p>
+
+<p>Requirements:</p>
+
+<p>MatchyPatchy requires Python &gt;= 3.12. <a href="">Download Python</a>.<br />
+For use with Nvida GPU, first <a href="https://developer.nvidia.com/cuda-downloads">install CUDA</a>.</p>
+
+<h2 id="install-via-github">Install via GitHub</h2>
+
+<ol>
+  <li>Go to the MatchyPatchy GitHub <a href="">repo</a>.</li>
+  <li>Clone the repository to your local machine.</li>
+  <li>In a terminal, navigate to the cloned repository.
+    <blockquote>
+      <p>cd matchypatchy</p>
+    </blockquote>
+  </li>
+  <li>Using pip, install dependencies. We recommend using a virtual environment.
+    <blockquote>
+      <p>pip install -r requirements.txt</p>
+    </blockquote>
+  </li>
+  <li>Launch MatchyPatchy from the terminal
+    <blockquote>
+      <p>python -m matchypatchy</p>
+    </blockquote>
+  </li>
+</ol>
+
+<p><br /></p>
+<hr />
+
+<p><br /></p>
+<h1 id="getting-started"><a name="getting-started"></a>Getting Started</h1>
+
+<p>Welcome to the MatchyPatchy User Manual! This manual is designed to help you 
+get started with MatchyPatchy, a desktop application for aiding in camera 
+trap-based re-identification for accurate population assessment. MatchyPatchy
+supports both images and video, and the database that is created can be shared 
+and exported easily.</p>
+
+<p>When running MatchyPatchy for the first time, there are a few things to take care of first.</p>
+
+<h3 id="project-directory">Project Directory</h3>
+<p>On first launch, MatchyPatchy will create a folder in the location of the launcher
+called “MatchyPatchy-Share” that houses the database, any AI models you download, 
+and exported data.</p>
+
+<p>You can select a different MatchyPatchy-Share folder in Edit &gt; Configuration - Project Directory. 
+If you rename the folder, you must update the path in Edit &gt; Configuration - Project Directory.</p>
+
+<h3 id="surveys">Surveys</h3>
+<p>MatchyPatchy organizes sets of camera trap data by survey. On first launch, MatchyPatchy
+will create a Default Survey. To edit the name of this survey, select <b>“Manage Survey”</b>,
+select “Default Survey”, and press the <b>“Edit”</b> button.</p>
+
+<p>To add a new survey, press the <b>”+”</b> 
+button to add a new survey. A popup will appear. Input the Name of the survey, 
+the geographical Region the survey occured in, and the Start and End Year of the 
+survey period. You can view surveys by selecting <b>“Manage Surveys”</b>. A popup
+with the list of durveys will appear, allowing you to add, edit, and delete surveys.</p>
+
+<!-- Survey Popup -->
+
+<h3 id="stations">Stations</h3>
+<p>MatchyPatchy assumes that groups of camera trap images were collected from particular camera
+stations. When importing data from a folder of images, such as from a station, you can
+select the station name from the folder structure. You can also import multiple stations 
+at once, though this requires that the folder hierarchy is consistent across stations, 
+i.e. that the station name is at the same “depth” throughout the given directory.</p>
+
+<p>When importing from a .csv file, make sure there is a column that provides station information.</p>
+
+<!-- Example folder structure -->
+
+<h3 id="ai-models">AI Models</h3>
+<p>In order to predict potential matches, MatchyPatchy requires MegaDetector and 
+a matching algorithm suitable for your species of interest. We also recommend a 
+viewpoint detection algorithm to prescreen for impossible matches between different 
+sides of the animal. You can download models 
+from our server by pressing the <b>“Download ML Models”</b> button or by selecting the 
+File &gt; <b>Download ML Models</b> option from the menubar. MatchyPatchy downloads the 
+models into the <i>MatchyPatchy-Share/models</i> directory.</p>
+
+<p><u>Available models:</u></p>
+<table>
+<tr><td>MegaDetector v1000_sorrel</td><td>Standard MegaDetector model</td></tr>
+<tr><td>MiewID v3</td><td>Matching algorithm good for big cats, whales, ...</td></tr>
+<tr><td>Big Cat Viewpoint</td></tr>
+</table>
+
+<p>Once you have added a survey, organized the data by station, and downloaded the 
+required models, you are ready to start using MatchyPatchy!</p>
+
+<p><br /></p>
+<hr />
+
+<p><br /></p>
+<h1 id="using-matchypatchy"><a name="usage"></a>Using MatchyPatchy</h1>
+
+<p>To begin using MatchyPatchy to match individuals, select a survey to add camera 
+trap data to, or create a new survey. Then follow the steps in the left column
+of the Home page.</p>
+
+<p><img src="/assets/screenshots/home_page.png" style="display: block; margin: auto;" /></p>
+
+<h2 id="1-import-data">1. Import Data</h2>
+<p>MatchyPatchy supports importing raw data from a folder, as well as from a .csv.
+The .csv can contain preprocessed information such as bounding boxes, timestamps, etc.</p>
+
+<h3 id="from-a-folder">From a Folder</h3>
+<p>To import a folder of images, select Step 1. Import from Folder and select the 
+desired folder in the browser popup. Then select the level in the folder tree 
+that refers to the camera trap Station and then press okay.</p>
+
+<p>MatchyPatchy can import multiple stations at 
+once if they are all contained in a single higher-level directory. However, all of the
+Station folders must be at the same depth within the directory.  Select the level
+that corresponds to Station from the example path and then press OK.</p>
+
+<!--file tree example -->
+
+<h3 id="from-a-csv-file">From a .CSV File</h3>
+<p>You can import a pre-processed spreadsheet that contains information about the images.
+MatchyPatchy can accept the following information as columns:</p>
+
+<ul>
+  <li>Filepath (full local path required)</li>
+  <li>Timestamp (required)</li>
+  <li>Survey (required)</li>
+  <li>Station (required)</li>
+  <li>Region</li>
+  <li>Camera</li>
+  <li>Sequence ID</li>
+  <li>External ID</li>
+  <li>Viewpoint</li>
+  <li>Individual</li>
+  <li>Comment</li>
+</ul>
+
+<p>The names in the spreadsheet do not have to be identical to the ones above. 
+Once you select a .csv file to import MatchyPatchy will ask you to associate 
+columns in the .csv file to the information it can accept. The full filepaths 
+to the images that can be accessed from your machine, timestamps, and
+station names are required fields. If your .csv does not contain a column that 
+conveys the optional information, leave the column selection to “None”.</p>
+
+<p>For more information about these fields, see <a href="#table-information"> media 
+table information</a>.</p>
+
+<p><br /></p>
+<h2 id="2-process">2. Process</h2>
+<p>After importing images by either selecting a folder or .csv file, you must 
+then process the data with AI. MatchyPatchy looks for models in the MatchyPatchy-Share/models
+folder. You can download models from our server by selecting File &gt; Download Models 
+from the menubar.</p>
+
+<p><img src="/assets/screenshots/process.png" style="display: block; margin: auto;" /></p>
+
+<h3 id="calculate-sequence">Calculate Sequence</h3>
+<p>You can optionally check “Calculate Sequence” which will group images together based on 
+Station and timestamp. By default, sequences will have no more than 3 images per 
+sequence that occur within 60 seconds. The default images per sequence and sequence
+length in seconds can be changed in Edit &gt; Configuration</p>
+
+<p>Videos will each be given their own sequence ID number. A set number of frames will be 
+extracted from each video to be processed by the Detector and Re-Identification models.
+These frames will also be assigned that sequence ID and will behave similarly to a 
+sequence of images. The default number of extracted frames is 3 and can be changed
+in Edit &gt; Configuration.</p>
+
+<h3 id="detector-model">Detector Model</h3>
+<p>If you imported from a folder or if you did <em>not</em> import bounding boxes in the .csv file, 
+you must first use an object detector like MegaDetector to automatically extract Regions of Interest (ROIs) 
+that closely crop to the animal.</p>
+
+<h3 id="re-identification-model">Re-Identification Model</h3>
+<p>In order to calculate potential matches, each ROI has to processed with an 
+embedding extractor such as MiewIDv3.</p>
+
+<h3 id="viewpoint">Viewpoint</h3>
+<p>For some species, we offer a viewpoint model that determines whether the animal
+is facing left or right. MatchyPatchy only offers potential matches 
+with the same viewpoint, or if viewpoint information is missing.
+Viewpoint can be manually input or edited in the Media page.</p>
+
+<p><br /></p>
+<h2 id="3-validate">3. Validate</h2>
+
+<p>Before beginning the matching process, we recommend validating the AI output.
+This step will bring you to a table that lists all of the animals identified in
+the images or videos, as well as associated metadata. From here you can verify that 
+each ROI contains a single animal. You can return to the Home page or continue
+to the Match page by pressing the corresponding buttons.</p>
+
+<p>To view the full images, select “Full Images” from the <b>“Show:”</b> dropdown menu.</p>
+
+<p><img src="/assets/screenshots/media_page.png" style="display: block; margin: auto;" /></p>
+
+<h3 id="editing-the-table">Editing the Table</h3>
+<p>You can edit the table directly by double-clicking a cell and inputing the desired value.
+Certain fields are not editable, such as Filepath and Station (marked with * below).
+Station names can be changed via the “Manage Stations” button on the Home page.</p>
+
+<p>You can edit a row by double-clicking on the row number to the left. This will show
+a popup that contains the image and metadata, including editable fields.</p>
+
+<p>You can edit multiple images at once by checking the boxes under the “Select” column
+and pressing <b>“Edit”</b>. To select all images, press “Select All”.</p>
+
+<p>NOTE: To save any changes, press the <b>Save</b> button.<br />
+To undo changes before saving, press the <b>Undo</b> button.</p>
+
+<p>To duplicate a media file or ROI, check the box under “Select” for the desired row(s) 
+and press the <b>“Duplicate”</b> button.</p>
+
+<p>To delete a media file or ROI, check the box under “Select” for the desired 
+row(s) and press the <b>“Delete”</b> button.</p>
+
+<h3 id="table-information">Table Information</h3>
+
+<p>The ROIs contain the following information:</p>
+
+<p><a name="#table-info"></a></p>
+<table>
+<tr>
+<td>Filepath*</td>
+<td>The local filepath to the image.</td></tr>
+
+<tr><td>Timestamp*</td>
+<td>Exif CreateDate if available, otherwise FileModifyDate.</td></tr>
+
+<tr><td>Station*</td>
+<td>The station (site) name or code that the file was taken at. </td></tr>
+
+<tr><td>Camera*</td>
+<td>The specific camera trap that is the source of the image.</td></tr>
+
+<tr><td>Sequence ID*</td>
+<td>A unique numerical id that refers to a specific sequence of images or frames from a video.</td></tr>
+
+<tr><td>External ID*</td>
+<td>This refers to a unique identifier to associate the image with its entry in 
+another database or software.</td></tr>
+
+<tr><td>Viewpoint</td>
+<td>The side of the body facing the camera, "Left" or "Right".</td></tr>
+
+<tr><td>Individual</td>
+<td>The name or code that identifies the individual.</td></tr>
+
+<tr><td>Sex</td>
+<td>"Male", "Female", or "Unknown".</td></tr>
+
+<tr><td>Age</td>
+<td>Approximate age, "juvenile", "Sub-adult", "Adult" or "Unknown".</td></tr>
+
+<tr><td>Reviewed</td>
+<td>If checked, this ROI was given an ID from the Match page.</td></tr>
+
+<tr><td>Favorite</td>
+<td>If checked, this ROI was marked for future lookup and quality control.</td></tr>
+
+<tr><td>Comment</td>
+<td>This is an editable text field in which you can input any extra information or comments.</td></tr>
+</table>
+
+<p>The Full Images contain the following information:</p>
+
+<table>
+<tr>
+<td>Filepath*</td>
+<td>The local filepath to the image.</td></tr>
+
+<tr><td>Timestamp*</td>
+<td>Exif CreateDate if available, otherwise FileModifyDate.</td></tr>
+
+<tr><td>Station*</td>
+<td>The station (site) name or code that the file was taken at. </td></tr>
+
+<tr><td>Camera*</td>
+<td>The specific camera trap that is the source of the image.</td></tr>
+
+<tr><td>Sequence ID*</td>
+<td>A unique numerical id that refers to a specific sequence of images or frames from a video.</td></tr>
+
+<tr><td>External ID*</td>
+<td>This refers to a unique identifier to associate the image with its entry in 
+another database or software.</td></tr>
+
+<tr><td>Comment</td>
+<td>This is an editable text field in which you can input any extra information or comments.</td></tr>
+</table>
+
+<h3 id="filtering-the-table">Filtering the Table</h3>
+<p>You can filter images by Region, Survey, Station and Viewpoint by selecting them from
+the dropdown. You can also filter for unidentified ROIs or favorited media by 
+checking the boxes next to those options. To apply selected filters, press <b>Apply 
+Filters</b>.</p>
+
+<p><img src="/assets/screenshots/media_filters.png" style="display: block; margin: auto;" /></p>
+
+<p><br /></p>
+<h2 id="4-match">4. Match</h2>
+<!-- Match page -->
+
+<p>Once you have validated that each ROI contains a single animal and that all station
+names and viewpoints are correct, select Step 4. Match from the Home page or from within
+the Media page. This will take you to the Match page, shown below.</p>
+
+<p><img src="/assets/screenshots/match_page.png" style="display: block; margin: auto;" /></p>
+
+<p>The left side of the screen shows an unidentfied Query ROI and its metadata, 
+while the right side shows one of the potential Match ROIs based on the chosen
+Match Embedding model. MatchyPatchy will show potential matches that are of the 
+same viewpoint of the animal, and are not from the same sequence or individual 
+already. Potential match sequences are sorted by the distance between the two 
+ROIs in their vector space in increasing order, with priority given to previously 
+identified images.</p>
+
+<h3 id="navigation">Navigation</h3>
+
+<p>The number of matches for the query sequence and currently displayed match index 
+are displayed above the match image. 
+Move through each potential match for the given query image by pressing 
+the <b>«</b> and <b>»</b> buttons on the Match (right) side or the Left and 
+Right arrow keys on the keyboard.</p>
+
+<p>The box on the far right displays the calculated distance between the two images.
+The smaller the number, the more likely a match.</p>
+
+<p>You can toggle the viewpoint filter to display only left-side or only right-side
+images, assuming viewpoint had been determined for each image prior. You can select 
+all viewpoints by moving the toggle back to the center.</p>
+
+<p><img src="/assets/screenshots/match.png" style="display: block; margin: auto;" /></p>
+
+<p><br />
+Once you have determined which potential matches are confirmed for that sequence, 
+you can move to the next sequence.  Move
+through sequences by pressing the <b>«</b> and <b>»</b> buttons on the left 
+“Query Image:” side or the Up and Down arrow keys on the keyboard. If there are 
+more than one image in a query sequence, you can move through those images by pressing 
+the <b>«</b> and <b>»</b> arrows on the “Sequence:” side.</p>
+
+<p><img src="/assets/screenshots/query.png" style="display: block; margin: auto;" /></p>
+
+<h3 id="making-a-match">Making a Match</h3>
+
+<p>When you believe the image on the right side is a match for the query image on the left,
+select the <b>“Match”</b> button in the center or by pressing “M” on your keyboard. 
+If the match image does not have an individual ID, a popup will appear to allow 
+you to create a new name. If you can tell the animal’s sex and age from the images, 
+you can select that information from the dropdowns at this time as well.</p>
+
+<p><img src="/assets/screenshots/new_match.png" style="display: block; margin: auto;" /></p>
+
+<p>After selecting “OK”, both the Query and Match metadata will update to reflect 
+the new information.</p>
+
+<p>If the Match ROI has already been identified, pressing the “Match” button will 
+apply that name to the Query ROI.</p>
+
+<p>The “Match” button will turn green if the Query and Match ROIs belong to the same 
+individual. Pressing “Match” while it is green will unmatch the images and reset 
+the Query ROI’s identification to None.</p>
+
+<h3 id="distance-metrics">Distance Metrics</h3>
+<p>By default, MatchyPatchy calculates the cosine distance between each embedding vector
+and presents only potential matches with a distance below than 0.5. You can change 
+this threshold using the slider (or input a number directly), as well as calculate
+the L2 distance instead. Press <b>“Recalculate Matches”</b> to use a different distance 
+metric and/or threshold.</p>
+
+<p>At any point, you can press <b>“Recalculate Matches”</b> to filter out all confirmed 
+matches that have been made so far.</p>
+
+<p><img src="/assets/screenshots/distance.png" style="display: block; margin: auto;" /></p>
+
+<h3 id="quality-control-by-individual">Quality Control by Individual</h3>
+
+<p>You can enter Quality Control mode by pressing the <b>“Quality Control by Individual”</b>
+button. See <a href="#quality-control">Quality Control</a> for more information.</p>
+
+<h3 id="filters">Filters</h3>
+
+<p>You can restrict the search space by a specifc Region, Survey, or even Station.
+Select the desired filter(s) from the dropdown and press <b>“Apply Filters”</b> to 
+recalculate matches within the bounds of those filters.</p>
+
+<p><img src="/assets/screenshots/match_filters.png" style="display: block; margin: auto;" /></p>
+
+<h3 id="image-adjustments">Image Adjustments</h3>
+
+<p>You can adjust the Brightness, Sharpness and Contrast using the sliders below each
+image. To reset the image to its original state, press <b>“Reset”</b>.</p>
+
+<p>To edit the image metadata, press <b>“Edit Image”</b>.</p>
+
+<p>You can open the image in your default image viewer by pressing <b>“Open Image”</b>.</p>
+
+<p>You can mark the image as a “Favorite” by pressing the <b>♥</b> button.</p>
+
+<p><br /></p>
+<h2 id="5-export">5. Export</h2>
+<p>You can export the entire database as a .csv by selecting <b>Step 5. Export</b> on the
+Home page. The .csv file will include local filepaths, timestamps, Survey and Station information,
+bounding boxes, and any Individual information that was added from the Match page.</p>
+
+<h3 id="sharing-a-database">Sharing a Database</h3>
+<p>You can move and share the entire MatchyPatchy-Share directory. Be sure to set 
+the correct path to the directory by selecting Edit &gt; Configuration - Project Directory.
+MatchyPatchy will verify that the database within the directory is compatible with
+the current version of MatchyPatchy.</p>
+
+<p><br /></p>
+<hr />
+
+<p><br /></p>
+<h1 id="quality-control"><a name="quality-control"></a>Quality Control</h1>
+
+<p>After you have identified every image, you can verify the labels by selecting 
+<b>4. Match</b> from the Home page and then selecting <b>Quality Control by Individual</b>.
+This will place every named individual in the query cue and put every example image
+for that individual in both the query and match sides. This allows you to compare 
+each example of an individual against each other example to confirm that all belong
+to that individual. It is recommended that viewpoint is determined for all ROIs 
+prior to starting Quality Control.</p>
+
+<p>If an ROI on the Query (left) side is determined to be of a different individual,
+pressing the <b>“Match”</b> button or the “M” key will unmatch it from that individual ID.</p>
+
+<p>In Quality Control mode, a new filter for Individual will appear, allowing you
+to select specific individuals to view and verify.</p>
+
+<p>In Quality Control mode, “Recalculate Matches” will …</p>
+
+<!-- screenshot -->
+
+<p><br /></p>
+<hr />
+
+<p><br /></p>
+<h1 id="troubleshooting-and-faq"><a name="troubleshooting"></a>Troubleshooting and FAQ</h1>
+<h3 id="importing-from-a-folder">Importing from a Folder</h3>
+
+<h3 id="database-management">Database Management</h3>
+
+<p>Surveys</p>
+
+<p>Stations</p>
+
+<p>Media</p>
+
+<p>Individuals</p>
+
+<p><b><u>How do I use my own Detector/Re-Identification Model?</u></b>
+Currently, MatchyPatchy only supports</p>
+
+<p><br /></p>
+<hr />
+
+<p><br /></p>
+<h2 class="post-list-heading">Release Notes</h2>
+<ul class="post-list"><li><span class="post-meta">Oct 13, 2025</span>
+    <h3>
+ <a class="post-link" href="/jekyll/update/2025/10/13/welcome-to-jekyll.html">v1.0.0</a>
+    </h3></li></ul>
+
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- Footer -->
+    <footer class="site-footer h-card">
+        <data class="u-url" href="/"></data>
+        <div class="footer-wrapper">
+
+            <h2 class="footer-heading">MatchyPatchy</h2>
+
+            <div class="footer-col-wrapper">
+                <div class="footer-col footer-col-1">
+                    <ul class="contact-list">
+                    <li>San Diego Zoo Wildlife Alliance</li>
+                    <li>©2025</li></ul>
+                </div>
+
+                <div class="footer-col footer-col-2"><ul class="social-media-list">
+                    <li class="p-name"><a href="/contact/">Contact</a></li>
+                    <li><a href="https://github.com/conservationtechlab"><svg class="svg-icon"><use xlink:href="/assets/minima-social-icons.svg#github"></use></svg> <span class="username">conservationtechlab</span></a></li></ul>
+                </div>
+
+            <div class="footer-col footer-col-3">
+                <p>MatchyPatchy is a desktop application for aiding in camera trap-based 
+                    re-identification for accurate population assessment. </p>
+            </div>
+
+        </div></div>
+    </footer>
+</body>
+
+</html>

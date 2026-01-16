@@ -8,6 +8,7 @@ from datetime import datetime
 
 
 def setup_database(key, filepath):
+    """Set up SQLite database with required tables"""
     # Connect to SQLite database
     db = sqlite3.connect(filepath)
     cursor = db.cursor()
@@ -49,12 +50,13 @@ def setup_database(key, filepath):
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
+                        camera_id INTEGER,
                         sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
-                        favorite INTEGER NOT NULL,
                         FOREIGN KEY (station_id) REFERENCES station (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id) );''')
+                        FOREIGN KEY (camera_id) REFERENCES camera (id),
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id));''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
@@ -66,46 +68,41 @@ def setup_database(key, filepath):
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
                         viewpoint INTEGER,
-                        species_id INTEGER,
                         reviewed INTEGER NOT NULL,
+                        favorite INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb INTEGER,
-                        FOREIGN KEY(media_id) REFERENCES media (id)
-                        FOREIGN KEY(individual_id) REFERENCES individual (id)
-                        FOREIGN KEY(species_id) REFERENCES species (id));''')
+                        FOREIGN KEY(media_id) REFERENCES media (id),
+                        FOREIGN KEY(individual_id) REFERENCES individual (id));''')
 
     # INDIVIDUAL
     cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
                         id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
-                        species_id INTEGER,
                         sex TEXT,
-                        age TEXT,
-                        FOREIGN KEY(species_id) REFERENCES species (id));''')
-    
-    # SPECIES
-    cursor.execute('''CREATE TABLE IF NOT EXISTS species (
-                        id INTEGER PRIMARY KEY,
-                        binomen TEXT NOT NULL,
-                        common TEXT NOT NULL );''')
+                        age TEXT);''')
 
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
 
+    # CAMERA
+    cursor.execute('''CREATE TABLE IF NOT EXISTS camera (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        station_id INTEGER NOT NULL,
+                        FOREIGN KEY (station_id) REFERENCES station (id));''')
 
     # THUMBNAILS
-    cursor.execute('''DROP TABLE IF EXISTS media_thumbnails;''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        fid INTEGER NOT NULL,
+                        fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES media (id));''')
 
-    cursor.execute('''DROP TABLE IF EXISTS roi_thumbnails;''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        fid INTEGER NOT NULL,
+                        fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES roi (id));''')
 
@@ -117,6 +114,7 @@ def setup_database(key, filepath):
 
 
 def setup_chromadb(key, filepath):
+    """Set up ChromaDB vector database for embeddings"""
     client = chromadb.PersistentClient(str(filepath))
     client.create_collection(
         name="embedding_collection",
@@ -125,5 +123,5 @@ def setup_chromadb(key, filepath):
             "created": str(datetime.now()),
             "hnsw:space": "cosine",
             "key": key
-        }  
+        }
     )

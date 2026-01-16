@@ -1,7 +1,9 @@
 """
-Popup for Selection within a list, ie Survey selection
+Popup for selecting and downloading ML models
 
 """
+import logging
+
 from pathlib import Path
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
@@ -12,21 +14,25 @@ from matchypatchy import config
 
 
 class MLDownloadPopup(QDialog):
+    """
+    Popup to select and download available ML models
+    """
     def __init__(self, parent):
         super().__init__(parent)
-        self.ml_dir = Path(config.load('ML_DIR'))
-        self.ml_cfg = models.load()
+        # update model yml
+        update_confirmed = models.update_model_yml()
+        logging.info(f"Model yaml update attempt: {update_confirmed}")
+        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        self.ml_cfg = models.load_model()
         self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
         self.available_models = self.discover_models()
-
         self.setWindowTitle("Select Models")
 
         # Create layout for the checkboxes and add it to the dialog
         layout = QVBoxLayout(self)
         self.checkbox_layout = QGridLayout()
         layout.addLayout(self.checkbox_layout)
-
         # Add checkboxes to the grid layout in two columns
         self.models = list(self.models)  # convert to ordered list
         for i, m in enumerate(self.models):
@@ -51,6 +57,7 @@ class MLDownloadPopup(QDialog):
         self.set_checkboxes()
 
     def discover_models(self):
+        """Check which models are already downloaded"""
         models_dict = dict()
         for m in self.models.keys():
             path = self.ml_dir / self.models[m][0]
@@ -60,11 +67,13 @@ class MLDownloadPopup(QDialog):
         return models_dict
 
     def set_checkboxes(self):
+        """Set checkboxes for already downloaded models"""
         for m in self.available_models.keys():
             checkbox = self.checkbox_layout.itemAtPosition(self.models.index(m), 0).widget()
             checkbox.setChecked(True)
 
     def toggle_checkbox(self):
+        """Check which models are checked, see if any new ones are checked"""
         all = set()
         for i, m in enumerate(self.models):
             checkbox = self.checkbox_layout.itemAtPosition(i, 0).widget()
@@ -74,13 +83,14 @@ class MLDownloadPopup(QDialog):
         self.checked_models = all - set(self.available_models.keys())
         if self.checked_models:
             self.download_ml()
-    
+
     def toggle_close(self):
+        """Disable/Enable the OK button to prevent closing during download"""
         ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         ok_button.setEnabled(not ok_button.isEnabled())  # Disable the OK button
 
     def download_ml(self):
-        # Start download thread
+        """Start download thread"""
         self.toggle_close()
         self.progress_bar.setRange(0, 0)
         self.progress_bar.show()
@@ -90,16 +100,24 @@ class MLDownloadPopup(QDialog):
         self.build_thread.start()
 
     def cancel(self):
-        for key in self.checked_models:
-            models.delete(self.ml_dir, key)
+        # delete any partially downloaded models
+        # for key in self.checked_models:
+        #     models.delete(self.ml_dir, key)
         self.reject()
 
 
 class MLOptionsPopup(QDialog):
+    """
+    Popup to select ML model options from available models
+    1) Sequence (checkbox)
+    2) Detector (dropdown)
+    3) Re-ID (dropdown)
+    4) Viewpoint (dropdown)
+    """
     def __init__(self, parent):
         super().__init__(parent)
-        self.ml_dir = Path(config.load('ML_DIR'))
-        self.ml_cfg = models.load()
+        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        self.ml_cfg = models.load_model()
         self.available_models = self.discover_models()
 
         self.setWindowTitle('Model Options')
@@ -117,25 +135,14 @@ class MLOptionsPopup(QDialog):
         self.detector = QComboBox()
         layout.addWidget(self.detector_label)
         layout.addWidget(self.detector)
-
         self.available_detectors = self.get_subset('DETECTOR_MODELS')
         self.detector.addItems(self.available_detectors)
-
-        # Classifier
-        self.classifier_label = QLabel("Select Classifier Model:")
-        self.classifier = QComboBox()
-        layout.addWidget(self.classifier_label)
-        layout.addWidget(self.classifier)
-
-        self.available_classifiers = ['None'] + self.get_subset('CLASSIFIER_MODELS')
-        self.classifier.addItems(self.available_classifiers)
 
         # Re-ID
         self.reid_label = QLabel("Select Re-Identification Model:")
         self.reid = QComboBox()
         layout.addWidget(self.reid_label)
         layout.addWidget(self.reid)
-
         self.available_reids = self.get_subset('REID_MODELS')
         self.reid.addItems(self.available_reids)
 
@@ -144,7 +151,6 @@ class MLOptionsPopup(QDialog):
         self.viewpoint = QComboBox()
         layout.addWidget(self.viewpoint_label)
         layout.addWidget(self.viewpoint)
-
         self.available_viewpoints = ['None'] + self.get_subset('VIEWPOINT_MODELS')
         self.viewpoint.addItems(self.available_viewpoints)
 
@@ -158,6 +164,7 @@ class MLOptionsPopup(QDialog):
         self.setLayout(layout)
 
     def discover_models(self):
+        """Check which models are already downloaded"""
         models_dict = dict()
         for m in self.ml_cfg['MODELS'].keys():
             path = self.ml_dir / self.ml_cfg['MODELS'][m][0]
@@ -167,7 +174,7 @@ class MLOptionsPopup(QDialog):
         return models_dict
 
     def get_subset(self, subset):
-        # GET THE AVAILABLE MODELS OF SUBSET TYPE
+        """Get the available models of subset type"""
         models_dict = dict()
         for m in self.ml_cfg[subset]:
             if m in self.available_models.keys():
@@ -178,38 +185,39 @@ class MLOptionsPopup(QDialog):
         return list(models_dict)
 
     def select_sequence(self):
+        """Return whether sequence is checked"""
         return self.sequence.isChecked()
 
     def select_detector(self):
-        self.selected_detector_key = self.available_detectors[self.detector.currentIndex()]
-        return self.selected_detector_key
-
-    def select_classifier(self):
-        if self.classifier.currentIndex() == 0:
+        """Return the selected detector model"""
+        if len(self.available_detectors) == 0:
             return None
         else:
-            self.selected_classifier_key = self.available_classifiers[self.classifier.currentIndex()]
-            return self.selected_classifier_key
+            self.selected_DETECTOR_KEY = self.available_detectors[self.detector.currentIndex()]
+            return self.selected_DETECTOR_KEY
 
     def select_reid(self):
-        self.selected_reid_key = self.available_reids[self.reid.currentIndex()]
-        return self.selected_reid_key
+        """Return the selected re-identification model"""
+        if len(self.available_reids) == 0:
+            return None
+        else:
+            self.selected_REID_KEY = self.available_reids[self.reid.currentIndex()]
+            return self.selected_REID_KEY
 
     def select_viewpoint(self):
+        """Return the selected viewpoint model"""
         if self.viewpoint.currentIndex() == 0:
             return None
         else:
-            self.selected_viewpoint_key = self.available_viewpoints[self.viewpoint.currentIndex()]
-            return self.selected_viewpoint_key
-        
+            self.selected_VIEWPOINT_KEY = self.available_viewpoints[self.viewpoint.currentIndex()]
+            return self.selected_VIEWPOINT_KEY
+
     def return_selections(self):
         sequence_checked = self.select_sequence()
-        detector_key = self.select_detector()
-        classifier_key = self.select_classifier()
-        reid_key = self.select_reid()
-        viewpoint_key = self.select_viewpoint()
-        return {"sequence_checked":sequence_checked,
-                "detector_key":detector_key,
-                "classifier_key":classifier_key,
-                "reid_key":reid_key,
-                "viewpoint_key":viewpoint_key,}
+        DETECTOR_KEY = self.select_detector()
+        REID_KEY = self.select_reid()
+        VIEWPOINT_KEY = self.select_viewpoint()
+        return {"sequence_checked": sequence_checked,
+                "DETECTOR_KEY": DETECTOR_KEY,
+                "REID_KEY": REID_KEY,
+                "VIEWPOINT_KEY": VIEWPOINT_KEY}

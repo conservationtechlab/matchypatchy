@@ -163,13 +163,6 @@ _Detector Models_:
 - MegaDetector v5a
 - MegaDetector v5b
 
-_Classifer Models_: 
-- SDZWA Andes
-- SDZWA Amazon Rainforest
-- SDZWA Savanna
-- SDZWA SE Asian Rainforest
-- SDZWA Southwest USA
-
 _Re-ID Models_: 
 - MiewID v3
 - MiewID v2

@@ -1,40 +1,37 @@
 '''
-Main Function
-
+Main entry point for MatchyPatchy application
 '''
-# GET CWD
-import os
+import time
 import sys
-if getattr(sys, 'frozen', False):
-    application_path = os.path.dirname(sys.executable)
-    os.chdir(application_path)
+import os
 
-# DISABLE HUGGINGFACE
-import requests
-from huggingface_hub import configure_http_backend
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-def backend_factory() -> requests.Session:
-    session = requests.Session()
-    session.verify = False
-    return session
-configure_http_backend(backend_factory=backend_factory)
+from PyQt6.QtWidgets import QApplication
 
-# START GUI
-from matchypatchy.gui import main_gui
+from matchypatchy.gui import MainWindow, AlertPopup
 from matchypatchy.database import mpdb
 from matchypatchy import config
-from matchypatchy.algo import models
+
+start_time = time.time()
+os.environ["CHROMA_TELEMETRY"] = "FALSE"
 
 
 def main():
+    app = QApplication(sys.argv)
     cfg = config.initiate()
-    models.update_model_yml()
     mpDB = mpdb.MatchyPatchyDB(cfg['DB_DIR'])
-    if mpDB.key:
-        main_gui.main_display(mpDB)      
-    else:
-        main_gui.main_display(mpDB, warning='Existing database contains an error. Please select a valid database in the configuration settings.')
+    window = MainWindow(mpDB)
+    window.show()
+
+    if not mpDB.key:
+        dialog = AlertPopup(window,
+                            prompt="""Existing database contains an error.
+                                      Please select a valid database in the configuration settings.""")
+        if dialog.exec():
+            del dialog
+
+    print(f"Startup took {time.time() - start_time:.2f} seconds")
+    sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

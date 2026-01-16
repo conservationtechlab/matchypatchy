@@ -1,5 +1,5 @@
 '''
-
+Popup for adding/editing/deleting surveys
 '''
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QListWidget, QLineEdit, QLabel, QDialogButtonBox)
@@ -27,7 +27,6 @@ class SurveyPopup(QDialog):
 
         # Buttons
         button_layout = QHBoxLayout()
-
         button_new = QPushButton("New")
         self.button_edit = QPushButton("Edit")
         self.button_del = QPushButton("Delete")
@@ -55,12 +54,14 @@ class SurveyPopup(QDialog):
         self.update()
 
     def set_editdel(self):
+        """Set edit/delete buttons enabled if survey selected"""
         # currentRow() returns -1 if nothing selected
         flag = bool(self.list.currentRow() + 1)
         self.button_edit.setEnabled(flag)
         self.button_del.setEnabled(flag)
 
     def update(self):
+        """Update survey list from database"""
         self.list.clear()
         self.survey_list_ordered = self.mpDB.select("survey", columns="id, name")
         self.survey_list = dict(self.survey_list_ordered)
@@ -69,9 +70,10 @@ class SurveyPopup(QDialog):
         self.set_editdel()
 
     def add(self):
+        """Add a new survey"""
         dialog = SurveyFillPopup(self)
         if dialog.exec():
-            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'", quiet=False)
+            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'")
             if not region_id:
                 region_id = self.mpDB.add_region(dialog.get_region())
             else:
@@ -82,6 +84,7 @@ class SurveyPopup(QDialog):
         self.surveys = self.update()
 
     def edit(self):
+        """Edit selected survey"""
         selected_survey = self.list.currentRow()
         id = self.survey_list_ordered[selected_survey][0]
         cond = f'survey.id={id}'
@@ -106,24 +109,33 @@ class SurveyPopup(QDialog):
                             "region_id": region_id,
                             "year_start": dialog.get_year_start(),
                             "year_end": dialog.get_year_end()}
-            self.mpDB.edit_row("survey", id, replace_dict, quiet=False)
+            self.mpDB.edit_row("survey", id, replace_dict)
         del dialog
         self.surveys = self.update()
 
     def delete(self):
+        """Delete selected survey"""
         selected_survey = self.list.currentRow()
         id, selected = self.survey_list_ordered[selected_survey]
-        n = media_count(self.mpDB, id)
+        media, n = media_count(self.mpDB, id)
         dialog = AlertPopup(self, f'Are you sure you want to delete {selected}? This will remove {n} images.')
         if dialog.exec():
-            row = self.survey_list_ordered[self.list.currentRow()][0]
-            self.mpDB.delete("survey", f'id={row}')
-            # self.mpDB.delete("")
+            # delete survey
+            self.mpDB.delete("survey", f'id={id}')
+            # also delete associated media and roi
+            for m in media:
+                rois = self.mpDB.select("roi", columns="emb_id", row_cond=f'media_id={m[0]}')
+                for r in rois:
+                    if r[0] is not None:
+                        self.mpDB.delete_emb(r[0])
+                self.mpDB.delete("roi", f'media_id={m[0]}')
+                self.mpDB.delete("media", f'id={m[0]}')
         del dialog
         self.update()
 
 
 class SurveyFillPopup(QDialog):
+    """Popup to fill in new survey details"""
     def __init__(self, parent, name="", region_name="", year_start="", year_end=""):
         super().__init__(parent)
         self.setWindowTitle("Survey")
@@ -138,20 +150,17 @@ class SurveyFillPopup(QDialog):
         self.name = QLineEdit()
         self.name.setText(str(name))
         layout.addWidget(self.name)
-
         # region
         layout.addWidget(QLabel('Region'))
         self.region = QLineEdit()
         self.region.setText(str(region_name))
         layout.addWidget(self.region)
-
         # start year
         layout.addWidget(QLabel('Start Year'))
         self.year_start = QLineEdit()
         self.year_start.setValidator(QIntValidator(0, 3000))
         self.year_start.setText(str(year_start))
         layout.addWidget(self.year_start)
-
         # end year
         layout.addWidget(QLabel('End Year'))
         self.year_end = QLineEdit()
@@ -168,18 +177,17 @@ class SurveyFillPopup(QDialog):
 
         self.name.textChanged.connect(self.check_input)
         self.region.textChanged.connect(self.check_input)
-
         self.name.returnPressed.connect(lambda: self.region.setFocus())
         self.region.returnPressed.connect(lambda: self.year_start.setFocus())
         self.year_start.returnPressed.connect(lambda: self.year_end.setFocus())
         self.year_end.returnPressed.connect(self.accept_verify)
-
         self.name.setFocus()
         self.check_input()
 
         self.setLayout(layout)
 
     def check_input(self):
+        """Enable OK button only if required fields are filled"""
         self.okButton.setEnabled(bool(self.get_name() and self.get_region()))
 
     def get_name(self):

@@ -1,32 +1,30 @@
 """
 Class Definition for Query Object
 """
-
-import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
 
-from matchypatchy.algo.models import load
+from matchypatchy.algo.models import load_model
 from matchypatchy.algo.match_thread import MatchEmbeddingThread
 
 
 class QueryContainer(QObject):
-    thread_signal = pyqtSignal()
+    thread_signal = pyqtSignal(bool)
 
     def __init__(self, parent):
         super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
-        self.filters = dict()
+        self.metric = parent.distance_metric
+        self.k = parent.k
+        self.threshold = parent.threshold
+        self.filter_dict = dict()
+        self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
-        self.neighbor_dict_raw = None
-        self.nearest_dict_raw = None
         self.neighbor_dict = dict()
-        self.nearest_dict = dict()
         self.ranked_sequences = []
-        self.VIEWPOINT_DICT = load('VIEWPOINTS')
 
         self.current_query = 0
         self.current_match = 0
@@ -39,10 +37,11 @@ class QueryContainer(QObject):
 
         self.viewpoints = {}
         self.match_viewpoints = {}
-        self.selected_viewpoint = 'all'
+        self.selected_viewpoint = 'Any'
         self.empty_query = 0
         self.empty_match = 0
 
+    # STEP 0
     def load_data(self):
         """
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
@@ -50,44 +49,15 @@ class QueryContainer(QObject):
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
         # no data
         if self.data_raw.empty:
-            return 0  
+            return False
 
-        self.sequences = db_roi.sequence_roi_dict(self.data_raw)
         # must have embeddings to continue
         if not (self.data_raw["emb"] == 0).all():
             # need sequence and capture ids from media to restrict comparisons shown to
-            info = "roi.id, media_id, reviewed, viewpoint, species_id, individual_id, emb, timestamp, station_id, sequence_id"
-            rois, columns = self.mpDB.select_join("roi", "media", 'roi.media_id = media.id', columns=info)
-            self.rois = pd.DataFrame(rois, columns=columns)
-            return len(self.sequences)
+            return True
         # no embeddings
         else:
-            return 0
-
-    # RUN ON ENTRY IF LOAD_DATA
-    def calculate_neighbors(self):
-        self.match_thread = MatchEmbeddingThread(self.mpDB, self.rois, self.sequences,
-                                                 k=self.parent.k, 
-                                                 metric=self.parent.distance_metric,
-                                                 threshold=self.parent.threshold)
-        self.match_thread.progress_update.connect(self.parent.progress.set_counter)
-        self.match_thread.prompt_update.connect(self.parent.progress.update_prompt)
-        self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
-        self.match_thread.nearest_dict_return.connect(self.capture_nearest_dict)
-        self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished
-        self.match_thread.start()
-
-    def capture_neighbor_dict(self, neighbor_dict):
-        # capture neighbor_dict from MatchEmbeddingThread
-        self.neighbor_dict_raw = neighbor_dict
-
-    def capture_nearest_dict(self, nearest_dict):
-        # capture neighbor_dict from MatchEmbeddingThread
-        self.nearest_dict_raw = nearest_dict
-
-    def finish_calculating(self):
-        self.thread_signal.emit()
-        return True
+            return False
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
@@ -117,51 +87,50 @@ class QueryContainer(QObject):
                 self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
                 # no valid stations, empty dataframe
             else:
-                self.parent.warn("No data to compare within filter.")
+                self.parent.show_progress("No data to compare within filter.")
 
-        # filter neighbor dict and nearest dict by sequences present in filtered self.data
-        self.neighbor_dict = {k: self.neighbor_dict_raw[k] for k in self.data['sequence_id'] if k in self.neighbor_dict_raw}
-        self.nearest_dict = {k: self.nearest_dict_raw[k] for k in self.data['sequence_id'] if k in self.nearest_dict_raw}
+        self.sequences = db_roi.sequence_roi_dict(self.data)
 
-        # compute viewpoints
-        self.compute_viewpoints()
-        self.compute_match_viewpoints()
-
-        # Sort by Distance
-        # must have valid matches to continue
-        if self.neighbor_dict:
-            self.rank()
-            return True
-        # filtered neighbor dict returns empty, all existing data must be from same individual
-        else:
-            return False
-
-    def rank(self):
+    # RUN ON ENTRY IF LOAD_DATA
+    def calculate_neighbors(self):
         """
-        Ranking Function
-            Prioritizes previously IDd individuals and number of matches,
-            then ranks matchs by distances
+        Start MatchEmbeddingThread to calculate neighbors
         """
-        # get sequences with IDs
-        ided_sequences = self.data[~self.data["individual_id"].isna()]["sequence_id"].unique().tolist()
-        if ided_sequences:
-            # rank sequences by number of matches
-            rank_by_n_match = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
+        self.match_thread = MatchEmbeddingThread(self.mpDB, self.data, self.sequences,
+                                                 k=self.k, metric=self.metric, threshold=self.threshold)
+        self.match_thread.progress_update.connect(self.parent.progress.set_counter)
+        self.match_thread.prompt_update.connect(self.parent.progress.update_prompt)
+        self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
+        self.match_thread.ranked_sequences_return.connect(self.capture_ranked_sequences)
+        self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished
+        self.match_thread.start()
 
-            # prioritize already id'd sequences
-            self.ranked_sequences = sorted(rank_by_n_match, key=lambda x: (0 if x[0] in ided_sequences else 1, x))
+    def capture_neighbor_dict(self, neighbor_dict):
+        """Capture neighbor_dict from MatchEmbeddingThread"""
+        self.neighbor_dict = neighbor_dict
 
-        # if no ids, rank by distance
-        else:
-            self.ranked_sequences = sorted(self.nearest_dict.items(), key=lambda x: x[1])
-
+    def capture_ranked_sequences(self, ranked_sequences):
+        """Capture ranked_sequences from MatchEmbeddingThread"""
+        self.ranked_sequences = ranked_sequences
         # set number of queries to validate
         self.n_queries = len(self.ranked_sequences)
 
+    def finish_calculating(self):
+        """
+        Finish calculating neighbors, compute viewpoints
+        Triggered when MatchEmbeddingThread finishes
+        """
+        if self.neighbor_dict:
+            # compute viewpoints
+            self.compute_viewpoints()
+            self.compute_match_viewpoints()
+            self.thread_signal.emit(True)
+        else:
+            # interrupt occurred, dicts are empty
+            self.thread_signal.emit(False)
+
     def set_query(self, n):
-        """
-        Set the Query side to a particular (n) image in the list
-        """
+        """Set the Query side to a particular (n) image in the list"""
         # wrap around
         if n < 0:
             n = self.n_queries - 1
@@ -172,7 +141,7 @@ class QueryContainer(QObject):
         self.current_query = n
 
         # get corresponding sequence_id and rois
-        self.current_sequence_id = self.ranked_sequences[self.current_query][0]
+        self.current_sequence_id = self.ranked_sequences[self.current_query]
         self.current_query_rois = self.sequences[self.current_sequence_id]
 
         # set view to first in sequence
@@ -221,6 +190,9 @@ class QueryContainer(QObject):
 
     # VIEWPOINT ----------------------------------------------------------------
     def compute_viewpoints(self):
+        """
+        Compute Human-Readable Viewpoints for Query
+        """
         self.viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
 
         for sequence_id, rois in self.sequences.items():
@@ -234,6 +206,7 @@ class QueryContainer(QObject):
                         self.viewpoints[value][sequence_id] = []
 
     def compute_match_viewpoints(self):
+        """Compute Human-Readable Viewpoints for Matches"""
         self.match_viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
 
         for sequence_id, matches in self.neighbor_dict.items():
@@ -248,28 +221,24 @@ class QueryContainer(QObject):
                         self.match_viewpoints[value][sequence_id] = []
 
     def show_all_query_image(self):
-        """
-        Show All Viewpoints for Query
-        """
+        """Show All Viewpoints for Query"""
         self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
         self.set_within_query_sequence(0)
 
     def toggle_viewpoint(self, selected_viewpoint):
-        """
-        Flip between viewpoints in paired images within a sequence
-        """
+        """Flip between viewpoints in paired images within a sequence"""
         self.selected_viewpoint = selected_viewpoint
         self.update_viewpoint_current_query()
         self.update_viewpoint_matching_images()
 
     def update_viewpoint_current_query(self):
-        # Sets Query to Display Only Selected Viewpoint
+        """Sets Query to Display Only Selected Viewpoint"""
         self.empty_query = False
         if self.selected_viewpoint == 'Any':
             self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
         else:
             self.current_query_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
-
+        # Set to first in sequence
         if self.current_query_rois:
             self.set_within_query_sequence(0)
         else:
@@ -279,7 +248,7 @@ class QueryContainer(QObject):
             self.set_within_query_sequence(0)
 
     def update_viewpoint_matching_images(self):
-        # Sets Match to Display Only Selected Viewpoint
+        """Sets Match to Display Only Selected Viewpoint"""
         self.empty_match = False
         if self.selected_viewpoint == 'Any':
             self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
@@ -300,27 +269,26 @@ class QueryContainer(QObject):
 
     # RETURN INFO --------------------------------------------------------------------
     def is_existing_match(self):
+        """Return whether current query and match have same individual_id"""
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None
 
     def both_unnamed(self):
-        """
-        Both are unnamed
-        """
+        """Return whether both current query and match are unnamed"""
         return self.data.loc[self.current_match_rid, "individual_id"] is None and \
             self.data.loc[self.current_query_rid, "individual_id"] is None
 
     def current_distance(self):
-        # return distance between current sequence and matchs
+        """Return distance between current sequence and matchs"""
         return self.neighbor_dict[self.current_sequence_id][self.current_match][1]
 
-    # Accessing Info
     def get_info(self, rid, column=None):
+        """Get info from data table for given rid and column"""
         if column is None:  # return whole row
             return self.data.loc[rid]
         elif column == 'bbox':
             # Return the bbox coordinates for current query
-            return db_roi.get_bbox(self.data.loc[rid])
+            return db_roi.get_roi_bbox(self.data.loc[[rid]])
         elif column == 'metadata':
             return self.roi_metadata(self.data.loc[rid])
         else:
@@ -331,32 +299,26 @@ class QueryContainer(QObject):
         Display relevant metadata in comparison label box
         """
         location = fetch_station_names_from_id(self.mpDB, roi['station_id'])
-        if roi['species_id'] is not None:
-            binomen, common = self.mpDB.select("station", "binomen, common", row_cond=f"id={roi['species_id']}")[0]
-        else:
-            common = 'Not Specified'
 
         roi = roi.rename(index={"name": "Name",
-                                "species_id": "Species",
                                 "sex": "Sex",
                                 "age": "Age",
-                                "filepath": "File Path",
+                                "filepath": "Filepath",
                                 "comment": "Comment",
                                 "timestamp": "Timestamp",
                                 "station_id": "Station",
                                 "sequence_id": "Sequence ID",
                                 "viewpoint": "Viewpoint"})
 
-        info_dict = roi[['Name', 'Species', 'Sex', 'Age', 'File Path', 'Timestamp', 'Station',
+        info_dict = roi[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
                         'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
-                
+
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
-        info_dict['Species'] = common
 
         # convert viewpoint to human-readable (0=Left, 1=Right)
-        VIEWPOINT = load('VIEWPOINTS')
+        VIEWPOINT = load_model('VIEWPOINTS')
         if info_dict['Viewpoint'] is None:
             info_dict['Viewpoint'] = 'None'
         else:  # BUG: Typecasting issue, why is viewpoint returning a float?
@@ -366,50 +328,43 @@ class QueryContainer(QObject):
 
     # MATCH FUNCTIONS ----------------------------------------------------------
     def new_iid(self, individual_id):
-        """
-        Update records for roi after confirming a match
-        """
+        """Update records for roi after confirming a match"""
         for roi in self.current_query_rois:
             self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
 
         self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
 
     def merge(self):
-        """
-        Merge two individuals after match
-
-        TODO: Add option to select which name to keep
-        """
+        """Merge two individuals after match"""
         query = self.data.loc[self.current_query_rid]
         match = self.data.loc[self.current_match_rid]
 
         query_iid = query['individual_id']
         match_iid = match['individual_id']
 
-        print("Merging", query_iid, match_iid)
+        # both are named
+        if query_iid is not None:
+            # query is older, keep query name
+            if match_iid is None or match_iid < query_iid:
+                sequence = [match['sequence_id']]
+                keep_id = query_iid
 
-        # query is unknown, give match name
-        if query_iid is None:
-            sequence = self.current_sequence_id
-            keep_id = match_iid
-            drop_id = None
-        # match is older, update query
-        elif match_iid is not None and query_iid > match_iid:
-            sequence = self.current_sequence_id
-            keep_id = match_iid
-            drop_id = query_iid
-        # query is older or match is None update match
+            # match is older, keep match name
+            else:
+                sequence = [self.current_sequence_id]
+                keep_id = match_iid
+
+        # query is None, give match name
         else:
-            sequence = match['sequence_id']
-            keep_id = query_iid
-            drop_id = match_iid
+            sequence = [self.current_sequence_id]
+            keep_id = match_iid
 
         # find all rois with newer name
-        to_merge = self.data[self.data["sequence_id"] == sequence]
+        to_merge = self.data[self.data["sequence_id"].isin(sequence)]
 
         for i in to_merge.index:
             self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
 
     def unmatch(self):
-        # Set current match id to none
-        self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': None}, quiet=False)
+        """Unmatch the current query ROI from the matched ROI"""
+        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None}, quiet=False)

@@ -1,11 +1,11 @@
 """
 Class Definition for Query Object
 """
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
-from matchypatchy.algo.models import load
+from matchypatchy.algo.models import load_model
 
 
 class QC_QueryContainer(QObject):
@@ -20,7 +20,7 @@ class QC_QueryContainer(QObject):
         self.neighbor_dict = dict()
         self.nearest_dict = dict()
         self.ranked_sequences = []
-        self.VIEWPOINT_DICT = load('VIEWPOINTS')
+        self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
         self.current_query = 0
         self.current_match = 0
@@ -37,6 +37,7 @@ class QC_QueryContainer(QObject):
         self.empty_query = 0
         self.empty_match = 0
 
+    # STEP 1
     def load_data(self):
         """
         Load ROI Table
@@ -44,11 +45,11 @@ class QC_QueryContainer(QObject):
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
         # no data
         if self.data_raw.empty:
-            self.parent.home(warn=True)
             return False
 
-        self.individuals = db_roi.individual_roi_dict(self.data_raw)
-        self.individuals.pop(None, None)
+        self.individuals_raw = db_roi.individual_roi_dict(self.data_raw)
+        self.individuals_raw.pop(None, None)
+        return True
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
@@ -61,6 +62,7 @@ class QC_QueryContainer(QObject):
         """
         # create backups for filtering
         self.data = self.data_raw.copy()
+        self.individuals = self.individuals_raw.copy()
 
         if filter_dict is not None and valid_stations is not None:
             # Region Filter (depends on prefilterd stations from MediaDisplay)
@@ -77,7 +79,13 @@ class QC_QueryContainer(QObject):
             elif filter_dict['active_station'][0] == 0 and valid_stations:
                 self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
             else:  # no valid stations, empty dataframe
-                self.parent.warn("No data to compare within filter.")
+                self.parent.show_progress("No data to compare within filter.")
+
+            # Individual Filter
+            if filter_dict['active_individual'][0] > 0:
+                active_iid = filter_dict['active_individual'][0]
+                self.data = self.data[self.data['individual_id'] == int(active_iid)]
+                self.individuals = {active_iid: self.individuals_raw[active_iid]}
 
         # compute viewpoints
         self.compute_viewpoints()
@@ -88,7 +96,7 @@ class QC_QueryContainer(QObject):
             self.rank()
         # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
-            self.parent.warn(prompt="No data to compare, all available data from same sequence/capture.")
+            self.parent.show_progress(prompt="No data to compare, all available data from same sequence/capture.")
             return False
 
     def rank(self):
@@ -161,6 +169,7 @@ class QC_QueryContainer(QObject):
 
     # VIEWPOINT ----------------------------------------------------------------
     def compute_viewpoints(self):
+        """Compute humnan-readable viewpoints"""
         self.viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
         for iid, rois in self.individuals.items():
             for key, value in self.VIEWPOINT_DICT.items():
@@ -173,15 +182,12 @@ class QC_QueryContainer(QObject):
                         self.viewpoints[value][iid] = []
 
     def toggle_viewpoint(self, selected_viewpoint):
-        """
-        Flip between viewpoints in paired images within a sequence
-        """
-        self.VIEWPOINT_DICT.values()
+        """Set the selected viewpoint filter and update rois"""
         self.selected_viewpoint = selected_viewpoint
-
         self.update_viewpoint()
 
     def update_viewpoint(self):
+        """Sets Both Sides to Display Only Selected Viewpoint"""
         self.empty_query = False
         if self.selected_viewpoint == 'Any':
             self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
@@ -205,17 +211,19 @@ class QC_QueryContainer(QObject):
             self.data.loc[self.current_query_rid, "individual_id"] is not None
 
     def get_info(self, rid, column=None):
+        """Get info from data table for given rid and column"""
         if column is None:  # return whole row
             return self.data.loc[rid]
         elif column == 'bbox':
             # Return the bbox coordinates for current query
-            return db_roi.get_bbox(self.data.loc[rid])
+            return db_roi.get_roi_bbox(self.data.loc[[rid]])
         elif column == 'metadata':
             return self.roi_metadata(self.data.loc[rid])
         else:
             return self.data.loc[rid, column]
 
     def current_distance(self):
+        """Return distance between current sequence and matchs"""
         return 0
 
     def roi_metadata(self, roi):
@@ -223,32 +231,26 @@ class QC_QueryContainer(QObject):
         Display relevant metadata in comparison label box
         """
         location = fetch_station_names_from_id(self.mpDB, roi['station_id'])
-        if roi['species_id'] is not None:
-            binomen, common = self.mpDB.select("station", "binomen, common", row_cond=f"id={roi['species_id']}")[0]
-        else:
-            common = 'Not Specified'
 
         roi = roi.rename(index={"name": "Name",
-                                "species_id": "Species",
                                 "sex": "Sex",
                                 "age": "Age",
-                                "filepath": "File Path",
+                                "filepath": "Filepath",
                                 "comment": "Comment",
                                 "timestamp": "Timestamp",
                                 "station_id": "Station",
                                 "sequence_id": "Sequence ID",
                                 "viewpoint": "Viewpoint"})
 
-        info_dict = roi[['Name', 'Species', 'Sex', 'Age', 'File Path', 'Timestamp', 'Station',
-                        'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
-                
+        info_dict = roi[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
+                         'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
-        info_dict['Species'] = common
 
         # convert viewpoint to human-readable (0=Left, 1=Right)
-        VIEWPOINT = load('VIEWPOINTS')
+        VIEWPOINT = load_model('VIEWPOINTS')
         if info_dict['Viewpoint'] is None:
             info_dict['Viewpoint'] = 'None'
         else:  # BUG: Typecasting issue, why is viewpoint returning a float?
@@ -268,4 +270,4 @@ class QC_QueryContainer(QObject):
 
     def unmatch(self):
         # Set current match id to none
-        self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': None}, quiet=False)
+        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None}, quiet=False)
