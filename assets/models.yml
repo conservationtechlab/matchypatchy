@@ -1,0 +1,28 @@
+MODELS: 
+  "MegaDetector": 
+    - "md_v1000.0.0-sorrel.onnx"
+    - ["https://sandiegozoo.box.com/shared/static/7z9xagk8zweu6op3dgdk386jf9ayl2gt.onnx"]
+  "miewid_v3": 
+    - "miewid_v3.onnx"
+    - ["https://sandiegozoo.box.com/shared/static/xi1dijx35ta2tqtu2sa28bd09ve9li6f.data",
+       "https://sandiegozoo.box.com/shared/static/ppm0odjgscvpj9lf5ax86p3fqu5vraxw.onnx"]
+  "SDZWA Viewpoint": 
+    - "sdzwa_viewpoint.pt"
+    - ["https://sandiegozoo.box.com/shared/static/7yrxkli0bodfmysre2cenzsgqnz22co9.pt"]
+
+
+# FIX
+MEGADETECTOR_DEFAULT: 0
+MIEW_DEFAULT: 7
+
+DETECTOR_MODELS: 
+  - "MegaDetector"
+
+REID_MODELS: ["miewid_v3"]
+VIEWPOINT_MODELS: ["SDZWA Viewpoint"]
+
+VIEWPOINTS:
+  'Any': "Any"
+  'None': "None"
+  '0': "Left"
+  '1': "Right"

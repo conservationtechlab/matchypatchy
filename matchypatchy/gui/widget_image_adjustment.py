@@ -1,3 +1,7 @@
+"""
+Image Adjustment Bar Widget for brightness, contrast, sharpness
+"""
+
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSlider, QPushButton
 from PyQt6.QtCore import Qt
 
@@ -11,12 +15,12 @@ class ImageAdjustBar(QWidget):
         self.display = display
         # media widget object it connects to
         self.mediawidget = mediawidget
-        self.side = side # query or match
+        self.side = side  # query or match
         self.brightness_factor = 1.0
         self.contrast_factor = 1.0
         self.sharpness_factor = 1.0
 
-        # Layout ---------------------------------------------------------------   
+        # Layout ---------------------------------------------------------------
         query_image_buttons = QHBoxLayout()
         # Brightness
         query_image_buttons.addWidget(QLabel("Brightness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -76,8 +80,8 @@ class ImageAdjustBar(QWidget):
         """
         self.contrast_factor = value / 50
         self.mediawidget.image_widget.adjust(brightness=self.brightness_factor,
-                                 contrast=self.contrast_factor,
-                                 sharpness=self.sharpness_factor)
+                                             contrast=self.contrast_factor,
+                                             sharpness=self.sharpness_factor)
 
     def adjust_sharpness(self, value):
         """
@@ -85,10 +89,11 @@ class ImageAdjustBar(QWidget):
         """
         self.sharpness_factor = value / 50
         self.mediawidget.image_widget.adjust(brightness=self.brightness_factor,
-                                 contrast=self.contrast_factor,
-                                 sharpness=self.sharpness_factor)
+                                             contrast=self.contrast_factor,
+                                             sharpness=self.sharpness_factor)
 
     def reset(self):
+        """Reset sliders and image adjustments"""
         self.slider_brightness.setValue(50)
         self.slider_contrast.setValue(50)
         self.slider_sharpness.setValue(50)
@@ -96,17 +101,14 @@ class ImageAdjustBar(QWidget):
         self.contrast_factor = 1.0
         self.sharpness_factor = 1.0
         self.mediawidget.image_widget.reset()
-    
-    def reset_sliders(self):
-        self.slider_brightness.setValue(50)
-        self.slider_contrast.setValue(50)
-        self.slider_sharpness.setValue(50)
 
     def press_favorite(self):
+        """Press favorite button, connect to Compare View"""
         current_rid = self.display.get_rid(self.side)
         self.display.press_favorite_button(current_rid)
 
     def set_favorite(self, state):
+        """Set favorite button state"""
         if state:
             self.button_favorite.setChecked(True)
             self.button_favorite.setStyleSheet(self.FAVORITE_STYLE)
@@ -115,9 +117,11 @@ class ImageAdjustBar(QWidget):
             self.button_favorite.setStyleSheet("")
 
     def edit_image(self):
+        """Edit image button, connect to Compare View"""
         current_rid = self.display.get_rid(self.side)
         self.display.edit_image(current_rid)
-    
+
     def open_image(self):
+        """Open image button, connect to Compare View"""
         current_rid = self.display.get_rid(self.side)
-        self.display.open_image(current_rid)     
+        self.display.open_image(current_rid)

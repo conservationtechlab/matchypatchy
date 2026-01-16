@@ -54,27 +54,18 @@ CREATE TABLE roi (
                         bbox_w REAL NOT NULL,
                         bbox_h REAL NOT NULL,
                         viewpoint INTEGER,
-                        species_id INTEGER,
                         reviewed INTEGER NOT NULL,
                         favorite INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb INTEGER,
                         FOREIGN KEY(media_id) REFERENCES media (id),
-                        FOREIGN KEY(individual_id) REFERENCES individual (id),
-                        FOREIGN KEY(species_id) REFERENCES species (id))
+                        FOREIGN KEY(individual_id) REFERENCES individual (id))
 TABLE: individual
 CREATE TABLE individual (
                         id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
-                        species_id INTEGER,
                         sex TEXT,
-                        age TEXT,
-                        FOREIGN KEY(species_id) REFERENCES species (id))
-TABLE: species
-CREATE TABLE species (
-                        id INTEGER PRIMARY KEY,
-                        binomen TEXT NOT NULL,
-                        common TEXT NOT NULL )
+                        age TEXT)
 TABLE: sequence
 CREATE TABLE sequence (
                         id INTEGER PRIMARY KEY)
@@ -87,12 +78,16 @@ CREATE TABLE camera (
 TABLE: media_thumbnails
 CREATE TABLE media_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        fid INTEGER NOT NULL,
+                        fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES media (id))
+INDEX: sqlite_autoindex_media_thumbnails_1
+None
 TABLE: roi_thumbnails
 CREATE TABLE roi_thumbnails (
                         id INTEGER PRIMARY KEY,
-                        fid INTEGER NOT NULL,
+                        fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
                         FOREIGN KEY(fid) REFERENCES roi (id))
+INDEX: sqlite_autoindex_roi_thumbnails_1
+None

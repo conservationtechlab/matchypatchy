@@ -1,8 +1,12 @@
+"""
+Custom Widgets for Displaying Media (Image/Video)
+"""
+
 import cv2
 from pathlib import Path
 from PIL import Image, ImageEnhance
 
-from PyQt6.QtWidgets import (QDialog, QWidget, QLabel, QVBoxLayout, QHBoxLayout, 
+from PyQt6.QtWidgets import (QDialog, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
                              QStackedLayout, QPushButton, QSlider)
 from PyQt6.QtGui import QPixmap, QPainter, QImage, QPen
 from PyQt6.QtCore import Qt, QRect, QPointF, QRectF, QUrl
@@ -10,6 +14,7 @@ from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT
+
 
 class MediaWidget(QWidget):
     """
@@ -45,6 +50,15 @@ class MediaWidget(QWidget):
         self.setLayout(layout)
 
     def load(self, filepath, bbox=None, frame=None, crop=False):
+        """
+        Load media file (image or video) into the appropriate widget
+
+        Args:
+            filepath (str): Path to the media file
+            bbox (DataFrame, optional): Bounding box data for cropping/display
+            frame (int, optional): Frame number to load from video
+            crop (bool, optional): Whether to crop to bbox
+        """
         # IMAGE
         if Path(filepath).suffix.lower() in IMAGE_EXT:
             self.playbackbar.setVisible(False)
@@ -64,8 +78,9 @@ class MediaWidget(QWidget):
                 self.player.play()
         else:
             raise ValueError("Unsupported file format")
-        
+
     def reset(self):
+        """Reset the media widget to its initial state"""
         self.player.stop()
         if self.stacked.currentWidget() == self.video_widget:
             pass
@@ -104,6 +119,12 @@ class ImageWidget(QLabel):
     def load(self, image_path, bbox=None, frame=None, crop=False):
         """
         Load image path with pillow
+
+        Args:
+            image_path (str): Path to the image file
+            bbox (DataFrame, optional): Bounding box data for cropping/display
+            frame (int, optional): Frame number to load from video
+            crop (bool, optional): Whether to crop to bbox
         """
         if self.image_path is None or image_path != self.image_path:
             self.image_path = image_path
@@ -118,11 +139,25 @@ class ImageWidget(QLabel):
         self.adjust()
 
     def load_from_array(self, img_array):
+        """
+        Load image from numpy array
+        Used for pairx
+
+        Args:
+            img_array (np.array): Image data as numpy array
+        """
+
         self.image_path = None
         self.pil_image = Image.fromarray(img_array)
         self.adjust()
 
     def load_from_video(self, frame):
+        """
+        Load a specific frame from a video file
+
+        Args:
+            frame (int): Frame number to load
+        """
         cap = cv2.VideoCapture(self.image_path)
         cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
         ret, frame = cap.read()
@@ -136,7 +171,12 @@ class ImageWidget(QLabel):
     def adjust(self, brightness=1.0, contrast=1.0, sharpness=1.0):
         """
         Adjust image values, convert to qimage, crop, display
+
+        Connected to sliders in imageadjustmentbar widget
         """
+        # Reload original image
+        self.pil_image = Image.open(self.image_path)
+
         enhancer = ImageEnhance.Brightness(self.pil_image)
         self.pil_image = enhancer.enhance(brightness)
         enhancer = ImageEnhance.Contrast(self.pil_image)
@@ -182,6 +222,7 @@ class ImageWidget(QLabel):
 
     # IMAGE ADJUSTMENTS ========================================================
     def reset(self):
+        """Reset image adjustments and reload"""
         self.scale_factor = 1.0
         self.zoom_factor = 1.0
         self.image_offset = QPointF(0, 0)
@@ -190,6 +231,9 @@ class ImageWidget(QLabel):
 
     # EVENTS ===================================================================
     def paintEvent(self, event):
+        """
+        Paint the image with current zoom and offset.
+        """
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
@@ -289,6 +333,7 @@ class VideoWidget(QVideoWidget):
 
 
 class VideoPlayerBar(QWidget):
+    """Video Playback Control Bar"""
     def __init__(self, player, audio_output):
         super().__init__()
         self.player = player
@@ -314,7 +359,6 @@ class VideoPlayerBar(QWidget):
         self.player.positionChanged.connect(self.update_position)
         self.player.durationChanged.connect(self.update_duration)
 
-
         # Volume slider
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setRange(0, 100)
@@ -335,36 +379,42 @@ class VideoPlayerBar(QWidget):
         playback_layout.addStretch()
         self.setLayout(playback_layout)
 
-
     def update_position(self, position):
+        """Update seek slider position"""
         if not self.seeking:
             self.seek_slider.setValue(position)
 
     def update_duration(self, duration):
+        """Update seek slider duration"""
         self.seek_slider.setRange(0, duration)
 
     def seek_position(self, position):
+        """Seek to a new position in the video"""
         self.player.setPosition(position)
 
     def pause_for_seek(self):
+        """Pause playback when seeking"""
         self.seeking = True
         self.was_playing = self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
         self.player.pause()
 
     def resume_after_seek(self):
+        """Resume playback after seeking"""
         self.seeking = False
         if self.was_playing:
             self.player.play()
 
     def set_volume(self, value):
+        """Set audio volume"""
         self.audio_output.setVolume(value / 100)
 
     def get_frame(self):
+        """Get current frame number based on position"""
         cap = cv2.VideoCapture('/path/to/video.mp4')
         fps = cap.get(cv2.CAP_PROP_FPS)
         cap.release()
         return int(self.player.position() / 1000 * fps)
-    
+
 
 class VideoViewer(QDialog):
     """

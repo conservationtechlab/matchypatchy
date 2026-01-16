@@ -16,8 +16,6 @@ from matchypatchy.algo.animl_thread import BuildManifestThread
 from matchypatchy.algo.import_thread import FolderImportThread
 
 
-# TODO: disable ok while importing, cancel thread
-
 class ImportFolderPopup(QDialog):
     def __init__(self, parent, directory):
         super().__init__(parent)
@@ -60,6 +58,7 @@ class ImportFolderPopup(QDialog):
 
     # 1. Run Thread on entry
     def build_manifest(self):
+        """Start thread to build manifest from folder"""
         # show progress bar
         self.progress_bar.setRange(0, 0)
         self.build_thread = BuildManifestThread(self.directory)
@@ -68,6 +67,7 @@ class ImportFolderPopup(QDialog):
 
     # 2. Receive data from thread, check if valid
     def get_manifest(self, manifest):
+        """Receive manifest from thread, proceed or alert no images found"""
         self.progress_bar.hide()
         self.data = manifest
 
@@ -78,8 +78,9 @@ class ImportFolderPopup(QDialog):
             if dialog.exec():
                 self.reject()
 
-    # 3. Offer
+    # 3. Offer Station Options
     def get_options(self):
+        """Offer options for station level selection"""
         self.label.setText("Select a level in the directory hierarchy that corresponds to station, if available:")
         self.station.show()
         self.buttonBox.show()
@@ -96,6 +97,7 @@ class ImportFolderPopup(QDialog):
         # assert bbox in manifest.columns
         self.progress_bar.setRange(0, len(self.data))
         self.progress_bar.show()
+        self.buttonBox.setDisabled(True)
 
         station_level = 0 if self.station.currentIndex() == 0 else self.station.currentIndex() - 1
 

@@ -2,10 +2,10 @@
 Thread Class for Processing Viewpoint and Miew Embedding
 
 """
+import animl
 from numpy import argmax
 from pathlib import Path
 import pandas as pd
-import torchvision.transforms as transforms
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -13,10 +13,8 @@ from matchypatchy.algo import models
 from matchypatchy import config
 from matchypatchy.database.media import fetch_roi
 
-from matchypatchy.pairx.core import explain
-from matchypatchy.pairx import xai_dataset
-
-import animl
+# from matchypatchy.pairx.core import explain
+# from matchypatchy.pairx import xai_dataset
 
 
 class ReIDThread(QThread):
@@ -27,12 +25,13 @@ class ReIDThread(QThread):
     def __init__(self, mpDB, REID_KEY, VIEWPOINT_KEY):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = Path(config.load('ML_DIR'))
+        self.ml_dir = Path(config.load_cfg('ML_DIR'))
         self.reid_filepath = models.get_path(self.ml_dir, REID_KEY)
         self.viewpoint_filepath = models.get_path(self.ml_dir, VIEWPOINT_KEY)
 
     def run(self):
-        # must be fetched after start() to chain with animl
+        """Process viewpoint and embeddings for ROIs"""
+        # ROIS must be fetched after start() to chain with animl
         self.rois = fetch_roi(self.mpDB)
 
         if self.rois.empty:
@@ -57,38 +56,38 @@ class ReIDThread(QThread):
             self.done.emit()
 
     def get_viewpoint(self):
-        # user did not select a viewpoint model
+        """Process viewpoint for ROIs"""
+        # if no viewpoint model selected, skip
         if self.viewpoint_filepath is None:
             return
 
+        # filter rois without viewpoint
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
 
-            device = animl.get_device()
-            model = animl.load_classifier(self.viewpoint_filepath, 2, device=device)
+            model = animl.load_classifier(self.viewpoint_filepath)
             dataloader = animl.manifest_dataloader(filtered_rois, crop=True)
 
             for i, batch in enumerate(dataloader):
                 if not self.isInterruptionRequested():
-                    data = batch[0]
-                    data = data.to(device)
-                    output = model(data)
-                    output = output.detach().cpu().numpy()
+                    image = batch[0]
+                    output = model.run(None, {model.get_inputs()[0].name: image})[0]
                     value = argmax(animl.softmax(output), axis=1)[0]
 
-                    # TODO: Utilize probability for captures/sequences
                     # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
                     roi_id = filtered_rois.at[i, 'roi_id']
                     self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
+                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
     def get_embeddings(self):
-        # Process only those that have not yet been processed
+        """Process embeddings for ROIs"""
+        # If no reid model selected, skip
         if self.reid_filepath is None:
             self.prompt_update.emit("No Re-ID model selected, skipping embedding extraction...")
             return
 
+        # filter rois without embeddings
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
@@ -103,13 +102,12 @@ class ReIDThread(QThread):
                     emb = animl.extract_miew_embeddings(model, row)[0]
 
                     self.mpDB.add_emb(roi_id, emb)
-                    self.mpDB.edit_row("roi", roi_id, {"emb": 1}, quiet=False)
+                    self.mpDB.edit_row("roi", roi_id, {"emb": 1})
 
-                    self.progress_update.emit(round(100 * i/len(filtered_rois)))
+                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
 
-
-# TODO: load model once?
+"""
 class PairXThread(QThread):
     explained_img = pyqtSignal(list)  # Signal to update the alert prompt
     done = pyqtSignal()
@@ -134,14 +132,15 @@ class PairXThread(QThread):
 
         img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(device, self.query, self.match,
                                                                                (440,440), self.img_transforms)
-        explained_imgs = explain(device, img_0, img_1, 
+        explained_imgs = explain(device, img_0, img_1,
                                  img_np_0, img_np_1,
                                  self.model, ["backbone.blocks.3"],
                                  k_lines=20, k_colors=10)
         return explained_imgs
     
     def get_bbox(self, roi):
-        """
+        '''
         Return the bbox coordinates for a given roi row
-        """
+        '''
         return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
+"""

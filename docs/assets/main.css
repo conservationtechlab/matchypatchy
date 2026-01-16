@@ -12,6 +12,14 @@ main { display: block; /* Default value of `display` of `main` element is 'inlin
 
 /** Images */
 img { max-width: 100%; vertical-align: middle; }
+img.zoomable {
+  transition: transform 0.25s ease; /* Smooth transition */
+  cursor: zoom-in; /* Changes cursor to a zoom icon */
+}
+
+img.zoomable:hover {
+  transform: scale(1.5); /* Zooms the image by 50% */
+}
 
 /** Figures */
 figure > img { display: block; }
@@ -47,7 +55,7 @@ pre > code { border: 0; padding-right: 0; padding-left: 0; }
 
 /** Wrapper */
 .layout {display: flex; align-items: flex-start; min-height: 80vh;}
-.wrapper {max-width: -webkit-calc(1200px - (30px * 2)); max-width: calc(1200px - (30px * 2)); 
+.wrapper {max-width: -webkit-calc(1600px - (30px * 2)); max-width: calc(1600px - (30px * 2)); 
           margin-right: auto; margin-left: auto; padding-right: 30px; padding-left: 30px; }
 @media screen and (max-width: 600px) { .wrapper { max-width: -webkit-calc(600px - (30px)); 
   max-width: calc(600px - (30px)); padding-right: 15px; padding-left: 15px; } }

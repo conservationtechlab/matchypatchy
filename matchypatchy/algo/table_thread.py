@@ -1,16 +1,14 @@
 """
 QThread for saving thumbnails to temp dir for media table
 """
-import os
 import pandas as pd
 
 from PyQt6.QtGui import QImage
 from PyQt6.QtWidgets import QTableWidgetItem
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 
-
-THUMBNAIL_NOTFOUND = QImage(os.path.join(os.path.dirname(__file__), "assets/thumbnail_notfound.png"))
-# TODO THUMBNAIL_NOTFOUND = QImage(os.path.normpath("assets/logo.png"))
+from matchypatchy.database.thumbnails import THUMBNAIL_NOTFOUND
+from matchypatchy.config import resource_path
 
 
 class LoadTableThread(QThread):
@@ -24,7 +22,6 @@ class LoadTableThread(QThread):
         self.valid_stations = parent.valid_stations
         self.valid_cameras = parent.valid_cameras
         self.VIEWPOINTS = parent.VIEWPOINTS
-        self.species_list = parent.species_list
         self.individual_list = parent.individual_list
         self.columns = parent.columns
 
@@ -51,7 +48,7 @@ class LoadTableThread(QThread):
         elif column == 'thumbnail':
             thumbnail_path = roi['thumbnail_path']
             if not thumbnail_path:
-                thumbnail_path = THUMBNAIL_NOTFOUND
+                thumbnail_path = resource_path(THUMBNAIL_NOTFOUND)
             qtw = QImage(thumbnail_path)
 
         # filepath and Timestamp not editable
@@ -78,25 +75,6 @@ class LoadTableThread(QThread):
 
             vp_value = self.VIEWPOINTS.get(vp_key, "None")
             qtw = QTableWidgetItem(vp_value)
-
-        # Species ID
-        elif column == 'binomen' or column == 'common':
-            if self.species_list.empty:
-                # can't edit if no species in table
-                qtw = QTableWidgetItem()
-                qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            else:
-                if roi['species_id'] is not None:
-                    species = self.species_list[self.species_list['id'] == roi['species_id']]
-
-                    if not species.empty:
-                        qtw = QTableWidgetItem(str(species[column].values[0]))
-                    else:
-                        print("Species not found — setting to 'Unknown'")
-                        qtw = QTableWidgetItem("Unknown")
-
-                else:
-                    qtw = QTableWidgetItem("Unknown")
 
         # name not editable here
         elif column == "individual_id":

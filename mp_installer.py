@@ -1,5 +1,12 @@
 '''
 MP Installer
+
+Linux
+Need to package separately for Ubuntu 22.04 and 24.04 / Mint 22
+What about other versions of linux?
+
+Windows
+
 '''
 import time
 start_time = time.time()
