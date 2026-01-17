@@ -103,7 +103,7 @@ To begin using MatchyPatchy to match individuals, select a survey to add camera
 trap data to, or create a new survey. Then follow the steps in the left column
 of the Home page. 
 
-<img src="/assets/screenshots/home_page.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/home_page.png' | relative_url }}" style="display: block; margin: auto;" />
 
 
 ## 1. Import Data
@@ -155,7 +155,7 @@ then process the data with AI. MatchyPatchy looks for models in the MatchyPatchy
 folder. You can download models from our server by selecting File > Download Models 
 from the menubar.
 
-<img src="/assets/screenshots/process.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/process.png' | relative_url }}" style="display: block; margin: auto;" />
 
 ### Calculate Sequence 
 You can optionally check "Calculate Sequence" which will group images together based on 
@@ -195,7 +195,7 @@ to the Match page by pressing the corresponding buttons.
 
 To view the full images, select "Full Images" from the <b>"Show:"</b> dropdown menu.
 
-<img src="/assets/screenshots/media_page.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/media_page.png' | relative_url }}" style="display: block; margin: auto;" />
 
 
 ### Editing the Table
@@ -300,7 +300,7 @@ the dropdown. You can also filter for unidentified ROIs or favorited media by
 checking the boxes next to those options. To apply selected filters, press <b>Apply 
 Filters</b>.
 
-<img src="/assets/screenshots/media_filters.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/media_filters.png' | relative_url }}" style="display: block; margin: auto;" />
 
 
 <br>
@@ -311,7 +311,7 @@ Once you have validated that each ROI contains a single animal and that all stat
 names and viewpoints are correct, select Step 4. Match from the Home page or from within
 the Media page. This will take you to the Match page, shown below.
 
-<img src="/assets/screenshots/match_page.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/match_page.png' | relative_url }}" style="display: block; margin: auto;" />
 
 The left side of the screen shows an unidentfied Query ROI and its metadata, 
 while the right side shows one of the potential Match ROIs based on the chosen
@@ -336,7 +336,7 @@ You can toggle the viewpoint filter to display only left-side or only right-side
 images, assuming viewpoint had been determined for each image prior. You can select 
 all viewpoints by moving the toggle back to the center. 
 
-<img src="/assets/screenshots/match.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/match.png' | relative_url }}" style="display: block; margin: auto;" />
 
 <br>
 Once you have determined which potential matches are confirmed for that sequence, 
@@ -346,7 +346,7 @@ through sequences by pressing the <b><<</b> and <b>>></b> buttons on the left
 more than one image in a query sequence, you can move through those images by pressing 
 the <b><<</b> and <b>>></b> arrows on the "Sequence:" side. 
 
-<img src="/assets/screenshots/query.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/query.png' | relative_url }}" style="display: block; margin: auto;" />
 
 ### Making a Match
 
@@ -356,7 +356,7 @@ If the match image does not have an individual ID, a popup will appear to allow
 you to create a new name. If you can tell the animal's sex and age from the images, 
 you can select that information from the dropdowns at this time as well.
 
-<img src="/assets/screenshots/new_match.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/new_match.png' | relative_url }}" style="display: block; margin: auto;" />
 
 After selecting "OK", both the Query and Match metadata will update to reflect 
 the new information.
@@ -378,7 +378,7 @@ metric and/or threshold.
 At any point, you can press <b>"Recalculate Matches"</b> to filter out all confirmed 
 matches that have been made so far. 
 
-<img src="/assets/screenshots/distance.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/distance.png' | relative_url }}" style="display: block; margin: auto;" />
 
 ### Quality Control by Individual
 
@@ -393,7 +393,7 @@ Select the desired filter(s) from the dropdown and press <b>"Apply Filters"</b> 
 recalculate matches within the bounds of those filters. 
 
 
-<img src="/assets/screenshots/match_filters.png" style="display: block; margin: auto;" />
+<img src="{{ '/assets/screenshots/match_filters.png' | relative_url }}" style="display: block; margin: auto;" />
 
 ### Image Adjustments
 
