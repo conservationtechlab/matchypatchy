@@ -15,7 +15,7 @@ bbox_h - the height of the box as a proportion of the whole image
 A physical camera trap device deployed at a Station.
 
 # Capture <a name="capture"></a>
-
+...
 
 # Detector <a name="detector"></a>
 A machine-learning model that is capable of detecting the animals in raw camera trap images (e.g. MegaDetector).
