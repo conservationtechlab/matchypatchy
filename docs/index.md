@@ -460,16 +460,4 @@ Individuals
 
 
 <b><u>How do I use my own Detector/Re-Identification Model?</u></b>
-Currently, MatchyPatchy only supports 
-
-
-<br>
-<hr>
-<br>
-
-
-<h2 class="post-list-heading">Release Notes</h2>
-<ul class="post-list"><li><span class="post-meta">Oct 13, 2025</span>
-    <h3>
- <a class="post-link" href="/release-notes/welcome-to-jekyll.html">v1.0.0</a>
-    </h3></li></ul>
+Currently, MatchyPatchy only supports MiewID v3.
