@@ -452,8 +452,8 @@ class DisplayCompare(QWidget):
 
         self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
 
-        self.query_image_bar.reset_sliders()
-        self.match_image_bar.reset_sliders()
+        self.query_image_bar.reset()
+        self.match_image_bar.reset()
         # load new images
         self.load_query()
         self.load_match()
@@ -461,14 +461,14 @@ class DisplayCompare(QWidget):
     def change_query_in_sequence(self, n):
         """Load nth image within the current sequence"""
         self.QueryContainer.set_within_query_sequence(n)
-        self.query_image_bar.reset_sliders()
+        self.query_image_bar.reset()
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
         self.load_query()
 
     def change_match(self, n):
         """Load nth atch within the current match queue"""
         self.QueryContainer.set_match(n)
-        self.match_image_bar.reset_sliders()
+        self.match_image_bar.reset()
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.load_match()
 
