@@ -1,5 +1,5 @@
 ---
-layout: release
+layout: default
 ---
 
 # Release notes
