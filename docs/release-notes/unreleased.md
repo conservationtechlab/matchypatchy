@@ -1,3 +1,7 @@
+---
+layout: default
+---
+
 # v1.1.0 — 2026-02-01
 
 **Summary:** New GUI validation workflow and several performance improvements.
