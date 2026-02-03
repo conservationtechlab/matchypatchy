@@ -421,7 +421,8 @@ the current version of MatchyPatchy.
 <br>
 <hr>
 <br>
-# <a name="quality-control"></a>Quality Control
+
+# Quality Control <a name="quality-control"></a>
 
 After you have identified every image, you can verify the labels by selecting 
 <b>4. Match</b> from the Home page and then selecting <b>Quality Control by Individual</b>.
@@ -439,12 +440,11 @@ to select specific individuals to view and verify.
 
 In Quality Control mode, "Recalculate Matches" will ...
 
-<!-- screenshot -->
-
 <br>
 <hr>
 <br>
-# <a name="troubleshooting"></a>Troubleshooting and FAQ
+
+# Troubleshooting and FAQ <a name="troubleshooting"></a>
 ### Importing from a Folder
 
 
@@ -466,8 +466,10 @@ Currently, MatchyPatchy only supports
 <br>
 <hr>
 <br>
+
+
 <h2 class="post-list-heading">Release Notes</h2>
 <ul class="post-list"><li><span class="post-meta">Oct 13, 2025</span>
     <h3>
- <a class="post-link" href="/jekyll/update/2025/10/13/welcome-to-jekyll.html">v1.0.0</a>
+ <a class="post-link" href="/release-notes/welcome-to-jekyll.html">v1.0.0</a>
     </h3></li></ul>
