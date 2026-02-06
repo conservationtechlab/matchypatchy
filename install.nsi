@@ -203,18 +203,41 @@ Section "Install"
     Abort
 
   PipDone:
-    ; continue with rest of install (shortcuts, uninstaller, etc.)
+    ; continue with install of matchypatchy
+    DetailPrint "Installing packaged project from $INSTDIR\matchypatchy (log: $R0)..."
 
-    ; Write uninstaller
-    WriteUninstaller "$INSTDIR\Uninstall.exe"
+    ; Recommended for production: non-editable installation from directory (builds a wheel)
+    ExecWait 'cmd /c cd /D "$INSTDIR" && "$INSTDIR\\venv\\Scripts\\python.exe" -m pip install --no-deps "$INSTDIR\matchypatchy" >>"$R0" 2>&1' $0
+    IntCmp $0 0 install_local_ok install_local_failed install_local_failed
 
-    ; Start Menu shortcut
-    CreateDirectory "$SMPROGRAMS\MatchyPatchy"
-    ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)
-    CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
-    CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+    install_local_ok:
+      DetailPrint "Local package installed successfully."
+      Goto local_done
 
-    DetailPrint "Installation complete."
+    install_local_failed:
+      ; Optionally try an editable install (useful during development)
+      DetailPrint "Install from directory failed (exit $0). Attempting editable install (-e) as fallback..."
+      ExecWait 'cmd /c cd /D "$INSTDIR" && "$INSTDIR\\venv\\Scripts\\python.exe" -m pip install --no-deps -e "$INSTDIR\\matchypatchy" >>"$R0" 2>&1' $1
+      IntCmp $1 0 install_local_ok install_local_final_failed install_local_final_failed
+
+    install_local_final_failed:
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install the packaged project from $INSTDIR\\matchypatchy (see $R0 for pip output). The installer will abort."
+      Abort
+
+    local_done:
+      ; (continue)
+      StrCpy $R2 "" ; clear helper var
+
+      ; Write uninstaller
+      WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+      ; Start Menu shortcut
+      CreateDirectory "$SMPROGRAMS\MatchyPatchy"
+      ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)
+      CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.png" 0
+      CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.png" 0
+
+      DetailPrint "Installation complete."
 
 SectionEnd
 
