@@ -126,8 +126,13 @@ class ImageWidget(QLabel):
             frame (int, optional): Frame number to load from video
             crop (bool, optional): Whether to crop to bbox
         """
-        if self.image_path is None or image_path != self.image_path:
+        #load new image if path is different
+        if image_path is not None:
             self.image_path = image_path
+
+        # no image path to load
+        if self.image_path is None:
+            return
 
         if frame is not None:
             self.pil_image = self.load_from_video(frame)
