@@ -32,6 +32,11 @@ Section "Install"
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
+  ; Include pip requirements
+  File "requirements.txt"
+  ; Include launcher
+  File "launcher.vbs"
+
   ; Recursively include and extract the 'matchypatchy' package directory
   DetailPrint "Installing matchypatchy files..."
   SetOutPath "$INSTDIR\matchypatchy"
@@ -44,10 +49,6 @@ Section "Install"
   CreateDirectory "$INSTDIR\assets"
   File /r "assets\*.*"
 
-  ; Include pip requirements
-  File "requirements.txt"
-  ; Include launcher
-  File "launcher.vbs"
   ; -------------------------------------------------------------
 
   ; --- Require Python >= 3.12 check ---
