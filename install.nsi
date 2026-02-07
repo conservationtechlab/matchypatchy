@@ -24,6 +24,10 @@ Function .onInit
   System::Call 'kernel32::SetEnvironmentVariable(t "PATH", t "$0;$1")'
 FunctionEnd
 
+Section "Add size"
+  AddSize 1450000
+SectionEnd
+
 ; -------------------------
 ; Install section
 ; -------------------------
@@ -55,12 +59,16 @@ Section "Install"
   ; --- Check for NVIDIA GPU ---
   DetailPrint "Checking for NVIDIA GPU..."
   StrCpy $HAS_NVIDIA_GPU "0"
+
+  ExecWait 'cmd /C set PATH >"$INSTDIR\\installer-path.txt" 2>&1' $0
+  ExecWait 'cmd /C where nvidia-smi >"$INSTDIR\\where-nvidia.txt" 2>&1' $1
+  DetailPrint "Wrote installer PATH to $INSTDIR\\installer-path.txt and where output to $INSTDIR\\where-nvidia.txt"
   
   ; Check if nvidia-smi exists (indicates NVIDIA drivers are installed)
   nsExec::ExecToStack 'nvidia-smi --query-gpu=name --format=csv,noheader'
   Pop $0  ; exit code
   Pop $1  ; output
-  
+  DetailPrint "exit code $0 $1"
   IntCmp $0 0 0 no_nvidia_gpu no_nvidia_gpu
     ; nvidia-smi succeeded, check if output contains something
     StrLen $R0 $1
@@ -239,8 +247,8 @@ Section "Install"
     
     ; If requirements.txt has onnxruntime-gpu, replace it with CPU version
     DetailPrint "Ensuring CPU-only versions of dependencies..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime-gpu'
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install onnxruntime==1.20.0'
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime onnxruntime-gpu'
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install onnxruntime-gpu==1.20.0'
     Pop $1
     IntCmp $1 0 pip_success pip_install_failed pip_install_failed
 
