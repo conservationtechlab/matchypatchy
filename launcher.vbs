@@ -17,13 +17,13 @@ pythonPath  = scriptDir & "\venv\Scripts\python.exe"
 
 ' Prepare command to run main.py
 If fso.FileExists(pythonwPath) Then
-  cmd = """" & pythonwPath & """ """ & scriptDir & "\matchypatchy\main.py" & """"
+  cmd = """" & pythonwPath & """ """ & scriptDir & "\matchypatchy\src\matchypatchy\main.py" & """"
 ElseIf fso.FileExists(pythonPath) Then
   ' fallback to python (will show a console if used)
-  cmd = """" & pythonPath & """ """ & scriptDir & "\matchypatchy\main.py" & """"
+  cmd = """" & pythonPath & """ """ & scriptDir & "\matchypatchy\src\matchypatchy\main.py" & """"
 Else
   ' final fallback: try Python launcher on PATH (pyw for GUI, py if you want console)
-  cmd = "pyw -3 """ & scriptDir & "\matchypatchy\main.py" & """"
+  cmd = "pyw -3 """ & scriptDir & "\matchypatchy\src\matchypatchy\main.py" & """"
 End If
 
 ' Attempt to run the command hidden (0 = hidden window). Do not wait for it to finish (False).

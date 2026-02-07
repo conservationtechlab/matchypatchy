@@ -12,6 +12,7 @@ Page instfiles
 
 Var PYLAUNCHER
 Var PYVER_STR
+Var HAS_NVIDIA_GPU
 
 ; -------------------------
 ; .onInit - optional checks
@@ -50,6 +51,30 @@ Section "Install"
   File /r "assets\*.*"
 
   ; -------------------------------------------------------------
+
+  ; --- Check for NVIDIA GPU ---
+  DetailPrint "Checking for NVIDIA GPU..."
+  StrCpy $HAS_NVIDIA_GPU "0"
+  
+  ; Check if nvidia-smi exists (indicates NVIDIA drivers are installed)
+  nsExec::ExecToStack 'nvidia-smi --query-gpu=name --format=csv,noheader'
+  Pop $0  ; exit code
+  Pop $1  ; output
+  
+  IntCmp $0 0 0 no_nvidia_gpu no_nvidia_gpu
+    ; nvidia-smi succeeded, check if output contains something
+    StrLen $R0 $1
+    IntCmp $R0 0 no_nvidia_gpu has_nvidia_gpu has_nvidia_gpu
+  
+  has_nvidia_gpu:
+    StrCpy $HAS_NVIDIA_GPU "1"
+    DetailPrint "NVIDIA GPU detected: $1"
+    Goto gpu_check_done
+  
+  no_nvidia_gpu:
+    DetailPrint "No NVIDIA GPU detected. Will install CPU version of dependencies."
+  
+  gpu_check_done:
 
   ; --- Require Python >= 3.12 check ---
   ; $R0 = installer log (path)
@@ -187,10 +212,35 @@ Section "Install"
     DetailPrint "Warning: pip upgrade returned exit code $0. Continuing..."
 
   install_requirements:
-    ; Install requirements (if requirements.txt exists)
-    DetailPrint "Installing package requirements..."
-    ; run from $INSTDIR so relative paths inside requirements.txt resolve correctly
+    ; Install requirements based on GPU availability
+    StrCmp $HAS_NVIDIA_GPU "1" install_gpu_requirements install_cpu_requirements
+  
+  install_gpu_requirements:
+    DetailPrint "Installing package requirements with GPU support..."
+    ; First install base requirements
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-deps chromadb>=1.3.4'
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
+    Pop $1
+    IntCmp $1 0 0 pip_install_failed pip_install_failed
+    
+    ; Then install CUDA dependencies
+    DetailPrint "Installing NVIDIA CUDA runtime libraries..."
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12'
+    Pop $1
+    IntCmp $1 0 pip_success pip_install_failed pip_install_failed
+  
+  install_cpu_requirements:
+    DetailPrint "Installing package requirements (CPU version)..."
+    ; Install requirements, replacing any GPU packages with CPU versions
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-deps chromadb>=1.3.4'
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
+    Pop $1
+    IntCmp $1 0 0 pip_install_failed pip_install_failed
+    
+    ; If requirements.txt has onnxruntime-gpu, replace it with CPU version
+    DetailPrint "Ensuring CPU-only versions of dependencies..."
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime-gpu'
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --force-reinstall onnxruntime'
     Pop $1
     IntCmp $1 0 pip_success pip_install_failed pip_install_failed
 
@@ -207,7 +257,8 @@ Section "Install"
     DetailPrint "Installing packaged project from $INSTDIR\matchypatchy (log: $R0)..."
 
     ; Recommended for production: non-editable installation from directory (builds a wheel)
-    ExecWait 'cmd /c cd /D "$INSTDIR" && "$INSTDIR\\venv\\Scripts\\python.exe" -m pip install --no-deps "$INSTDIR\matchypatchy" >>"$R0" 2>&1' $0
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-deps -e "$INSTDIR\\matchypatchy"'
+    Pop $0
     IntCmp $0 0 install_local_ok install_local_failed install_local_failed
 
     install_local_ok:
@@ -217,7 +268,8 @@ Section "Install"
     install_local_failed:
       ; Optionally try an editable install (useful during development)
       DetailPrint "Install from directory failed (exit $0). Attempting editable install (-e) as fallback..."
-      ExecWait 'cmd /c cd /D "$INSTDIR" && "$INSTDIR\\venv\\Scripts\\python.exe" -m pip install --no-deps -e "$INSTDIR\\matchypatchy" >>"$R0" 2>&1' $1
+      nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-deps -e "$INSTDIR\\matchypatchy"'
+      Pop $1
       IntCmp $1 0 install_local_ok install_local_final_failed install_local_final_failed
 
     install_local_final_failed:
@@ -228,16 +280,16 @@ Section "Install"
       ; (continue)
       StrCpy $R2 "" ; clear helper var
 
-      ; Write uninstaller
-      WriteUninstaller "$INSTDIR\Uninstall.exe"
+    ; Write uninstaller
+    WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-      ; Start Menu shortcut
-      CreateDirectory "$SMPROGRAMS\MatchyPatchy"
-      ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)
+    ; Start Menu shortcut
+    CreateDirectory "$SMPROGRAMS\MatchyPatchy"
+    ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)
       CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.png" 0
       CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.png" 0
 
-      DetailPrint "Installation complete."
+    DetailPrint "Installation complete."
 
 SectionEnd
 
