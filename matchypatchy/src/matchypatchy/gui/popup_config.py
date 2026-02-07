@@ -18,7 +18,7 @@ from matchypatchy.algo.models import get_path, is_valid_reid_model
 
 
 class ConfigPopup(QDialog):
-    ICON_PENCIL = config.resource_path("assets/graphics/fluent_pencil_icon.png")
+    ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
 
     def __init__(self, parent):
         super().__init__(parent)

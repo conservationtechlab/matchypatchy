@@ -35,10 +35,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("MatchyPatchy")
         screen_resolution = QGuiApplication.primaryScreen().geometry()
         # print(screen_resolution)
-        default_width = min(1200, screen_resolution.width()*0.8)
-        default_height = min(900, screen_resolution.height()*0.8)
-        self.setGeometry(0, 0, default_width, default_height)
-        #self.setMinimumSize(1200, 900)
+        default_width = int(min(1200, screen_resolution.width()*0.8))
+        default_height = int(min(900, screen_resolution.height()*0.8))
+        #self.setGeometry(0, 0, default_width, default_height)
+        self.setMinimumSize(1200, 900)
 
         # Create Menu Bar
         self._createMenuBar()

@@ -226,7 +226,7 @@ Section "Install"
     DetailPrint "Installing NVIDIA CUDA runtime libraries..."
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12'
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime onnxruntime-gpu'
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install onnxruntime-gpu'
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install onnxruntime-gpu==1.20.0'
     Pop $1
     IntCmp $1 0 pip_success pip_install_failed pip_install_failed
   
@@ -240,7 +240,7 @@ Section "Install"
     ; If requirements.txt has onnxruntime-gpu, replace it with CPU version
     DetailPrint "Ensuring CPU-only versions of dependencies..."
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime-gpu'
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --force-reinstall onnxruntime'
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install onnxruntime==1.20.0'
     Pop $1
     IntCmp $1 0 pip_success pip_install_failed pip_install_failed
 
@@ -286,8 +286,8 @@ Section "Install"
     ; Start Menu shortcut
     CreateDirectory "$SMPROGRAMS\MatchyPatchy"
     ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)
-      CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.png" 0
-      CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.png" 0
+      CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+      CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
 
     DetailPrint "Installation complete."
 
