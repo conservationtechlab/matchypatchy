@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
+import animl
 
 from matchypatchy import config
 from matchypatchy.gui.popup_alert import AlertPopup
@@ -17,7 +18,7 @@ from matchypatchy.algo.models import get_path, is_valid_reid_model
 
 
 class ConfigPopup(QDialog):
-    ICON_PENCIL = config.resource_path("assets/graphics/fluent_pencil_icon.png")
+    ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -109,10 +110,9 @@ class ConfigPopup(QDialog):
         cuda_label = QLabel("CUDA Available:")
         cuda_label.setFixedWidth(self.column1_width)
         cuda_layout.addWidget(cuda_label)
-        import onnxruntime as ort
-        cuda = ort.get_available_providers()
-        #cuda = True if "CUDAExecutionProvider" in ort.get_available_providers() else False
-        cuda_available = QLabel(f"{cuda}")
+        providers = animl.get_onnx_device()
+        cuda = True if "CUDAExecutionProvider" in providers else False
+        cuda_available = QLabel(f"{providers}")
         cuda_available.setStyleSheet("color: green;" if cuda else "color: red;")
         cuda_layout.addWidget(cuda_available, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(cuda_layout)
