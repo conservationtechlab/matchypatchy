@@ -17,7 +17,7 @@
             <!-- logo goes here -->
             <a class="site-title" rel="author" href="/matchypatchy/">MatchyPatchy User Manual</a>
             <nav class="site-nav">
-                <div class="trigger"><a class="page-link" href="about">About</a></div>
+                <div class="trigger"><a class="page-link" href="{{ '/about/' | relative_url }}">About</a></div>
             </nav>
         </div>
     </header>
@@ -28,11 +28,11 @@
         <aside class="sidebar">
         <h2>Navigation</h2>
         <nav>
-            <a href="{{ '/#installation/' | relative_url }}">Installation</a>
-            <a href="{{ '/#getting-started/' | relative_url }}">Getting Started</a>
-            <a href="{{ '/#usage/' | relative_url }}">Using MatchyPatchy</a>
-            <a href="{{ '/#quality-control/' | relative_url }}">Quality Control</a>
-            <a href="{{ '/#troubleshooting/' | relative_url }}">Troubleshooting</a>
+            <a href="{{ '/' | relative_url }}#installation">Installation</a>
+            <a href="{{ '/' | relative_url }}#getting-started">Getting Started</a>
+            <a href="{{ '/' | relative_url }}#usage">Using MatchyPatchy</a>
+            <a href="{{ '/' | relative_url }}#quality-control">Quality Control</a>
+            <a href="{{ '/' | relative_url }}#troubleshooting">Troubleshooting</a>
             <a href="{{ '/glossary/' | relative_url }}">Glossary</a>
             <a href="{{ '/release-notes/' | relative_url }}">Release Notes</a>
             <a href="{{ '/about/' | relative_url }}">Contact</a>
