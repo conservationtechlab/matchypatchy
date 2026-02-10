@@ -1,0 +1,9 @@
+Package: matchypatchy
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: Your Name <you@example.com>
+Depends: bash, python3, xdg-utils
+Description: MatchyPatchy packaged app (example)
+ MatchyPatchy installed to /opt/matchypatchy with launcher and desktop entry.

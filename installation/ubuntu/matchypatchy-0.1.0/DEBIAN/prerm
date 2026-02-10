@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+# prerm is run as root before package is removed.
+# nothing special required, but we can remove desktop DB entries on uninstall (optional).
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database /usr/share/applications || true
+fi
+
+exit 0

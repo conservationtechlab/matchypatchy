@@ -1,3 +1,5 @@
+__version__ = '0.1.0'
+
 from matchypatchy import algo
 from matchypatchy import config
 from matchypatchy import database
