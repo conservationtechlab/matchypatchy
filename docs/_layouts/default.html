@@ -14,11 +14,10 @@
     <!-- Header -->
     <header class="site-header" role="banner">
         <div class="header-wrapper">
-            <!-- logo goes here -->
             <img class="site-logo" src="{{ '/assets/logo.png' | relative_url }}" alt="MatchyPatchy logo">
-            <a class="site-title" rel="author" href="/matchypatchy/">MatchyPatchy User Manual</a>
+            <a class="site-title" rel="author" href="{{ '/' | relative_url }}">MatchyPatchy User Manual</a>
             <nav class="site-nav">
-                <div class="trigger"><a class="page-link" href="about">About</a></div>
+                <div class="trigger"><a class="page-link" href="{{ '/about/' | relative_url }}">About</a></div>
             </nav>
         </div>
     </header>
@@ -29,11 +28,11 @@
         <aside class="sidebar">
         <h2>Navigation</h2>
         <nav>
-            <a href="#installation">Installation</a>
-            <a href="#getting-started">Getting Started</a>
-            <a href="#usage">Using MatchyPatchy</a>
-            <a href="#quality-control">Quality Control</a>
-            <a href="#troubleshooting">Troubleshooting</a>
+            <a href="{{ '/' | relative_url }}#installation">Installation</a>
+            <a href="{{ '/' | relative_url }}#getting-started">Getting Started</a>
+            <a href="{{ '/' | relative_url }}#usage">Using MatchyPatchy</a>
+            <a href="{{ '/' | relative_url }}#quality-control">Quality Control</a>
+            <a href="{{ '/' | relative_url }}#troubleshooting">Troubleshooting</a>
             <a href="{{ '/glossary/' | relative_url }}">Glossary</a>
             <a href="{{ '/release-notes/' | relative_url }}">Release Notes</a>
             <a href="{{ '/about/' | relative_url }}">Contact</a>
