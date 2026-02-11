@@ -41,6 +41,9 @@ Section "Install"
   File "requirements.txt"
   ; Include launcher
   File "launcher.vbs"
+  File LICENSE
+  File README.md
+  File ABOUT.md
 
   ; Recursively include and extract the 'matchypatchy' package directory
   DetailPrint "Installing matchypatchy files..."
