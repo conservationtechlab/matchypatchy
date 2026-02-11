@@ -298,13 +298,13 @@ SectionEnd
 Section "Uninstall"
 
   ; Remove shortcuts and start menu folder (check if they exist first)
-  IfFileExists "$DESKTOP\MatchyPatchy.lnk" 0 skip_desktop
+  IfFileExists "$DESKTOP\MatchyPatchy.lnk" 0 SkipDesktop
     Delete "$DESKTOP\MatchyPatchy.lnk"
-  skip_desktop:
+  SkipDesktop:
   
-  IfFileExists "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" 0 skip_startmenu
+  IfFileExists "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" 0 SkipStartMenu
     Delete "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk"
-  skip_startmenu:
+  SkipStartMenu:
   
   RMDir "$SMPROGRAMS\MatchyPatchy"
 
