@@ -94,18 +94,12 @@ Section "Install"
 
   DetailPrint "Locating Python 3.12+ ..."
   
-  ; Try direct path first - check if Python 3.14 exists in common location
-  IfFileExists "$LOCALAPPDATA\Programs\Python\Python314\python.exe" 0 try_python313
-    DetailPrint "Found Python 3.14 in LocalAppData"
-    StrCpy $PYLAUNCHER "$LOCALAPPDATA\Programs\Python\Python314\python.exe"
+  ; Try direct path first - check if Python 3.13 exists in common location
+  IfFileExists "$LOCALAPPDATA\Programs\Python\Python313\python.exe" 0 try_python312
+    DetailPrint "Found Python 3.13 in LocalAppData"
+    StrCpy $PYLAUNCHER "$LOCALAPPDATA\Programs\Python\Python313\python.exe"
     Goto test_python
-  
-  try_python313:
-    IfFileExists "$LOCALAPPDATA\Programs\Python\Python313\python.exe" 0 try_python312
-      DetailPrint "Found Python 3.13 in LocalAppData"
-      StrCpy $PYLAUNCHER "$LOCALAPPDATA\Programs\Python\Python313\python.exe"
-      Goto test_python
-  
+
   try_python312:
     IfFileExists "$LOCALAPPDATA\Programs\Python\Python312\python.exe" 0 try_programfiles
       DetailPrint "Found Python 3.12 in LocalAppData"
@@ -114,12 +108,6 @@ Section "Install"
   
   try_programfiles:
     ; Check Program Files locations
-    IfFileExists "$PROGRAMFILES\Python314\python.exe" 0 try_pf_313
-      DetailPrint "Found Python 3.14 in Program Files"
-      StrCpy $PYLAUNCHER "$PROGRAMFILES\Python314\python.exe"
-      Goto test_python
-  
-  try_pf_313:
     IfFileExists "$PROGRAMFILES\Python313\python.exe" 0 try_pf_312
       DetailPrint "Found Python 3.13 in Program Files"
       StrCpy $PYLAUNCHER "$PROGRAMFILES\Python313\python.exe"
