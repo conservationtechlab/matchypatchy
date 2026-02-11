@@ -214,29 +214,20 @@ Section "Install"
   install_gpu_requirements:
     DetailPrint "Installing package requirements with GPU support..."
     ; First install base requirements
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
+    DetailPrint "Installing NVIDIA CUDA runtime libraries..."
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12'
     Pop $1
     IntCmp $1 0 0 pip_install_failed pip_install_failed
     
-    ; Then install CUDA dependencies and reinstall onnxruntime-gpu
-    DetailPrint "Installing NVIDIA CUDA runtime libraries..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12'
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime onnxruntime-gpu'
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install onnxruntime-gpu==1.20.0'
+    ; Then install dependencies
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
     Pop $1
     IntCmp $1 0 pip_success pip_install_failed pip_install_failed
   
   install_cpu_requirements:
     DetailPrint "Installing package requirements (CPU version)..."
-    ; Install requirements, replacing any GPU packages with CPU versions
+    ; Install requirements without
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
-    Pop $1
-    IntCmp $1 0 0 pip_install_failed pip_install_failed
-    
-    ; If requirements.txt has onnxruntime-gpu, replace it with CPU version
-    DetailPrint "Ensuring CPU-only versions of dependencies..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime onnxruntime-gpu'
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install onnxruntime-gpu==1.20.0'
     Pop $1
     IntCmp $1 0 pip_success pip_install_failed pip_install_failed
 
