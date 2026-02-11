@@ -3,29 +3,38 @@ layout: default
 ---
 # <a name="installation"></a>Installation
 
-Download MatchyPatchy:
-<table>
-<tr><td>Windows</td><td>LINK</td></tr>
-<tr><td>MacOS</td><td>LINK</td></tr>
-<tr><td>Ubuntu</td><td>22.04</td><td>24.04</td></tr>
-</table>
+## Requirements:
 
-The app may take several second to start up. 
-
-Requirements:
-
-MatchyPatchy requires Python >= 3.12. <a href>Download Python</a>.<br>
+MatchyPatchy requires Python >= 3.12, <3.14. <a href="https://www.python.org/downloads/release/python-31212/">Download Python 3.12</a>.<br>
 For use with Nvida GPU, first <a href="https://developer.nvidia.com/cuda-downloads">install CUDA</a>.
 
+## Installer
+Download MatchyPatchy v0.1.0 Installer:
+<table>
+<tr><td>Windows</td><td><a href="">Installer .zip</a>></td></tr>
+<tr><td>MacOS</td><td>Coming soon</td></tr>
+<tr><td>Ubuntu</td><td><a href="">.deb</a></td></tr>
+</table>
+
+Windows: Extract the downloaded .zip file and then run MatchyPatchy-Setup.exe.
+Linux: Run the downloaded .deb file.
+
+## Install via PyPi
+
+1. Using pip, install matchypatchy with onnxruntime. We recommend using a virtual environment.
+   > pip install matchypatchy[onnx]
+2. Launch MatchyPatchy from the terminal
+   > python -m matchypatchy
 
 ## Install via GitHub
 
 1. Go to the MatchyPatchy GitHub <a href>repo</a>.
 2. Clone the repository to your local machine.
 3. In a terminal, navigate to the cloned repository.
-   > cd matchypatchy
-4. Using pip, install dependencies. We recommend using a virtual environment.
-   > pip install -r requirements.txt
+   > cd matchypatchy/matchypatchy
+4. Using pip install onnxruntime or onnxruntime-gpu <1.21.0. We recommend using a virtual environment.
+4. Using pip install package locally. We recommend using a virtual environment.
+   > pip install -e .
 5. Launch MatchyPatchy from the terminal
    > python -m matchypatchy
 
@@ -302,10 +311,9 @@ Filters</b>.
 
 <img src="{{ '/assets/screenshots/media_filters.png' | relative_url }}" style="display: block; margin: auto;" />
 
-
 <br>
+
 ## 4. Match
-<!-- Match page -->
 
 Once you have validated that each ROI contains a single animal and that all station
 names and viewpoints are correct, select Step 4. Match from the Home page or from within
@@ -459,5 +467,7 @@ Media
 Individuals
 
 
-<b><u>How do I use my own Detector/Re-Identification Model?</u></b>
-Currently, MatchyPatchy only supports MiewID v3.
+<b><u>How do I use my own Detector/Re-Identification Model?</u></b><br>
+Currently, MatchyPatchy only supports MiewID v3. To request a new model, 
+<a href="https://github.com/conservationtechlab/matchypatchy/issues">submit 
+an issue</a>.

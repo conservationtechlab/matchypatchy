@@ -7,15 +7,16 @@ layout: default
 See recent highlights below or open the full notes for a release.
 
 ## Latest highlights
-- v1.0.0 — 2025-12-10: First public release.
+- v0.1.0 — 2026-02-10: Beta Release
+- [v1.0.0 — 2026-02-05](unreleased.md) — Planned release.
 
 ## Recent releases
-- [v1.0.0 — 2026-02-05](v1.0.0.md) — Initial release.
+- v0.1.0 — 2026-02-10: Beta Release
 
 ---
 
 ## All releases
 ### 2026
-- [v1.0.0 — 2026-02-01](v1.0.0.md)
+- v0.1.0 — 2026-02-10: Beta Release
 
 ---
