@@ -4,7 +4,6 @@ from matchypatchy import algo
 from matchypatchy import config
 from matchypatchy import database
 from matchypatchy import gui
-#from matchypatchy import pairx
 
 from matchypatchy.algo import (AnimlThread, BuildManifestThread,
                                CSVImportThread, DownloadMLThread,
