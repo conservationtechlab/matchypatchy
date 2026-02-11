@@ -34,17 +34,20 @@ Function .onInit
   ${If} $R0 != ""
     ; Installation exists, show update prompt
     ${If} $R1 != ""
-      MessageBox MB_YESNO|MB_ICONQUESTION "MatchyPatchy (version $R1) is already installed at:$\n$\n$R0$\n$\nDo you want to update/reinstall?" IDYES proceed_install
+      MessageBox MB_YESNO|MB_ICONQUESTION "MatchyPatchy (version $R1) is already installed at:$\n$\n$R0$\n$\nDo you want to update to version ${APP_VERSION}?" IDNO abort_install
     ${Else}
-      MessageBox MB_YESNO|MB_ICONQUESTION "MatchyPatchy is already installed at:$\n$\n$R0$\n$\nDo you want to update/reinstall?" IDYES proceed_install
+      MessageBox MB_YESNO|MB_ICONQUESTION "MatchyPatchy is already installed at:$\n$\n$R0$\n$\nDo you want to update/reinstall (version ${APP_VERSION})?" IDNO abort_install
     ${EndIf}
     
-    ; User clicked NO, abort installation
-    Abort
+    ; User clicked YES, use existing installation directory
+    StrCpy $INSTDIR $R0
+    Goto end_version_check
     
-    proceed_install:
-      ; User clicked YES, use existing installation directory
-      StrCpy $INSTDIR $R0
+    abort_install:
+      ; User clicked NO, abort installation
+      Abort
+    
+    end_version_check:
   ${EndIf}
 FunctionEnd
 
