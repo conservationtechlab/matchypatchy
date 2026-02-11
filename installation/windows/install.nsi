@@ -7,9 +7,9 @@ InstallDir "$LOCALAPPDATA\MatchyPatchy"
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
-Page components
-Page directory
-Page instfiles
+!insertmacro MUI_PAGE_COMPONENTS
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
 
 Var PYLAUNCHER
 Var PYVER_STR
@@ -304,8 +304,7 @@ Section "Uninstall"
   IfFileExists "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" 0 +2
     Delete "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk"
   
-  IfFileExists "$SMPROGRAMS\MatchyPatchy" 0 +2
-    RMDir "$SMPROGRAMS\MatchyPatchy"
+  RMDir "$SMPROGRAMS\MatchyPatchy"
 
   ; Remove files - adjust if you embed more files
   Delete "$INSTDIR\runner.vbs"
