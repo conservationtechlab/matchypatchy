@@ -11,12 +11,12 @@ For use with Nvida GPU, first <a href="https://developer.nvidia.com/cuda-downloa
 ## Installer
 Download MatchyPatchy v0.1.0 Installer:
 <table>
-<tr><td>Windows</td><td><a href="">Installer .zip</a>></td></tr>
+<tr><td>Windows</td><td><a href="">.zip</a></td></tr>
 <tr><td>MacOS</td><td>Coming soon</td></tr>
 <tr><td>Ubuntu</td><td><a href="">.deb</a></td></tr>
 </table>
 
-Windows: Extract the downloaded .zip file and then run MatchyPatchy-Setup.exe.
+Windows: Extract the downloaded .zip file and then run MatchyPatchy-Setup.exe.<br>
 Linux: Run the downloaded .deb file.
 
 ## Install via PyPi
@@ -453,19 +453,6 @@ In Quality Control mode, "Recalculate Matches" will ...
 <br>
 
 # Troubleshooting and FAQ <a name="troubleshooting"></a>
-### Importing from a Folder
-
-
-### Database Management
-
-Surveys
-
-Stations
-
-Media
-
-Individuals
-
 
 <b><u>How do I use my own Detector/Re-Identification Model?</u></b><br>
 Currently, MatchyPatchy only supports MiewID v3. To request a new model, 
