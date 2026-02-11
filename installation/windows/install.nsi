@@ -7,6 +7,7 @@ InstallDir "$LOCALAPPDATA\MatchyPatchy"
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
+Page components
 Page directory
 Page instfiles
 
@@ -270,14 +271,25 @@ Section "Install"
     ; Write uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-    ; Start Menu shortcut
-    CreateDirectory "$SMPROGRAMS\MatchyPatchy"
-    ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)
-      CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
-      CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
-
     DetailPrint "Installation complete."
 
+SectionEnd
+
+; -------------------------
+; Optional Desktop Shortcut
+; -------------------------
+Section "Desktop Shortcut" SecDesktop
+  SectionIn 1
+  CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+SectionEnd
+
+; -------------------------
+; Optional Start Menu Shortcuts
+; -------------------------
+Section "Start Menu Shortcuts" SecStartMenu
+  SectionIn 1
+  CreateDirectory "$SMPROGRAMS\MatchyPatchy"
+  CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
 SectionEnd
 
 ; -------------------------
@@ -285,10 +297,15 @@ SectionEnd
 ; -------------------------
 Section "Uninstall"
 
-  ; Remove shortcuts and start menu folder
-  Delete "$DESKTOP\MatchyPatchy.lnk"
-  Delete "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk"
-  RMDir "$SMPROGRAMS\MatchyPatchy"
+  ; Remove shortcuts and start menu folder (check if they exist first)
+  IfFileExists "$DESKTOP\MatchyPatchy.lnk" 0 +2
+    Delete "$DESKTOP\MatchyPatchy.lnk"
+  
+  IfFileExists "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" 0 +2
+    Delete "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk"
+  
+  IfFileExists "$SMPROGRAMS\MatchyPatchy" 0 +2
+    RMDir "$SMPROGRAMS\MatchyPatchy"
 
   ; Remove files - adjust if you embed more files
   Delete "$INSTDIR\runner.vbs"
@@ -308,4 +325,6 @@ SectionEnd
 ; Optional: show installation log (useful for debugging)
 ; -------------------------
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecDesktop} "Create a desktop shortcut for MatchyPatchy."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecStartMenu} "Create Start Menu shortcuts for MatchyPatchy."
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
