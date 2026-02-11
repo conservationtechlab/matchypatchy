@@ -1,4 +1,5 @@
 !include LogicLib.nsh
+!include MUI2.nsh
 
 !define APP_NAME "MatchyPatchy"
 !define APP_FOLDER_NAME "MatchyPatchy"         ; must match folder name next to installer
@@ -12,6 +13,7 @@ RequestExecutionLevel admin
 
 
 Page directory
+Page components
 Page instfiles
 UninstPage uninstConfirm
 UninstPage instfiles
@@ -31,24 +33,44 @@ Section "Install"
 
     ; Write uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
+SectionEnd
 
-    ; Create shortcuts
-    DetailPrint "Creating shortcuts..."
+Section "Create Desktop Shortcut" SecDesktop
+    SectionIn 1
+    DetailPrint "Creating desktop shortcut..."
+    CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${EXE_NAME}"
+SectionEnd
+
+Section "Create Start Menu Shortcuts" SecStartMenu
+    SectionIn 1
+    DetailPrint "Creating start menu shortcuts..."
     CreateDirectory "$SMPROGRAMS\${APP_NAME}"
     CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${EXE_NAME}"
-    CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${EXE_NAME}"
     CreateShortCut "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
 SectionEnd
+
+; Section descriptions
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+    !insertmacro MUI_DESCRIPTION_TEXT ${SecDesktop} "Create a shortcut on the desktop"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SecStartMenu} "Create shortcuts in the Start Menu"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Section "Uninstall"
     Delete "$INSTDIR\${EXE_NAME}"
     Delete "$INSTDIR\Uninstall.exe"
     RMDir /r "$INSTDIR"
 
-    Delete "$DESKTOP\${APP_NAME}.lnk"
-    Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
-    Delete "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk"
-    RMDir "$SMPROGRAMS\${APP_NAME}"
+    ; Delete desktop shortcut if it exists
+    IfFileExists "$DESKTOP\${APP_NAME}.lnk" 0 +2
+        Delete "$DESKTOP\${APP_NAME}.lnk"
+    
+    ; Delete start menu shortcuts if they exist
+    IfFileExists "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" 0 +2
+        Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
+    IfFileExists "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk" 0 +2
+        Delete "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk"
+    IfFileExists "$SMPROGRAMS\${APP_NAME}" 0 +2
+        RMDir "$SMPROGRAMS\${APP_NAME}"
 
     DeleteRegKey HKLM "Software\${APP_NAME}"
 SectionEnd
