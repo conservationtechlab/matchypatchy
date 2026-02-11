@@ -69,8 +69,7 @@ Section "Uninstall"
         Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
     IfFileExists "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk" 0 +2
         Delete "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk"
-    IfFileExists "$SMPROGRAMS\${APP_NAME}" 0 +2
-        RMDir "$SMPROGRAMS\${APP_NAME}"
+    RMDir "$SMPROGRAMS\${APP_NAME}"
 
     DeleteRegKey HKLM "Software\${APP_NAME}"
 SectionEnd
