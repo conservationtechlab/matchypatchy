@@ -42,6 +42,7 @@ def initiate():
         'SEQUENCE_DURATION': 60,
         'SEQUENCE_N': 3,
     }
+    print("HOME_DIR: " + str(HOME_DIR))
 
     CONFIG_PATH = HOME_DIR / '.config.yml'
     if CONFIG_PATH.exists():

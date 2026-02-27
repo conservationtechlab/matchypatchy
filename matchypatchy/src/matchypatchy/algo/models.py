@@ -66,42 +66,85 @@ def delete(ML_DIR, key):
         path.unlink()
 
 
-def download(ML_DIR, key):
-    """Downloads ML model to ML_DIR"""
-    model_yml_path = resource_path("assets/models.yml")
-    with open(model_yml_path, 'r') as cfg_file:
-        ml_cfg = yaml.safe_load(cfg_file)
-        models = ml_cfg['MODELS']
-        name = models[key][0]
-        url = models[key][1]
 
-        path = ML_DIR / Path(name)
+def download_one(url: str, final_path: Path, should_cancel) -> None:
+    """
+    Download url -> final_path with cancel + cleanup.
+    Writes to final_path.part, renames on success.
+    should_cancel: callable returning True when cancel requested.
+    """
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = final_path.with_suffix(final_path.suffix + ".part")
 
-        if not path.exists():  # check to see if it already exists first
-            for url in url if isinstance(url, list) else [url]:
-                try:
-                    urllib.request.urlretrieve(url, path)
-                    return True
-                except urllib.error.URLError:
-                    logging.error("Unable to connect to server.")
-                    return False
-        if path.exists():  # validate that it downloaded
-            return True
-        else:
-            return False
+    try:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=30) as resp, open(tmp_path, "wb") as f:
+            while True:
+                if should_cancel():
+                    raise InterruptedError("Cancelled")
+
+                chunk = resp.read(1024 * 1024)  # 1 MiB
+                if not chunk:
+                    break
+                f.write(chunk)
+
+        # success: atomic replace
+        tmp_path.replace(final_path)
+
+    except Exception:
+        # always delete partial
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except OSError:
+            pass
+        raise
 
 
 class DownloadMLThread(QThread):
-    """
-    Thread for downloading ML model
-    """
-    downloaded = pyqtSignal(str)
+    # optional: signal result back to UI
+    finished_ok = pyqtSignal(bool, str)  # ok, message
 
-    def __init__(self, ml_dir, checked_models):
-        super().__init__()
+    def __init__(self, ml_dir, checked_models, parent=None):
+        super().__init__(parent)
+        self.ml_dir = Path(ml_dir)
         self.checked_models = checked_models
-        self.ml_dir = ml_dir
+        print("Initialized DownloadMLThread with models:", self.checked_models)
+        model_yml_path = resource_path("assets/models.yml")
+        with open(model_yml_path, 'r') as cfg_file:
+            ml_cfg = yaml.safe_load(cfg_file)
+            self.models = ml_cfg['MODELS']
 
     def run(self):
-        for key in self.checked_models:
-            download(self.ml_dir, key)
+        try:
+            # Example loop: you’ll map checked_models -> (name, url)
+            for key in self.checked_models:
+                names = self.models[key][0]
+                urls = self.models[key][1]
+                
+                for i, url in enumerate(urls):  # if you have multiple urls per model, loop through them
+                    name = names[i]
+                    final_path = self.ml_dir / name
+
+                    # Skip if already there
+                    if final_path.exists():
+                        continue
+
+                    download_one(
+                        url=url,
+                        final_path=final_path,
+                        should_cancel=self.isInterruptionRequested,
+                    )
+
+            self.finished_ok.emit(True, "Download complete")
+
+        except InterruptedError:
+            self.finished_ok.emit(False, "Download cancelled")
+
+        except urllib.error.URLError:
+            logging.exception("Unable to connect to server.")
+            self.finished_ok.emit(False, "Network error")
+
+        except Exception:
+            logging.exception("Download failed.")
+            self.finished_ok.emit(False, "Download failed")
