@@ -109,7 +109,6 @@ class DownloadMLThread(QThread):
         super().__init__(parent)
         self.ml_dir = Path(ml_dir)
         self.checked_models = checked_models
-        print("Initialized DownloadMLThread with models:", self.checked_models)
         model_yml_path = resource_path("assets/models.yml")
         with open(model_yml_path, 'r') as cfg_file:
             ml_cfg = yaml.safe_load(cfg_file)

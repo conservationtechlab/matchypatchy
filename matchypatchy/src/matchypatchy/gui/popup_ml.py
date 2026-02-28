@@ -104,7 +104,7 @@ class MLDownloadPopup(QDialog):
         self.build_thread = models.DownloadMLThread(self.ml_dir, self.checked_models)
         self.build_thread.finished.connect(self.progress_bar.hide)
         self.build_thread.finished.connect(self.enable_close)
-        self.build_thread.finished_ok.connect(self.on_download_result)
+        #self.build_thread.finished_ok.connect(self.on_download_result)
         self.build_thread.start()
 
     def on_download_result(self, ok: bool, msg: str):
