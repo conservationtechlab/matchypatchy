@@ -1,4 +1,8 @@
 ; MatchyPatchy NSIS installer - creates venv, pip installs requirements, and creates shortcuts.
+
+; Version constant - update this for each release
+!define APP_VERSION "1.0.0"
+
 Name "MatchyPatchy"
 OutFile "MatchyPatchy-Setup.exe"
 ; Per-user install (no admin required). Change to RequestExecutionLevel admin + SetShellVarContext all if you want system-wide install.
@@ -23,6 +27,29 @@ Function .onInit
   ReadRegStr $0 HKCU "Environment" "Path"
   ReadRegStr $1 HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "Path"
   System::Call 'kernel32::SetEnvironmentVariable(t "PATH", t "$0;$1")'
+
+    ; Check for existing installation
+  ReadRegStr $R0 HKCU "Software\MatchyPatchy" "Install_Dir"
+  ReadRegStr $R1 HKCU "Software\MatchyPatchy" "Version"
+  
+  ${If} $R0 != ""
+    ; Installation exists, show update prompt
+    ${If} $R1 != ""
+      MessageBox MB_YESNO|MB_ICONQUESTION "MatchyPatchy (version $R1) is already installed at:$\n$\n$R0$\n$\nDo you want to update to version ${APP_VERSION}?" IDNO abort_install
+    ${Else}
+      MessageBox MB_YESNO|MB_ICONQUESTION "MatchyPatchy is already installed at:$\n$\n$R0$\n$\nDo you want to update/reinstall (version ${APP_VERSION})?" IDNO abort_install
+    ${EndIf}
+    
+    ; User clicked YES, use existing installation directory
+    StrCpy $INSTDIR $R0
+    Goto end_version_check
+    
+    abort_install:
+      ; User clicked NO, abort installation
+      Abort
+    
+    end_version_check:
+  ${EndIf}
 FunctionEnd
 
 Section "Create Desktop Shortcut"
@@ -38,7 +65,7 @@ SectionEnd
 ; -------------------------
 ; Install section
 ; -------------------------
-Section "Install MatchyPatchy"
+Section "Install MatchyPatchy ${APP_VERSION}"
   AddSize 1450000
 
   ; Create install folder
@@ -283,6 +310,20 @@ Section "Install MatchyPatchy"
     CreateDirectory "$SMPROGRAMS\MatchyPatchy"
     CreateShortCut "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk" "$INSTDIR\uninstall.exe" ""
 
+
+    ; Write registry keys for version tracking and Add/Remove Programs
+    WriteRegStr HKCU "Software\MatchyPatchy" "Version" "${APP_VERSION}"
+    WriteRegStr HKCU "Software\MatchyPatchy" "Install_Dir" "$INSTDIR"
+
+    ; Register in Add/Remove Programs
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayName" "MatchyPatchy"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayVersion" "${APP_VERSION}"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "Conservation Technology Lab"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
+    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
+    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\assets\graphics\desktop_icon.ico"
+
     DetailPrint "Installation complete."
 
 SectionEnd
@@ -308,6 +349,10 @@ Section "Uninstall"
 
   Delete "$INSTDIR\Uninstall.exe"
   RMDir /r "$INSTDIR"
+
+  ; Remove registry keys
+  DeleteRegKey HKCU "Software\MatchyPatchy"
+  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy"
 
 SectionEnd
 
