@@ -8,6 +8,7 @@ InstallDir "$LOCALAPPDATA\MatchyPatchy"
 !include "LogicLib.nsh"
 
 Page directory
+Page components
 Page instfiles
 
 Var PYLAUNCHER
@@ -24,14 +25,21 @@ Function .onInit
   System::Call 'kernel32::SetEnvironmentVariable(t "PATH", t "$0;$1")'
 FunctionEnd
 
-Section "Add size"
-  AddSize 1450000
+Section "Create Desktop Shortcut"
+  CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+SectionEnd
+
+Section "Create Start Menu Shortcut"
+  CreateDirectory "$SMPROGRAMS\MatchyPatchy"
+  ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)   
+  CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
 SectionEnd
 
 ; -------------------------
 ; Install section
 ; -------------------------
-Section "Install"
+Section "Install MatchyPatchy"
+  AddSize 1450000
 
   ; Create install folder
   CreateDirectory "$INSTDIR"
@@ -272,12 +280,8 @@ Section "Install"
 
     ; Write uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
-
-    ; Start Menu shortcut
     CreateDirectory "$SMPROGRAMS\MatchyPatchy"
-    ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)
-      CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
-      CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+    CreateShortCut "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk" "$INSTDIR\uninstall.exe" ""
 
     DetailPrint "Installation complete."
 
