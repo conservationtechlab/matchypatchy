@@ -33,18 +33,22 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.mpDB = mpDB
         self.setWindowTitle("MatchyPatchy")
-        screen_resolution = QGuiApplication.primaryScreen().geometry()
-        # print(screen_resolution)
-        default_width = int(min(1200, screen_resolution.width()*0.8))
-        default_height = int(min(900, screen_resolution.height()*0.8))
-        #self.setGeometry(0, 0, default_width, default_height)
-        self.setMinimumSize(1200, 900)
+        screen_resolution = QGuiApplication.primaryScreen().availableGeometry()
+        minimum_height = 700
+        minimum_width = 1200
+        self.setMinimumSize(minimum_width, minimum_height)
+        
+        preferred_width = min(int(screen_resolution.width() * 0.9), 1300) if screen_resolution.width() > minimum_width else minimum_width
+        preferred_height = min(int(screen_resolution.height() * 0.9), 900) if screen_resolution.height() > minimum_height else minimum_height
+            
+        self.resize(preferred_width, preferred_height)
+
+        print(self.size())
 
         # Create Menu Bar
         self._createMenuBar()
         # Create container
         container = QWidget(self)
-        container.setFocus()
         # Create Page Views
         self.Base = DisplayBase(self)
         self.Media = DisplayMedia(self)

@@ -52,7 +52,11 @@ def get_path(ML_DIR, key):
     MODELS = load_model('MODELS')
     if key is None:
         return None
-    path = ML_DIR / MODELS[key][0]
+    names =  MODELS[key][0]
+    if len(names) > 0:
+        path = Path(ML_DIR) / names[0]
+    else:
+        path = Path(ML_DIR) / names
     if path.exists():
         return path
     else:

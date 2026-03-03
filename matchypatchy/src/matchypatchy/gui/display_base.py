@@ -46,10 +46,11 @@ class DisplayBase(QWidget):
         self.label = QLabel("Welcome To MatchyPatchy")
         self.label.setObjectName("Title")
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setFixedHeight(20)
+        self.label.setFixedHeight(25)
         self.label.setStyleSheet("""#Title {font-size: 22px;}""")
         layout.addWidget(self.label)
-        layout.addSpacing(20)
+        layout.addSpacing(10)
+        layout.addStretch()
 
         self.logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
         self.logo.setFixedSize(600, 400)
@@ -57,6 +58,7 @@ class DisplayBase(QWidget):
         logo_img = QImage(self.LOGO)
         self.logo.setPixmap(QPixmap.fromImage(logo_img))
         layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addSpacing(10)
         layout.addStretch()
 
         column_layout = QHBoxLayout()
@@ -141,7 +143,7 @@ class DisplayBase(QWidget):
         column_layout.addSpacing(padding)  # add spacing to right side
         column_layout.addStretch()
         layout.addLayout(column_layout)
-        layout.addSpacing(50)  # add spacing to bottom
+        layout.addSpacing(40)  # add spacing to bottom
         layout.addStretch()
 
         self.setStyleSheet("QPushButton, QComboBox { height: 40px; font-size: 16px;}"

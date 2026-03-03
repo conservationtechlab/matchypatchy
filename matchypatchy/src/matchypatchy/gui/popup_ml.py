@@ -61,10 +61,12 @@ class MLDownloadPopup(QDialog):
         models_dict = dict()
         for m in self.models.keys():
             names = self.models[m][0]
-            for name in names:
-                path = self.ml_dir / name
-                if path.exists():
-                    models_dict[m] = path
+            if len(names) > 0:
+                path = self.ml_dir / names[0]
+            else:
+                path = self.ml_dir / names
+            if path.exists():
+                models_dict[m] = path
         # if looking for a particular model, give back path
         return models_dict
 
@@ -181,7 +183,8 @@ class MLOptionsPopup(QDialog):
         """Check which models are already downloaded"""
         models_dict = dict()
         for m in self.ml_cfg['MODELS'].keys():
-            path = self.ml_dir / self.ml_cfg['MODELS'][m][0]
+            for name in self.ml_cfg['MODELS'][m][0]:
+                path = self.ml_dir / name
             if path.exists():
                 models_dict[m] = path
         # if looking for a particular model, give back path
