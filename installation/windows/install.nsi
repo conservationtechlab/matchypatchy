@@ -52,20 +52,11 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
-Section "Create Desktop Shortcut"
-  CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
-SectionEnd
-
-Section "Create Start Menu Shortcut"
-  CreateDirectory "$SMPROGRAMS\MatchyPatchy"
-  ; create shortcut that points directly at the .vbs file (no explicit wscript.exe)   
-  CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
-SectionEnd
-
 ; -------------------------
-; Install section
+; Install section (MAIN - always runs)
 ; -------------------------
-Section "Install MatchyPatchy ${APP_VERSION}"
+Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
+  SectionIn RO  ; This section is required (read-only, can't be unchecked)
   AddSize 1450000
 
   ; Create install folder
@@ -270,8 +261,11 @@ Section "Install MatchyPatchy ${APP_VERSION}"
     IntCmp $1 0 pip_success pip_install_failed pip_install_failed
 
   pip_success:
-    DetailPrint "Requirements installed successfully."
-    Goto PipDone
+    ; force reinstall of onnxruntime-gpu
+    DetailPrint "Uninstall onnxruntime..."
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime'
+    Pop $1
+    IntCmp $1 0 PipDone pip_install_failed pip_install_failed
 
   pip_install_failed:
     MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install Python requirements (exit code $1). Check the installer details for more information."
@@ -279,6 +273,7 @@ Section "Install MatchyPatchy ${APP_VERSION}"
 
   PipDone:
     ; continue with install of matchypatchy
+    DetailPrint "Requirements installed successfully."
     DetailPrint "Installing packaged project from $INSTDIR\matchypatchy (log: $R0)..."
 
     ; Recommended for production: non-editable installation from directory (builds a wheel)
@@ -307,9 +302,6 @@ Section "Install MatchyPatchy ${APP_VERSION}"
 
     ; Write uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
-    CreateDirectory "$SMPROGRAMS\MatchyPatchy"
-    CreateShortCut "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk" "$INSTDIR\uninstall.exe" ""
-
 
     ; Write registry keys for version tracking and Add/Remove Programs
     WriteRegStr HKCU "Software\MatchyPatchy" "Version" "${APP_VERSION}"
@@ -329,6 +321,26 @@ Section "Install MatchyPatchy ${APP_VERSION}"
 SectionEnd
 
 ; -------------------------
+; Optional Components
+; -------------------------
+Section "Desktop Shortcut" SEC_DESKTOP
+  CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+SectionEnd
+
+Section "Start Menu Shortcuts" SEC_STARTMENU
+  CreateDirectory "$SMPROGRAMS\MatchyPatchy"
+  CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+  CreateShortCut "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0
+SectionEnd
+
+; Section descriptions (shown in component selection page)
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_MAIN} "MatchyPatchy application files (required)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DESKTOP} "Create a shortcut on the desktop"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_STARTMENU} "Create shortcuts in the Start Menu"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
+
+; -------------------------
 ; Uninstall section
 ; -------------------------
 Section "Uninstall"
@@ -336,28 +348,31 @@ Section "Uninstall"
   ; Remove shortcuts and start menu folder
   Delete "$DESKTOP\MatchyPatchy.lnk"
   Delete "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk"
+  Delete "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk"
   RMDir "$SMPROGRAMS\MatchyPatchy"
 
-  ; Remove files - adjust if you embed more files
-  Delete "$INSTDIR\runner.vbs"
-  Delete "$INSTDIR\main.py"
+  ; Remove files
+  Delete "$INSTDIR\launcher.vbs"
   Delete "$INSTDIR\requirements.txt"
+  Delete "$INSTDIR\LICENSE"
+  Delete "$INSTDIR\README.md"
+  Delete "$INSTDIR\ABOUT.md"
+  Delete "$INSTDIR\install-log.txt"
+  Delete "$INSTDIR\py-version.txt"
+  Delete "$INSTDIR\installer-path.txt"
+  Delete "$INSTDIR\where-nvidia.txt"
+  Delete "$INSTDIR\launcher.log"
+  
+  ; Remove directories
   RMDir /r "$INSTDIR\venv"
-  ; If you included an assets folder, remove it as well
   RMDir /r "$INSTDIR\assets"
   RMDir /r "$INSTDIR\matchypatchy"
 
   Delete "$INSTDIR\Uninstall.exe"
-  RMDir /r "$INSTDIR"
+  RMDir "$INSTDIR"
 
   ; Remove registry keys
   DeleteRegKey HKCU "Software\MatchyPatchy"
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy"
 
 SectionEnd
-
-; -------------------------
-; Optional: show installation log (useful for debugging)
-; -------------------------
-!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-!insertmacro MUI_FUNCTION_DESCRIPTION_END
