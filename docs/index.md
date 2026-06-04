@@ -6,6 +6,7 @@ layout: default
 ## Requirements:
 
 MatchyPatchy requires Python >= 3.12, <3.14. [Download Python 3.12]("https://www.python.org/downloads/release/python-31212/").
+
 For use with Nvida GPU, first [install CUDA]("https://developer.nvidia.com/cuda-downloads").
 
 ## Installer
@@ -446,7 +447,7 @@ pressing the <b>"Match"</b> button or the "M" key will unmatch it from that indi
 In Quality Control mode, a new filter for Individual will appear, allowing you
 to select specific individuals to view and verify. 
 
-In Quality Control mode, "Recalculate Matches" will ...
+In Quality Control mode, "Recalculate Matches" will reload the data and apply any set filters.
 
 <br>
 <hr>
