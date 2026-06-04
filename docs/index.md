@@ -5,15 +5,15 @@ layout: default
 
 ## Requirements:
 
-MatchyPatchy requires Python >= 3.12, <3.14. <a href="https://www.python.org/downloads/release/python-31212/">Download Python 3.12</a>.<br>
-For use with Nvida GPU, first <a href="https://developer.nvidia.com/cuda-downloads">install CUDA</a>.
+MatchyPatchy requires Python >= 3.12, <3.14. [Download Python 3.12]("https://www.python.org/downloads/release/python-31212/").
+For use with Nvida GPU, first [install CUDA]("https://developer.nvidia.com/cuda-downloads").
 
 ## Installer
 Download MatchyPatchy v0.1.0 Installer:
 <table>
-<tr><td>Windows</td><td><a href="">.zip</a></td></tr>
+<tr><td>Windows</td><td><a href="https://sandiegozoo.box.com/shared/static/70w58wy7dkz2z53cwbv9hkwzi32srl38.zip">[.zip]</a></td></tr>
 <tr><td>MacOS</td><td>Coming soon</td></tr>
-<tr><td>Ubuntu</td><td><a href="">.deb</a></td></tr>
+<tr><td>Ubuntu</td><td>Coming soon</td></tr>
 </table>
 
 Windows: Extract the downloaded .zip file and then run MatchyPatchy-Setup.exe.<br>
