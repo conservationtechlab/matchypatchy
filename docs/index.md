@@ -5,9 +5,9 @@ layout: default
 
 ## Requirements:
 
-MatchyPatchy requires Python >= 3.12, <3.14. [Download Python 3.12]("https://www.python.org/downloads/release/python-31212/").
+MatchyPatchy requires Python >= 3.12, <3.14. [Download Python 3.12](https://www.python.org/downloads/release/python-31212/).
 
-For use with Nvida GPU, first [install CUDA]("https://developer.nvidia.com/cuda-downloads").
+For use with Nvida GPU, first [install CUDA](https://developer.nvidia.com/cuda-downloads).
 
 ## Installer
 Download MatchyPatchy v0.1.0 Installer:
@@ -29,7 +29,7 @@ Linux: Run the downloaded .deb file.
 
 ## Install via GitHub
 
-1. Go to the MatchyPatchy GitHub <a href>repo</a>.
+1. Go to the [MatchyPatchy GitHub repository](https://github.com/conservationtechlab/matchypatchy).
 2. Clone the repository to your local machine.
 3. In a terminal, navigate to the cloned repository.
    > cd matchypatchy/matchypatchy
