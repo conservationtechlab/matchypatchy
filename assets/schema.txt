@@ -7,7 +7,8 @@ None
 TABLE: region
 CREATE TABLE region (
                         id INTEGER PRIMARY KEY,
-                        name TEXT UNIQUE NOT NULL )
+                        name TEXT UNIQUE NOT NULL,
+                        timezone TEXT)
 INDEX: sqlite_autoindex_region_1
 None
 TABLE: survey

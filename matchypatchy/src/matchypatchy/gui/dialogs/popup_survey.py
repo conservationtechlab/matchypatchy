@@ -1,11 +1,15 @@
 '''
 Popup for adding/editing/deleting surveys
 '''
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+
+from datetime import datetime
+import zoneinfo
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox,
                              QListWidget, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtGui import QIntValidator
 
+from matchypatchy.database.location import TZ_CONVERT_DICT
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.database.media import media_count
 
@@ -75,11 +79,13 @@ class SurveyPopup(QDialog):
         if dialog.exec():
             region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'")
             if not region_id:
-                region_id = self.mpDB.add_region(dialog.get_region())
+                region_id = self.mpDB.add_region(dialog.get_region(), str(dialog.get_timezone()))
             else:
                 region_id = region_id[0][0]
-            self.mpDB.add_survey(dialog.get_name(), region_id,
-                                 dialog.get_year_start(), dialog.get_year_start())
+            self.mpDB.add_survey(dialog.get_name(),
+                                 region_id,
+                                 dialog.get_year_start(),
+                                 dialog.get_year_end())
         del dialog
         self.surveys = self.update()
 
@@ -101,7 +107,7 @@ class SurveyPopup(QDialog):
         if dialog.exec() and dialog.accepted:
             region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'")
             if not region_id:
-                region_id = self.mpDB.add_region(dialog.get_region())
+                region_id = self.mpDB.add_region(dialog.get_region(), dialog.get_timezone())
             else:
                 region_id = region_id[0][0]
 
@@ -136,7 +142,8 @@ class SurveyPopup(QDialog):
 
 class SurveyFillPopup(QDialog):
     """Popup to fill in new survey details"""
-    def __init__(self, parent, name="", region_name="", year_start="", year_end=""):
+
+    def __init__(self, parent, name="", region_name="", timezone = datetime.now().astimezone().tzinfo, year_start="", year_end=""):
         super().__init__(parent)
         self.setWindowTitle("Survey")
         layout = QVBoxLayout()
@@ -155,6 +162,19 @@ class SurveyFillPopup(QDialog):
         self.region = QLineEdit()
         self.region.setText(str(region_name))
         layout.addWidget(self.region)
+        # timezone
+        layout.addWidget(QLabel('Timezone'))
+        self.timezone = QComboBox()
+        self.timezone.setFixedHeight(20)
+        self.timezone.addItems(sorted(zoneinfo.available_timezones()))  
+        self.timezone.setEditable(True)
+        
+        # convert common abbreviations to IANA names if needed
+        iana_name = TZ_CONVERT_DICT.get(str(timezone), str(timezone))
+        if iana_name in zoneinfo.available_timezones():
+            self.timezone.setCurrentIndex(self.timezone.findText(iana_name))
+        layout.addWidget(self.timezone)
+
         # start year
         layout.addWidget(QLabel('Start Year'))
         self.year_start = QLineEdit()
@@ -195,6 +215,9 @@ class SurveyFillPopup(QDialog):
 
     def get_region(self):
         return self.region.text()
+    
+    def get_timezone(self):
+        return self.timezone.currentText()
 
     def get_year_start(self):
         return self.year_start.text()

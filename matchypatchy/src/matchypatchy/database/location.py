@@ -4,6 +4,15 @@ Functions for Managing Region, Survey and Station Tables
 import pandas as pd
 
 
+TZ_CONVERT_DICT = {
+    'PST': 'America/Los_Angeles',
+    'PDT': 'America/Los_Angeles',
+    'EST': 'America/New_York',
+    'EDT': 'America/New_York',
+    'CST': 'America/Chicago',
+    'CDT': 'America/Chicago',
+}
+
 def fetch_surveys(mpDB):
     """Fetches survey Table, Converts to DataFrame"""
     surveys = mpDB.select("survey")

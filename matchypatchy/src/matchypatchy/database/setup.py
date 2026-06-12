@@ -23,7 +23,8 @@ def setup_database(key, filepath):
     # Corresponds to "Site" in CameraBase
     cursor.execute('''CREATE TABLE IF NOT EXISTS region (
                         id INTEGER PRIMARY KEY,
-                        name TEXT UNIQUE NOT NULL );''')
+                        name TEXT UNIQUE NOT NULL,
+                        timezone TEXT);''')
 
     # SURVEY
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (

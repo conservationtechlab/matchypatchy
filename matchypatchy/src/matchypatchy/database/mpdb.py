@@ -1,6 +1,7 @@
 '''
 Class Definition for MatchyPatchyDB
 '''
+import datetime
 import logging
 from typing import Optional
 import sqlite3
@@ -10,6 +11,7 @@ from random import randrange
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy.config import resource_path
+from matchypatchy.database.location import TZ_CONVERT_DICT
 
 
 class MatchyPatchyDB():
@@ -22,7 +24,10 @@ class MatchyPatchyDB():
             self.key = '{:05}'.format(randrange(1, 10 ** 5))
             setup_database(self.key, self.filepath)
             setup_chromadb(self.key, self.chroma_filepath)
-            id = self.add_region("Default Region")
+            # add default region and survey
+            timezone = str(datetime.datetime.now().astimezone().tzname())
+            timezone = TZ_CONVERT_DICT.get(timezone, timezone)
+            id = self.add_region("Default Region", timezone)
             self.add_survey("Default Survey", id, None, None)
 
     def update_paths(self, DB_PATH):
@@ -160,16 +165,17 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_region(self, name: str):
+    def add_region(self, name: str, timezone: str):
         """
         Add a region with
             - name (str) Not Null
+            - timezone (str) Optional
         """
         try:
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
-            command = """INSERT INTO region (name) VALUES (?);"""
-            data_tuple = (name,)
+            command = """INSERT INTO region (name, timezone) VALUES (?, ?);"""
+            data_tuple = (name, timezone)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             db.commit()
