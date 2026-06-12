@@ -168,6 +168,10 @@ class DisplayCompare(QWidget):
         # MIDDLE COLUMN --------------------------------------------------------
         middle_column = QVBoxLayout()
         middle_column.addStretch()
+
+        self.match_counter = QLabel("/9")
+        middle_column.addWidget(self.match_counter, alignment=Qt.AlignmentFlag.AlignCenter)
+
         self.button_match = QPushButton("Match")
         self.button_match.setCheckable(True)
         self.button_match.setChecked(False)
@@ -417,7 +421,9 @@ class DisplayCompare(QWidget):
     def unmatch(self):
         """If already matched, unmatch current query from IID"""
         name = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, 'name')
-        dialog = AlertPopup(self, prompt=f"This will remove Match from individual '{name}'")
+        dialog = AlertPopup(self,
+                            prompt=f"This will remove Match from individual '{name}'. Are you sure?", 
+                            cancel_only=False)
         if dialog.exec():
             self.QueryContainer.unmatch()
             del dialog
@@ -449,6 +455,7 @@ class DisplayCompare(QWidget):
 
         self.match_n.setText("/ " + str(len(self.QueryContainer.current_match_rois)))
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
+        self.match_counter.setText(str(self.QueryContainer.current_match + 1) + "/ " + str(len(self.QueryContainer.current_match_rois)))
 
         self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
 
@@ -658,6 +665,7 @@ class DisplayCompare(QWidget):
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()
+        print(f"Key pressed: {key_text} (Qt key code: {key})")
         # Left Arrow
         if key == 16777234:
             self.change_match(self.QueryContainer.current_match - 1)
@@ -673,10 +681,13 @@ class DisplayCompare(QWidget):
 
         # Space - Match
         elif key == 32:
-            self.button_match.click()
+            self.confirm_match()
         # M - Match
         elif key == 77:
-            self.button_match.click()
+            self.confirm_match()
+        # U - Unmatch
+        elif key == 85:
+            self.unmatch()
 
         # L - Left Viewpoint
         elif key == 76:
