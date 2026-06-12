@@ -128,6 +128,11 @@ class IndividualFillPopup(QDialog):
         self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
         layout.addWidget(self.age)
 
+        self.secret_text = QLabel('')
+        self.secret_text.setStyleSheet("QLabel { color : red; }")
+        layout.addWidget(self.secret_text)
+        self.secret_text.hide()
+
         self.name.textChanged.connect(self.checkInput)
         self.sex.currentIndexChanged.connect(self.checkInput)
         self.age.currentIndexChanged.connect(self.checkInput)
@@ -144,7 +149,8 @@ class IndividualFillPopup(QDialog):
         self.setLayout(layout)
 
     def checkInput(self):
-        self.okButton.setEnabled(bool(self.get_name()))
+        name_okay = self.check_existing_name()
+        self.okButton.setEnabled(name_okay and bool(self.get_name()))
 
     def get_name(self):
         return self.name.text()
@@ -158,3 +164,14 @@ class IndividualFillPopup(QDialog):
     def accept_verify(self):
         if self.get_name():
             self.accept()
+
+    def check_existing_name(self):
+        """Check if name already exists in database, if so alert user"""
+        existing_names = [ind[0] for ind in self.mpDB.select('individual', 'name')]
+        if self.get_name() in existing_names:
+            self.secret_text.setText("Name already exists.\nPlease choose a different name.")
+            self.secret_text.show()
+            return False
+        else:
+            self.secret_text.hide()
+            return True
