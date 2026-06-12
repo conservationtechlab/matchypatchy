@@ -23,12 +23,13 @@ class BuildManifestThread(QThread):
     """
     manifest = pyqtSignal(pd.DataFrame)
 
-    def __init__(self, directory):
+    def __init__(self, directory, timezone):
         super().__init__()
         self.directory = directory
+        self.timezone = timezone
 
     def run(self):
-        self.data = animl.build_file_manifest(self.directory)
+        self.data = animl.build_file_manifest(self.directory, exif=True, data_timezone=self.timezone)
         self.manifest.emit(self.data)
 
 

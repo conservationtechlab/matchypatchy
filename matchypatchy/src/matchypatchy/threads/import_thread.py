@@ -69,6 +69,7 @@ class CSVImportThread(QThread):
                     # frame number for videos, else 1 if image
                     frame = roi["frame"] if "frame" in group.columns else 0
 
+                    # convert old md bbox format if present, else look for new bbox format, else add filterable empties
                     if "bbox1" in roi:
                         bbox_x = roi["bbox1"]
                         bbox_y = roi["bbox2"]
@@ -169,14 +170,16 @@ class CSVImportThread(QThread):
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, active_survey, data, station_level):
+    def __init__(self, mpDB, active_survey, data, station_level, camera_level):
         super().__init__()
         self.mpDB = mpDB
         self.active_survey = active_survey
         self.data = data
         self.station_level = station_level
+        self.camera_level = camera_level
         self.default_station = None
         self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
+        # get timezone for timestamp parsing
 
     def run(self):
         for i, file in self.data.iterrows():
@@ -194,12 +197,14 @@ class FolderImportThread(QThread):
 
                 # get remaining information
                 if self.station_level > 0:
-                    station_name = Path(filepath).parts[self.station_level]
-                    try:
-                        station_id = self.mpDB.select("station", columns='id', row_cond=f'name="{station_name}"')[0][0]
-                    except IndexError:
-                        station_id = self.mpDB.add_station(str(station_name), None, None, int(self.active_survey[0]))
+                    station_id = self.station(filepath, self.active_survey[0])
+
+                    # add camera if camera level provided, else None
+                    if self.camera_level > 0:
+                        camera_id = self.camera(filepath, station_id)
+
                 else:
+                    # create default station if no station level and use for all media
                     if not self.default_station:
                         self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
                     station_id = self.default_station
@@ -209,7 +214,7 @@ class FolderImportThread(QThread):
                                                ext,
                                                str(timestamp),
                                                int(station_id),
-                                               camera_id=None,
+                                               camera_id=int(camera_id) if self.camera_level > 0 else None,
                                                sequence_id=None,
                                                external_id=None,
                                                comment=None)
@@ -221,3 +226,26 @@ class FolderImportThread(QThread):
 
         # finished adding media
         self.finished.emit()
+
+    def station(self, filepath, survey_id):
+        """Get or create station"""
+        station_name = Path(filepath).parts[self.station_level]
+        station_name = str(station_name).strip()
+        station_name = station_name.replace("'", "''")
+        try:
+            station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
+        except IndexError:
+            station_id = self.mpDB.add_station(station_name, None, None, survey_id)
+        return station_id
+    
+    def camera(self, filepath, station_id):
+        camera_name = Path(filepath).parts[self.camera_level]
+        camera_name = str(camera_name).strip()
+        camera_name = camera_name.replace("'", "''")
+        try:
+            camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name='{camera_name}'")[0][0]
+        except IndexError:
+            camera_id = self.mpDB.add_camera(str(camera_name), station_id)
+
+        return camera_id
+
