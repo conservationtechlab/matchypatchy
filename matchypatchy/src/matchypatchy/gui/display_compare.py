@@ -665,7 +665,7 @@ class DisplayCompare(QWidget):
     def keyPressEvent(self, event):
         key = event.key()
         key_text = event.text()
-        print(f"Key pressed: {key_text} (Qt key code: {key})")
+        #print(f"Key pressed: {key_text} (Qt key code: {key})")
         # Left Arrow
         if key == 16777234:
             self.change_match(self.QueryContainer.current_match - 1)

@@ -9,9 +9,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.threads.model_dowload_thread import load_model
 from matchypatchy.config import load_cfg
-from matchypatchy.threads.table_thread import LoadTableThread
-from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
-from matchypatchy.database import thumbnails
+from matchypatchy.threads.table_thread import FetchTableThread, LoadTableThread
+
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import ComboBoxDelegate
 
@@ -75,66 +74,19 @@ class MediaTable(QWidget):
         self.data_type = data_type
         self.table.clearContents()
         self.table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
-        # fetch data
-        self.fetch()
         self.format_table()
-        if not self.data.empty:
-            self.filter()
-            return True
-        else:
-            # no media, give warning, go home
-            return False
+
+        # fetch data
+        self.dataloader = FetchTableThread(self)
+        self.dataloader.done.connect(self.filter)
+        self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
+        self.dataloader.start()
 
     # STEP 2 - CALLED BY load_data()
-    def fetch(self):
-        """
-        Select all media, store in dataframe
-        Merge with thumbnails table
-        """
-        self.individual_list = fetch_individual(self.mpDB)
-        # check for missing thumbnails and add
-        missing_thumbnails = thumbnails.check_missing_thumbnails(self.mpDB, data_type=self.data_type)
-        # ROIS
-        if self.data_type == 1:
-            self.data = fetch_roi_media(self.mpDB, reset_index=False)
-            # add missing thumbnails
-            if missing_thumbnails:
-                for roi_id in missing_thumbnails:
-                    row = self.data[self.data['id'] == roi_id]
-                    filepath = row['filepath'].values[0]
-                    ext = row['ext'].values[0]
-                    frame = row['frame'].values[0]
-                    bbox_x = row['bbox_x'].values[0]
-                    bbox_y = row['bbox_y'].values[0]
-                    bbox_w = row['bbox_w'].values[0]
-                    bbox_h = row['bbox_h'].values[0]
-                    thumbnail_path = thumbnails.save_roi_thumbnail(self.thumbnail_dir, filepath, ext,
-                                                                   frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    self.mpDB.delete("roi_thumbnails", f"fid={roi_id}")  # remove old entry if exists
-                    self.mpDB.add_thumbnail("roi", roi_id, thumbnail_path)
-            # load thumbnails
-            self.thumbnails = thumbnails.fetch_roi_thumbnails(self.mpDB)
-            self.data = pd.merge(self.data, self.thumbnails, on="id")
-        # MEDIA
-        elif self.data_type == 0:
-            self.data = fetch_media(self.mpDB)
-            # add missing thumbnails
-            if missing_thumbnails:
-                for media_id in missing_thumbnails:
-                    filepath = self.data.loc[self.data['id'] == media_id, 'filepath'].values[0]
-                    ext = self.data.loc[self.data['id'] == media_id, 'ext'].values[0]
-                    thumbnail_path = thumbnails.save_media_thumbnail(self.thumbnail_dir, filepath, ext)
-                    self.mpDB.delete("media_thumbnails", f"fid={media_id}")  # remove old entry if exists
-                    self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
-            # load thumbnails
-            self.thumbnails = thumbnails.fetch_media_thumbnails(self.mpDB)
-            self.data = pd.merge(self.data, self.thumbnails, on="id")
-        # return empty
-        else:
-            self.data = pd.DataFrame()
-
-    # STEP 3 - CALLED BY load_data()
     def format_table(self):
+        """
+        Format table for media or roi display, add delegates for combos, and load thumbnails
+        """
         if self.data_type == 1:
             # corresponding mpDB column names
             self.columns = {0: "select",
@@ -197,6 +149,7 @@ class MediaTable(QWidget):
             else:
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
 
+    # Step 3 - Filter and Display ------------------------------------------------------
     def filter(self):
         """
         Filter media based on active survey selected in dropdown of DisplayMedia
@@ -208,8 +161,14 @@ class MediaTable(QWidget):
         """
         # create new copy of full dataset
         self.data_filtered = self.data.copy()
+
+        # if no media, skip
+        if self.data_filtered.empty:
+            return
+
         # include user edits to current data_filtered:
         self.apply_edits()
+
         # map parent filters and valid stations/cameras to local variables
         filters = self.parent.filters
         self.valid_stations = self.parent.valid_stations
@@ -248,6 +207,7 @@ class MediaTable(QWidget):
             self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
         self.data_filtered.reset_index(inplace=True)
+
         # refresh table contents
         self.refresh_table()
 
@@ -455,6 +415,10 @@ class MediaTable(QWidget):
                     self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
             else:
                 self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
+
+        # reload data and refresh table
+        self.edit_stack = []
+        self.load_data(self.data_type)
 
     def select_row(self, row, overwrite=None):
         select = self.table.item(row, 0)

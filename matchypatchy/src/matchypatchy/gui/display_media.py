@@ -180,12 +180,17 @@ class DisplayMedia(QWidget):
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
 
+            # load table with current data type
             self.media_table.load_data(self.data_type)
             return True
 
     def update_count_label(self):
         """Set count label at bottom of media table"""
         self.count_label.setText(f"Total Media: {len(self.media_table.data_filtered)}")
+
+    def update_count_label_selected(self):
+        """Set count label at bottom of media table to show selected/total"""
+        self.count_label.setText(f"Selected: {len(self.media_table.selectedRows())} / {len(self.media_table.data_filtered)}")
 
     def change_type(self):
         """Change between full image and ROI view"""
@@ -211,6 +216,7 @@ class DisplayMedia(QWidget):
         row = edit[0]
         column = edit[1]
         item = self.media_table.table.item(row, column)
+        # select checkbox column, update selected rows and count label
         if column == 0:
             self.check_selected_rows()
         self.check_undo_button()
@@ -300,13 +306,16 @@ class DisplayMedia(QWidget):
         """Handle Select All button press, invert selection"""
         if self.button_select.isChecked():
             self.select_all(overwrite=False)
+            self.update_count_label()
         else:
             self.select_all(overwrite=True)
+            self.update_count_label_selected()
 
     def select_all(self, overwrite=False):
         """Select all rows in the media table"""
         for row in range(self.media_table.table.rowCount()):
             self.media_table.select_row(row, overwrite=overwrite)
+        self.update_count_label_selected()
 
     def check_selected_rows(self):
         """Enable/Disable Edit, Duplicate, Delete buttons based on selection"""
@@ -315,10 +324,13 @@ class DisplayMedia(QWidget):
             self.button_edit.setEnabled(True)
             # self.button_duplicate.setEnabled(True)
             self.button_delete.setEnabled(True)
+            self.update_count_label_selected()
         else:
             self.button_edit.setEnabled(False)
             self.button_duplicate.setEnabled(False)
             self.button_delete.setEnabled(False)
+            self.update_count_label()
+
 
     def duplicate(self):
         if len(self.selected_rows) > 0:
