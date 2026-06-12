@@ -1,4 +1,4 @@
-__version__ = '0.1.0'
+__version__ = '0.1.1_dev'
 
 from matchypatchy import algo
 from matchypatchy import config
