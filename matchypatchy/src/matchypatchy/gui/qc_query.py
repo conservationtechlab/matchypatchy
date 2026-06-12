@@ -5,7 +5,7 @@ from PyQt6.QtCore import QObject
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
-from matchypatchy.algo.models import load_model
+from matchypatchy.threads.model_dowload_thread import load_model
 
 
 class QC_QueryContainer(QObject):

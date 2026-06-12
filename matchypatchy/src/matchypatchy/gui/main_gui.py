@@ -18,12 +18,12 @@ from PyQt6.QtGui import QAction, QGuiApplication
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
 from matchypatchy.gui.display_compare import DisplayCompare
-from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.popup_config import ConfigPopup
-from matchypatchy.gui.popup_ml import MLDownloadPopup
-from matchypatchy.gui.popup_readme import AboutPopup, READMEPopup, LicensePopup
-from matchypatchy.gui.popup_survey import SurveyPopup
-from matchypatchy.gui.popup_station import StationPopup
+from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
+from matchypatchy.gui.dialogs.popup_readme import AboutPopup, READMEPopup, LicensePopup
+from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy.database.media import export_data
 

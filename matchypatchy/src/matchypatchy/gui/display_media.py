@@ -8,10 +8,10 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy.database.media import IMAGE_EXT
 from matchypatchy.gui.media_table import MediaTable
-from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.popup_media_edit import MediaEditPopup
-from matchypatchy.gui.gui_assets import VerticalSeparator, StandardButton
-from matchypatchy.gui.widget_filterbar import FilterBar
+from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButton
+from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
 
 class DisplayMedia(QWidget):

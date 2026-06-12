@@ -7,13 +7,13 @@ from PyQt6.QtWidgets import (QTableWidget, QVBoxLayout, QWidget, QLabel, QHeader
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.algo.models import load_model
+from matchypatchy.threads.model_dowload_thread import load_model
 from matchypatchy.config import load_cfg
-from matchypatchy.algo.table_thread import LoadTableThread
+from matchypatchy.threads.table_thread import LoadTableThread
 from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
 from matchypatchy.database import thumbnails
-from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.gui_assets import ComboBoxDelegate
+from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.gui.widgets.gui_assets import ComboBoxDelegate
 
 
 class MediaTable(QWidget):

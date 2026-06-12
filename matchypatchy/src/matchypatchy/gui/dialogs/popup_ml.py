@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.algo import models
+from matchypatchy.threads import model_dowload_thread
 from matchypatchy import config
 
 
@@ -20,10 +20,10 @@ class MLDownloadPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         # update model yml
-        update_confirmed = models.update_model_yml()
+        update_confirmed = model_dowload_thread.update_model_yml()
         logging.info(f"Model yaml update attempt: {update_confirmed}")
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
-        self.ml_cfg = models.load_model()
+        self.ml_cfg = model_dowload_thread.load_model()
         self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
         self.available_models = self.discover_models()
@@ -103,7 +103,7 @@ class MLDownloadPopup(QDialog):
         self.disable_close()
         self.progress_bar.setRange(0, 0)  # indefinite
         self.progress_bar.show()
-        self.build_thread = models.DownloadMLThread(self.ml_dir, self.checked_models)
+        self.build_thread = model_dowload_thread.DownloadMLThread(self.ml_dir, self.checked_models)
         self.build_thread.finished.connect(self.progress_bar.hide)
         self.build_thread.finished.connect(self.enable_close)
         #self.build_thread.finished_ok.connect(self.on_download_result)
@@ -133,7 +133,7 @@ class MLOptionsPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
-        self.ml_cfg = models.load_model()
+        self.ml_cfg = model_dowload_thread.load_model()
         self.available_models = self.discover_models()
 
         self.setWindowTitle('Model Options')

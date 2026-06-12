@@ -14,17 +14,17 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
 
-from matchypatchy.gui.popup_survey import SurveyPopup
-from matchypatchy.gui.popup_station import StationPopup
-from matchypatchy.gui.popup_individual import IndividualPopup
-from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.popup_import_csv import ImportCSVPopup
-from matchypatchy.gui.popup_import_folder import ImportFolderPopup
-from matchypatchy.gui.popup_ml import MLOptionsPopup
+from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+from matchypatchy.gui.dialogs.popup_station import StationPopup
+from matchypatchy.gui.dialogs.popup_individual import IndividualPopup
+from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+from matchypatchy.gui.dialogs.popup_ml import MLOptionsPopup
 
-from matchypatchy.algo.sequence_thread import SequenceThread
-from matchypatchy.algo.animl_thread import AnimlThread
-from matchypatchy.algo.reid_thread import ReIDThread
+from matchypatchy.threads.sequence_thread import SequenceThread
+from matchypatchy.threads.animl_thread import AnimlThread
+from matchypatchy.threads.reid_thread import ReIDThread
 
 from matchypatchy.database.media import export_data
 from matchypatchy import config

@@ -4,6 +4,7 @@ Popups to create or edit station
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QListWidget, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6 import QtCore, QtWidgets
+
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 
 

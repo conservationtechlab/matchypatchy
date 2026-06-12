@@ -10,17 +10,17 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QLineEdit, QSlider)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.gui.widget_media import MediaWidget, VideoViewer
-from matchypatchy.gui.widget_image_adjustment import ImageAdjustBar
-from matchypatchy.gui.popup_alert import AlertPopup
-from matchypatchy.gui.popup_individual import IndividualFillPopup
-from matchypatchy.gui.popup_media_edit import MediaEditPopup
-from matchypatchy.gui.popup_pairx import PairXPopup
-from matchypatchy.gui.gui_assets import VerticalSeparator, StandardButton, ThreePointSlider
-from matchypatchy.gui.widget_filterbar import FilterBar
+from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
+from matchypatchy.gui.widgets.widget_image_adjustment import ImageAdjustBar
+from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.gui.dialogs.popup_individual import IndividualFillPopup
+from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+from matchypatchy.gui.dialogs.popup_pairx import PairXPopup
+from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButton, ThreePointSlider
+from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
-from matchypatchy.algo.query import QueryContainer
-from matchypatchy.algo.qc_query import QC_QueryContainer
+from matchypatchy.gui.query import QueryContainer
+from matchypatchy.gui.qc_query import QC_QueryContainer
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
 from matchypatchy.config import load_cfg

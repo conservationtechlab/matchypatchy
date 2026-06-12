@@ -10,7 +10,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.database.media import fetch_roi_media
-from matchypatchy.algo import models
+from matchypatchy.threads import model_dowload_thread
 from matchypatchy import config
 
 
@@ -44,7 +44,7 @@ class AnimlThread(QThread):
         self.thumbnail_dir = config.load_cfg('THUMBNAIL_DIR')
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
-        self.md_filepath = models.get_path(self.ml_dir, DETECTOR_KEY)
+        self.md_filepath = model_dowload_thread.get_path(self.ml_dir, DETECTOR_KEY)
 
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS

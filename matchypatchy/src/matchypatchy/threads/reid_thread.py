@@ -9,7 +9,7 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.algo import models
+from matchypatchy.threads import model_dowload_thread
 from matchypatchy import config
 from matchypatchy.database.media import fetch_roi
 
@@ -26,8 +26,8 @@ class ReIDThread(QThread):
         super().__init__()
         self.mpDB = mpDB
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
-        self.reid_filepath = models.get_path(self.ml_dir, REID_KEY)
-        self.viewpoint_filepath = models.get_path(self.ml_dir, VIEWPOINT_KEY)
+        self.reid_filepath = model_dowload_thread.get_path(self.ml_dir, REID_KEY)
+        self.viewpoint_filepath = model_dowload_thread.get_path(self.ml_dir, VIEWPOINT_KEY)
 
     def run(self):
         """Process viewpoint and embeddings for ROIs"""
