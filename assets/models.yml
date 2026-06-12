@@ -7,13 +7,10 @@ MODELS:
     - ["https://sandiegozoo.box.com/shared/static/ppm0odjgscvpj9lf5ax86p3fqu5vraxw.onnx",
        "https://sandiegozoo.box.com/shared/static/xi1dijx35ta2tqtu2sa28bd09ve9li6f.data"]
   "SDZWA Viewpoint": 
-    - ["sdzwa_viewpoint.pt"]
-    - ["https://sandiegozoo.box.com/shared/static/7yrxkli0bodfmysre2cenzsgqnz22co9.pt"]
+    - ["bigcat_viewpoint.onnx", "bigcat_viewpoint.onnx.data"]
+    - ["https://sandiegozoo.box.com/shared/static/7yrxkli0bodfmysre2cenzsgqnz22co9.pt",
+       "https://sandiegozoo.box.com/shared/static/9h7l8j1n5y2m0v6s9c3gq4l7t1h8w2e.data"]
 
-
-# FIX
-MEGADETECTOR_DEFAULT: 0
-MIEW_DEFAULT: 7
 
 DETECTOR_MODELS: 
   - "MegaDetector"
