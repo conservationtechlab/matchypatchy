@@ -28,11 +28,11 @@ class HorizontalSeparator(QFrame):
 
 class StandardButton(QPushButton):
     """Fixed size standard button."""
-    def __init__(self, text):
+    def __init__(self, text, width=100):
         super().__init__(text)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         # self.setFixedHeight(30)
-        self.setFixedWidth(100)
+        self.setFixedWidth(width)
         # self.setStyleSheet("font-size: 14px; padding: 5px 15px;")
 
 

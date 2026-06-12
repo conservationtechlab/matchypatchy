@@ -45,7 +45,7 @@ class MLDownloadPopup(QDialog):
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.cancel)
+        self.buttonBox.rejected.connect(self.reject)
 
         # Progress Bar (hidden at start)
         self.progress_bar = QProgressBar()
@@ -60,7 +60,11 @@ class MLDownloadPopup(QDialog):
         """Check which models are already downloaded"""
         models_dict = dict()
         for m in self.models.keys():
-            path = self.ml_dir / self.models[m][0]
+            names = self.models[m][0]
+            if len(names) > 0:
+                path = self.ml_dir / names[0]
+            else:
+                path = self.ml_dir / names
             if path.exists():
                 models_dict[m] = path
         # if looking for a particular model, give back path
@@ -84,26 +88,38 @@ class MLDownloadPopup(QDialog):
         if self.checked_models:
             self.download_ml()
 
-    def toggle_close(self):
+    def enable_close(self):
+        """Enable the OK button to allow closing after download"""
+        ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+        ok_button.setEnabled(True)
+
+    def disable_close(self):
         """Disable/Enable the OK button to prevent closing during download"""
         ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
-        ok_button.setEnabled(not ok_button.isEnabled())  # Disable the OK button
+        ok_button.setEnabled(False)
 
     def download_ml(self):
         """Start download thread"""
-        self.toggle_close()
-        self.progress_bar.setRange(0, 0)
+        self.disable_close()
+        self.progress_bar.setRange(0, 0)  # indefinite
         self.progress_bar.show()
         self.build_thread = models.DownloadMLThread(self.ml_dir, self.checked_models)
         self.build_thread.finished.connect(self.progress_bar.hide)
-        self.build_thread.finished.connect(self.toggle_close)
+        self.build_thread.finished.connect(self.enable_close)
+        #self.build_thread.finished_ok.connect(self.on_download_result)
         self.build_thread.start()
 
-    def cancel(self):
-        # delete any partially downloaded models
-        # for key in self.checked_models:
-        #     models.delete(self.ml_dir, key)
-        self.reject()
+    def on_download_result(self, ok: bool, msg: str):
+        # show msg somewhere (status bar, dialog, etc.)
+        print(ok, msg)
+
+    def reject(self):
+        # interrupt download if in progress, otherwise just close
+        if getattr(self, "build_thread", None) is not None and self.build_thread.isRunning():
+            self.build_thread.requestInterruption()
+            # optional: don't close immediately; wait for thread to finish
+            return
+        super().reject()
 
 
 class MLOptionsPopup(QDialog):
@@ -167,7 +183,8 @@ class MLOptionsPopup(QDialog):
         """Check which models are already downloaded"""
         models_dict = dict()
         for m in self.ml_cfg['MODELS'].keys():
-            path = self.ml_dir / self.ml_cfg['MODELS'][m][0]
+            for name in self.ml_cfg['MODELS'][m][0]:
+                path = self.ml_dir / name
             if path.exists():
                 models_dict[m] = path
         # if looking for a particular model, give back path

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Lightweight wrapper that executes the .command file using bash.
+# This wrapper lets users run `matchypatchy` from terminal.
+exec /bin/bash /opt/matchypatchy/install.command "$@"

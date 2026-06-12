@@ -15,6 +15,12 @@ def resource_path(relative_path):
     """ Get path to resource whether running in dev or PyInstaller bundle """
     if getattr(sys, 'frozen', False):
         return os.path.join(sys._MEIPASS, relative_path)
+    
+    if "__file__" in globals() or "__file__" in locals():
+        # Path(__file__).resolve().parent is robust (resolves symlinks)
+        install_dir = Path(__file__).resolve().parents[3]
+        return install_dir / Path(relative_path)
+    
     return os.path.abspath(relative_path)
 
 
@@ -36,6 +42,7 @@ def initiate():
         'SEQUENCE_DURATION': 60,
         'SEQUENCE_N': 3,
     }
+    print("HOME_DIR: " + str(HOME_DIR))
 
     CONFIG_PATH = HOME_DIR / '.config.yml'
     if CONFIG_PATH.exists():

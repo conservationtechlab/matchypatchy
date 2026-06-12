@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+INSTALL_DIR="/opt/matchypatchy"
+WRAPPER="/usr/local/bin/matchypatchy"
+DESKTOP="/usr/share/applications/matchypatchy.desktop"
+
+# Ensure files are executable and readable
+if [ -f "$INSTALL_DIR/install.command" ]; then
+  chmod 0755 "$INSTALL_DIR/install.command"
+fi
+if [ -d "$INSTALL_DIR/matchypatchy" ]; then
+  # make python files readable (they are already because packaging copied them)
+  chmod -R a+r "$INSTALL_DIR/matchypatchy"
+fi
+if [ -d "$INSTALL_DIR/assets" ]; then
+  chmod -R a+r "$INSTALL_DIR/assets"
+fi
+if [ -f "$WRAPPER" ]; then
+  chmod 0755 "$WRAPPER"
+fi
+if [ -f "$DESKTOP" ]; then
+  chmod 0644 "$DESKTOP"
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database /usr/share/applications || true
+  fi
+fi
+
+exit 0

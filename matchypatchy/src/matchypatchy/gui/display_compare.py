@@ -45,7 +45,7 @@ class DisplayCompare(QWidget):
         # Options Bar ==============================================================
         layout = QVBoxLayout()
         first_layer = QHBoxLayout()
-        button_home = StandardButton("Home")
+        button_home = StandardButton("Home", width=80)
         button_home.clicked.connect(lambda: self.home(warn=False))
         first_layer.addWidget(button_home)
 
@@ -83,8 +83,8 @@ class DisplayCompare(QWidget):
         # FILTERBAR --------------------------------------------------------------
         first_layer.addSpacing(10)
         first_layer.addWidget(VerticalSeparator())
-        first_layer.addSpacing(10)
-        self.filterbar = FilterBar(self, 120)
+        #first_layer.addSpacing(10)
+        self.filterbar = FilterBar(self, 100)
         self.filterbar.viewpoint_visible(False)
         self.filterbar.individual_visible(False)
         self.filterbar.unidentified_visible(False)
@@ -452,8 +452,8 @@ class DisplayCompare(QWidget):
 
         self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
 
-        self.query_image_bar.reset_sliders()
-        self.match_image_bar.reset_sliders()
+        self.query_image_bar.reset()
+        self.match_image_bar.reset()
         # load new images
         self.load_query()
         self.load_match()
@@ -461,14 +461,14 @@ class DisplayCompare(QWidget):
     def change_query_in_sequence(self, n):
         """Load nth image within the current sequence"""
         self.QueryContainer.set_within_query_sequence(n)
-        self.query_image_bar.reset_sliders()
+        self.query_image_bar.reset()
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
         self.load_query()
 
     def change_match(self, n):
         """Load nth atch within the current match queue"""
         self.QueryContainer.set_match(n)
-        self.match_image_bar.reset_sliders()
+        self.match_image_bar.reset()
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.load_match()
 

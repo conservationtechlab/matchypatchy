@@ -13,7 +13,7 @@ from matchypatchy.algo.animl_thread import (AnimlThread, BuildManifestThread,
 from matchypatchy.algo.import_thread import (CSVImportThread,
                                              FolderImportThread,)
 from matchypatchy.algo.match_thread import (MatchEmbeddingThread,)
-from matchypatchy.algo.models import (DownloadMLThread, delete, download,
+from matchypatchy.algo.models import (DownloadMLThread, delete, download_one,
                                       get_path, is_valid_reid_model,
                                       load_model, update_model_yml,)
 from matchypatchy.algo.qc_query import (QC_QueryContainer,)
@@ -26,7 +26,8 @@ __all__ = ['AnimlThread', 'BuildManifestThread', 'CSVImportThread',
            'DownloadMLThread', 'FolderImportThread', 'LoadTableThread',
            'MEGADETECTORv1000_SIZE', 'MatchEmbeddingThread',
            'QC_QueryContainer', 'QueryContainer', 'ReIDThread',
-           'SequenceThread', 'animl_thread', 'delete', 'download', 'get_path',
-           'import_thread', 'is_valid_reid_model', 'load_model',
+           'SequenceThread', 'animl_thread', 'delete', 'download_one',
+           'get_path', 'import_thread', 'is_valid_reid_model', 'load_model',
            'match_thread', 'models', 'qc_query', 'query', 'reid_thread',
            'sequence_thread', 'table_thread', 'update_model_yml']
+
