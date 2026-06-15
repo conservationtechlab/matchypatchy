@@ -27,7 +27,7 @@ class ImportFolderPopup(QDialog):
         self.directory = Path(directory)
         self.data = pd.DataFrame()
 
-        self.setWindowTitle('Import from Folder')
+        self.setWindowTitle(f'Importing into "{self.active_survey[1]}"')
         layout = QVBoxLayout()
 
         # Create a label
