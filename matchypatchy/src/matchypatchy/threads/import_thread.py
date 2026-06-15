@@ -195,9 +195,11 @@ class FolderImportThread(QThread):
                 # get file extension
                 ext = Path(filepath).suffix.lower()
 
+                survey_id = self.active_survey[0]
+
                 # get remaining information
                 if self.station_level > 0:
-                    station_id = self.station(filepath, self.active_survey[0])
+                    station_id = self.station(filepath, survey_id)
 
                     # add camera if camera level provided, else None
                     if self.camera_level > 0:
@@ -206,7 +208,7 @@ class FolderImportThread(QThread):
                 else:
                     # create default station if no station level and use for all media
                     if not self.default_station:
-                        self.default_station = self.mpDB.add_station("None", None, None, int(self.active_survey[0]))
+                        self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
                     station_id = self.default_station
 
                 # insert into table, force type

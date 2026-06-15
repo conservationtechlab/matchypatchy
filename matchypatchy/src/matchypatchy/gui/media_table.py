@@ -17,6 +17,7 @@ from matchypatchy.gui.widgets.gui_assets import ComboBoxDelegate
 
 class MediaTable(QWidget):
     update_signal = pyqtSignal(list)
+    loaded_data = pyqtSignal()
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -62,6 +63,7 @@ class MediaTable(QWidget):
 
         # Connect table.cellchanged to Media View
         self.update_signal.connect(parent.handle_table_change)
+        self.loaded_data.connect(parent.handle_loaded_data)
 
     # RUN ON ENTRY -------------------------------------------------------------
     def load_data(self, data_type):
@@ -80,6 +82,7 @@ class MediaTable(QWidget):
         self.dataloader = FetchTableThread(self)
         self.dataloader.done.connect(self.filter)
         self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
+        self.dataloader.loaded_data.connect(self.loaded_data.emit)
         self.dataloader.start()
 
     # STEP 2 - CALLED BY load_data()
@@ -233,6 +236,7 @@ class MediaTable(QWidget):
             self.table_loader_thread = LoadTableThread(self)
             self.table_loader_thread.loaded_cell.connect(self.add_cell)
             self.table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
+            self.table_loader_thread.done.connect(self.loaded_data.emit)
 
             if popup:
                 loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
@@ -429,6 +433,11 @@ class MediaTable(QWidget):
                 select.setCheckState(Qt.CheckState.Unchecked)
         else:
             self.invert_checkstate(select)
+
+    def select_all(self, overwrite=False):
+        """Select all rows in the media table"""
+        for row in range(self.table.rowCount()):
+            self.select_row(row, overwrite=overwrite)
 
     def selectedRows(self):
         selected_rows = []

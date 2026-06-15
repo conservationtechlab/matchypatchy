@@ -135,7 +135,6 @@ class DisplayMedia(QWidget):
         Allows refresh of dropdowns if re-entry into media view after updating database
         """
         # wipe previous selections
-        self.select_all(overwrite=False)
         self.filterbar.refresh_filters(prefilter=prefilter)
         # get current filters
         self.filters = self.filterbar.get_filters()
@@ -221,6 +220,10 @@ class DisplayMedia(QWidget):
             self.check_selected_rows()
         self.check_undo_button()
 
+    def handle_loaded_data(self):
+        """Slot to receive loaded data from MediaTable, update count label"""
+        self.update_count_label()
+
     def save(self):
         """Save changes to the media table"""
         self.media_table.save_changes()
@@ -305,17 +308,11 @@ class DisplayMedia(QWidget):
     def set_button_select(self):
         """Handle Select All button press, invert selection"""
         if self.button_select.isChecked():
-            self.select_all(overwrite=False)
+            self.media_table.select_all(overwrite=False)
             self.update_count_label()
         else:
-            self.select_all(overwrite=True)
+            self.media_table.select_all(overwrite=True)
             self.update_count_label_selected()
-
-    def select_all(self, overwrite=False):
-        """Select all rows in the media table"""
-        for row in range(self.media_table.table.rowCount()):
-            self.media_table.select_row(row, overwrite=overwrite)
-        self.update_count_label_selected()
 
     def check_selected_rows(self):
         """Enable/Disable Edit, Duplicate, Delete buttons based on selection"""
