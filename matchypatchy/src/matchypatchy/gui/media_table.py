@@ -152,6 +152,12 @@ class MediaTable(QWidget):
             else:
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
 
+        # increase checkbox size
+        self.table.setStyleSheet(""" QTableWidget::indicator {
+                                 width: 25px;
+                                 height: 25px;}
+                                 """)
+
     # Step 3 - Filter and Display ------------------------------------------------------
     def filter(self):
         """
