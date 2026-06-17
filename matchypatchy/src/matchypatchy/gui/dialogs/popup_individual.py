@@ -112,6 +112,8 @@ class IndividualFillPopup(QDialog):
         self.setWindowTitle("Edit Individual")
         layout = QVBoxLayout()
 
+        self.existing_name = name
+
         # Name
         layout.addWidget(QLabel('Name'))
         self.name = QLineEdit()
@@ -149,6 +151,7 @@ class IndividualFillPopup(QDialog):
         self.setLayout(layout)
 
     def checkInput(self):
+       
         name_okay = self.check_existing_name()
         self.okButton.setEnabled(name_okay and bool(self.get_name()))
 
@@ -167,6 +170,9 @@ class IndividualFillPopup(QDialog):
 
     def check_existing_name(self):
         """Check if name already exists in database, if so alert user"""
+        if self.get_name() == self.existing_name:  # if name is same as current name, allow it
+            self.secret_text.hide()
+            return True
         existing_names = [ind[0] for ind in self.mpDB.select('individual', 'name')]
         if self.get_name() in existing_names:
             self.secret_text.setText("Name already exists.\nPlease choose a different name.")
