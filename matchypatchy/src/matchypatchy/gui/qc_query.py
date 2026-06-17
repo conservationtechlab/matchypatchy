@@ -1,7 +1,8 @@
 """
 Class Definition for Query Object
 """
-from PyQt6.QtCore import QObject
+import pandas as pd
+from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
@@ -12,6 +13,8 @@ class QC_QueryContainer(QObject):
     """
     Alternate Query Container for QC Only
     """
+    loaded_data = pyqtSignal(pd.DataFrame)
+
     def __init__(self, parent):
         super().__init__()
         self.mpDB = parent.mpDB
@@ -43,6 +46,7 @@ class QC_QueryContainer(QObject):
         Load ROI Table
         """
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
+        self.loaded_data.emit(self.data_raw)
         # no data
         if self.data_raw.empty:
             return False
