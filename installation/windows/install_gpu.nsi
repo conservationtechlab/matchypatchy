@@ -14,6 +14,7 @@ InstallDir "$LOCALAPPDATA\MatchyPatchy"
 Page directory
 Page components
 Page instfiles
+Page custom FinishPage
 
 Var PYLAUNCHER
 Var PYVER_STR
@@ -84,34 +85,6 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   File /r "assets\*.*"
 
   ; -------------------------------------------------------------
-
-  ; --- Check for NVIDIA GPU ---
-  DetailPrint "Checking for NVIDIA GPU..."
-  StrCpy $HAS_NVIDIA_GPU "0"
-
-  ExecWait 'cmd /C set PATH >"$INSTDIR\\installer-path.txt" 2>&1' $0
-  ExecWait 'cmd /C where nvidia-smi >"$INSTDIR\\where-nvidia.txt" 2>&1' $1
-  DetailPrint "Wrote installer PATH to $INSTDIR\\installer-path.txt and where output to $INSTDIR\\where-nvidia.txt"
-  
-  ; Check if nvidia-smi exists (indicates NVIDIA drivers are installed)
-  nsExec::ExecToStack 'nvidia-smi --query-gpu=name --format=csv,noheader'
-  Pop $0  ; exit code
-  Pop $1  ; output
-  DetailPrint "exit code $0 $1"
-  IntCmp $0 0 0 no_nvidia_gpu no_nvidia_gpu
-    ; nvidia-smi succeeded, check if output contains something
-    StrLen $R0 $1
-    IntCmp $R0 0 no_nvidia_gpu has_nvidia_gpu has_nvidia_gpu
-  
-  has_nvidia_gpu:
-    StrCpy $HAS_NVIDIA_GPU "1"
-    DetailPrint "NVIDIA GPU detected: $1"
-    Goto gpu_check_done
-  
-  no_nvidia_gpu:
-    DetailPrint "No NVIDIA GPU detected. Will install CPU version of dependencies."
-  
-  gpu_check_done:
 
   ; --- Require Python >= 3.12 check ---
   ; $R0 = installer log (path)
@@ -237,10 +210,6 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     DetailPrint "Warning: pip upgrade returned exit code $0. Continuing..."
 
   install_requirements:
-    ; Install requirements based on GPU availability
-    StrCmp $HAS_NVIDIA_GPU "1" install_gpu_requirements install_cpu_requirements
-  
-  install_gpu_requirements:
     DetailPrint "Installing package requirements with GPU support..."
     ; First install base requirements
     DetailPrint "Installing NVIDIA CUDA runtime libraries..."
@@ -252,16 +221,9 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
     Pop $1
     IntCmp $1 0 pip_success pip_install_failed pip_install_failed
-  
-  install_cpu_requirements:
-    DetailPrint "Installing package requirements (CPU version)..."
-    ; Install requirements without
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
-    Pop $1
-    IntCmp $1 0 pip_success pip_install_failed pip_install_failed
 
   pip_success:
-    ; force reinstall of onnxruntime-gpu
+    ; uninstall onnxruntime
     DetailPrint "Uninstall onnxruntime..."
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime'
     Pop $1
@@ -319,6 +281,36 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     DetailPrint "Installation complete."
 
 SectionEnd
+
+; -------------------------
+; Install complete
+; -------------------------
+
+; Custom finish page
+Function FinishPage
+  nsDialogs::Create 1018
+  Pop $0
+  
+  ${NSD_CreateLabel} 0 0 100% 24u "Installation Complete!"
+  Pop $1
+  SetCtlColors $1 000000 ffffff
+  
+  ${NSD_CreateLabel} 0 30u 100% 20u "matchypatchy has been installed successfully."
+  Pop $2
+  
+  ${NSD_CreateCheckbox} 0 55u 100% 12u "Launch matchypatchy now"
+  Pop $LaunchCheckbox
+  ${NSD_SetState} $LaunchCheckbox 1
+  
+  ${NSD_CreateCheckbox} 0 70u 100% 12u "Create desktop shortcut"
+  Pop $CreateDesktopIcon
+  ${NSD_SetState} $CreateDesktopIcon 0
+  
+  ${NSD_CreateLabel} 0 100u 100% 30u "You can now use matchypatchy from the Start Menu.$\nFor updates, visit: https://github.com/yourrepo/matchypatchy"
+  Pop $3
+  
+  nsDialogs::Show
+FunctionEnd
 
 ; -------------------------
 ; Optional Components
