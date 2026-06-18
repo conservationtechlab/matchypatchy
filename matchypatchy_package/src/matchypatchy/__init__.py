@@ -1,3 +1,5 @@
+__version__ = "0.1.1_dev"
+
 from matchypatchy import config
 from matchypatchy import database
 from matchypatchy import gui

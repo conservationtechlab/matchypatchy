@@ -1,5 +1,6 @@
 from matchypatchy.threads import animl_thread
 from matchypatchy.threads import import_thread
+from matchypatchy.threads import match_object
 from matchypatchy.threads import match_thread
 from matchypatchy.threads import model_dowload_thread
 from matchypatchy.threads import reid_thread
@@ -11,6 +12,7 @@ from matchypatchy.threads.animl_thread import (AnimlThread,
                                                MEGADETECTORv1000_SIZE,)
 from matchypatchy.threads.import_thread import (CSVImportThread,
                                                 FolderImportThread,)
+from matchypatchy.threads.match_object import (MatchObject,)
 from matchypatchy.threads.match_thread import (MatchEmbeddingThread,)
 from matchypatchy.threads.model_dowload_thread import (DownloadMLThread,
                                                        delete, download_one,
@@ -26,7 +28,8 @@ from matchypatchy.threads.table_thread import (FetchTableThread,
 __all__ = ['AnimlThread', 'BuildManifestThread', 'CSVImportThread',
            'DownloadMLThread', 'FetchTableThread', 'FolderImportThread',
            'LoadTableThread', 'MEGADETECTORv1000_SIZE', 'MatchEmbeddingThread',
-           'ReIDThread', 'SequenceThread', 'animl_thread', 'delete',
-           'download_one', 'get_path', 'import_thread', 'is_valid_reid_model',
-           'load_model', 'match_thread', 'model_dowload_thread', 'reid_thread',
-           'sequence_thread', 'table_thread', 'update_model_yml']
+           'MatchObject', 'ReIDThread', 'SequenceThread', 'animl_thread',
+           'delete', 'download_one', 'get_path', 'import_thread',
+           'is_valid_reid_model', 'load_model', 'match_object', 'match_thread',
+           'model_dowload_thread', 'reid_thread', 'sequence_thread',
+           'table_thread', 'update_model_yml']
