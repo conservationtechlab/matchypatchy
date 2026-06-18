@@ -528,7 +528,7 @@ class DisplayCompare(QWidget):
         viewpoints_available = self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
         if not viewpoints_available:
             self.warn(prompt="No images available for this viewpoint. Showing all available images.")
-            self.current_viewpoint = 1 # NOTE: decide on reset viewpoint for all queries or just current query
+            self.button_viewpoint.set_index(1)
 
         # update gui counts
         self.query_sequence_n.setText('/ ' + str(len(self.QueryContainer.current_query_rois)))

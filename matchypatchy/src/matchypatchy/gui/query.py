@@ -28,6 +28,9 @@ class QueryContainer(QObject):
         self.neighbor_dict = dict()
         self.ranked_sequences = []
 
+        self.current_match_object = None
+        self.current_query_rois = []
+        self.current_match_rois = []
         self.current_sequence = 0
         self.current_query = 0
         self.current_match = 0
