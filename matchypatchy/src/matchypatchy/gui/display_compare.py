@@ -706,6 +706,13 @@ class DisplayCompare(QWidget):
         elif key == 16777237:
             self.change_query(self.QueryContainer.current_query + 1)
 
+        # A - Previous Query in Sequence
+        elif key == 65: 
+            self.change_query_in_sequence(self.QueryContainer.current_query_sn - 1)
+        # D - Next Query in Sequence
+        elif key == 68:
+            self.change_query_in_sequence(self.QueryContainer.current_query_sn + 1)
+
         # Space - Match
         elif key == 32:
             self.confirm_match()
