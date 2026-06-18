@@ -29,6 +29,7 @@ from matchypatchy.config import load_cfg
 
 class DisplayCompare(QWidget):
     MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
+    VIEWPOINT_DICT = {0: 'Left', 1: 'Any', 2: 'Right'}
 
     def __init__(self, parent):
         super().__init__()
@@ -38,11 +39,13 @@ class DisplayCompare(QWidget):
         self.k = load_cfg('KNN')  # default knn
         self.distance_metric = 'cosine'
         self.threshold = 50
-        self.current_viewpoint = 'Any'
+        self.current_viewpoint = 1
         self.qc = False  # whether in QC mode
         self.QueryContainer = QueryContainer(self)
         self.progress = None   # placeholder for progress popup
         self.edit_stack = []  # placeholder for media edit stack
+        self.query_load_thread = None  # placeholder for image load thread
+        self.match_load_thread = None  # placeholder for image load thread
 
         self.data = pd.DataFrame()  # placeholder for query data to be used in filters
 
@@ -468,13 +471,10 @@ class DisplayCompare(QWidget):
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.match_counter.setText(str(self.QueryContainer.current_match + 1) + "/ " + str(len(self.QueryContainer.current_match_rois)))
 
-        self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
-
         self.query_image_bar.reset()
         self.match_image_bar.reset()
         # load new images
-        self.load_query()
-        self.load_match()
+        self.toggle_viewpoint(self.current_viewpoint)  # toggle to reset rois to current viewpoint
 
     def change_query_in_sequence(self, n):
         """Load nth image within the current sequence"""
@@ -484,7 +484,7 @@ class DisplayCompare(QWidget):
         self.load_query()
 
     def change_match(self, n):
-        """Load nth atch within the current match queue"""
+        """Load nth match within the current match queue"""
         self.QueryContainer.set_match(n)
         self.match_image_bar.reset()
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
@@ -524,21 +524,17 @@ class DisplayCompare(QWidget):
         """
         Flip between viewpoints in paired images within a sequence
         """
-        # convert int value to string
-        viewpoint_dict = {0: 'Left', 1: 'Any', 2: 'Right'}
-        selected_viewpoint = viewpoint_dict[selected_viewpoint]
-
         self.current_viewpoint = selected_viewpoint
-        self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
-        # either query or match has no examples with selected viewpoint, defaults to all viewpoints
-        if (self.QueryContainer.empty_query is True or self.QueryContainer.empty_match is True):
-            self.warn(f'No query image with {self.current_viewpoint} viewpoint in the current sequence.')
-            self.button_viewpoint.set_index(1)
+        viewpoints_available = self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
+        if not viewpoints_available:
+            self.warn(prompt="No images available for this viewpoint. Showing all available images.")
+
         # update gui counts
         self.query_sequence_n.setText('/ ' + str(len(self.QueryContainer.current_query_rois)))
         self.match_n.setText('/ ' + str(len(self.QueryContainer.current_match_rois)))
         self.query_seq_number.setText('1')
         self.match_number.setText('1')
+
         # load images and data
         self.load_query()
         self.load_match()
@@ -603,7 +599,8 @@ class DisplayCompare(QWidget):
         data = self.QueryContainer.get_info(rid)
         data["id"] = rid
         data = data.to_frame().T
-        dialog = MediaEditPopup(self, data, data_type=1)
+        filepath = self.QueryContainer.get_info(rid, "filepath")
+        dialog = MediaEditPopup(self, data, data_type=1 if Path(filepath).suffix.lower() in IMAGE_EXT else 2)
         if dialog.exec():
             self.edit_stack = dialog.get_edit_stack()
             self.save_changes()
@@ -692,6 +689,7 @@ class DisplayCompare(QWidget):
     # KEYBOARD HANDLER
     # ==========================================================================
     def keyPressEvent(self, event):
+        self.setFocus()  # ensure window has focus to receive key events
         key = event.key()
         key_text = event.text()
         #print(f"Key pressed: {key_text} (Qt key code: {key})")
@@ -726,7 +724,7 @@ class DisplayCompare(QWidget):
             self.button_viewpoint.set_index(2)
         # V - Viewpoint
         elif key == 86:
-            if self.current_viewpoint == 'Left':
+            if self.current_viewpoint == 0:
                 self.button_viewpoint.set_index(2)
             else:
                 self.button_viewpoint.set_index(0)

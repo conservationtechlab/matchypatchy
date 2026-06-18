@@ -3,17 +3,17 @@ QThread for Matching Embeddings
 
 """
 import pandas as pd
-import warnings
-warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
 
 from PyQt6.QtCore import QThread, pyqtSignal
+
+from matchypatchy.threads.match_object import MatchObject
+
 
 
 class MatchEmbeddingThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
-    neighbor_dict_return = pyqtSignal(dict)
-    ranked_sequences_return = pyqtSignal(list)
+    ranked_queries_return = pyqtSignal(list)
     done = pyqtSignal()
 
     def __init__(self, mpDB, rois, sequences, k=3, metric='cosine', threshold=70,
@@ -33,8 +33,9 @@ class MatchEmbeddingThread(QThread):
         self.filter_dict = filter_dict
         self.valid_stations = valid_stations
 
-        self.neighbor_dict = {}
+        self.pairs = []
         self.ranked_sequences = []
+        self.ranked_sequences_without_query_order = []
 
     def run(self):
         """
@@ -61,20 +62,29 @@ class MatchEmbeddingThread(QThread):
 
                 if filtered_neighbors:
                     filtered_neighbors = self.remove_duplicate_matches(filtered_neighbors)
-                    self.neighbor_dict[s] = filtered_neighbors
+
+                    # get viewpoints for query sequence and matched sequence
+                    query_data = self.rois[self.rois['id'].isin(sequence_rois)][['id', 'viewpoint']]
+                    matches = [x[0] for x in filtered_neighbors]
+                    match_data = self.rois[self.rois['id'].isin(matches)][['id', 'viewpoint']]
+                    # create match object to store matches and data for each sequence, to be used in ranking and padding
+                    match_object = MatchObject(s, filtered_neighbors, query_data, match_data)
+                    self.pairs.append(match_object)
 
                 completed_percentage = round((100 * (i + 1) / self.n) - 1)
                 self.progress_update.emit(completed_percentage)
 
         # rank sequences if matches found
-        if self.neighbor_dict:
-            self.ranked_sequences = self.rank()
-            # pad sequences
-            self.pad_sequences()
+        if len(self.pairs) > 0:
+            # rank sequences by number of matches and ided status of matches
+            self.rank()
+            # pad sequences with remaining matches and order by viewpoint
+            for match_object in self.pairs:
+                match_object.pad_sequences(self.rois, self.sequences)
+                match_object.order_matches()
 
         self.progress_update.emit(100)
-        self.neighbor_dict_return.emit(self.neighbor_dict)
-        self.ranked_sequences_return.emit(self.ranked_sequences)
+        self.ranked_queries_return.emit(self.pairs)
 
     # STEP 1
     def roi_knn(self, emb_id):
@@ -91,7 +101,7 @@ class MatchEmbeddingThread(QThread):
         Returns list of valid neighbors by roi_emb.id
         """
         filtered = []
-        query_rois = self.rois.loc[self.rois['id'].isin(sequence_rois)]
+        query_rois = self.rois.loc[self.rois['id'].isin(sequence_rois)].copy()
         neighbors = pd.DataFrame(neighbors, columns=['id', 'distance'])
         neighbors_df = pd.merge(self.rois, neighbors, on='id')
 
@@ -114,12 +124,11 @@ class MatchEmbeddingThread(QThread):
     def rank(self):
         """
         Ranking Function
-            Prioritizes previously IDd individuals and number of matches,
-            then ranks matchs by distances
+            Prioritizes sequences with matches that have previously IDd individuals and by total number of matches
         """
         # remove query sequences with IDed individuals
         ided_sequences = self.rois[~self.rois["individual_id"].isna()]["sequence_id"].unique().tolist()
-        self.neighbor_dict = {k: v for k, v in self.neighbor_dict.items() if k not in ided_sequences}
+        self.pairs = [m for m in self.pairs if m.sequence_id not in ided_sequences]
 
         # prioritize rois with known IDs and favorites
         ided_rois = self.rois[~self.rois["individual_id"].isna()]["id"].unique().tolist()
@@ -127,59 +136,24 @@ class MatchEmbeddingThread(QThread):
 
         # prioritize sequences with IDed individuals
         if len(ided_rois) > 0:
-            # remove named individuals from list of queries
-            for seq in self.neighbor_dict:
-                # rank by distance first
-                self.neighbor_dict[seq] = sorted(self.neighbor_dict[seq], key=lambda x: x[1])
-                # then prioritize matches by favorites and IDed individuals
+            for match_object in self.pairs:
+                # prioritize matches by favorites 
                 if len(favorite_rois) > 0:
-                    self.neighbor_dict[seq] = sorted(self.neighbor_dict[seq], key=lambda x: (x[0] not in favorite_rois))
-                self.neighbor_dict[seq] = sorted(self.neighbor_dict[seq], key=lambda x: (x[0] not in ided_rois))
+                    match_object.rank_neighbors_by_distance()
+                    match_object.rank_neighbors_by_favorites(favorite_rois)
+                # then prioritize matches by IDed status
+                match_object.rank_neighbors_by_ided(ided_rois)
 
             # prioritize by number of matches and ided status
-            ranked_sequences = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
-            ranked_sequences = sorted(ranked_sequences, key=lambda x: any(item[0] in ided_rois for item in x[1]), reverse=True)
-            ranked_sequences = [x[0] for x in ranked_sequences]
+            self.pairs = sorted(self.pairs, key=lambda x: len(x.neighbors), reverse=True)
+            self.pairs = sorted(self.pairs, key=lambda x: any(item[0] in ided_rois for item in x.neighbors), reverse=True)
 
         # if no ids, rank by distance
         else:
-            for seq in self.neighbor_dict:
-                self.neighbor_dict[seq] = sorted(self.neighbor_dict[seq], key=lambda x: x[1])
+            for match_object in self.pairs:
+                match_object.rank_neighbors_by_distance()
             # prioritize by number of matches
-            ranked_sequences = sorted(self.neighbor_dict.items(), key=lambda x: len(x[1]), reverse=True)
-            ranked_sequences = [x[0] for x in ranked_sequences]
-
-        return ranked_sequences
-
-    # STEP 4
-    def pad_sequences(self):
-        """
-        For each remaining match, add the rest of the sequence to the match stack
-        and move existing sequence matches to the appropriate position
-        """
-        for query in self.neighbor_dict.keys():
-            matched_rois = [item[0] for item in self.neighbor_dict[query]]
-            new_stack = []  # match stack after padding
-            to_remove = []
-            match_sequence_rois = {}
-            distances = {}
-            for i, match in enumerate(matched_rois):
-                match_sequence_id = self.rois.loc[self.rois['id'] == match, 'sequence_id'].values[0]
-                match_sequence_rois[match] = self.sequences[match_sequence_id]
-                distances[match] = self.neighbor_dict[query][i][1]
-                for roi in match_sequence_rois[match]:
-                    # check if match sequence appears later in match stack
-                    if roi in matched_rois[i + 1:]:
-                        to_remove.append(roi)
-
-            # rebuild match stack with padded sequences, using lowest distance match as anchor
-            for match in matched_rois:
-                if match not in to_remove:
-                    for roi in match_sequence_rois[match]:
-                        new_stack.append((roi, distances[match]))
-
-            # replace neighbor dict entry with new padded stack
-            self.neighbor_dict[query] = new_stack
+            self.pairs = sorted(self.pairs, key=lambda x: len(x.neighbors), reverse=True)
 
     def remove_duplicate_matches(self, matches):
         """

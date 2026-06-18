@@ -1,6 +1,7 @@
 """
 Class Definition for Query Object
 """
+import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
@@ -12,6 +13,7 @@ from matchypatchy.threads.match_thread import MatchEmbeddingThread
 
 class QueryContainer(QObject):
     thread_signal = pyqtSignal(bool)
+    loaded_data = pyqtSignal(pd.DataFrame)
 
     def __init__(self, parent):
         super().__init__()
@@ -26,6 +28,7 @@ class QueryContainer(QObject):
         self.neighbor_dict = dict()
         self.ranked_sequences = []
 
+        self.current_sequence = 0
         self.current_query = 0
         self.current_match = 0
         self.current_query_sn = 0
@@ -47,6 +50,7 @@ class QueryContainer(QObject):
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
         """
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
+        self.loaded_data.emit(self.data_raw)
         # no data
         if self.data_raw.empty:
             return False
@@ -100,14 +104,9 @@ class QueryContainer(QObject):
                                                  k=self.k, metric=self.metric, threshold=self.threshold)
         self.match_thread.progress_update.connect(self.parent.progress.set_counter)
         self.match_thread.prompt_update.connect(self.parent.progress.update_prompt)
-        self.match_thread.neighbor_dict_return.connect(self.capture_neighbor_dict)
-        self.match_thread.ranked_sequences_return.connect(self.capture_ranked_sequences)
+        self.match_thread.ranked_queries_return.connect(self.capture_ranked_sequences)
         self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished
         self.match_thread.start()
-
-    def capture_neighbor_dict(self, neighbor_dict):
-        """Capture neighbor_dict from MatchEmbeddingThread"""
-        self.neighbor_dict = neighbor_dict
 
     def capture_ranked_sequences(self, ranked_sequences):
         """Capture ranked_sequences from MatchEmbeddingThread"""
@@ -117,16 +116,13 @@ class QueryContainer(QObject):
 
     def finish_calculating(self):
         """
-        Finish calculating neighbors, compute viewpoints
-        Triggered when MatchEmbeddingThread finishes
+        Finish calculating neighbors, signal to DisplayCompare to update with gui
         """
-        if self.neighbor_dict:
+        if self.ranked_sequences:
             # compute viewpoints
-            self.compute_viewpoints()
-            self.compute_match_viewpoints()
             self.thread_signal.emit(True)
         else:
-            # interrupt occurred, dicts are empty
+            # interrupt occurred or dicts are empty
             self.thread_signal.emit(False)
 
     def set_query(self, n):
@@ -139,11 +135,9 @@ class QueryContainer(QObject):
 
         # set current query
         self.current_query = n
-
         # get corresponding sequence_id and rois
-        self.current_sequence_id = self.ranked_sequences[self.current_query]
-        self.current_query_rois = self.sequences[self.current_sequence_id]
-
+        self.current_match_object = self.ranked_sequences[self.current_query]
+        self.current_query_rois = self.current_match_object.get_ranked_query_rids()
         # set view to first in sequence
         self.set_within_query_sequence(0)
         # update matches
@@ -169,7 +163,7 @@ class QueryContainer(QObject):
         Update match list if current_query changes
         """
         # get all matches for query
-        full_match_set = self.neighbor_dict[self.current_sequence_id]
+        full_match_set = self.current_match_object.get_ranked_matches()
         self.current_match_rois = [x[0] for x in full_match_set]
 
         # set to top of matches
@@ -177,7 +171,7 @@ class QueryContainer(QObject):
 
     def set_match(self, n):
         """
-        Set the curent match index and id
+        Set the current match index and id
         """
         # wrap around
         if n < 0:
@@ -189,83 +183,20 @@ class QueryContainer(QObject):
         self.current_match_rid = self.current_match_rois[self.current_match]
 
     # VIEWPOINT ----------------------------------------------------------------
-    def compute_viewpoints(self):
-        """
-        Compute Human-Readable Viewpoints for Query
-        """
-        self.viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
-
-        for sequence_id, rois in self.sequences.items():
-            for key, value in self.VIEWPOINT_DICT.items():
-                if key == "Any":
-                    self.viewpoints[value][sequence_id] = rois
-                else:
-                    try:
-                        self.viewpoints[value][sequence_id] = [rid for rid in rois if str(self.data.loc[rid, 'viewpoint']) == key]
-                    except KeyError:
-                        self.viewpoints[value][sequence_id] = []
-
-    def compute_match_viewpoints(self):
-        """Compute Human-Readable Viewpoints for Matches"""
-        self.match_viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
-
-        for sequence_id, matches in self.neighbor_dict.items():
-            all_matches = [x[0] for x in matches]
-            for key, value in self.VIEWPOINT_DICT.items():
-                if key == "Any":
-                    self.match_viewpoints[value][sequence_id] = all_matches
-                else:
-                    try:
-                        self.match_viewpoints[value][sequence_id] = [rid for rid in all_matches if str(self.data.loc[rid, 'viewpoint']) == key]
-                    except KeyError:
-                        self.match_viewpoints[value][sequence_id] = []
-
-    def show_all_query_image(self):
-        """Show All Viewpoints for Query"""
-        self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
-        self.set_within_query_sequence(0)
 
     def toggle_viewpoint(self, selected_viewpoint):
         """Flip between viewpoints in paired images within a sequence"""
         self.selected_viewpoint = selected_viewpoint
-        self.update_viewpoint_current_query()
-        self.update_viewpoint_matching_images()
 
-    def update_viewpoint_current_query(self):
-        """Sets Query to Display Only Selected Viewpoint"""
-        self.empty_query = False
-        if self.selected_viewpoint == 'Any':
-            self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
-        else:
-            self.current_query_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
-        # Set to first in sequence
-        if self.current_query_rois:
-            self.set_within_query_sequence(0)
-        else:
-            self.empty_query = True
-            # show all viewpoints
-            self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
-            self.set_within_query_sequence(0)
+        # filter query and matches by selected viewpoint
+        viewpoint_available = self.current_match_object.show_viewpoint(self.selected_viewpoint)
+        
+        # update matches and query rois based on new viewpoint selection
+        self.current_query_rois = self.current_match_object.get_ranked_query_rids()
+        self.set_within_query_sequence(0)
+        self.update_matches()
 
-    def update_viewpoint_matching_images(self):
-        """Sets Match to Display Only Selected Viewpoint"""
-        self.empty_match = False
-        if self.selected_viewpoint == 'Any':
-            self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
-        else:
-            self.current_match_rois = self.match_viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
-
-        if self.current_match_rois and self.empty_query is False:
-            self.set_match(0)
-        elif not self.current_match_rois and self.empty_query is False:  # need to update query image to all viewpoints
-            self.empty_match = True
-            self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
-            self.set_match(0)
-            self.show_all_query_image()
-        else:  # empty query
-            # show all viewpoints
-            self.current_match_rois = self.match_viewpoints['Any'].get(self.current_sequence_id, [])
-            self.set_match(0)
+        return viewpoint_available
 
     # RETURN INFO --------------------------------------------------------------------
     def is_existing_match(self):
@@ -280,7 +211,8 @@ class QueryContainer(QObject):
 
     def current_distance(self):
         """Return distance between current sequence and matchs"""
-        return self.neighbor_dict[self.current_sequence_id][self.current_match][1]
+        matches = self.current_match_object.get_ranked_matches()
+        return matches[self.current_match][1]
 
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
@@ -313,6 +245,7 @@ class QueryContainer(QObject):
         info_dict = roi[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
                         'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
+        info_dict['id'] = roi.name
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
