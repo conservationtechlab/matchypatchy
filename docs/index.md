@@ -415,7 +415,14 @@ You can open the image in your default image viewer by pressing <b>"Open Image"<
 
 You can mark the image as a "Favorite" by pressing the <b>♥</b> button.
 
+### HotKeys
+
+Use the following hotkeys to navigate through the Match page and make matches without using the mouse.
+
+<img src="{{ '/assets/screenshots/hotkeys.png' | relative_url }}" style="display: block; margin: auto;" />
+
 <br>
+
 ## 5. Export
 You can export the entire database as a .csv by selecting <b>Step 5. Export</b> on the
 Home page. The .csv file will include local filepaths, timestamps, Survey and Station information,
