@@ -14,7 +14,6 @@ InstallDir "$LOCALAPPDATA\MatchyPatchy"
 Page directory
 Page components
 Page instfiles
-Page custom FinishPage
 
 Var PYLAUNCHER
 Var PYVER_STR
