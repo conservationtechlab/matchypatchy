@@ -1,7 +1,7 @@
 ; MatchyPatchy NSIS installer - creates venv, pip installs requirements, and creates shortcuts.
 
 ; Version constant - update this for each release
-!define APP_VERSION "1.0.0"
+!define APP_VERSION "0.1.1"
 
 Name "MatchyPatchy"
 OutFile "MatchyPatchy-Setup.exe"
@@ -75,7 +75,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   DetailPrint "Installing matchypatchy files..."
   SetOutPath "$INSTDIR\matchypatchy"
   CreateDirectory "$INSTDIR\matchypatchy"
-  File /r "matchypatchy\*.*"
+  File /r "matchypatchy_package\*.*"
 
   ; Recursively include and extract the 'assets' directory
   DetailPrint "Installing assets..."
