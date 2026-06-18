@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (QTableWidget, QVBoxLayout, QWidget, QLabel, QHeader
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from matchypatchy.database.media import fetch_individual
 from matchypatchy.threads.model_dowload_thread import load_model
 from matchypatchy.config import load_cfg
 from matchypatchy.threads.table_thread import FetchTableThread, LoadTableThread
@@ -79,6 +80,7 @@ class MediaTable(QWidget):
         self.format_table()
 
         # fetch data
+        self.individual_list = fetch_individual(self.mpDB)
         self.dataloader = FetchTableThread(self)
         self.dataloader.done.connect(self.filter)
         self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
@@ -151,6 +153,12 @@ class MediaTable(QWidget):
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), self.thumbnail_size))
             else:
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
+
+        # increase checkbox size
+        self.table.setStyleSheet(""" QTableWidget::indicator {
+                                 width: 25px;
+                                 height: 25px;}
+                                 """)
 
     # Step 3 - Filter and Display ------------------------------------------------------
     def filter(self):

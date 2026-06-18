@@ -96,7 +96,7 @@ class MediaEditPopup(QDialog):
         if self.metadatapanel.comment_changed:
             for id in self.ids:
                 if self.data_type == 1:
-                    media_id = self.data[self.data["id"] == id]["media_id"].item()
+                    media_id = self.data[self.data["id"] == id]["media_id"].values[0]
                 else:
                     media_id = id
                 edit = {'id': media_id,

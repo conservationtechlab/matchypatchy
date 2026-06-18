@@ -4,6 +4,7 @@ GUI Window for Match Comparisons
 """
 import os
 from pathlib import Path
+import pandas as pd
 from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
@@ -28,6 +29,7 @@ from matchypatchy.config import load_cfg
 
 class DisplayCompare(QWidget):
     MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
+    VIEWPOINT_DICT = {0: 'Left', 1: 'Any', 2: 'Right'}
 
     def __init__(self, parent):
         super().__init__()
@@ -37,10 +39,15 @@ class DisplayCompare(QWidget):
         self.k = load_cfg('KNN')  # default knn
         self.distance_metric = 'cosine'
         self.threshold = 50
-        self.current_viewpoint = 'Any'
+        self.current_viewpoint = 1
         self.qc = False  # whether in QC mode
         self.QueryContainer = QueryContainer(self)
         self.progress = None   # placeholder for progress popup
+        self.edit_stack = []  # placeholder for media edit stack
+        self.query_load_thread = None  # placeholder for image load thread
+        self.match_load_thread = None  # placeholder for image load thread
+
+        self.data = pd.DataFrame()  # placeholder for query data to be used in filters
 
         # Options Bar ==============================================================
         layout = QVBoxLayout()
@@ -328,20 +335,26 @@ class DisplayCompare(QWidget):
     # ON ENTRY
     # ==========================================================================
     def calculate_neighbors(self):
+        """Calculate neighbors for all query ROIs, load first query and match"""
         # Disable individual select until feature is implemented on QC
         self.qc = False
         self.filterbar.individual_visible(False)
         self.k = load_cfg('KNN')  # can be changed in configuration
         self.QueryContainer = QueryContainer(self)  # re-establish object
+        self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded) 
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
             self.show_progress("Matching embeddings... This may take a while.")
             self.QueryContainer.calculate_neighbors()
             self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
-            self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
+            self.QueryContainer.thread_signal.connect(self.check_matchthread_success)    
         else:
             self.home(warn=True)
+
+    def handle_query_data_loaded(self, data):
+        """Handle data loaded signal from QueryContainer, update self.data for filters"""
+        self.data = data
 
     def show_progress(self, prompt):
         """Progress Popup for Match Thread"""
@@ -359,6 +372,7 @@ class DisplayCompare(QWidget):
         """Enter QC mode, recalculate matches by individual IDs"""
         if not fetch_individual(self.mpDB).empty:
             self.QueryContainer = QC_QueryContainer(self)
+            self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
             self.qc = True
             self.filterbar.individual_visible(True)
             self.QueryContainer.load_data()
@@ -457,13 +471,10 @@ class DisplayCompare(QWidget):
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.match_counter.setText(str(self.QueryContainer.current_match + 1) + "/ " + str(len(self.QueryContainer.current_match_rois)))
 
-        self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
-
         self.query_image_bar.reset()
         self.match_image_bar.reset()
         # load new images
-        self.load_query()
-        self.load_match()
+        self.toggle_viewpoint(self.current_viewpoint)  # toggle to reset rois to current viewpoint
 
     def change_query_in_sequence(self, n):
         """Load nth image within the current sequence"""
@@ -473,7 +484,7 @@ class DisplayCompare(QWidget):
         self.load_query()
 
     def change_match(self, n):
-        """Load nth atch within the current match queue"""
+        """Load nth match within the current match queue"""
         self.QueryContainer.set_match(n)
         self.match_image_bar.reset()
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
@@ -513,21 +524,18 @@ class DisplayCompare(QWidget):
         """
         Flip between viewpoints in paired images within a sequence
         """
-        # convert int value to string
-        viewpoint_dict = {0: 'Left', 1: 'Any', 2: 'Right'}
-        selected_viewpoint = viewpoint_dict[selected_viewpoint]
-
         self.current_viewpoint = selected_viewpoint
-        self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
-        # either query or match has no examples with selected viewpoint, defaults to all viewpoints
-        if (self.QueryContainer.empty_query is True or self.QueryContainer.empty_match is True):
-            self.warn(f'No query image with {self.current_viewpoint} viewpoint in the current sequence.')
+        viewpoints_available = self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
+        if not viewpoints_available:
+            self.warn(prompt="No images available for this viewpoint. Showing all available images.")
             self.button_viewpoint.set_index(1)
+
         # update gui counts
         self.query_sequence_n.setText('/ ' + str(len(self.QueryContainer.current_query_rois)))
         self.match_n.setText('/ ' + str(len(self.QueryContainer.current_match_rois)))
         self.query_seq_number.setText('1')
         self.match_number.setText('1')
+
         # load images and data
         self.load_query()
         self.load_match()
@@ -592,14 +600,33 @@ class DisplayCompare(QWidget):
         data = self.QueryContainer.get_info(rid)
         data["id"] = rid
         data = data.to_frame().T
-        dialog = MediaEditPopup(self, data, data_type=1)
+        filepath = self.QueryContainer.get_info(rid, "filepath")
+        dialog = MediaEditPopup(self, data, data_type=1 if Path(filepath).suffix.lower() in IMAGE_EXT else 2)
         if dialog.exec():
+            self.edit_stack = dialog.get_edit_stack()
+            self.save_changes()
             del dialog
             # reload data
             self.QueryContainer.load_data()
             self.QueryContainer.filter()
             self.load_query()
             self.load_match()
+
+
+    def save_changes(self):
+        # commit all changes in self.edit_stack to database
+        while len(self.edit_stack) > 0:
+            edit = self.edit_stack.pop()
+            id = edit['id']
+            replace_dict = {edit['reference']: edit['new_value']}
+            # determine table to edit based on reference column
+            if edit['reference'] in {'age', 'sex'}:
+                iid = self.data.loc[self.data['id'] == id, 'individual_id'].values[0]
+                self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
+            elif edit['reference'] in {'comment'}:
+                self.mpDB.edit_row("media", id, replace_dict, allow_none=True, quiet=False)
+            else:
+                self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
 
     def open_image(self, rid):
         """
@@ -663,6 +690,7 @@ class DisplayCompare(QWidget):
     # KEYBOARD HANDLER
     # ==========================================================================
     def keyPressEvent(self, event):
+        self.setFocus()  # ensure window has focus to receive key events
         key = event.key()
         key_text = event.text()
         #print(f"Key pressed: {key_text} (Qt key code: {key})")
@@ -678,6 +706,13 @@ class DisplayCompare(QWidget):
         # Down Arrow
         elif key == 16777237:
             self.change_query(self.QueryContainer.current_query + 1)
+
+        # A - Previous Query in Sequence
+        elif key == 65: 
+            self.change_query_in_sequence(self.QueryContainer.current_query_sn - 1)
+        # D - Next Query in Sequence
+        elif key == 68:
+            self.change_query_in_sequence(self.QueryContainer.current_query_sn + 1)
 
         # Space - Match
         elif key == 32:
@@ -697,7 +732,7 @@ class DisplayCompare(QWidget):
             self.button_viewpoint.set_index(2)
         # V - Viewpoint
         elif key == 86:
-            if self.current_viewpoint == 'Left':
+            if self.current_viewpoint == 0:
                 self.button_viewpoint.set_index(2)
             else:
                 self.button_viewpoint.set_index(0)

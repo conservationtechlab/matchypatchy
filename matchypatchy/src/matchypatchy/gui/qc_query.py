@@ -1,7 +1,8 @@
 """
 Class Definition for Query Object
 """
-from PyQt6.QtCore import QObject
+import pandas as pd
+from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
@@ -12,16 +13,22 @@ class QC_QueryContainer(QObject):
     """
     Alternate Query Container for QC Only
     """
+    loaded_data = pyqtSignal(pd.DataFrame)
+
     def __init__(self, parent):
         super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
+        self.data_raw = pd.DataFrame()
+        self.data = pd.DataFrame()
+        self.individuals_raw = dict()
+        self.individuals = dict()
         self.filters = dict()
-        self.neighbor_dict = dict()
-        self.nearest_dict = dict()
         self.ranked_sequences = []
         self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
+        self.current_query_rois = []
+        self.current_match_rois = []
         self.current_query = 0
         self.current_match = 0
         self.current_query_sn = 0
@@ -43,6 +50,7 @@ class QC_QueryContainer(QObject):
         Load ROI Table
         """
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
+        self.loaded_data.emit(self.data_raw)
         # no data
         if self.data_raw.empty:
             return False
@@ -87,9 +95,6 @@ class QC_QueryContainer(QObject):
                 self.data = self.data[self.data['individual_id'] == int(active_iid)]
                 self.individuals = {active_iid: self.individuals_raw[active_iid]}
 
-        # compute viewpoints
-        self.compute_viewpoints()
-
         # Sort by Distance
         # must have valid matches to continue
         if self.individuals:
@@ -117,14 +122,11 @@ class QC_QueryContainer(QObject):
 
         # set current query
         self.current_query = n
-
         # get corresponding sequence_id and rois
         self.current_sequence_id = self.ranked_sequences[self.current_query][0]
         self.current_query_rois = self.individuals[self.current_sequence_id]
-
         # set view to first in sequence
         self.set_within_query_sequence(0)
-
         # update matches
         self.update_matches()
 
@@ -149,7 +151,7 @@ class QC_QueryContainer(QObject):
         Update match list if current_query changes
         """
         # get all matches for query
-        self.current_match_rois = self.individuals[self.current_sequence_id]
+        self.current_match_rois = self.current_query_rois
 
         # set to top of matches, skip the first one which will be on the query side
         self.set_match(1)
@@ -168,42 +170,28 @@ class QC_QueryContainer(QObject):
         self.current_match_rid = self.current_match_rois[self.current_match]
 
     # VIEWPOINT ----------------------------------------------------------------
-    def compute_viewpoints(self):
-        """Compute humnan-readable viewpoints"""
-        self.viewpoints = {x: dict() for x in self.VIEWPOINT_DICT.values()}
-        for iid, rois in self.individuals.items():
-            for key, value in self.VIEWPOINT_DICT.items():
-                if key == "Any":
-                    self.viewpoints[value][iid] = rois
-                else:
-                    try:
-                        self.viewpoints[value][iid] = [rid for rid in rois if str(self.data.loc[rid, 'viewpoint']) == key]
-                    except KeyError:
-                        self.viewpoints[value][iid] = []
-
+        
     def toggle_viewpoint(self, selected_viewpoint):
         """Set the selected viewpoint filter and update rois"""
+        data = self.data.loc[self.current_query_rois]
+        self.query_viewpoint_map = dict(zip(data.index, data['viewpoint']))
+
         self.selected_viewpoint = selected_viewpoint
-        self.update_viewpoint()
-
-    def update_viewpoint(self):
-        """Sets Both Sides to Display Only Selected Viewpoint"""
-        self.empty_query = False
-        if self.selected_viewpoint == 'Any':
-            self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
-            self.current_match_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
+        print(f"Toggling to {self.selected_viewpoint} viewpoint")
+        if self.selected_viewpoint == 1:
+            # if selected_viewpoint is all, show all rois
+            return True
         else:
-            self.current_query_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
-            self.current_match_rois = self.viewpoints[self.selected_viewpoint].get(self.current_sequence_id, [])
-
-        if self.current_query_rois:
-            self.set_within_query_sequence(0)
-        else:
-            self.empty_query = True
-            # show all viewpoints
-            self.current_query_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
-            self.current_match_rois = self.viewpoints['Any'].get(self.current_sequence_id, [])
-            self.set_within_query_sequence(0)
+            # adjust numbering
+            self.selected_viewpoint = 1 if self.selected_viewpoint == 2 else selected_viewpoint
+            self.current_query_rois = [rid for rid in self.current_query_rois if self.query_viewpoint_map[rid] == self.selected_viewpoint]
+            self.current_match_rois = [rid for rid in self.current_match_rois if self.query_viewpoint_map[rid] == self.selected_viewpoint]
+            if not self.current_query_rois or not self.current_match_rois:
+                return False
+            else:
+                self.set_within_query_sequence(0)
+                self.update_matches()
+                return True
 
     # RETURN INFO --------------------------------------------------------------
     def is_existing_match(self):

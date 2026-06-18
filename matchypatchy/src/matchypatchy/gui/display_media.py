@@ -44,6 +44,17 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         first_layer.addWidget(VerticalSeparator())
 
+        # Save
+        button_save = StandardButton("Save")
+        button_save.clicked.connect(self.save)
+        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Undo
+        self.button_undo = StandardButton("Undo")
+        self.button_undo.clicked.connect(self.undo)
+        self.button_undo.setEnabled(False)
+        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(VerticalSeparator())
+
         # Select All
         self.button_select = StandardButton("Select All")
         self.button_select.setCheckable(True)
@@ -64,17 +75,6 @@ class DisplayMedia(QWidget):
         self.button_delete.clicked.connect(self.delete)
         self.button_delete.setEnabled(False)
         first_layer.addWidget(self.button_delete, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
-        # Save
-        first_layer.addWidget(VerticalSeparator())
-        button_save = StandardButton("Save")
-        button_save.clicked.connect(self.save)
-        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Undo
-        self.button_undo = StandardButton("Undo")
-        self.button_undo.clicked.connect(self.undo)
-        self.button_undo.setEnabled(False)
-        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addStretch()
         layout.addLayout(first_layer)

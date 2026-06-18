@@ -177,7 +177,7 @@ class ConfigPopup(QDialog):
     def command(self):
         """Execute custom command on database."""
         new_cmd = self.command_line.text()
-        self.mpDB._command(new_cmd)
+        self.mpDB._command(new_cmd, quiet=False)
 
     def set_home_dir(self):
         """Change Home directory"""
