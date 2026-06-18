@@ -284,12 +284,12 @@ class QueryContainer(QObject):
 
             # match is older, keep match name
             else:
-                sequence = [self.current_sequence_id]
+                sequence = [self.current_sequence]
                 keep_id = match_iid
 
         # query is None, give match name
         else:
-            sequence = [self.current_sequence_id]
+            sequence = [self.current_sequence]
             keep_id = match_iid
 
         # find all rois with newer name

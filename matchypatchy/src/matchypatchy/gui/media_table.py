@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (QTableWidget, QVBoxLayout, QWidget, QLabel, QHeader
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
+from matchypatchy.database.media import fetch_individual
 from matchypatchy.threads.model_dowload_thread import load_model
 from matchypatchy.config import load_cfg
 from matchypatchy.threads.table_thread import FetchTableThread, LoadTableThread
@@ -79,6 +80,7 @@ class MediaTable(QWidget):
         self.format_table()
 
         # fetch data
+        self.individual_list = fetch_individual(self.mpDB)
         self.dataloader = FetchTableThread(self)
         self.dataloader.done.connect(self.filter)
         self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
