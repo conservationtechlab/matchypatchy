@@ -1,96 +1,57 @@
-from matchypatchy import config
-from matchypatchy import database
-from matchypatchy import gui
-from matchypatchy import threads
+from matchypatchy.gui import dialogs
+from matchypatchy.gui import display_base
+from matchypatchy.gui import display_compare
+from matchypatchy.gui import display_media
+from matchypatchy.gui import main_gui
+from matchypatchy.gui import media_table
+from matchypatchy.gui import qc_query
+from matchypatchy.gui import query
+from matchypatchy.gui import widgets
 
-from matchypatchy.config import (HOME_DIR, add, initiate, load_cfg,
-                                 resource_path, update,)
-from matchypatchy.database import (COLUMNS, IMAGE_EXT, MatchyPatchyDB,
-                                   THUMBNAIL_NOTFOUND, THUMBNAIL_SIZE,
-                                   TZ_CONVERT_DICT, VIDEO_EXT,
-                                   check_missing_thumbnails, export_data,
-                                   fetch_individual, fetch_media,
-                                   fetch_media_thumbnails, fetch_regions,
-                                   fetch_roi, fetch_roi_media,
-                                   fetch_roi_thumbnails,
-                                   fetch_station_names_from_id, fetch_stations,
-                                   fetch_surveys, get_frame, get_roi_bbox,
-                                   get_roi_frame, get_sequence,
-                                   individual_roi_dict, location, media,
-                                   media_count, mpdb, save_media_thumbnail,
-                                   save_roi_thumbnail, sequence_roi_dict,
-                                   setup, setup_chromadb, setup_database,
-                                   thumbnails,)
-from matchypatchy.gui import (AboutPopup, AlertPopup, ClickableSlider,
-                              ComboBoxDelegate, ComboBoxSeparator, ConfigPopup,
-                              DisplayBase, DisplayCompare, DisplayMedia,
-                              FilterBar, FilterBox, HorizontalSeparator,
-                              ImageAdjustBar, ImageWidget, ImportCSVPopup,
-                              ImportFolderPopup, IndividualFillPopup,
-                              IndividualPopup, LicensePopup, MLDownloadPopup,
-                              MLOptionsPopup, MainWindow, MediaEditPopup,
-                              MediaTable, MediaWidget, MetadataPanel,
-                              PairXPopup, QC_QueryContainer, QueryContainer,
-                              READMEPopup, StandardButton, StationFillPopup,
-                              StationPopup, SurveyFillPopup, SurveyPopup,
-                              ThreePointSlider, VerticalSeparator,
-                              VideoPlayerBar, VideoViewer, VideoWidget,
-                              dialogs, display_base, display_compare,
-                              display_media, gui_assets, main_gui, media_table,
-                              popup_alert, popup_config, popup_import_csv,
-                              popup_import_folder, popup_individual,
-                              popup_media_edit, popup_ml, popup_pairx,
-                              popup_readme, popup_station, popup_survey,
-                              qc_query, query, widget_filterbar,
-                              widget_image_adjustment, widget_media, widgets,)
-from matchypatchy.threads import (AnimlThread, BuildManifestThread,
-                                  CSVImportThread, DownloadMLThread,
-                                  FetchTableThread, FolderImportThread,
-                                  LoadTableThread, MEGADETECTORv1000_SIZE,
-                                  MatchEmbeddingThread, MatchObject,
-                                  ReIDThread, SequenceThread, animl_thread,
-                                  delete, download_one, get_path,
-                                  import_thread, is_valid_reid_model,
-                                  load_model, match_object, match_thread,
-                                  model_dowload_thread, reid_thread,
-                                  sequence_thread, table_thread,
-                                  update_model_yml,)
+from matchypatchy.gui.dialogs import (AboutPopup, AlertPopup, ConfigPopup,
+                                      ImportCSVPopup, ImportFolderPopup,
+                                      IndividualFillPopup, IndividualPopup,
+                                      LicensePopup, MLDownloadPopup,
+                                      MLOptionsPopup, MediaEditPopup,
+                                      MetadataPanel, PairXPopup, READMEPopup,
+                                      StationFillPopup, StationPopup,
+                                      SurveyFillPopup, SurveyPopup,
+                                      popup_alert, popup_config,
+                                      popup_import_csv, popup_import_folder,
+                                      popup_individual, popup_media_edit,
+                                      popup_ml, popup_pairx, popup_readme,
+                                      popup_station, popup_survey,)
+from matchypatchy.gui.display_base import (DisplayBase,)
+from matchypatchy.gui.display_compare import (DisplayCompare,)
+from matchypatchy.gui.display_media import (DisplayMedia,)
+from matchypatchy.gui.main_gui import (MainWindow,)
+from matchypatchy.gui.media_table import (MediaTable,)
+from matchypatchy.gui.qc_query import (QC_QueryContainer,)
+from matchypatchy.gui.query import (QueryContainer,)
+from matchypatchy.gui.widgets import (ClickableSlider, ComboBoxDelegate,
+                                      ComboBoxSeparator, FilterBar, FilterBox,
+                                      HorizontalSeparator, ImageAdjustBar,
+                                      ImageWidget, MediaWidget, StandardButton,
+                                      ThreePointSlider, VerticalSeparator,
+                                      VideoPlayerBar, VideoViewer, VideoWidget,
+                                      gui_assets, widget_filterbar,
+                                      widget_image_adjustment, widget_media,)
 
-__all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
-           'COLUMNS', 'CSVImportThread', 'ClickableSlider', 'ComboBoxDelegate',
+__all__ = ['AboutPopup', 'AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
            'ComboBoxSeparator', 'ConfigPopup', 'DisplayBase', 'DisplayCompare',
-           'DisplayMedia', 'DownloadMLThread', 'FetchTableThread', 'FilterBar',
-           'FilterBox', 'FolderImportThread', 'HOME_DIR',
-           'HorizontalSeparator', 'IMAGE_EXT', 'ImageAdjustBar', 'ImageWidget',
-           'ImportCSVPopup', 'ImportFolderPopup', 'IndividualFillPopup',
-           'IndividualPopup', 'LicensePopup', 'LoadTableThread',
-           'MEGADETECTORv1000_SIZE', 'MLDownloadPopup', 'MLOptionsPopup',
-           'MainWindow', 'MatchEmbeddingThread', 'MatchObject',
-           'MatchyPatchyDB', 'MediaEditPopup', 'MediaTable', 'MediaWidget',
-           'MetadataPanel', 'PairXPopup', 'QC_QueryContainer',
-           'QueryContainer', 'READMEPopup', 'ReIDThread', 'SequenceThread',
+           'DisplayMedia', 'FilterBar', 'FilterBox', 'HorizontalSeparator',
+           'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
+           'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
+           'LicensePopup', 'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow',
+           'MediaEditPopup', 'MediaTable', 'MediaWidget', 'MetadataPanel',
+           'PairXPopup', 'QC_QueryContainer', 'QueryContainer', 'READMEPopup',
            'StandardButton', 'StationFillPopup', 'StationPopup',
-           'SurveyFillPopup', 'SurveyPopup', 'THUMBNAIL_NOTFOUND',
-           'THUMBNAIL_SIZE', 'TZ_CONVERT_DICT', 'ThreePointSlider',
-           'VIDEO_EXT', 'VerticalSeparator', 'VideoPlayerBar', 'VideoViewer',
-           'VideoWidget', 'add', 'animl_thread', 'check_missing_thumbnails',
-           'config', 'database', 'delete', 'dialogs', 'display_base',
-           'display_compare', 'display_media', 'download_one', 'export_data',
-           'fetch_individual', 'fetch_media', 'fetch_media_thumbnails',
-           'fetch_regions', 'fetch_roi', 'fetch_roi_media',
-           'fetch_roi_thumbnails', 'fetch_station_names_from_id',
-           'fetch_stations', 'fetch_surveys', 'get_frame', 'get_path',
-           'get_roi_bbox', 'get_roi_frame', 'get_sequence', 'gui',
-           'gui_assets', 'import_thread', 'individual_roi_dict', 'initiate',
-           'is_valid_reid_model', 'load_cfg', 'load_model', 'location',
-           'main_gui', 'match_object', 'match_thread', 'media', 'media_count',
-           'media_table', 'model_dowload_thread', 'mpdb', 'popup_alert',
+           'SurveyFillPopup', 'SurveyPopup', 'ThreePointSlider',
+           'VerticalSeparator', 'VideoPlayerBar', 'VideoViewer', 'VideoWidget',
+           'dialogs', 'display_base', 'display_compare', 'display_media',
+           'gui_assets', 'main_gui', 'media_table', 'popup_alert',
            'popup_config', 'popup_import_csv', 'popup_import_folder',
            'popup_individual', 'popup_media_edit', 'popup_ml', 'popup_pairx',
            'popup_readme', 'popup_station', 'popup_survey', 'qc_query',
-           'query', 'reid_thread', 'resource_path', 'save_media_thumbnail',
-           'save_roi_thumbnail', 'sequence_roi_dict', 'sequence_thread',
-           'setup', 'setup_chromadb', 'setup_database', 'table_thread',
-           'threads', 'thumbnails', 'update', 'update_model_yml',
-           'widget_filterbar', 'widget_image_adjustment', 'widget_media',
-           'widgets']
+           'query', 'widget_filterbar', 'widget_image_adjustment',
+           'widget_media', 'widgets']
