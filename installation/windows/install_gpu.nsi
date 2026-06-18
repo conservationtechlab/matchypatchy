@@ -14,11 +14,9 @@ InstallDir "$LOCALAPPDATA\MatchyPatchy"
 Page directory
 Page components
 Page instfiles
-Page custom FinishPage
 
 Var PYLAUNCHER
 Var PYVER_STR
-Var HAS_NVIDIA_GPU
 
 ; -------------------------
 ; .onInit - optional checks
@@ -281,36 +279,6 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     DetailPrint "Installation complete."
 
 SectionEnd
-
-; -------------------------
-; Install complete
-; -------------------------
-
-; Custom finish page
-Function FinishPage
-  nsDialogs::Create 1018
-  Pop $0
-  
-  ${NSD_CreateLabel} 0 0 100% 24u "Installation Complete!"
-  Pop $1
-  SetCtlColors $1 000000 ffffff
-  
-  ${NSD_CreateLabel} 0 30u 100% 20u "matchypatchy has been installed successfully."
-  Pop $2
-  
-  ${NSD_CreateCheckbox} 0 55u 100% 12u "Launch matchypatchy now"
-  Pop $LaunchCheckbox
-  ${NSD_SetState} $LaunchCheckbox 1
-  
-  ${NSD_CreateCheckbox} 0 70u 100% 12u "Create desktop shortcut"
-  Pop $CreateDesktopIcon
-  ${NSD_SetState} $CreateDesktopIcon 0
-  
-  ${NSD_CreateLabel} 0 100u 100% 30u "You can now use matchypatchy from the Start Menu.$\nFor updates, visit: https://github.com/yourrepo/matchypatchy"
-  Pop $3
-  
-  nsDialogs::Show
-FunctionEnd
 
 ; -------------------------
 ; Optional Components
