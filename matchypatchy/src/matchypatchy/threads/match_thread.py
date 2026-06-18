@@ -27,9 +27,9 @@ class MatchEmbeddingThread(QThread):
         self.k = k
         self.metric = metric
         if self.metric == 'cosine':
-            self.threshold = threshold / 100
+            self.threshold = 1 - (threshold / 100)
         else:
-            self.threshold = threshold
+            self.threshold = 100 - threshold
         self.filter_dict = filter_dict
         self.valid_stations = valid_stations
 

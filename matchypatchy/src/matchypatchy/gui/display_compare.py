@@ -62,13 +62,13 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(VerticalSeparator())
 
         # OPTIONS
-        first_layer.addWidget(QLabel("Distance Metric:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(QLabel("Similarity Metric:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.option_distance_metric = QComboBox()
         self.option_distance_metric.addItems(['Cosine', 'L2'])
         self.option_distance_metric.currentIndexChanged.connect(self.change_metric)
         first_layer.addWidget(self.option_distance_metric, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        first_layer.addWidget(QLabel("Distance Threshold:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(QLabel("Similarity Threshold:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self.threshold_slider.setRange(0, 100)  # Set range from 1 to 100
         self.threshold_slider.setValue(self.threshold)  # Set initial value
@@ -226,7 +226,7 @@ class DisplayCompare(QWidget):
         self.button_next_match.clicked.connect(lambda: self.change_match(self.QueryContainer.current_match + 1))
         match_options.addWidget(self.button_next_match)
 
-        self.match_distance = QLabel("Distance: ")
+        self.match_distance = QLabel("Similarity: ")
         self.match_distance.setStyleSheet("border: 1px solid black;")
         match_options.addWidget(self.match_distance)
 
@@ -300,7 +300,7 @@ class DisplayCompare(QWidget):
         """
         self.distance_metric = self.option_distance_metric.currentText().lower()
         if self.distance_metric == 'l2':
-            self.threshold_slider.setValue(70)
+            self.threshold_slider.setValue(30)
         else:
             self.threshold_slider.setValue(50)
 
@@ -507,8 +507,8 @@ class DisplayCompare(QWidget):
         """
         Load Image and Metadata for Current Match ROI
         """
-        distance = self.QueryContainer.current_distance()
-        self.match_distance.setText(f"Distance: {distance:.2f}")
+        distance = 1 - self.QueryContainer.current_distance()
+        self.match_distance.setText(f"Similarity: {distance:.2f}")
 
         self.match_image.load(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "filepath"),
                               frame=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "frame"),
