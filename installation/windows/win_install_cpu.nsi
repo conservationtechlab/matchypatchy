@@ -64,7 +64,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   ; Include pip requirements and launcher
   File "installation\windows\win_py312_cpu_requirements.txt"
   File "installation\windows\win_py313_cpu_requirements.txt"
-  File "installation\windows\launcher.vbs"
+  File "installation\windows\launch.bat"
 
   ; Recursively include and extract the 'matchypatchy' package directory
   DetailPrint "Installing matchypatchy files..."
@@ -86,13 +86,6 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
 
   ; -------------------------------------------------------------
   ; --- Require Python >= 3.12 check ---
-  ; $R0 = installer log (path)
-  ; $R1 = temp file for numeric version
-  StrCpy $R0 "$INSTDIR\install-log.txt"
-  StrCpy $R1 "$INSTDIR\py-version.txt"
-  Delete "$R0"
-  Delete "$R1"
-
   DetailPrint "Locating Python 3.12+ ..."
   
   ; Try direct path first - check if Python 3.13 exists in common location
@@ -263,29 +256,27 @@ SectionEnd
 ; -------------------------
 Section "Desktop Shortcut" SEC_DESKTOP
   CreateShortCut "$DESKTOP\MatchyPatchy.lnk" \
-    "$INSTDIR\venv\Scripts\pythonw.exe" \
-    "-m matchypatchy" \
+    "$INSTDIR\launch.bat" \
+    "" \
     "$INSTDIR\assets\graphics\desktop_icon.ico" \
     0 \
     SW_SHOWNORMAL \
     "" \
-    "$INSTDIR"  ; Working directory
+    "$INSTDIR"
 SectionEnd
 
 Section "Start Menu Shortcuts" SEC_STARTMENU
   CreateDirectory "$SMPROGRAMS\MatchyPatchy"
-  CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
-
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" \
-    "$INSTDIR\venv\Scripts\pythonw.exe" \
-    "-m matchypatchy" \
+    "$INSTDIR\launch.bat" \
+    "" \
     "$INSTDIR\assets\graphics\desktop_icon.ico" \
     0 \
     SW_SHOWNORMAL \
     "" \
-    "$INSTDIR"  ; Working directory
-
-  CreateShortCut "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0
+    "$INSTDIR"
+  
+  CreateShortCut "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
 SectionEnd
 
 ; Section descriptions (shown in component selection page)
@@ -307,12 +298,9 @@ Section "Uninstall"
   RMDir "$SMPROGRAMS\MatchyPatchy"
 
   ; Remove files
-  Delete "$INSTDIR\launcher.vbs"
+  Delete "$INSTDIR\launch.bat"
   Delete "$INSTDIR\win_py312_cpu_requirements.txt"
   Delete "$INSTDIR\win_py313_cpu_requirements.txt"
-  Delete "$INSTDIR\install-log.txt"
-  Delete "$INSTDIR\py-version.txt"
-  Delete "$INSTDIR\runner.log"
   Delete "$INSTDIR\matchypatchy.log"
   
   ; Remove directories
