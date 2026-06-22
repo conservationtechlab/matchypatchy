@@ -56,7 +56,6 @@ FunctionEnd
 ; -------------------------
 Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SectionIn RO  ; This section is required (read-only, can't be unchecked)
-  AddSize 1450000
 
   ; Create install folder
   CreateDirectory "$INSTDIR"
