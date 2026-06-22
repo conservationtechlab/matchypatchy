@@ -10,8 +10,9 @@ bcrypt==5.0.0
 build==1.5.0
 certifi==2026.6.17
 charset-normalizer==3.4.7
-chromadb
+chromadb==1.5.9
 click==8.4.1
+colorama==0.4.6
 durationpy==0.10
 filelock==3.29.4
 flatbuffers==25.12.19
