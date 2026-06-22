@@ -211,6 +211,21 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     DetailPrint "Installing package requirements with GPU support..."
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-index --find-links "$R5" -r "$R6"'
     Pop $1
+    IntCmp $1 0 install_onnxruntime_gpu pip_install_failed pip_install_failed
+
+  install_onnxruntime_gpu:
+    DetailPrint "Replacing onnxruntime with onnxruntime-gpu..."
+    
+    ; Uninstall CPU version
+    DetailPrint "Uninstalling onnxruntime (CPU)..."
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime'
+    Pop $0
+    ; Ignore errors
+  
+    ; Install GPU version
+    DetailPrint "Installing onnxruntime-gpu..."
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-index --find-links "$R5" onnxruntime-gpu'
+    Pop $1
     IntCmp $1 0 install_mp pip_install_failed pip_install_failed
 
   pip_install_failed:
