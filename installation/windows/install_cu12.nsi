@@ -63,7 +63,8 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SetOutPath "$INSTDIR"
 
   ; Include pip requirements
-  File "requirements.txt"
+  File "win_py12_cu12_requirements.txt"
+  File "win_py13_cu12_requirements.txt"
   ; Include launcher
   File "launcher.vbs"
   File LICENSE
@@ -82,8 +83,14 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   CreateDirectory "$INSTDIR\assets"
   File /r "assets\*.*"
 
-  ; -------------------------------------------------------------
+  ; Include wheels
+  DetailPrint "Installing Python 3.12 wheels..."
+  SetOutPath "$INSTDIR\wheels"
+  CreateDirectory "$INSTDIR\wheels"
+  File /r "installation\windows\wheels\default\*.*"
+  File /r "installation\windows\wheels\cu12\*.*"
 
+  ; -------------------------------------------------------------
   ; --- Require Python >= 3.12 check ---
   ; $R0 = installer log (path)
   ; $R1 = temp file for numeric version
@@ -173,7 +180,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
 
   venv_ok:
     DetailPrint "Virtual environment created successfully."
-    Goto venv_done
+    Goto select_wheels
 
   venv_failed:
     ; Try ensurepip then retry venv creation (common on some constrained installs)
@@ -192,38 +199,22 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to create a Python virtual environment. Check the installer details for more information."
     Abort
 
-  venv_done:
-    ; Upgrade pip/setuptools/wheel in the venv (recommended)
-    DetailPrint "Upgrading pip/setuptools/wheel inside venv..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --upgrade pip setuptools wheel'
-    Pop $0
-    IntCmp $0 0 pip_ok pip_upgrade_failed pip_upgrade_failed
-
-  pip_ok:
-    DetailPrint "pip upgrade succeeded."
-    Goto install_requirements
-
-  pip_upgrade_failed:
-    ; If $0 != 0 we still continue to attempt installing requirements but warn the user
-    DetailPrint "Warning: pip upgrade returned exit code $0. Continuing..."
+  select_wheels:
+    ; Determine which wheels to use based on detected Python version
+    ${If} $PYVER_STR >= 31300
+      DetailPrint "Using Python 3.13 wheels..."
+      StrCpy $R5 "$INSTDIR\wheels"
+      ; StrCpy $R6 "$INSTDIR\win_py13_cu12_requirements.txt"
+    ${Else}
+      DetailPrint "Using Python 3.12 wheels..."
+      StrCpy $R5 "$INSTDIR\wheels"
+      StrCpy $R6 "$INSTDIR\win_py12_cu12_requirements.txt"
+    ${EndIf}
+  Goto install_requirements
 
   install_requirements:
     DetailPrint "Installing package requirements with GPU support..."
-    ; First install base requirements
-    DetailPrint "Installing NVIDIA CUDA runtime libraries..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12'
-    Pop $1
-    IntCmp $1 0 0 pip_install_failed pip_install_failed
-    
-    ; Then install dependencies
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\requirements.txt"'
-    Pop $1
-    IntCmp $1 0 pip_success pip_install_failed pip_install_failed
-
-  pip_success:
-    ; uninstall onnxruntime
-    DetailPrint "Uninstall onnxruntime..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime'
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-index --find-links "$R5" -r "$R6"'
     Pop $1
     IntCmp $1 0 PipDone pip_install_failed pip_install_failed
 

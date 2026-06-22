@@ -82,6 +82,12 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   CreateDirectory "$INSTDIR\assets"
   File /r "assets\*.*"
 
+  ; Include wheels
+  DetailPrint "Installing Python 3.12 wheels..."
+  SetOutPath "$INSTDIR\wheels"
+  CreateDirectory "$INSTDIR\wheels"
+  File /r "installation\windows\wheels\default\*.*"
+
   ; -------------------------------------------------------------
   ; --- Require Python >= 3.12 check ---
   ; $R0 = installer log (path)
@@ -172,7 +178,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
 
   venv_ok:
     DetailPrint "Virtual environment created successfully."
-    Goto venv_done
+    Goto select_wheels
 
   venv_failed:
     ; Try ensurepip then retry venv creation (common on some constrained installs)
@@ -191,20 +197,18 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to create a Python virtual environment. Check the installer details for more information."
     Abort
 
-  venv_done:
-    ; Upgrade pip/setuptools/wheel in the venv (recommended)
-    DetailPrint "Upgrading pip/setuptools/wheel inside venv..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --upgrade pip setuptools wheel'
-    Pop $0
-    IntCmp $0 0 pip_ok pip_upgrade_failed pip_upgrade_failed
-
-  pip_ok:
-    DetailPrint "pip upgrade succeeded."
-    Goto install_requirements
-
-  pip_upgrade_failed:
-    ; If $0 != 0 we still continue to attempt installing requirements but warn the user
-    DetailPrint "Warning: pip upgrade returned exit code $0. Continuing..."
+  select_wheels:
+    ; Determine which wheels to use based on detected Python version
+    ${If} $PYVER_STR >= 31300
+      DetailPrint "Using Python 3.13 wheels..."
+      StrCpy $R5 "$INSTDIR\wheels"
+      ; StrCpy $R6 "$INSTDIR\win_py13_cpu_requirements.txt"
+    ${Else}
+      DetailPrint "Using Python 3.12 wheels..."
+      StrCpy $R5 "$INSTDIR\wheels"
+      StrCpy $R6 "$INSTDIR\win_py12_cpu_requirements.txt"
+    ${EndIf}
+  Goto install_requirements
 
   install_requirements:
     DetailPrint "Installing package requirements (CPU version)..."
