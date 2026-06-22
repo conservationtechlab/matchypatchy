@@ -62,13 +62,10 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
-  ; Include pip requirements
-  File "requirements.txt"
-  ; Include launcher
-  File "launcher.vbs"
-  File LICENSE
-  File README.md
-  File ABOUT.md
+  ; Include pip requirements and launcher
+  File "installation\windows\win_py12_cu12_requirements.txt"
+  File "installation\windows\win_py13_cu12_requirements.txt"
+  File "installation\windows\launcher.vbs"
 
   ; Recursively include and extract the 'matchypatchy' package directory
   DetailPrint "Installing matchypatchy files..."
