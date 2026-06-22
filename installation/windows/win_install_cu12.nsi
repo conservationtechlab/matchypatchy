@@ -212,13 +212,13 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     DetailPrint "Installing package requirements with GPU support..."
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-index --find-links "$R5" -r "$R6"'
     Pop $1
-    IntCmp $1 0 PipDone pip_install_failed pip_install_failed
+    IntCmp $1 0 install_mp pip_install_failed pip_install_failed
 
   pip_install_failed:
     MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install Python requirements (exit code $1). Check the installer details for more information."
     Abort
 
-  PipDone:
+  install_mp:
     ; continue with install of matchypatchy
     DetailPrint "Requirements installed successfully."
     DetailPrint "Installing packaged project from $INSTDIR\matchypatchy (log: $R0)..."
@@ -226,24 +226,17 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     ; Recommended for production: non-editable installation from directory (builds a wheel)
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-deps -e "$INSTDIR\\matchypatchy"'
     Pop $0
-    IntCmp $0 0 install_local_ok install_local_failed install_local_failed
+    IntCmp $0 0 install_mp_ok install_mp_failed install_mp_failed
 
-    install_local_ok:
-      DetailPrint "Local package installed successfully."
+  install_mp_ok:
+      DetailPrint "MatchyPatchy package installed successfully."
       Goto local_done
 
-    install_local_failed:
-      ; Optionally try an editable install (useful during development)
-      DetailPrint "Install from directory failed (exit $0). Attempting editable install (-e) as fallback..."
-      nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-deps -e "$INSTDIR\\matchypatchy"'
-      Pop $1
-      IntCmp $1 0 install_local_ok install_local_final_failed install_local_final_failed
-
-    install_local_final_failed:
-      MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install the packaged project from $INSTDIR\\matchypatchy (see $R0 for pip output). The installer will abort."
+  install_mp_failed:
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install from $INSTDIR\\matchypatchy (see $R0 for pip output). The installer will abort."
       Abort
 
-    local_done:
+  local_done:
       ; (continue)
       StrCpy $R2 "" ; clear helper var
 
