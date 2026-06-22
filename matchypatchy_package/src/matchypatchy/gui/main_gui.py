@@ -29,9 +29,10 @@ from matchypatchy.database.media import export_data
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, mpDB):
+    def __init__(self, mpDB, logger):
         super().__init__()
         self.mpDB = mpDB
+        self.logger = logger
         self.setWindowTitle("MatchyPatchy")
         screen_resolution = QGuiApplication.primaryScreen().availableGeometry()
         minimum_height = 700

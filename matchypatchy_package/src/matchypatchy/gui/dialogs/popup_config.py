@@ -14,7 +14,7 @@ import animl
 from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
-from matchypatchy.threads.model_dowload_thread import get_path, is_valid_reid_model
+from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
 
 
 class ConfigPopup(QDialog):

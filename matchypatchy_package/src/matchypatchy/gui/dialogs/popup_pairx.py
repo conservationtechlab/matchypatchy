@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QDialogButtonBox,
 from PyQt6.QtCore import Qt
 
 #from matchypatchy.algo.reid_thread import PairXThread
-from matchypatchy.threads import model_dowload_thread
+from matchypatchy.threads.model_download_thread import get_path
 from matchypatchy.gui.widgets.widget_media import ImageWidget
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy import config
@@ -64,7 +64,7 @@ class PairXPopup(QDialog):
         #self.pairx_thread.start()
 
     def load_model(self):
-        self.reid_filepath = model_dowload_thread.get_path(Path(config.load_cfg('ML_DIR')), config.load_cfg('REID_KEY'))
+        self.reid_filepath = get_path(Path(config.load_cfg('ML_DIR')), config.load_cfg('REID_KEY'))
         if self.reid_filepath:
             self.model = animl.load_miew(self.reid_filepath)
             return True

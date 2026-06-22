@@ -15,9 +15,10 @@ from matchypatchy.database.location import TZ_CONVERT_DICT
 
 
 class MatchyPatchyDB():
-    def __init__(self, DB_PATH):
+    def __init__(self, DB_PATH, logger):
         self.filepath = Path(DB_PATH) / 'matchypatchy.db'
         self.chroma_filepath = Path(DB_PATH) / 'emb.db'
+        self.logger = logger
         if self.filepath.is_file() and self.chroma_filepath.is_dir():
             self.key = self.validate()
         else:

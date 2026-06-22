@@ -2,7 +2,7 @@ from matchypatchy.threads import animl_thread
 from matchypatchy.threads import import_thread
 from matchypatchy.threads import match_object
 from matchypatchy.threads import match_thread
-from matchypatchy.threads import model_dowload_thread
+from matchypatchy.threads import model_download_thread
 from matchypatchy.threads import reid_thread
 from matchypatchy.threads import sequence_thread
 from matchypatchy.threads import table_thread
@@ -14,7 +14,7 @@ from matchypatchy.threads.import_thread import (CSVImportThread,
                                                 FolderImportThread,)
 from matchypatchy.threads.match_object import (MatchObject,)
 from matchypatchy.threads.match_thread import (MatchEmbeddingThread,)
-from matchypatchy.threads.model_dowload_thread import (DownloadMLThread,
+from matchypatchy.threads.model_download_thread import (DownloadMLThread,
                                                        delete, download_one,
                                                        get_path,
                                                        is_valid_reid_model,
@@ -31,5 +31,5 @@ __all__ = ['AnimlThread', 'BuildManifestThread', 'CSVImportThread',
            'MatchObject', 'ReIDThread', 'SequenceThread', 'animl_thread',
            'delete', 'download_one', 'get_path', 'import_thread',
            'is_valid_reid_model', 'load_model', 'match_object', 'match_thread',
-           'model_dowload_thread', 'reid_thread', 'sequence_thread',
+           'model_download_thread', 'reid_thread', 'sequence_thread',
            'table_thread', 'update_model_yml']

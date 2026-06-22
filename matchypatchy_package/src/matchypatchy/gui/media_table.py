@@ -8,7 +8,7 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.database.media import fetch_individual
-from matchypatchy.threads.model_dowload_thread import load_model
+from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.config import load_cfg
 from matchypatchy.threads.table_thread import FetchTableThread, LoadTableThread
 

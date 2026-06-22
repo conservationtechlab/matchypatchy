@@ -11,7 +11,7 @@ from matchypatchy.gui.widgets.widget_media import MediaWidget
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator
 
-from matchypatchy.threads.model_dowload_thread import load_model
+from matchypatchy.threads.model_download_thread import load_model
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
 
