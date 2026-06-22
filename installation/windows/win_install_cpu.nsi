@@ -62,8 +62,8 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SetOutPath "$INSTDIR"
 
   ; Include pip requirements and launcher
-  File "installation\windows\win_py312_cu12_requirements.txt"
-  File "installation\windows\win_py313_cu12_requirements.txt"
+  File "installation\windows\win_py312_cpu_requirements.txt"
+  File "installation\windows\win_py313_cpu_requirements.txt"
   File "installation\windows\launcher.vbs"
 
   ; Recursively include and extract the 'matchypatchy' package directory
