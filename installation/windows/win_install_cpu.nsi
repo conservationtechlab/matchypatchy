@@ -198,11 +198,11 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     ${If} $PYVER_STR >= 31300
       DetailPrint "Using Python 3.13 wheels..."
       StrCpy $R5 "$INSTDIR\wheels"
-      StrCpy $R6 "$INSTDIR\win_py13_cpu_requirements.txt"
+      StrCpy $R6 "$INSTDIR\win_py313_cpu_requirements.txt"
     ${Else}
       DetailPrint "Using Python 3.12 wheels..."
       StrCpy $R5 "$INSTDIR\wheels"
-      StrCpy $R6 "$INSTDIR\win_py12_cpu_requirements.txt"
+      StrCpy $R6 "$INSTDIR\win_py312_cpu_requirements.txt"
     ${EndIf}
   Goto install_requirements
 
