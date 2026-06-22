@@ -262,12 +262,29 @@ SectionEnd
 ; Optional Components
 ; -------------------------
 Section "Desktop Shortcut" SEC_DESKTOP
-  CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+  CreateShortCut "$DESKTOP\MatchyPatchy.lnk" \
+    "$INSTDIR\venv\Scripts\pythonw.exe" \
+    "-m matchypatchy" \
+    "$INSTDIR\assets\graphics\desktop_icon.ico" \
+    0 \
+    SW_SHOWNORMAL \
+    "" \
+    "$INSTDIR"  ; Working directory
 SectionEnd
 
 Section "Start Menu Shortcuts" SEC_STARTMENU
   CreateDirectory "$SMPROGRAMS\MatchyPatchy"
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+
+  CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" \
+    "$INSTDIR\venv\Scripts\pythonw.exe" \
+    "-m matchypatchy" \
+    "$INSTDIR\assets\graphics\desktop_icon.ico" \
+    0 \
+    SW_SHOWNORMAL \
+    "" \
+    "$INSTDIR"  ; Working directory
+
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0
 SectionEnd
 
@@ -295,7 +312,8 @@ Section "Uninstall"
   Delete "$INSTDIR\win_py313_cpu_requirements.txt"
   Delete "$INSTDIR\install-log.txt"
   Delete "$INSTDIR\py-version.txt"
-  Delete "$INSTDIR\launcher.log"
+  Delete "$INSTDIR\runner.log"
+  Delete "$INSTDIR\matchypatchy.log"
   
   ; Remove directories
   RMDir /r "$INSTDIR\venv"

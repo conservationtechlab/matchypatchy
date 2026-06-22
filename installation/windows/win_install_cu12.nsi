@@ -278,14 +278,32 @@ SectionEnd
 ; Optional Components
 ; -------------------------
 Section "Desktop Shortcut" SEC_DESKTOP
-  CreateShortCut "$DESKTOP\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+  CreateShortCut "$DESKTOP\MatchyPatchy.lnk" \
+    "$INSTDIR\venv\Scripts\pythonw.exe" \
+    "-m matchypatchy" \
+    "$INSTDIR\assets\graphics\desktop_icon.ico" \
+    0 \
+    SW_SHOWNORMAL \
+    "" \
+    "$INSTDIR"  ; Working directory
 SectionEnd
 
 Section "Start Menu Shortcuts" SEC_STARTMENU
   CreateDirectory "$SMPROGRAMS\MatchyPatchy"
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" "$INSTDIR\launcher.vbs" "" "$INSTDIR\assets\graphics\desktop_icon.ico" 0
+
+  CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" \
+    "$INSTDIR\venv\Scripts\pythonw.exe" \
+    "-m matchypatchy" \
+    "$INSTDIR\assets\graphics\desktop_icon.ico" \
+    0 \
+    SW_SHOWNORMAL \
+    "" \
+    "$INSTDIR"  ; Working directory
+
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk" "$INSTDIR\Uninstall.exe" "" "$INSTDIR\Uninstall.exe" 0
 SectionEnd
+
 
 ; Section descriptions (shown in component selection page)
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
