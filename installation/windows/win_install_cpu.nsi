@@ -207,7 +207,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   Goto install_requirements
 
   install_requirements:
-    DetailPrint "Installing package requirements with GPU support..."
+    DetailPrint "Installing package requirements..."
     nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-index --find-links "$R5" -r "$R6"'
     Pop $1
     IntCmp $1 0 install_mp pip_install_failed pip_install_failed
@@ -291,19 +291,16 @@ Section "Uninstall"
 
   ; Remove files
   Delete "$INSTDIR\launcher.vbs"
-  Delete "$INSTDIR\requirements.txt"
-  Delete "$INSTDIR\LICENSE"
-  Delete "$INSTDIR\README.md"
-  Delete "$INSTDIR\ABOUT.md"
+  Delete "$INSTDIR\win_py312_cpu_requirements.txt"
+  Delete "$INSTDIR\win_py313_cpu_requirements.txt"
   Delete "$INSTDIR\install-log.txt"
   Delete "$INSTDIR\py-version.txt"
-  Delete "$INSTDIR\installer-path.txt"
-  Delete "$INSTDIR\where-nvidia.txt"
   Delete "$INSTDIR\launcher.log"
   
   ; Remove directories
   RMDir /r "$INSTDIR\venv"
   RMDir /r "$INSTDIR\assets"
+  RMDir /r "$INSTDIR\wheels"
   RMDir /r "$INSTDIR\matchypatchy"
 
   Delete "$INSTDIR\Uninstall.exe"
