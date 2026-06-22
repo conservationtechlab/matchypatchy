@@ -1,2 +1,0 @@
-onnxruntime-gpu used for all cpu/CUDA
-cpu version does not install cuda or cudnn

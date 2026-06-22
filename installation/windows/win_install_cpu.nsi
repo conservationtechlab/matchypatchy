@@ -64,7 +64,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   ; Include pip requirements and launcher
   File "installation\windows\win_py312_cpu_requirements.txt"
   File "installation\windows\win_py313_cpu_requirements.txt"
-  File "installation\windows\launch.bat"
+  File "installation\windows\launcher.vbs"
 
   ; Recursively include and extract the 'matchypatchy' package directory
   DetailPrint "Installing matchypatchy files..."
@@ -256,7 +256,7 @@ SectionEnd
 ; -------------------------
 Section "Desktop Shortcut" SEC_DESKTOP
   CreateShortCut "$DESKTOP\MatchyPatchy.lnk" \
-    "$INSTDIR\launch.bat" \
+    "$INSTDIR\launcher.vbs" \
     "" \
     "$INSTDIR\assets\graphics\desktop_icon.ico" \
     0 \
@@ -268,7 +268,7 @@ SectionEnd
 Section "Start Menu Shortcuts" SEC_STARTMENU
   CreateDirectory "$SMPROGRAMS\MatchyPatchy"
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" \
-    "$INSTDIR\launch.bat" \
+    "$INSTDIR\launcher.vbs" \
     "" \
     "$INSTDIR\assets\graphics\desktop_icon.ico" \
     0 \
@@ -298,10 +298,11 @@ Section "Uninstall"
   RMDir "$SMPROGRAMS\MatchyPatchy"
 
   ; Remove files
-  Delete "$INSTDIR\launch.bat"
+  Delete "$INSTDIR\launcher.vbs"
   Delete "$INSTDIR\win_py312_cpu_requirements.txt"
   Delete "$INSTDIR\win_py313_cpu_requirements.txt"
   Delete "$INSTDIR\matchypatchy.log"
+  Delete "$INSTDIR\launcher.log"
   
   ; Remove directories
   RMDir /r "$INSTDIR\venv"

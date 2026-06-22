@@ -1,7 +1,7 @@
 Option Explicit
-' runner.vbs - robust launcher for venv/pythonw
-' Sets CWD to the install folder and launches main.py with pythonw (or python/pyw fallback).
-' Writes errors to runner.log and shows a message box if launch fails.
+' launcher.vbs - robust launcher for venv/pythonw
+' Sets CWD to the install folder and launches __main__.py with pythonw (or python/pyw fallback).
+' Writes errors to launcher.log and shows a message box if launch fails.
 
 Dim fso, wsh, scriptPath, scriptDir, pythonwPath, pythonPath, cmd, logPath
 Set fso = CreateObject("Scripting.FileSystemObject")
@@ -9,21 +9,24 @@ Set wsh = CreateObject("WScript.Shell")
 
 scriptPath = WScript.ScriptFullName
 scriptDir = fso.GetParentFolderName(scriptPath)
-logPath = scriptDir & "\runner.log"
+logPath = scriptDir & "\launcher.log"
+
+' Set working directory to install folder
+wsh.CurrentDirectory = scriptDir
 
 ' Build candidate python executables
 pythonwPath = scriptDir & "\venv\Scripts\pythonw.exe"
 pythonPath  = scriptDir & "\venv\Scripts\python.exe"
 
-' Prepare command to run main.py
+' Prepare command to run __main__.py
 If fso.FileExists(pythonwPath) Then
-  cmd = """" & pythonwPath & """ """ & scriptDir & "\matchypatchy\src\matchypatchy\__main__.py" & """"
+  cmd = """" & pythonwPath & """ -m matchypatchy"
 ElseIf fso.FileExists(pythonPath) Then
   ' fallback to python (will show a console if used)
-  cmd = """" & pythonPath & """ """ & scriptDir & "\matchypatchy\src\matchypatchy\__main__.py" & """"
+  cmd = """" & pythonPath & """ -m matchypatchy"
 Else
-  ' final fallback: try Python launcher on PATH (pyw for GUI, py if you want console)
-  cmd = "pyw -3 """ & scriptDir & "\matchypatchy\src\matchypatchy\__main__.py" & """"
+  ' final fallback: try Python launcher on PATH
+  cmd = "pyw -3 -m matchypatchy"
 End If
 
 ' Attempt to run the command hidden (0 = hidden window). Do not wait for it to finish (False).
@@ -39,7 +42,7 @@ If Err.Number <> 0 Then
   ' Show error to user
   MsgBox errMsg, vbExclamation, "Launcher error"
 
-  ' Append error to runner.log for diagnostics
+  ' Append error to launcher.log for diagnostics
   On Error Resume Next
   Set tf = fso.OpenTextFile(logPath, 8, True) ' 8 = ForAppending
   If Err.Number = 0 Then
@@ -50,7 +53,7 @@ If Err.Number <> 0 Then
   WScript.Quit 1
 End If
 
-' Optionally write a small "launched" entry to the log so you can confirm run attempts
+' Optionally write a small "launched" entry to the log
 On Error Resume Next
 Set tf = fso.OpenTextFile(logPath, 8, True)
 If Err.Number = 0 Then
