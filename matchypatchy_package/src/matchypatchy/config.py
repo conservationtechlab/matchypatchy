@@ -72,10 +72,6 @@ def initiate():
     Path(cfg['ML_DIR']).mkdir(exist_ok=True)
     Path(cfg['THUMBNAIL_DIR']).mkdir(exist_ok=True)
 
-    # LOG CONFIG
-    logging.basicConfig(filename=cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
-    logging.info('HOME_DIR: ' + str(HOME_DIR))
-
     return cfg
 
 
