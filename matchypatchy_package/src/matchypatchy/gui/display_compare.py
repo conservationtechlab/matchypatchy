@@ -35,6 +35,7 @@ class DisplayCompare(QWidget):
         super().__init__()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.parent = parent
+        self.logger = parent.logger
         self.mpDB = parent.mpDB
         self.k = load_cfg('KNN')  # default knn
         self.distance_metric = 'cosine'

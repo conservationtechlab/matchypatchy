@@ -18,6 +18,7 @@ class DisplayMedia(QWidget):
     def __init__(self, parent, data_type=1):
         super().__init__()
         self.parent = parent
+        self.logger = parent.logger
         self.mpDB = parent.mpDB
         # 0 for Media, 1 for ROI
         self.data_type = data_type

@@ -1,15 +1,14 @@
 '''
 Popup to add or edit config settings
 '''
+import animl
 import os
-import logging
 from pathlib import Path
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
-import animl
 
 from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
@@ -25,6 +24,7 @@ class ConfigPopup(QDialog):
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
         self.mpDB = parent.mpDB
+        self.logger = parent.logger
         self.cfg = config.load_cfg()
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
         self.column1_width = 120
@@ -196,9 +196,8 @@ class ConfigPopup(QDialog):
 
                 # Update config
                 self.cfg['LOG_PATH'] = new_project + "/matchypatchy.log"
-                logging.basicConfig(filename=self.cfg['LOG_PATH'], encoding='utf-8', level=logging.DEBUG, force=True)
-                logging.info("HOME_DIR CHANGED")
-                logging.info('HOME_DIR: ' + str(HOME_DIR))
+                self.logger.info("HOME_DIR CHANGED")
+                self.logger.info('HOME_DIR: ' + str(HOME_DIR))
 
                 # Check or create ML, Thumbnail and Frame folders
                 new_ml = Path(new_project) / "Models"
@@ -219,6 +218,7 @@ class ConfigPopup(QDialog):
                 dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
                 if dialog.exec():
                     del dialog
+                self.logger.warning(f"Database at {new_db} is invalid. User prompted to select another path or delete.")
 
     def set_visualizer_model(self):
         """

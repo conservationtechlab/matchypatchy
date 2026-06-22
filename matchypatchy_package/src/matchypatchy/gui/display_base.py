@@ -7,7 +7,6 @@ Also contains database management options for
 surveys, stations, individuals, and downloading ML models
 """
 import os
-import logging
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
@@ -36,6 +35,7 @@ class DisplayBase(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.logger = parent.logger
         self.mpDB = parent.mpDB
         padding = 120
 
@@ -217,7 +217,7 @@ class DisplayBase(QWidget):
                                                    os.path.expanduser('~'),
                                                    ("CSV Files (*.csv)"))[0]
             if manifest:
-                logging.info(f"Importing from manifest: {manifest}")
+                self.logger.info(f"Importing from manifest: {manifest}")
                 dialog = ImportCSVPopup(self, manifest)
                 if dialog.exec():
                     del dialog
@@ -237,7 +237,7 @@ class DisplayBase(QWidget):
                                                          QFileDialog.Option.ShowDirsOnly)
             if directory:
                 dialog = ImportFolderPopup(self, directory)
-                logging.info(f"Importing from directory: {directory}")
+                self.logger.info(f"Importing from directory: {directory}")
                 if dialog.exec() == QDialog.DialogCode.Rejected:
                     self.import_folder()
                 del dialog
@@ -325,7 +325,7 @@ class DisplayBase(QWidget):
 
                 with open(file_path, 'w') as file:
                     data.to_csv(file)
-                logging.info(f"Data exported to: {file_path}")
+                self.logger.info(f"Data exported to: {file_path}")
         else:
             dialog = AlertPopup(self, prompt="No data to export.")
             if dialog.exec():
@@ -342,7 +342,7 @@ class DisplayBase(QWidget):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
         if dialog.exec():
             self.mpDB.info()
-            logging.warning("DELETING DATA")
+            self.logger.warning("DELETING DATA")
             self.mpDB.clear("media")
             self.mpDB.clear("media_thumbnails")
             self.mpDB.clear("roi")

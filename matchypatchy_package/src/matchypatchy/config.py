@@ -5,11 +5,9 @@ Functions for Handling Config Yaml
 import os
 import sys
 from pathlib import Path
-import logging
 import yaml
 
 HOME_DIR = Path.cwd() / "MatchyPatchy-Share"
-
 
 def resource_path(relative_path):
     """ Get path to resource whether running in dev or PyInstaller bundle """
@@ -42,7 +40,6 @@ def initiate():
         'SEQUENCE_DURATION': 60,
         'SEQUENCE_N': 3,
     }
-    print("HOME_DIR: " + str(HOME_DIR))
 
     CONFIG_PATH = HOME_DIR / '.config.yml'
     if CONFIG_PATH.exists():

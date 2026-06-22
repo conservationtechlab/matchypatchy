@@ -3,8 +3,6 @@ QThreads for Importing Data
 
 """
 from pathlib import Path
-import logging
-
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.config import load_cfg
@@ -14,9 +12,10 @@ from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thum
 class CSVImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, unique_images, selected_columns):
+    def __init__(self, mpDB, unique_images, selected_columns, logger):
         super().__init__()
         self.mpDB = mpDB
+        self.logger = logger
         self.unique_images = unique_images
         self.selected_columns = selected_columns
         self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
@@ -28,7 +27,7 @@ class CSVImportThread(QThread):
             if not self.isInterruptionRequested():
                 # check to see if file exists
                 if not Path(filepath).exists():
-                    logging.warning(f"File {filepath} does not exist, skipping import...")
+                    self.logger.warning(f"File {filepath} does not exist, skipping import...")
                     continue
 
                 # get file extension
@@ -170,9 +169,10 @@ class CSVImportThread(QThread):
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, active_survey, data, station_level, camera_level):
+    def __init__(self, mpDB, active_survey, data, station_level, camera_level, logger):
         super().__init__()
         self.mpDB = mpDB
+        self.logger = logger
         self.active_survey = active_survey
         self.data = data
         self.station_level = station_level
@@ -189,7 +189,7 @@ class FolderImportThread(QThread):
 
                 # check to see if file exists
                 if not Path(filepath).exists():
-                    logging.warning(f"File {filepath} does not exist")
+                    self.logger.warning(f"File {filepath} does not exist")
                     continue
 
                 # get file extension

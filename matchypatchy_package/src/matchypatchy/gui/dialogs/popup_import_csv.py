@@ -1,7 +1,6 @@
 """
 Popup for Importing a Manifest
 """
-import logging
 import pandas as pd
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
@@ -16,6 +15,7 @@ class ImportCSVPopup(QDialog):
     def __init__(self, parent, manifest):
         super().__init__(parent)
         self.mpDB = parent.mpDB
+        self.logger = parent.logger
         self.data = pd.read_csv(manifest)
         self.columns = ["None"] + list(self.data.columns)
         self.survey_columns = [str(parent.active_survey[1])] + list(self.data.columns)
@@ -298,9 +298,9 @@ class ImportCSVPopup(QDialog):
         unique_images = self.data.groupby(selected_columns["filepath"])
 
         print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
-        logging.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
+        self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
 
-        self.import_thread = CSVImportThread(self.mpDB, unique_images, selected_columns)
+        self.import_thread = CSVImportThread(self.mpDB, unique_images, selected_columns, self.logger)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.close)
         self.import_thread.start()

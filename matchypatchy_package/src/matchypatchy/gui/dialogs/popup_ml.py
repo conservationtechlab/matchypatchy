@@ -2,7 +2,7 @@
 Popup for selecting and downloading ML models
 
 """
-import logging
+
 
 from pathlib import Path
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
@@ -19,9 +19,10 @@ class MLDownloadPopup(QDialog):
     """
     def __init__(self, parent):
         super().__init__(parent)
+        self.logger = parent.logger
         # update model yml
         update_confirmed = model_download_thread.update_model_yml()
-        logging.info(f"Model yaml update attempt: {update_confirmed}")
+        self.logger.info(f"Model yaml update attempt: {update_confirmed}")
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
         self.ml_cfg = model_download_thread.load_model()
         self.models = self.ml_cfg['MODELS']

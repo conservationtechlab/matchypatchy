@@ -8,7 +8,6 @@ Display Pages:
     1. DisplayMedia
     2. DisplayCompare
 """
-import logging
 from typing import Optional
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog,
@@ -44,6 +43,7 @@ class MainWindow(QMainWindow):
             
         self.resize(preferred_width, preferred_height)
 
+        # TODO: find best default size based on screen resolution and available space
         print(self.size())
 
         # Create Menu Bar
@@ -163,7 +163,7 @@ class MainWindow(QMainWindow):
 
                 with open(file_path, 'w') as file:
                     data.to_csv(file)
-                logging.info(f"Data exported to: {file_path}")
+                self.logger.info(f"Data exported to: {file_path}")
         else:
             dialog = AlertPopup(self, prompt="No data to export.")
             if dialog.exec():

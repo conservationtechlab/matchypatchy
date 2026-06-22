@@ -1,7 +1,6 @@
 """
 Set Up matchypatchy Database
 """
-import logging
 import sqlite3
 import chromadb
 from datetime import datetime
@@ -109,7 +108,6 @@ def setup_database(key, filepath):
 
     # Commit changes and close connection
     db.commit()
-    logging.info('Database initiated.')
     db.close()
     return True
 
