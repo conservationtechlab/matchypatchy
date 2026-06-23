@@ -39,6 +39,8 @@ mmh3==5.2.1
 mpmath==1.3.0
 multidict==6.7.1
 numpy==2.5.0
+nvidia-cublas-cu12 
+nvidia-cuda-nvrtc-cu12
 nvidia-cuda-runtime-cu12
 nvidia-cudnn-cu12
 oauthlib==3.3.1

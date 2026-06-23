@@ -38,6 +38,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "platform", 
+        default="win_amd64",
         help="The platform for which to download wheels (e.g., win_amd64, manylinux_2_28_x86_64, macosx_10_15_x86_64)."
     )
 
