@@ -1,13 +1,27 @@
 """
 Functions for Manipulating and Processing ROIs
 """
+import hashlib
 import pandas as pd
+from pathlib import Path
 
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
 COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
            "comment", "viewpoint", "individual_id"]
+
+
+def get_sha256(path: str | Path, 
+                chunk_size: int = 1024 * 1024) -> str:
+    """
+    Calculate the SHA256 hash of a file in chunks and return the hexadecimal to avoid adding duplicate files
+    """
+    h = hashlib.sha256()
+    with Path(path).open("rb") as f:
+        while chunk := f.read(chunk_size):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def fetch_media(mpDB, ids=None):
@@ -21,7 +35,7 @@ def fetch_media(mpDB, ids=None):
         media = mpDB.select("media")
 
     if media:
-        media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp",
+        media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
                                              'station_id', "camera_id", 'sequence_id',
                                              "external_id", 'comment'])
         media = media.replace({float('nan'): None})
@@ -50,7 +64,7 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     Fetch Combined Roi and Media Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-                'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
+                'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                 'comment', 'name', 'sex', 'age']
     """
     if rids:
@@ -81,7 +95,7 @@ def export_data(mpDB):
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-               'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
+               'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                'comment', 'name', 'sex', 'age',
                 'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
     """

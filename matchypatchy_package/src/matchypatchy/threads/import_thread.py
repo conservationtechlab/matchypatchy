@@ -7,6 +7,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.config import load_cfg
 from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail
+from matchypatchy.database.media import get_sha256
 
 
 class CSVImportThread(QThread):
@@ -47,8 +48,11 @@ class CSVImportThread(QThread):
                 external_id = int(exemplar[self.selected_columns["external_id"]].item()) if self.selected_columns["external_id"] != "None" else None
                 comment = exemplar[self.selected_columns["comment"]].item() if self.selected_columns["comment"] != "None" else None
 
+                hash = get_sha256(filepath)  # Calculate the SHA256 hash of the file
+
                 # insert into table
                 media_id = self.mpDB.add_media(filepath,
+                                               hash,
                                                ext,
                                                timestamp,
                                                station_id=station_id,
@@ -211,8 +215,11 @@ class FolderImportThread(QThread):
                         self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
                     station_id = self.default_station
 
+                hash = get_sha256(filepath)  # Calculate the SHA256 hash of the file
+
                 # insert into table, force type
                 media_id = self.mpDB.add_media(filepath,
+                                               hash,
                                                ext,
                                                str(timestamp),
                                                int(station_id),
