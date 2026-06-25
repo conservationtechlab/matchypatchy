@@ -244,6 +244,7 @@ class MatchyPatchyDB():
 
     def add_media(self,
                   filepath: str,
+                  sha256: str,
                   ext: str,
                   timestamp: str,
                   station_id: int,
@@ -255,6 +256,7 @@ class MatchyPatchyDB():
         Media has 10 attributes not including id:
             id INTEGER PRIMARY KEY,
             filepath TEXT UNIQUE NOT NULL,
+            sha256 TEXT UNIQUE NOT NULL,
             ext TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             station_id INTEGER NOT NULL,
@@ -267,10 +269,10 @@ class MatchyPatchyDB():
             db = sqlite3.connect(self.filepath)
             cursor = db.cursor()
             command = """INSERT INTO media
-                        (filepath, ext, timestamp, station_id,
+                        (filepath, sha256, ext, timestamp, station_id,
                         camera_id, sequence_id, external_id, comment)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, ext, timestamp, station_id,
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+            data_tuple = (filepath, sha256, ext, timestamp, station_id,
                           camera_id, sequence_id, external_id, comment)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
@@ -282,6 +284,12 @@ class MatchyPatchyDB():
         except sqlite3.IntegrityError as error:
             if 'UNIQUE constraint failed: media.filepath' in error.args[0]:
                 self.logger.error(f"Failed to add {filepath}, already exists in database.")
+                if db:
+                    db.close()
+                return "duplicate_error"
+            
+            if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
+                self.logger.error(f"Failed to add {filepath}, file is a duplicate.")
                 if db:
                     db.close()
                 return "duplicate_error"
