@@ -1,6 +1,6 @@
 [project]
 name = "matchypatchy"
-version = "0.1.1_dev"
+version = "0.1.2_dev"
 authors = [
   { name="Kyra Swanson", email="tswanson@sdzwa.org" },
 ]
