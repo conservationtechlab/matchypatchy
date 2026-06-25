@@ -1,0 +1,6 @@
+nvidia-cublas-cu12
+nvidia-cudnn-cu12
+nvidia-cuda-runtime-cu12
+nvidia-cuda-nvrtc-cu12
+onnxruntime-gpu==1.21.0
+
