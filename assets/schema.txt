@@ -33,6 +33,7 @@ TABLE: media
 CREATE TABLE media (
                         id INTEGER PRIMARY KEY,
                         filepath TEXT UNIQUE NOT NULL,
+                        sha256 TEXT UNIQUE NOT NULL,
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
@@ -44,6 +45,8 @@ CREATE TABLE media (
                         FOREIGN KEY (camera_id) REFERENCES camera (id),
                         FOREIGN KEY (sequence_id) REFERENCES sequence (id))
 INDEX: sqlite_autoindex_media_1
+None
+INDEX: sqlite_autoindex_media_2
 None
 TABLE: roi
 CREATE TABLE roi (
