@@ -54,6 +54,16 @@ class MLDownloadPopup(QDialog):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
 
+        # Warning Label (hidden at start)
+        self.warning_label = QLabel()
+        self.warning_label.hide()
+        layout.addWidget(self.warning_label)
+
+        # Create thread ONCE, keep it running
+        self.build_thread = model_download_thread.DownloadMLThread(self.ml_dir)
+        self.build_thread.finished_ok.connect(self.on_download_result)
+        self.build_thread.start()
+
         # check already downloaded models
         self.set_checkboxes()
 
@@ -84,10 +94,12 @@ class MLDownloadPopup(QDialog):
             checkbox = self.checkbox_layout.itemAtPosition(i, 0).widget()
             if checkbox.isChecked():
                 all.add(m)
-        # see if any are newly checked
-        self.checked_models = all - set(self.available_models.keys())
-        if self.checked_models:
-            self.download_ml()
+        
+        # See if any are newly checked
+        newly_checked = all - set(self.available_models.keys())
+        
+        if newly_checked:
+            self.download_ml(newly_checked)
 
     def enable_close(self):
         """Enable the OK button to allow closing after download"""
@@ -99,20 +111,23 @@ class MLDownloadPopup(QDialog):
         ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
         ok_button.setEnabled(False)
 
-    def download_ml(self):
-        """Start download thread"""
+    def download_ml(self, checked_models: set):
+        """Queue models for download"""
         self.disable_close()
         self.progress_bar.setRange(0, 0)  # indefinite
         self.progress_bar.show()
-        self.build_thread = model_download_thread.DownloadMLThread(self.ml_dir, self.checked_models)
-        self.build_thread.finished.connect(self.progress_bar.hide)
-        self.build_thread.finished.connect(self.enable_close)
-        #self.build_thread.finished_ok.connect(self.on_download_result)
-        self.build_thread.start()
+        
+        # Queue each model (thread-safe)
+        for model_key in checked_models:
+            self.build_thread.queue_download(model_key)
 
-    def on_download_result(self, ok: bool, msg: str):
-        # show msg somewhere (status bar, dialog, etc.)
-        print(ok, msg)
+    def on_download_result(self, ok: bool, message: str):
+        """Handle download completion"""
+        self.progress_bar.hide()
+        self.enable_close()
+        if not ok:
+            self.warning_label.setText(message)
+            self.warning_label.show()
 
     def reject(self):
         # interrupt download if in progress, otherwise just close
