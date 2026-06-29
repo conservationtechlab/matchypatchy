@@ -5,7 +5,7 @@ import animl
 import os
 from pathlib import Path
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QComboBox,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
@@ -27,8 +27,8 @@ class ConfigPopup(QDialog):
         self.logger = parent.logger
         self.cfg = config.load_cfg()
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
-        self.column1_width = 120
-        self.edit_width = 80
+        self.column1_width = 150
+        self.edit_width = 150
 
         layout = QVBoxLayout()
         # Home Directory -------------------------------------------------------------
@@ -107,14 +107,19 @@ class ConfigPopup(QDialog):
 
         # CUDA -----------------------------------------------------------------
         cuda_layout = QHBoxLayout()
-        cuda_label = QLabel("CUDA Available:")
+        cuda_label = QLabel("Hardware Device:")
         cuda_label.setFixedWidth(self.column1_width)
         cuda_layout.addWidget(cuda_label)
         providers = animl.get_onnx_device()
-        cuda = True if "CUDAExecutionProvider" in providers else False
-        cuda_available = QLabel(f"{providers}")
-        cuda_available.setStyleSheet("color: green;" if cuda else "color: red;")
-        cuda_layout.addWidget(cuda_available, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.device = QComboBox()
+        self.device.setFixedWidth(self.edit_width)
+        self.device.addItem("CPU")
+        if "CUDAExecutionProvider" in providers:
+            self.device.addItem("CUDA-enabled GPU")
+            self.device.setCurrentIndex(1)
+        self.device.setToolTip("Select the hardware device for running models.")
+        self.device.currentTextChanged.connect(self.change_device)
+        cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(cuda_layout)
 
         # MPDB KEY -----------------------------------------------------------------
@@ -260,3 +265,13 @@ class ConfigPopup(QDialog):
                 config.update(self.cfg)
         except ValueError:
             pass
+
+    def change_device(self):
+        self.logger.info(f"Device changed to {self.device.currentText()}")
+        """Change hardware device for running models"""
+        selected_device = self.device.currentText()
+        if selected_device == "CPU":
+            self.cfg['DEVICE'] = "CPUExecutionProvider"
+        elif selected_device == "CUDA-enabled GPU":
+            self.cfg['DEVICE'] = "CUDAExecutionProvider"
+        config.update(self.cfg)
