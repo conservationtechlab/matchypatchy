@@ -470,7 +470,7 @@ class DisplayCompare(QWidget):
 
         self.match_n.setText("/ " + str(len(self.QueryContainer.current_match_rois)))
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
-        self.match_counter.setText(str(self.QueryContainer.current_match + 1) + "/ " + str(len(self.QueryContainer.current_match_rois)))
+        self.match_counter.setText(str(self.QueryContainer.current_match + 1) + " / " + str(len(self.QueryContainer.current_match_rois)))
 
         self.query_image_bar.reset()
         self.match_image_bar.reset()
@@ -489,6 +489,7 @@ class DisplayCompare(QWidget):
         self.QueryContainer.set_match(n)
         self.match_image_bar.reset()
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
+        self.match_counter.setText(str(self.QueryContainer.current_match + 1) + " / " + str(len(self.QueryContainer.current_match_rois)))
         self.load_match()
 
     def load_query(self):
@@ -714,6 +715,12 @@ class DisplayCompare(QWidget):
         # D - Next Query in Sequence
         elif key == 68:
             self.change_query_in_sequence(self.QueryContainer.current_query_sn + 1)
+        # W - Previous Query
+        elif key == 87:
+            self.change_query(self.QueryContainer.current_query - 1)
+        # S - Next Query
+        elif key == 83:
+            self.change_query(self.QueryContainer.current_query + 1)
 
         # Space - Match
         elif key == 32:

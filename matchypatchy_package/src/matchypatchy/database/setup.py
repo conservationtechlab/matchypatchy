@@ -47,6 +47,7 @@ def setup_database(key, filepath):
     cursor.execute('''CREATE TABLE IF NOT EXISTS media (
                         id INTEGER PRIMARY KEY,
                         filepath TEXT UNIQUE NOT NULL,
+                        sha256 TEXT UNIQUE NOT NULL,
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,

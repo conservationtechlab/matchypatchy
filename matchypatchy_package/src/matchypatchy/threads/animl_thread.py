@@ -50,7 +50,7 @@ class AnimlThread(QThread):
         # select media that do not have rois
         media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
                                  (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
-        self.media = pd.DataFrame(media, columns=["id", "filepath", "ext", "timestamp", "station_id", "camera_id",
+        self.media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp", "station_id", "camera_id",
                                                   "sequence_id", "external_id", "comment"])
         # select rois that do not have bbox
         rois = fetch_roi_media(mpDB, reset_index=False)

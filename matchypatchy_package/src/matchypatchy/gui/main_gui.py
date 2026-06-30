@@ -24,6 +24,7 @@ from matchypatchy.gui.dialogs.popup_readme import AboutPopup, READMEPopup, Licen
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
+from matchypatchy import __version__
 from matchypatchy.database.media import export_data
 
 
@@ -32,13 +33,13 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.mpDB = mpDB
         self.logger = logger
-        self.setWindowTitle("MatchyPatchy")
+        self.setWindowTitle(f"MatchyPatchy v{__version__}")
         screen_resolution = QGuiApplication.primaryScreen().availableGeometry()
-        minimum_height = 700
-        minimum_width = 1200
+        minimum_height = 768
+        minimum_width = 1366
         self.setMinimumSize(minimum_width, minimum_height)
         
-        preferred_width = min(int(screen_resolution.width() * 0.9), 1300) if screen_resolution.width() > minimum_width else minimum_width
+        preferred_width = min(int(screen_resolution.width() * 0.9), 1400) if screen_resolution.width() > minimum_width else minimum_width
         preferred_height = min(int(screen_resolution.height() * 0.9), 900) if screen_resolution.height() > minimum_height else minimum_height
             
         self.resize(preferred_width, preferred_height)
