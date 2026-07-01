@@ -12,8 +12,8 @@ Download MatchyPatchy v0.1.1 Installer:
 <table>
 <tr><td>OS</td><td>CPU ONLY</td><td>GPU</td></tr>
 <tr><td>Windows</td>
-    <td><a href="https://sandiegozoo.box.com/v/matchypatchy-011-win-cpu">[.exe]</a></td>
-    <td><a href="https://sandiegozoo.box.com/v/matchypatchy-011-win-gpu">[.exe]</a></td>
+    <td><a href="https://sandiegozoo.box.com/v/matchypatchy-012-win-cpu">[.exe]</a></td>
+    <td><a href="https://sandiegozoo.box.com/v/matchypatchy-012-win-gpu">[.exe]</a></td>
 </tr>
 <tr><td>MacOS</td><td>Coming soon</td></tr>
 <tr><td>Ubuntu</td><td>Coming soon</td></tr>
