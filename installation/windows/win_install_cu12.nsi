@@ -62,8 +62,8 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SetOutPath "$INSTDIR"
 
   ; Include pip requirements
-  File "installation\windows\win_py312_cu12_requirements.txt"
-  File "installation\windows\win_py313_cu12_requirements.txt"
+  File "installation\windows\win_py312_cpu_requirements.txt"
+  File "installation\windows\win_py313_cpu_requirements.txt"
   File "installation\windows\launcher.vbs"
   File "ABOUT.md"
   File "README.md"
@@ -195,11 +195,11 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     ${If} $PYVER_STR >= 31300
       DetailPrint "Using Python 3.13 wheels..."
       StrCpy $R5 "$INSTDIR\wheels"
-      StrCpy $R6 "$INSTDIR\win_py313_cu12_requirements.txt"
+      StrCpy $R6 "$INSTDIR\win_py313_cpu_requirements.txt"
     ${Else}
       DetailPrint "Using Python 3.12 wheels..."
       StrCpy $R5 "$INSTDIR\wheels"
-      StrCpy $R6 "$INSTDIR\win_py312_cu12_requirements.txt"
+      StrCpy $R6 "$INSTDIR\win_py312_cpu_requirements.txt"
     ${EndIf}
   Goto install_requirements
 
@@ -210,7 +210,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     IntCmp $1 0 install_onnxruntime_gpu pip_install_failed pip_install_failed
 
   install_onnxruntime_gpu:
-    DetailPrint "Replacing onnxruntime with onnxruntime-gpu..."
+    DetailPrint "Installing GPU requirements.."
     
     ; Uninstall CPU version
     DetailPrint "Uninstalling onnxruntime (CPU)..."
@@ -220,12 +220,12 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   
     ; Install GPU version
     DetailPrint "Installing onnxruntime-gpu..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-index --find-links "$R5" onnxruntime-gpu'
+    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\win_cuda12_requirements.txt"'
     Pop $1
     IntCmp $1 0 install_mp pip_install_failed pip_install_failed
 
   pip_install_failed:
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install Python requirements (exit code $1). Check the installer details for more information."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install Python requirements online (exit code $1). Check the installer details for more information."
     Abort
 
   install_mp:
