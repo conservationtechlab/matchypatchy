@@ -11,7 +11,7 @@ from random import randrange
 from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy.config import resource_path
 from matchypatchy.database.location import TZ_CONVERT_DICT
-
+from matchypatchy import __version__
 
 class MatchyPatchyDB():
     def __init__(self, DB_PATH, logger):
@@ -56,15 +56,15 @@ class MatchyPatchyDB():
         """Retrieve key from both databases to confirm match"""
         db = sqlite3.connect(self.filepath)
         cursor = db.cursor()
-        cursor.execute("SELECT key FROM metadata WHERE id=1;")
-        mpdb_key = cursor.fetchone()[0]
+        cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
+        db_build_version, mpkey = cursor.fetchone()
         db.close()
 
         client = chromadb.PersistentClient(str(self.chroma_filepath))
         collection = client.get_collection(name="embedding_collection")
         chroma_key = collection.metadata['key']
 
-        return mpdb_key, chroma_key
+        return db_build_version, mpkey, chroma_key
 
     def info(self):
         """Get current counts of media and roi in database"""
@@ -91,6 +91,7 @@ class MatchyPatchyDB():
         schema = cursor.fetchall()
         db.close()
 
+        # compare schema to expected schema
         s = ""
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
@@ -99,16 +100,23 @@ class MatchyPatchyDB():
         with open(schema_path, 'r') as file:
             content = file.read()
         match_schema = (content==s)
+
+        # Check that the database build version and key match
+        db_build_version, mpkey, chromakey = self.retrieve_key()
+
         if match_schema:
-            # retrieve keys and confirm match
-            mpkey, chromakey = self.retrieve_key()
+            # confirm databases match
             if mpkey == chromakey:
                 return mpkey
             else:
                 self.logger.error("Key mismatch for Image DB and Emb DB.")
                 return False
         else:
-            self.logger.error("Schema of selected DB invalid.")
+            if db_build_version != __version__:
+                self.logger.error(f"""Schema of selected DB invalid. 
+                                  Database build version {db_build_version} does not match current version {__version__}.""")
+            else:
+                self.logger.error("Schema of selected DB invalid. Database content does not match expected schema.")
             print(s)
             return False
 

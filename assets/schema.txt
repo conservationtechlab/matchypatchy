@@ -1,6 +1,7 @@
 TABLE: metadata
 CREATE TABLE metadata (
                         id INTEGER PRIMARY KEY,
+                        mp_version TEXT NOT NULL,
                         key TEXT UNIQUE NOT NULL )
 INDEX: sqlite_autoindex_metadata_1
 None
