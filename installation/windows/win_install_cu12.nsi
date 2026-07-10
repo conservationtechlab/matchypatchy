@@ -1,10 +1,10 @@
 ; MatchyPatchy NSIS installer - creates venv, pip installs requirements, and creates shortcuts.
 
 ; Version constant - update this for each release
-!define APP_VERSION "0.1.2"
+!define APP_VERSION "0.1.3"
 
 Name "MatchyPatchy"
-OutFile "MatchyPatchy-v0.1.2-GPU-Setup.exe"
+OutFile "MatchyPatchy-v0.1.3-GPU-Setup.exe"
 ; Per-user install (no admin required). Change to RequestExecutionLevel admin + SetShellVarContext all if you want system-wide install.
 InstallDir "$LOCALAPPDATA\MatchyPatchy"
 
@@ -86,7 +86,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   DetailPrint "Installing Python 3.12 wheels..."
   SetOutPath "$INSTDIR\wheels"
   CreateDirectory "$INSTDIR\wheels"
-  File /r "installation\windows\wheels\default\*.*"
+  File /r "installation\windows\wheels\*.*"
 
   ; -------------------------------------------------------------
   ; --- Require Python >= 3.12 check ---
