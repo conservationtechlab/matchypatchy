@@ -1,4 +1,4 @@
-__version__ = "0.1.2_dev"
+__version__ = "0.1.3_dev"
 
 from matchypatchy import config
 from matchypatchy import database
@@ -6,7 +6,7 @@ from matchypatchy import gui
 from matchypatchy import logging_config
 from matchypatchy import threads
 
-from matchypatchy.config import (HOME_DIR, add, initiate, load_cfg,
+from matchypatchy.config import (DEFAULT_HOME_DIR, add, initiate, load_cfg,
                                  resource_path, update,)
 from matchypatchy.database import (COLUMNS, IMAGE_EXT, MatchyPatchyDB,
                                    THUMBNAIL_NOTFOUND, THUMBNAIL_SIZE,
@@ -64,7 +64,7 @@ __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'COLUMNS', 'CSVImportThread', 'ClickableSlider', 'ComboBoxDelegate',
            'ComboBoxSeparator', 'ConfigPopup', 'DisplayBase', 'DisplayCompare',
            'DisplayMedia', 'DownloadMLThread', 'FetchTableThread', 'FilterBar',
-           'FilterBox', 'FolderImportThread', 'HOME_DIR',
+           'FilterBox', 'FolderImportThread', 'DEFAULT_HOME_DIR',
            'HorizontalSeparator', 'IMAGE_EXT', 'ImageAdjustBar', 'ImageWidget',
            'ImportCSVPopup', 'ImportFolderPopup', 'IndividualFillPopup',
            'IndividualPopup', 'LicensePopup', 'LoadTableThread',
