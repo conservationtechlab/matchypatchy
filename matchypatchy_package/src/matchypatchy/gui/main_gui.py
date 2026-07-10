@@ -25,7 +25,9 @@ from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
+from matchypatchy import config
 from matchypatchy.database.media import export_data
+from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
 class MainWindow(QMainWindow):
@@ -176,6 +178,13 @@ class MainWindow(QMainWindow):
             del dialog
 
     # EDIT =====================================================================
+    def new_project(self, filepath):
+        cfg = config.initiate(home_dir=filepath)
+        mpDB = MatchyPatchyDB(cfg['DB_DIR'], self.logger)
+        self.Base.update_db(mpDB)
+        self.Media.update_db(mpDB)
+        self.Compare.update_db(mpDB)
+
     def edit_config(self):
         dialog = ConfigPopup(self)
         if dialog.exec():

@@ -127,6 +127,10 @@ class DisplayMedia(QWidget):
         else:
             self.parent._set_compare_view()
 
+    def update_db(self, mpDB):
+        """Update database object"""
+        self.mpDB = mpDB
+
     # =========================================================================
     # FILTERS
     # =========================================================================

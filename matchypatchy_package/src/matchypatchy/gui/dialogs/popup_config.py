@@ -14,6 +14,7 @@ from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
+from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
 class ConfigPopup(QDialog):
@@ -48,6 +49,13 @@ class ConfigPopup(QDialog):
         button_home_dir.setIcon(QIcon(self.ICON_PENCIL))
         button_home_dir.clicked.connect(self.set_home_dir)
         directory_layout.addWidget(button_home_dir)
+        
+        # Add Button
+        button_add = QPushButton("+")
+        button_add.clicked.connect(self.new_project)
+        button_add.setMaximumHeight(30)
+        button_add.setFixedWidth(30)
+        directory_layout.addWidget(button_add)
         layout.addLayout(directory_layout)
 
         # Visualizer Model
@@ -219,6 +227,14 @@ class ConfigPopup(QDialog):
                 if dialog.exec():
                     del dialog
                 self.logger.warning(f"Database at {new_db} is invalid. User prompted to select another path or delete.")
+
+    def new_project(self):
+        """Create new project directory"""
+        new_project = QFileDialog.getExistingDirectory(self, "Select new Project location",
+                                                       os.path.expanduser('~'),)
+        if new_project:
+            self.parent.new_project(new_project)
+            self.home_dir.setText(new_project + "/MatchyPatchy-Share")
 
     def set_visualizer_model(self):
         """

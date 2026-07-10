@@ -155,6 +155,10 @@ class DisplayBase(QWidget):
 
         self.update_survey()
 
+    def update_db(self, mpDB):
+        """Update database object"""
+        self.mpDB = mpDB
+
     # ==========================================================================
     # Database Management Functions
     # ==========================================================================
