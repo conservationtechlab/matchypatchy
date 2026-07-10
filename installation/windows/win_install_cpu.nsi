@@ -4,7 +4,7 @@
 !define APP_VERSION "0.1.2"
 
 Name "MatchyPatchy"
-OutFile "MatchyPatchy-Setup.exe"
+OutFile "MatchyPatchy-v0.1.2-CPU-Setup.exe"
 ; Per-user install (no admin required). Change to RequestExecutionLevel admin + SetShellVarContext all if you want system-wide install.
 InstallDir "$LOCALAPPDATA\MatchyPatchy"
 
