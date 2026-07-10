@@ -4,6 +4,7 @@ Set Up matchypatchy Database
 import sqlite3
 import chromadb
 from datetime import datetime
+from matchypatchy import __version__
 
 
 def setup_database(key, filepath):
@@ -15,8 +16,9 @@ def setup_database(key, filepath):
     # add key to database
     cursor.execute('''CREATE TABLE IF NOT EXISTS metadata (
                         id INTEGER PRIMARY KEY,
+                        mp_version TEXT NOT NULL,
                         key TEXT UNIQUE NOT NULL );''')
-    cursor.execute(f"""INSERT INTO metadata (key) VALUES ({key});""")
+    cursor.execute(f"""INSERT INTO metadata (mp_version, key) VALUES ('{__version__}', '{key}');""")
 
     # REGION
     # Corresponds to "Site" in CameraBase

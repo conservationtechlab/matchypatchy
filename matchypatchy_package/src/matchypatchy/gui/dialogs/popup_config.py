@@ -14,6 +14,7 @@ from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
+from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
 class ConfigPopup(QDialog):
@@ -21,6 +22,7 @@ class ConfigPopup(QDialog):
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
         self.mpDB = parent.mpDB
@@ -48,6 +50,13 @@ class ConfigPopup(QDialog):
         button_home_dir.setIcon(QIcon(self.ICON_PENCIL))
         button_home_dir.clicked.connect(self.set_home_dir)
         directory_layout.addWidget(button_home_dir)
+        
+        # Add Button
+        button_add = QPushButton("+")
+        button_add.clicked.connect(self.new_project)
+        button_add.setMaximumHeight(30)
+        button_add.setFixedWidth(30)
+        directory_layout.addWidget(button_add)
         layout.addLayout(directory_layout)
 
         # Visualizer Model
@@ -124,9 +133,9 @@ class ConfigPopup(QDialog):
         mpdbkey_label.setFixedWidth(self.column1_width)
         mpdbkey_layout.addWidget(mpdbkey_label)
         mpdbkey = self.mpDB.validate()
-        mpdbkey_valid = QLabel(f"{mpdbkey}")
-        mpdbkey_valid.setStyleSheet("color: red;" if not mpdbkey else "")
-        mpdbkey_layout.addWidget(mpdbkey_valid, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.mpdbkey_valid = QLabel(f"{mpdbkey}")
+        self.mpdbkey_valid.setStyleSheet("color: red;" if not mpdbkey else "")
+        mpdbkey_layout.addWidget(self.mpdbkey_valid, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(mpdbkey_layout)
 
         # Advanced -------------------------------------------------------------
@@ -179,46 +188,42 @@ class ConfigPopup(QDialog):
         new_cmd = self.command_line.text()
         self.mpDB._command(new_cmd, quiet=False)
 
+    def refresh(self):
+        """Refresh the config popup with updated values."""
+        self.cfg = config.load_cfg()
+        self.home_dir.setText(str(self.cfg['HOME_DIR']))
+        reid_path = get_path(self.ml_dir, self.cfg['REID_KEY'])
+        self.visualizer_model.setText(str(reid_path))
+        self.nummatches.setText(str(self.cfg['KNN']))
+        self.sequence_duration.setText(str(self.cfg['SEQUENCE_DURATION']))
+        self.sequence_n.setText(str(self.cfg['SEQUENCE_N']))
+        self.mpdbkey_valid.setText(f"{self.mpDB.validate()}")
+
     def set_home_dir(self):
         """Change Home directory"""
         new_project = QFileDialog.getExistingDirectory(self, "Get Project Folder",
                                                        os.path.expanduser('~'),)
         if new_project:
-            self.home_dir.setText(new_project)
             new_db = Path(new_project) / "Database"
             valid = self.mpDB.update_paths(new_db)
 
             if valid:
-                # Update home dir
-                global HOME_DIR
-                HOME_DIR = Path(new_project)
-                self.cfg['DB_DIR'] = str(new_db)
-
-                # Update config
-                self.cfg['LOG_PATH'] = new_project + "/matchypatchy.log"
-                self.logger.info("HOME_DIR CHANGED")
-                self.logger.info('HOME_DIR: ' + str(HOME_DIR))
-
-                # Check or create ML, Thumbnail and Frame folders
-                new_ml = Path(new_project) / "Models"
-                Path.mkdir(new_ml, exist_ok=True)
-                self.cfg['ML_DIR'] = str(new_ml)
-
-                new_thumb = Path(new_project) / "Thumbnails"
-                Path.mkdir(new_thumb, exist_ok=True)
-                self.cfg['THUMBNAIL_DIR'] = str(new_thumb)
-
-                new_frame = Path(new_project) / "Frames"
-                Path.mkdir(new_frame, exist_ok=True)
-                self.cfg['FRAME_DIR'] = str(new_frame)
-                # save changes to yml
-                config.update(self.cfg)
+                config.update_project_folder(new_project, new_db)
+                self.refresh()
 
             else:
                 dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
                 if dialog.exec():
                     del dialog
                 self.logger.warning(f"Database at {new_db} is invalid. User prompted to select another path or delete.")
+
+    def new_project(self):
+        """Create new project directory"""
+        parent_dir = QFileDialog.getExistingDirectory(self, "Select new Project location",
+                                                       os.path.expanduser('~'),)
+        if parent_dir:
+            self.parent.new_project(parent_dir)
+            self.refresh()
 
     def set_visualizer_model(self):
         """
