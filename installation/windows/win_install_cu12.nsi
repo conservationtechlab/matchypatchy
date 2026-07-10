@@ -64,6 +64,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   ; Include pip requirements
   File "installation\windows\win_py312_cpu_requirements.txt"
   File "installation\windows\win_py313_cpu_requirements.txt"
+  File "installation\windows\win_cuda12_requirements.txt"
   File "installation\windows\launcher.vbs"
   File "ABOUT.md"
   File "README.md"
