@@ -87,7 +87,6 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SetOutPath "$INSTDIR\wheels"
   CreateDirectory "$INSTDIR\wheels"
   File /r "installation\windows\wheels\default\*.*"
-  File /r "installation\windows\wheels\cu12\*.*"
 
   ; -------------------------------------------------------------
   ; --- Require Python >= 3.12 check ---
