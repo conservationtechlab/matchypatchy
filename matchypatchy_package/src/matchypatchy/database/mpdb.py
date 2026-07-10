@@ -113,8 +113,8 @@ class MatchyPatchyDB():
                 return False
         else:
             if db_build_version != __version__:
-                self.logger.error(f"""Schema of selected DB invalid. 
-                                  Database build version {db_build_version} does not match current version {__version__}.""")
+                self.logger.error(f"""Schema of selected DB invalid. Database was built with MatchyPatchy version 
+                                  {db_build_version} does not match current version {__version__}.""")
             else:
                 self.logger.error("Schema of selected DB invalid. Database content does not match expected schema.")
             print(s)
