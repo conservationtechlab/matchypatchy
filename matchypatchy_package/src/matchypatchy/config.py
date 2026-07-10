@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 import yaml
 
-HOME_DIR = Path.cwd() / "MatchyPatchy-Share"
+DEFAULT_HOME_DIR = Path.cwd() / "MatchyPatchy-Share"
 
 def resource_path(relative_path):
     """ Get path to resource whether running in dev or PyInstaller bundle """
@@ -22,16 +22,19 @@ def resource_path(relative_path):
     return os.path.abspath(relative_path)
 
 
-def initiate():
+def initiate(home_dir=DEFAULT_HOME_DIR):
     """
     Initiate configuration file with default values if not present
     """
+    global HOME_DIR
+    HOME_DIR = home_dir
+
     default_cfg = {
-        'HOME_DIR': str(HOME_DIR),
-        'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
-        'DB_DIR': str(HOME_DIR / 'Database'),
-        'ML_DIR': str(HOME_DIR / 'Models'),
-        'THUMBNAIL_DIR': str(HOME_DIR / 'Thumbnails'),
+        'HOME_DIR': str(home_dir),
+        'LOG_PATH': str(home_dir / 'matchpatchy.log'),
+        'DB_DIR': str(home_dir / 'Database'),
+        'ML_DIR': str(home_dir / 'Models'),
+        'THUMBNAIL_DIR': str(home_dir / 'Thumbnails'),
         'VIDEO_FRAMES': 3,
         'REID_KEY': None,
         'VIEWPOINT_KEY': None,
@@ -41,7 +44,7 @@ def initiate():
         'SEQUENCE_N': 3,
     }
 
-    CONFIG_PATH = HOME_DIR / '.config.yml'
+    CONFIG_PATH = home_dir / '.config.yml'
     if CONFIG_PATH.exists():
         cfg = load_cfg()
 
@@ -59,7 +62,7 @@ def initiate():
                 yaml.dump(cfg, cfg_file)
 
     else:
-        Path(HOME_DIR).mkdir(exist_ok=True)
+        Path(home_dir).mkdir(exist_ok=True)
         with open(CONFIG_PATH, 'w') as cfg_file:
             yaml.dump(default_cfg, cfg_file)
         cfg = default_cfg
