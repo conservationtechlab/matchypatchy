@@ -14,11 +14,11 @@ from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
-from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
 class ConfigPopup(QDialog):
     ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
+    DEVICE_OPTIONS = {"CPUExecutionProvider": "CPU", "CUDAExecutionProvider": "CUDA-enabled GPU"}
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -125,7 +125,8 @@ class ConfigPopup(QDialog):
         self.device.addItem("CPU")
         if "CUDAExecutionProvider" in providers:
             self.device.addItem("CUDA-enabled GPU")
-            self.device.setCurrentIndex(1)
+        current_device = self.cfg.get('DEVICE', 'CPUExecutionProvider')
+        self.device.setCurrentText(self.DEVICE_OPTIONS.get(current_device, "CPU"))
         self.device.setToolTip("Select the hardware device for running models.")
         self.device.currentTextChanged.connect(self.change_device)
         cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
