@@ -244,6 +244,7 @@ class ConfigPopup(QDialog):
                 self.visualizer_model.setText(new_model[0])
                 self.cfg['REID_KEY'] = str(Path(new_model[0]).stem)
                 # save changes to yml
+                self.logger.info(f"Re-ID model updated to {self.cfg['REID_KEY']}")
                 config.update(self.cfg)
             else:
                 dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
@@ -256,6 +257,7 @@ class ConfigPopup(QDialog):
             nummatches = int(self.nummatches.text())
             if nummatches > 0:
                 self.cfg['KNN'] = nummatches
+                self.logger.info(f"Max number of matches updated to {nummatches}")
                 config.update(self.cfg)
         except ValueError:
             pass
@@ -268,6 +270,7 @@ class ConfigPopup(QDialog):
             if duration > 0:
                 self.cfg['SEQUENCE_DURATION'] = duration
                 self.cfg['SEQUENCE_N'] = n
+                self.logger.info(f"Sequence settings updated: duration={duration}, n={n}")
                 config.update(self.cfg)
         except ValueError:
             pass
@@ -280,4 +283,5 @@ class ConfigPopup(QDialog):
             self.cfg['DEVICE'] = "CPUExecutionProvider"
         elif selected_device == "CUDA-enabled GPU":
             self.cfg['DEVICE'] = "CUDAExecutionProvider"
+        self.logger.info(f"Device changed to {self.cfg['DEVICE']}")
         config.update(self.cfg)
