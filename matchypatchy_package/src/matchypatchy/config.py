@@ -53,7 +53,7 @@ def initiate(parent_dir=None, project_name="MatchyPatchy-Share"):
     }
 
     # Check if CUDA is available and set DEVICE accordingly
-    providers = animl.get_onnx_device()
+    providers = animl.get_onnx_device(quiet=True)
     if "CUDAExecutionProvider" in providers:
         default_cfg['DEVICE'] = "CUDAExecutionProvider"
     else:
