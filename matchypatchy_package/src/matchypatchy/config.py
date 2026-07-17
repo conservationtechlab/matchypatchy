@@ -6,8 +6,10 @@ import os
 import sys
 from pathlib import Path
 import yaml
+import animl
+        
 
-HOME_DIR = Path.cwd() / "MatchyPatchy-Share"
+HOME_DIR = Path.cwd()
 
 def resource_path(relative_path):
     """ Get path to resource whether running in dev or PyInstaller bundle """
@@ -22,16 +24,25 @@ def resource_path(relative_path):
     return os.path.abspath(relative_path)
 
 
-def initiate():
+def initiate(parent_dir=None, project_name="MatchyPatchy-Share"):
     """
     Initiate configuration file with default values if not present
     """
+    if parent_dir is None:
+        parent_dir = Path.cwd()
+
+    # Append MatchyPatchy-Share to parent_dir
+    home_dir = Path(parent_dir) / project_name
+    
+    # Set global variable for home_dir
+    global HOME_DIR
+    HOME_DIR = home_dir
+
     default_cfg = {
-        'HOME_DIR': str(HOME_DIR),
-        'LOG_PATH': str(HOME_DIR / 'matchpatchy.log'),
-        'DB_DIR': str(HOME_DIR / 'Database'),
-        'ML_DIR': str(HOME_DIR / 'Models'),
-        'THUMBNAIL_DIR': str(HOME_DIR / 'Thumbnails'),
+        'HOME_DIR': str(home_dir),
+        'DB_DIR': str(home_dir / 'Database'),
+        'ML_DIR': str(home_dir / 'Models'),
+        'THUMBNAIL_DIR': str(home_dir / 'Thumbnails'),
         'VIDEO_FRAMES': 3,
         'REID_KEY': None,
         'VIEWPOINT_KEY': None,
@@ -39,9 +50,15 @@ def initiate():
         'KNN': 100,
         'SEQUENCE_DURATION': 60,
         'SEQUENCE_N': 3,
+        'DEVICE': "CPUExecutionProvider",
     }
 
-    CONFIG_PATH = HOME_DIR / '.config.yml'
+    # Check if CUDA is available and set DEVICE accordingly
+    providers = animl.get_onnx_device()
+    if "CUDAExecutionProvider" in providers:
+        default_cfg['DEVICE'] = "CUDAExecutionProvider"
+
+    CONFIG_PATH = home_dir / '.config.yml'
     if CONFIG_PATH.exists():
         cfg = load_cfg()
 
@@ -59,7 +76,7 @@ def initiate():
                 yaml.dump(cfg, cfg_file)
 
     else:
-        Path(HOME_DIR).mkdir(exist_ok=True)
+        Path(home_dir).mkdir(exist_ok=True)
         with open(CONFIG_PATH, 'w') as cfg_file:
             yaml.dump(default_cfg, cfg_file)
         cfg = default_cfg
@@ -70,6 +87,41 @@ def initiate():
     Path(cfg['THUMBNAIL_DIR']).mkdir(exist_ok=True)
 
     return cfg
+
+
+def update_project_folder(new_project, new_db):
+    # Update home dir and config path
+    global HOME_DIR
+    HOME_DIR = Path(new_project)
+
+    print("HOME_DIR CHANGED")
+    print('HOME_DIR: ' + str(HOME_DIR))
+
+    global CONFIG_PATH
+    CONFIG_PATH = HOME_DIR / '.config.yml'
+
+    if not Path(CONFIG_PATH).exists():
+        cfg = initiate(parent_dir=Path(new_project).parent, 
+                 project_name=Path(new_project).name)
+    else:
+        cfg = load_cfg()
+        cfg['HOME_DIR'] = str(new_project)
+        cfg['DB_DIR'] = str(new_db)
+
+    # Check or create ML, Thumbnail and Frame folders
+    new_ml = HOME_DIR / "Models"
+    new_ml.mkdir(exist_ok=True)
+    cfg['ML_DIR'] = str(new_ml)
+
+    new_thumb = HOME_DIR / "Thumbnails"
+    new_thumb.mkdir(exist_ok=True)
+    cfg['THUMBNAIL_DIR'] = str(new_thumb)
+
+    new_frame = HOME_DIR / "Frames"
+    new_frame.mkdir(exist_ok=True)
+    cfg['FRAME_DIR'] = str(new_frame)
+    # save changes to yml
+    update(cfg)
 
 
 def load_cfg(key=None):

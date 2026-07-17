@@ -272,6 +272,10 @@ class DisplayCompare(QWidget):
             if isinstance(child, (QPushButton)):
                 child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
+    def update_db(self, mpDB):
+        """Update database object"""
+        self.mpDB = mpDB
+
     # ==========================================================================
     # GUI
     # ==========================================================================
