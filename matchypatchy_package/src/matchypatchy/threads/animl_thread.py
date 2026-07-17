@@ -43,6 +43,7 @@ class AnimlThread(QThread):
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
         self.n_frames = config.load_cfg('VIDEO_FRAMES')
         self.thumbnail_dir = config.load_cfg('THUMBNAIL_DIR')
+        self.device = config.load_cfg('DEVICE')
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
@@ -78,7 +79,7 @@ class AnimlThread(QThread):
             return
         # load detector
         else:
-            detector = animl.load_detector(self.md_filepath)
+            detector = animl.load_detector(self.md_filepath, device=self.device)
 
         # viewpoint, individual TBD
         viewpoint = None
