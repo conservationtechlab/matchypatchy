@@ -44,11 +44,14 @@ def fetch_media(mpDB, ids=None):
         return pd.DataFrame()
 
 
-def fetch_roi(mpDB):
+def fetch_roi(mpDB, media_id=None):
     """
     Fetches roi table, converts to dataframe
     """
-    manifest = mpDB.select("roi")
+    if media_id:
+        manifest = mpDB.select("roi", row_cond=f"media_id={media_id}")
+    else:
+        manifest = mpDB.select("roi")
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
                                                "viewpoint", "reviewed", "favorite", "individual_id", "emb"])
