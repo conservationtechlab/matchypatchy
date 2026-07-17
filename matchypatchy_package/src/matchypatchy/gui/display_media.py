@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.database.media import IMAGE_EXT
+from matchypatchy.database.media import IMAGE_EXT, fetch_roi
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
@@ -354,22 +354,19 @@ class DisplayMedia(QWidget):
             if dialog.exec():
                 for row in self.selected_rows:
                     if self.data_type == 0:
-                        id = int(self.media_table.data_filtered.at[row, "media_id"])
-                        rois = self.media_table.data[self.media_table.data['media_id'] == id]
-                        embs = rois['emb_id']
+                        id = int(self.media_table.data_filtered.at[row, "id"])
                         self.mpDB.delete('media', f'id={id}')
-                        for i, row in rois.iterrows():
-                            self.mpDB.delete('roi', f"id={row['id']}")
-                        for emb in embs:
-                            if emb is not None:
-                                self.mpDB.delete_emb(id=emb)
-
+                        # delete all rois associated with this media
+                        rois = fetch_roi(self.mpDB, media_id=id)
+                        if len(rois) > 0:
+                            for roi in rois['roi_id']:
+                                self.mpDB.delete('roi', f"id={roi}")
+                                self.mpDB.delete_emb(id=roi)
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                        emb = int(self.media_table.data_filtered.at[row, "emb_id"])
                         self.mpDB.delete('roi', f'id={id}')
-                        if emb is not None:
-                            self.mpDB.delete_emb(id=emb)
+                        self.mpDB.delete_emb(id=id)
+
                 del dialog
                 # Clear selection and update UI
                 self.media_table.table.clearSelection()
