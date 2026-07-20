@@ -83,9 +83,8 @@ class FilterBar(QWidget):
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
 
-        self.station_select.clear()
-        self.station_list_ordered = [(0, 'Station')] + list(self.mpDB.select('station', columns='id, name'))
-        self.station_select.addItems([el[1] for el in self.station_list_ordered])
+        # filter stations based on all surveys
+        self.filter_stations()
 
          # individual list hidden until feature is implemented on QC
         self.individual_select.clear()
