@@ -299,8 +299,8 @@ class QueryContainer(QObject):
         to_merge = self.data[self.data["sequence_id"].isin(sequence)]
 
         for i in to_merge.index:
-            self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id)}, quiet=False)
+            self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id), "reviewed": 1}, quiet=False)
 
     def unmatch(self):
         """Unmatch the current query ROI from the matched ROI"""
-        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None}, quiet=False)
+        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None, "reviewed": 0}, quiet=False)

@@ -262,4 +262,4 @@ class QC_QueryContainer(QObject):
 
     def unmatch(self):
         # Set current match id to none
-        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None}, quiet=False)
+        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None, "reviewed": 0}, quiet=False)
