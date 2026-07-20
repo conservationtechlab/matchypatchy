@@ -95,10 +95,15 @@ class QC_QueryContainer(QObject):
                 self.data = self.data[self.data['individual_id'] == int(active_iid)]
                 self.individuals = {active_iid: self.individuals_raw[active_iid]}
 
+        # create new dict of filtered individuals
+        self.individuals = db_roi.individual_roi_dict(self.data)
+        self.individuals.pop(None, None)
+
         # Sort by Distance
         # must have valid matches to continue
         if self.individuals:
             self.rank()
+            return True
         # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
             self.parent.show_progress(prompt="No data to compare, all available data from same sequence/capture.")
@@ -177,7 +182,6 @@ class QC_QueryContainer(QObject):
         self.query_viewpoint_map = dict(zip(data.index, data['viewpoint']))
 
         self.selected_viewpoint = selected_viewpoint
-        print(f"Toggling to {self.selected_viewpoint} viewpoint")
         if self.selected_viewpoint == 1:
             # if selected_viewpoint is all, show all rois
             return True
