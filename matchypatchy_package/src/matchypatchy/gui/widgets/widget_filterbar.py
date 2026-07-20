@@ -47,7 +47,6 @@ class FilterBar(QWidget):
         self.individual_list_ordered = [(0, 'Individual')]
         self.individual_select = FilterBox(self.individual_list_ordered, self.size)
         self.individual_select.currentIndexChanged.connect(self.select_individual)
-        self.individual_select.setVisible(False)  # Disabled until feature is implemented
         layout.addWidget(self.individual_select, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # UNIDENTIFIED
@@ -66,11 +65,16 @@ class FilterBar(QWidget):
         """
         Clear and Refresh Filters on Re-entry
         """
+        # block signals to prevent triggers
         self.region_select.blockSignals(True)
         self.survey_select.blockSignals(True)
         self.station_select.blockSignals(True)
+        self.viewpoint_select.blockSignals(True)
         self.individual_select.blockSignals(True)
+        self.unidentified.blockSignals(True)
+        self.favorites.blockSignals(True)
 
+        # reset all filter selections to default, reload region, survey and individual lists in case they have changed
         self.region_select.clear()
         self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
         self.region_select.addItems([el[1] for el in self.region_list_ordered])
@@ -78,6 +82,15 @@ class FilterBar(QWidget):
         self.survey_select.clear()
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
+
+        # Reset viewpoint selection to default
+        self.viewpoint_select.setCurrentIndex(0)
+
+        # Reset unidentified and favorites checkboxes
+        self.unidentified_only = False
+        self.favorites_only = False
+        self.unidentified.setChecked(False)
+        self.favorites.setChecked(False)
 
         # individual list hidden until feature is implemented on QC
         self.individual_select.clear()
@@ -90,9 +103,17 @@ class FilterBar(QWidget):
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
                         'active_station': self.station_list_ordered[self.station_select.currentIndex()],
                         'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
-                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()]}
+                        'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
+                        'unidentified_only': self.unidentified_only,
+                        'favorites_only': self.favorites_only}
 
         if prefilter:
+            if 'unidentified_only' in prefilter.keys():
+                self.unidentified_only = prefilter['unidentified_only']
+                self.unidentified.setChecked(self.unidentified_only)
+            if 'favorites_only' in prefilter.keys():
+                self.favorites_only = prefilter['favorites_only']
+                self.favorites.setChecked(self.favorites_only)
             if 'individual_id' in prefilter.keys():
                 self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
                 self.individual_select.setCurrentIndex(prefilter['individual_id'])
@@ -100,7 +121,10 @@ class FilterBar(QWidget):
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
         self.station_select.blockSignals(False)
+        self.viewpoint_select.blockSignals(False)
         self.individual_select.blockSignals(False)
+        self.unidentified.blockSignals(False)
+        self.favorites.blockSignals(False)
 
     def select_region(self):
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
