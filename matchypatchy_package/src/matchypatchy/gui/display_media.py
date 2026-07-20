@@ -15,6 +15,8 @@ from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
 
 class DisplayMedia(QWidget):
+    SAVE_STYLE = """ QPushButton { background-color: #2a3e5e; color: white; }"""
+
     def __init__(self, parent, data_type=1):
         super().__init__()
         self.parent = parent
@@ -46,9 +48,9 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(VerticalSeparator())
 
         # Save
-        button_save = StandardButton("Save")
-        button_save.clicked.connect(self.save)
-        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.button_save = StandardButton("Save")
+        self.button_save.clicked.connect(self.save)
+        first_layer.addWidget(self.button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Undo
         self.button_undo = StandardButton("Undo")
         self.button_undo.clicked.connect(self.undo)
@@ -243,8 +245,10 @@ class DisplayMedia(QWidget):
         """Enable/Disable Undo button based on edit stack"""
         if len(self.media_table.edit_stack) > 0:
             self.button_undo.setEnabled(True)
+            self.button_save.setStyleSheet(self.SAVE_STYLE)
         else:
             self.button_undo.setEnabled(False)
+            self.button_save.setStyleSheet("")
 
     def update_buttons(self):
         """Enable/Disable Edit, Duplicate, Delete buttons based on selection and mode"""
