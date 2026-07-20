@@ -84,15 +84,17 @@ class DisplayMedia(QWidget):
 
         # FILTERS --------------------------------------------------------------
         second_layer = QHBoxLayout()
-        second_layer.addSpacing(20)
+        second_layer.addSpacing(5)
 
         self.filterbar = FilterBar(self, 200)
         second_layer.addWidget(self.filterbar, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         self.filters = self.filterbar.get_filters()  # get initial filters
 
         button_filter = QPushButton("Apply Filters")
         button_filter.clicked.connect(self.filter_table)
-        second_layer.addWidget(button_filter)
+        
+        second_layer.addWidget(button_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         second_layer.addStretch()
         layout.addLayout(second_layer)
