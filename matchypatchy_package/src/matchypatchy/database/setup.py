@@ -18,6 +18,11 @@ def setup_database(key, filepath):
                         key TEXT UNIQUE NOT NULL );''')
     cursor.execute(f"""INSERT INTO metadata (key) VALUES ({key});""")
 
+    cursor.execute('''CREATE TABLE IF NOT EXISTS uploads (
+                        id INTEGER PRIMARY KEY,
+                        timestamp TEXT UNIQUE NOT NULL,
+                        directory TEXT);''')
+
     # REGION
     # Corresponds to "Site" in CameraBase
     cursor.execute('''CREATE TABLE IF NOT EXISTS region (
@@ -48,6 +53,7 @@ def setup_database(key, filepath):
                         id INTEGER PRIMARY KEY,
                         filepath TEXT UNIQUE NOT NULL,
                         sha256 TEXT UNIQUE NOT NULL,
+                        filename TEXT NOT NULL,
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
