@@ -83,7 +83,15 @@ class FilterBar(QWidget):
         self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
 
-        # Reset viewpoint selection to default
+        # filter stations based on all surveys
+        self.filter_stations()
+
+         # individual list hidden until feature is implemented on QC
+        self.individual_select.clear()
+        self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
+        self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
+
+        # Reset viewpoint selection to default, no need to reset list
         self.viewpoint_select.setCurrentIndex(0)
 
         # Reset unidentified and favorites checkboxes
@@ -91,13 +99,6 @@ class FilterBar(QWidget):
         self.favorites_only = False
         self.unidentified.setChecked(False)
         self.favorites.setChecked(False)
-
-        # individual list hidden until feature is implemented on QC
-        self.individual_select.clear()
-        self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
-        self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
-
-        self.filter_stations()
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
@@ -108,6 +109,8 @@ class FilterBar(QWidget):
                         'favorites_only': self.favorites_only}
 
         if prefilter:
+            # TODO: Implement prefiltering for other filter types as needed
+
             if 'unidentified_only' in prefilter.keys():
                 self.unidentified_only = prefilter['unidentified_only']
                 self.unidentified.setChecked(self.unidentified_only)

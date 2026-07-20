@@ -381,10 +381,35 @@ class DisplayCompare(QWidget):
             self.qc = True
             self.filterbar.individual_visible(True)
             self.QueryContainer.load_data()
-            self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
-            self.change_query(0)
+            filtered = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
+            # no match thread, have to check success manually
+            if filtered:
+                self.change_query(0)
+            else:
+                self.warn(prompt="No data to compare within filter.")
         else:
             self.warn(prompt="No data to compare, all available data from same sequence/capture.")
+
+    # ==========================================================================
+    # FILTERS
+    # ==========================================================================
+    def refresh_filters(self):
+        """Clear and re-apply filters from filterbar"""
+        self.filterbar.refresh_filters()
+        self.filters = self.filterbar.get_filters()
+        self.valid_stations = self.filterbar.get_valid_stations()
+
+
+    def filter_neighbors(self):
+        """Apply filters from filterbar to current neighbor dict"""
+        self.filters = self.filterbar.get_filters()
+        self.valid_stations = self.filterbar.get_valid_stations()
+
+        if self.qc:
+            self.recalculate_by_individual()
+        else:
+            self.calculate_neighbors()
+
 
     # ==========================================================================
     # MATCHING PROCESS
@@ -577,23 +602,6 @@ class DisplayCompare(QWidget):
                         </div>
                     """
         return html_text
-
-    # ==========================================================================
-    # FILTERS
-    # ==========================================================================
-    def refresh_filters(self):
-        """Clear and re-apply filters from filterbar"""
-        self.filterbar.refresh_filters()
-
-    def filter_neighbors(self):
-        """Apply filters from filterbar to current neighbor dict"""
-        self.filters = self.filterbar.get_filters()
-        self.valid_stations = self.filterbar.get_valid_stations()
-
-        if self.qc:
-            self.recalculate_by_individual()
-        else:
-            self.calculate_neighbors()
 
     # ==========================================================================
     # IMAGE MANIPULATION
