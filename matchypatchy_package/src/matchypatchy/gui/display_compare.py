@@ -22,6 +22,7 @@ from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
 from matchypatchy.gui.query import QueryContainer
 from matchypatchy.gui.qc_query import QC_QueryContainer
+from matchypatchy.gui.manual_query import ManualQueryContainer
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
 from matchypatchy.config import load_cfg
@@ -41,7 +42,7 @@ class DisplayCompare(QWidget):
         self.distance_metric = 'cosine'
         self.threshold = 50
         self.current_viewpoint = 1
-        self.qc = False  # whether in QC mode
+        self.compare_type = 'default'  # whether 'default', 'qc' or 'manual'
         self.QueryContainer = QueryContainer(self)
         self.progress = None   # placeholder for progress popup
         self.edit_stack = []  # placeholder for media edit stack
@@ -85,7 +86,7 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(button_recalc)
 
         button_recalc = QPushButton("Quality Control by Individual")
-        button_recalc.clicked.connect(self.recalculate_by_individual)
+        button_recalc.clicked.connect(self.calculate_by_individual)
         first_layer.addWidget(button_recalc)
 
         # FILTERBAR --------------------------------------------------------------
@@ -342,7 +343,7 @@ class DisplayCompare(QWidget):
     def calculate_neighbors(self):
         """Calculate neighbors for all query ROIs, load first query and match"""
         # Disable individual select until feature is implemented on QC
-        self.qc = False
+        self.compare_type = 'default'
         self.filterbar.individual_visible(False)
         self.k = load_cfg('KNN')  # can be changed in configuration
         self.QueryContainer = QueryContainer(self)  # re-establish object
@@ -373,12 +374,13 @@ class DisplayCompare(QWidget):
         else:
             self.warn(prompt="No data to compare, all available data from same sequence/capture.")
 
-    def recalculate_by_individual(self):
+    def calculate_by_individual(self):
         """Enter QC mode, recalculate matches by individual IDs"""
+        # must have inviduals to enter QC mode
         if not fetch_individual(self.mpDB).empty:
+            self.compare_type = 'qc'
             self.QueryContainer = QC_QueryContainer(self)
             self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
-            self.qc = True
             self.filterbar.individual_visible(True)
             self.QueryContainer.load_data()
             filtered = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
@@ -389,6 +391,19 @@ class DisplayCompare(QWidget):
                 self.warn(prompt="No data to compare within filter.")
         else:
             self.warn(prompt="No data to compare, all available data from same sequence/capture.")
+
+    def compare_manual(self, selected_ids=None):
+        """Enter manual comparison mode, recalculate matches manually"""
+        self.compare_type = 'manual'
+        self.filterbar.individual_visible(False)
+        self.QueryContainer = ManualQueryContainer(self, selected_ids=selected_ids)  # re-establish object
+        self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
+        emb_exist = self.QueryContainer.load_data()
+        if emb_exist:
+            self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
+            self.change_query(0)
+        else:
+            self.warn(prompt="No data to compare within filter.")
 
     # ==========================================================================
     # FILTERS
@@ -405,8 +420,10 @@ class DisplayCompare(QWidget):
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
 
-        if self.qc:
-            self.recalculate_by_individual()
+        if self.compare_type == 'qc':
+            self.calculate_by_individual()
+        elif self.compare_type == 'manual':
+            self.compare_manual()
         else:
             self.calculate_neighbors()
 
@@ -498,6 +515,7 @@ class DisplayCompare(QWidget):
         self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
 
         self.match_n.setText("/ " + str(len(self.QueryContainer.current_match_rois)))
+        print(self.QueryContainer.current_match)
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.match_counter.setText(str(self.QueryContainer.current_match + 1) + " / " + str(len(self.QueryContainer.current_match_rois)))
 
@@ -564,8 +582,8 @@ class DisplayCompare(QWidget):
         # update gui counts
         self.query_sequence_n.setText('/ ' + str(len(self.QueryContainer.current_query_rois)))
         self.match_n.setText('/ ' + str(len(self.QueryContainer.current_match_rois)))
-        self.query_seq_number.setText('1')
-        self.match_number.setText('1')
+        self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
+        self.match_number.setText(str(self.QueryContainer.current_match + 1))
 
         # load images and data
         self.load_query()

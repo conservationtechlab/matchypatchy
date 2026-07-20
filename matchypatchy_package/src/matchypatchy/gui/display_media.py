@@ -129,7 +129,24 @@ class DisplayMedia(QWidget):
                 del dialog
             return
         else:
-            self.parent._set_compare_view()
+            rois = None
+            if self.data_type == 1:
+                selected_rows = self.media_table.selectedRows()
+                rois = self.media_table.data_filtered.loc[selected_rows, "id"]
+                rois = rois.tolist()
+                if len(rois) > 1:
+                    dialog = AlertPopup(self, prompt=f"Would you like to compare the {len(rois)} selected ROIs?")
+                    if dialog.exec() == QDialog.DialogCode.Accepted:
+                        print("Comparing rois:", rois)
+                        self.parent._set_manual_view(selected_ids=rois)
+                    del dialog
+                else:
+                    print("Not enough ROIs selected for comparison. Defaulting to full compare view.")
+                    self.parent._set_compare_view()
+            # if data type is media go to default compare view
+            else:
+                self.parent._set_compare_view()
+            
 
     def update_db(self, mpDB):
         """Update database object"""
@@ -337,7 +354,6 @@ class DisplayMedia(QWidget):
             self.button_duplicate.setEnabled(False)
             self.button_delete.setEnabled(False)
             self.update_count_label()
-
 
     def duplicate(self):
         if len(self.selected_rows) > 0:
