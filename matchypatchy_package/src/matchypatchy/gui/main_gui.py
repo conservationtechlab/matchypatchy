@@ -179,7 +179,7 @@ class MainWindow(QMainWindow):
 
     # EDIT =====================================================================
     def new_project(self, filepath):
-        cfg = config.initiate(home_dir=filepath)
+        cfg = config.initiate(parent_dir=filepath)
         mpDB = MatchyPatchyDB(cfg['DB_DIR'], self.logger)
         self.Base.update_db(mpDB)
         self.Media.update_db(mpDB)
