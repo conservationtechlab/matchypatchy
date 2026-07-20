@@ -68,6 +68,11 @@ class MediaEditPopup(QDialog):
         button_layout.addWidget(self.next_btn)
         self.check_next_buttons()
 
+        # Delete button
+        self.delete_btn = QPushButton("Delete")
+        self.delete_btn.clicked.connect(self.delete)
+        button_layout.addWidget(self.delete_btn)
+
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
@@ -167,6 +172,27 @@ class MediaEditPopup(QDialog):
         """Show next image in data"""
         self.current_image_index = (self.current_image_index + 1) % len(self.data)
         self.refresh()
+    
+    def delete(self):
+        """Delete current ROI"""
+        dialog = AlertPopup(self, prompt="Are you sure you want to delete this ROI? This action cannot be undone.")
+        if dialog.exec():
+            rid = self.data.iloc[self.current_image_index]["id"]  # roi
+            self.mpDB.delete('roi', f"id={rid}")
+            self.mpDB.delete_emb(id=rid)
+
+            self.data = self.data.drop(self.data.index[self.current_image_index]).reset_index(drop=True)
+            self.rids = self.data["id"].tolist()
+
+            # close if no more images left
+            if len(self.data) == 0:
+                self.close()
+                return
+
+            if self.current_image_index >= len(self.data):
+                self.current_image_index = len(self.data) - 1
+            self.refresh()
+            del dialog
 
 
 class MetadataPanel(QWidget):

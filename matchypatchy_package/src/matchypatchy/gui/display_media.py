@@ -310,9 +310,8 @@ class DisplayMedia(QWidget):
             edit_stack = self.media_table.transpose_edit_stack(edit_stack)
             self.check_undo_button()
             del dialog
-            # reload data
-            self.load_table()
-        # update buttons and count
+        # reload data and update buttons
+        self.load_table()
         self.update_buttons()
         self.update_count_label()
 
