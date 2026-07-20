@@ -401,6 +401,7 @@ class DisplayCompare(QWidget):
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
+            self.QueryContainer.calculate_neighbors()
             self.change_query(0)
         else:
             self.warn(prompt="No data to compare within filter.")

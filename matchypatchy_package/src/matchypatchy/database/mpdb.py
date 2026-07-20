@@ -7,6 +7,7 @@ import sqlite3
 import chromadb
 from pathlib import Path
 from random import randrange
+import numpy as np
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy.config import resource_path
@@ -666,6 +667,25 @@ class MatchyPatchyDB():
             return {'ids': [[]], 'distances': [[]]}
         knn = collection.query(query_embeddings=query, n_results=k + 1)
         return knn
+
+    def calculate_similarity(self, query_id, match_id):
+        client = chromadb.PersistentClient(str(self.chroma_filepath))
+        collection = client.get_collection(name="embedding_collection")
+
+        results1 = collection.get(ids=[str(query_id)], include=["embeddings"])
+        results2 = collection.get(ids=[str(match_id)], include=["embeddings"])
+
+        emb1 = results1['embeddings'][0]
+        emb2 = results2['embeddings'][0]
+
+        if emb1 is None or emb2 is None:
+            return None
+
+        dot_product = np.dot(emb1, emb2)
+        norm1 = np.linalg.norm(emb1)
+        norm2 = np.linalg.norm(emb2)
+        similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
+        return similarity
 
     def clear_emb(self):
         """Clear vector database and rebuild (no way to delete)"""

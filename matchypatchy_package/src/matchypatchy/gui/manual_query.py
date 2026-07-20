@@ -2,6 +2,7 @@
 Class Definition for Query Object
 """
 import pandas as pd
+from itertools import product
 from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
@@ -22,6 +23,7 @@ class ManualQueryContainer(QObject):
         self.selected_ids = selected_ids
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
+        self.pair_table = pd.DataFrame()
         self.filters = dict()
 
         self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
@@ -100,6 +102,21 @@ class ManualQueryContainer(QObject):
         # set match to first entry
         self.current_match_rois = self.rois
         self.set_match(self.current_match) #current_match default to 1
+
+    def calculate_neighbors(self):
+        distances_list = []
+        for i in range(len(self.data.index.tolist())):
+            for j in range(i + 1, len(self.data.index.tolist())):  # Only j > i
+                id1, id2 = self.data.index.tolist()[i], self.data.index.tolist()[j]
+                distance = 1 - self.mpDB.calculate_similarity(id1, id2)
+                
+                distances_list.append({
+                    'id1': id1,
+                    'id2': id2,
+                    'distance': distance
+                })
+
+        self.pair_table = pd.DataFrame(distances_list)
 
     def set_query(self, n):
         """
@@ -195,8 +212,10 @@ class ManualQueryContainer(QObject):
 
     def current_distance(self):
         """Return distance between current sequence and matchs"""
-        # TODO get distance anyway
-        return 0
+        lower = min(self.current_query_rid, self.current_match_rid)
+        upper = max(self.current_query_rid, self.current_match_rid)
+        distance = self.pair_table.loc[(self.pair_table['id1'] == lower) & (self.pair_table['id2'] == upper), 'distance']
+        return distance.values[0] if not distance.empty else 0
 
     def roi_metadata(self, roi):
         """
@@ -247,7 +266,6 @@ class ManualQueryContainer(QObject):
 
         query_iid = query['individual_id']
         match_iid = match['individual_id']
-
         # both are named
         if query_iid is not None:
             # query is older, keep query name
