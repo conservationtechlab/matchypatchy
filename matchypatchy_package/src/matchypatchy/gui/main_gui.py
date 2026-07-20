@@ -145,6 +145,12 @@ class MainWindow(QMainWindow):
         self.Compare.refresh_filters()
         self.Compare.calculate_neighbors()
 
+    def _set_manual_view(self, selected_ids=None):
+        self.pages.setCurrentIndex(2)
+        self.Compare.setFocus()
+        self.Compare.refresh_filters()
+        self.Compare.compare_manual(selected_ids=selected_ids)
+
     # FILE =====================================================================
     def new(self):
         pass

@@ -2,6 +2,7 @@
 Class Definition for Query Object
 """
 import pandas as pd
+from itertools import product
 from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
@@ -9,28 +10,28 @@ from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.threads.model_download_thread import load_model
 
 
-class QC_QueryContainer(QObject):
+class ManualQueryContainer(QObject):
     """
     Alternate Query Container for QC Only
     """
     loaded_data = pyqtSignal(pd.DataFrame)
 
-    def __init__(self, parent):
+    def __init__(self, parent, selected_ids):
         super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
+        self.selected_ids = selected_ids
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
-        self.individuals_raw = dict()
-        self.individuals = dict()
+        self.pair_table = pd.DataFrame()
         self.filters = dict()
-        self.ranked_sequences = []
+
         self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
         self.current_query_rois = []
         self.current_match_rois = []
         self.current_query = 0
-        self.current_match = 0
+        self.current_match = 1
         self.current_query_sn = 0
         self.n_queries = 0
 
@@ -49,15 +50,19 @@ class QC_QueryContainer(QObject):
         """
         Load ROI Table
         """
-        self.data_raw = db_roi.fetch_roi_media(self.mpDB)
+        self.data_raw = db_roi.fetch_roi_media(self.mpDB, rids=self.selected_ids)
         self.loaded_data.emit(self.data_raw)
         # no data
         if self.data_raw.empty:
             return False
 
-        self.individuals_raw = db_roi.individual_roi_dict(self.data_raw)
-        self.individuals_raw.pop(None, None)
-        return True
+        # must have embeddings to continue
+        if not (self.data_raw["emb"] == 0).all():
+            # need sequence and capture ids from media to restrict comparisons shown to
+            return True
+        # no embeddings
+        else:
+            return False
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
@@ -70,7 +75,6 @@ class QC_QueryContainer(QObject):
         """
         # create backups for filtering
         self.data = self.data_raw.copy()
-        self.individuals = self.individuals_raw.copy()
 
         if filter_dict is not None and valid_stations is not None:
             # Region Filter (depends on prefilterd stations from MediaDisplay)
@@ -89,31 +93,30 @@ class QC_QueryContainer(QObject):
             else:  # no valid stations, empty dataframe
                 self.parent.show_progress("No data to compare within filter.")
 
-            # Individual Filter
-            if filter_dict['active_individual'][0] > 0:
-                active_iid = filter_dict['active_individual'][0]
-                self.data = self.data[self.data['individual_id'] == int(active_iid)]
-                self.individuals = {active_iid: self.individuals_raw[active_iid]}
-
-        # create new dict of filtered individuals
-        self.individuals = db_roi.individual_roi_dict(self.data)
-        self.individuals.pop(None, None)
-
-        # Sort by Distance
-        # must have valid matches to continue
-        if self.individuals:
-            self.rank()
-            return True
-        # filtered neighbor dict returns empty, all existing data must be from same individual
-        else:
-            self.parent.show_progress(prompt="No data to compare, all available data from same sequence/capture.")
-            return False
-
-    def rank(self):
-        # Rank by number of rois for each iid
-        self.ranked_sequences = sorted(self.individuals.items(), key=lambda x: len(x[1]), reverse=True)
+        self.rois = self.data.index.tolist()
+        # set current query rois to all rois once 
+        self.ranked_sequences = [[r] for r in self.rois]
         # set number of queries to validate
-        self.n_queries = len(self.ranked_sequences)
+        self.n_queries = len(self.rois)
+
+        # set match to first entry
+        self.current_match_rois = self.rois
+        self.set_match(self.current_match) #current_match default to 1
+
+    def calculate_neighbors(self):
+        distances_list = []
+        for i in range(len(self.data.index.tolist())):
+            for j in range(i + 1, len(self.data.index.tolist())):  # Only j > i
+                id1, id2 = self.data.index.tolist()[i], self.data.index.tolist()[j]
+                distance = 1 - self.mpDB.calculate_similarity(id1, id2)
+                
+                distances_list.append({
+                    'id1': id1,
+                    'id2': id2,
+                    'distance': distance
+                })
+
+        self.pair_table = pd.DataFrame(distances_list)
 
     def set_query(self, n):
         """
@@ -127,13 +130,11 @@ class QC_QueryContainer(QObject):
 
         # set current query
         self.current_query = n
-        # get corresponding sequence_id and rois
-        self.current_sequence_id = self.ranked_sequences[self.current_query][0]
-        self.current_query_rois = self.individuals[self.current_sequence_id]
+        self.current_query_rois = self.ranked_sequences[self.current_query]
         # set view to first in sequence
         self.set_within_query_sequence(0)
         # update matches
-        self.update_matches()
+        #self.update_matches()
 
     def set_within_query_sequence(self, n):
         """
@@ -151,16 +152,6 @@ class QC_QueryContainer(QObject):
             self.current_query_rid = self.current_query_rois[self.current_query_sn]
 
     # refresh match list
-    def update_matches(self):
-        """
-        Update match list if current_query changes
-        """
-        # get all matches for query
-        self.current_match_rois = self.current_query_rois
-
-        # set to top of matches, skip the first one which will be on the query side
-        self.set_match(1)
-
     def set_match(self, n):
         """
         Set the curent match index and id
@@ -194,13 +185,18 @@ class QC_QueryContainer(QObject):
                 return False
             else:
                 self.set_within_query_sequence(0)
-                self.update_matches()
+                self.set_match(1)
                 return True
 
     # RETURN INFO --------------------------------------------------------------
     def is_existing_match(self):
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None
+    
+    def both_unnamed(self):
+        """Return whether both current query and match are unnamed"""
+        return self.data.loc[self.current_match_rid, "individual_id"] is None and \
+            self.data.loc[self.current_query_rid, "individual_id"] is None
 
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
@@ -216,7 +212,10 @@ class QC_QueryContainer(QObject):
 
     def current_distance(self):
         """Return distance between current sequence and matchs"""
-        return 0
+        lower = min(self.current_query_rid, self.current_match_rid)
+        upper = max(self.current_query_rid, self.current_match_rid)
+        distance = self.pair_table.loc[(self.pair_table['id1'] == lower) & (self.pair_table['id2'] == upper), 'distance']
+        return distance.values[0] if not distance.empty else 0
 
     def roi_metadata(self, roi):
         """
@@ -259,6 +258,30 @@ class QC_QueryContainer(QObject):
             self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
 
         self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
+
+    def merge(self):
+        """Merge two individuals after match"""
+        query = self.data.loc[self.current_query_rid]
+        match = self.data.loc[self.current_match_rid]
+
+        query_iid = query['individual_id']
+        match_iid = match['individual_id']
+        # both are named
+        if query_iid is not None:
+            # query is older, keep query name
+            if match_iid is None or match_iid < query_iid:
+                keep_id = query_iid
+
+            # match is older, keep match name
+            else:
+                keep_id = match_iid
+
+        # query is None, give match name
+        else:
+            keep_id = match_iid
+
+        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': int(keep_id), "reviewed": 1}, quiet=False)
+        self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': int(keep_id), "reviewed": 1}, quiet=False)
 
     def unmatch(self):
         # Set current match id to none

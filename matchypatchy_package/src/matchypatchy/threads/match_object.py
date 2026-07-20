@@ -68,7 +68,6 @@ class MatchObject():
         self.query_viewpoint_map = dict(zip(self.query_data['id'], self.query_data['viewpoint']))
         self.match_viewpoint_map = dict(zip(self.match_data['id'], self.match_data['viewpoint']))
 
-
     def order_matches(self):        
         """
         Order neighbors by viewpoint 
@@ -89,7 +88,6 @@ class MatchObject():
                                                        else float('inf')))
         self.ranked_matches = self.og_ranked_matches
         self.ranked_query_rids = self.og_ranked_query_rids
-
 
     def show_viewpoint(self, selected_viewpoint):
         """
@@ -120,5 +118,3 @@ class MatchObject():
                 self.ranked_query_rids = available_queries
                 self.ranked_matches = available_matches
                 return True
-
-    
