@@ -232,6 +232,8 @@ class DisplayMedia(QWidget):
         self.data_type = self.show_type.currentIndex()
         # reload table
         self.load_table()
+        self.filterbar.individual_visible(self.data_type == 1)
+        self.filterbar.unidentified_visible(self.data_type == 1)
         # Disable "Edit Rows" if not in ROI mode
         self.update_buttons()
         self.update_count_label()
