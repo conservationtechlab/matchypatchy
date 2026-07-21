@@ -59,6 +59,12 @@ class FilterBar(QWidget):
         self.favorites.toggled.connect(self.select_favorites)
         self.favorites_only = False
         layout.addWidget(self.favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        self.no_roi = QCheckBox("No ROI")
+        self.no_roi.toggled.connect(self.select_no_roi)
+        self.no_roi_only = False
+        layout.addWidget(self.no_roi, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         self.setLayout(layout)
 
     def refresh_filters(self, prefilter=None):
@@ -73,6 +79,7 @@ class FilterBar(QWidget):
         self.individual_select.blockSignals(True)
         self.unidentified.blockSignals(True)
         self.favorites.blockSignals(True)
+        self.no_roi.blockSignals(True)
 
         # reset all filter selections to default, reload region, survey and individual lists in case they have changed
         self.region_select.clear()
@@ -128,6 +135,7 @@ class FilterBar(QWidget):
         self.individual_select.blockSignals(False)
         self.unidentified.blockSignals(False)
         self.favorites.blockSignals(False)
+        self.no_roi.blockSignals(False)
 
     def select_region(self):
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
@@ -152,6 +160,9 @@ class FilterBar(QWidget):
 
     def select_favorites(self):
         self.favorites_only = not self.favorites_only
+
+    def select_no_roi(self):
+        self.no_roi_only = not self.no_roi_only
 
     def filter_surveys(self):
         """Filter surveys based on active region"""
@@ -195,7 +206,8 @@ class FilterBar(QWidget):
                         'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
-                        'favorites_only': self.favorites_only}
+                        'favorites_only': self.favorites_only,
+                        'no_roi_only': self.no_roi_only}
         return self.filters
 
     def get_valid_stations(self):
