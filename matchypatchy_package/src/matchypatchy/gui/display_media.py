@@ -86,15 +86,19 @@ class DisplayMedia(QWidget):
         second_layer = QHBoxLayout()
         second_layer.addSpacing(5)
 
-        self.filterbar = FilterBar(self, 200)
+        self.filterbar = FilterBar(self, 180)
         second_layer.addWidget(self.filterbar, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.filters = self.filterbar.get_filters()  # get initial filters
 
         button_filter = QPushButton("Apply Filters")
         button_filter.clicked.connect(self.filter_table)
+
+        button_clear_filter = QPushButton("Clear Filters")
+        button_clear_filter.clicked.connect(self.clear_filters)
         
         second_layer.addWidget(button_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(button_clear_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         second_layer.addStretch()
         layout.addLayout(second_layer)
@@ -165,7 +169,7 @@ class DisplayMedia(QWidget):
         # get current filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
-
+        self.toggle_filterbar_datatype()
 
     def filter_table(self):
         """
@@ -173,10 +177,24 @@ class DisplayMedia(QWidget):
         Run after any setting is changed and filter button is pressed
         """
         self.filters = self.filterbar.get_filters()
-        self.valid_stations = self.filterbar.get_valid_stations()
+        self.valid_stations = self.filterbar.get_valid_stations() 
+        self.toggle_filterbar_datatype()
         self.media_table.filter()
         self.update_count_label()
 
+    def toggle_filterbar_datatype(self):
+        """Toggle visibility of filter bar elements based on data type"""
+        self.filterbar.individual_visible(self.data_type == 1)
+        self.filterbar.unidentified_visible(self.data_type == 1)
+        self.filterbar.favorites_visible(self.data_type == 1)
+        self.filterbar.viewpoint_visible(self.data_type == 1)
+        self.filterbar.no_roi_visible(self.data_type == 0)
+
+    def clear_filters(self):
+        """Clear all filters and refresh the table"""
+        self.refresh_filters()
+        self.media_table.filter()
+        self.update_count_label()
     # =========================================================================
     # MEDIA TABLE HANDLERS
     # =========================================================================
@@ -232,8 +250,7 @@ class DisplayMedia(QWidget):
         self.data_type = self.show_type.currentIndex()
         # reload table
         self.load_table()
-        self.filterbar.individual_visible(self.data_type == 1)
-        self.filterbar.unidentified_visible(self.data_type == 1)
+        self.toggle_filterbar_datatype()
         # Disable "Edit Rows" if not in ROI mode
         self.update_buttons()
         self.update_count_label()

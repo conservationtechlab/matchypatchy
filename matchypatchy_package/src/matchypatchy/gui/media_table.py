@@ -217,6 +217,11 @@ class MediaTable(QWidget):
         if filters['favorites_only']:
             self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
+        if len(filters['no_roi_mids']) > 0:
+            if self.data_type == 1:
+                pass
+            self.data_filtered = self.data_filtered[self.data_filtered['id'].isin(filters['no_roi_mids'])]
+
         self.data_filtered.reset_index(inplace=True)
 
         # refresh table contents
