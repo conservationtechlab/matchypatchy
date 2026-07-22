@@ -2,6 +2,8 @@
 Custom Widgets for Displaying Media (Image/Video)
 """
 
+from turtle import pen
+
 import cv2
 from pathlib import Path
 from PIL import Image, ImageEnhance
@@ -20,8 +22,9 @@ class MediaWidget(QWidget):
     """
     Container Widget for Displaying Image or Video
     """
-    def __init__(self):
+    def __init__(self, adjust_mode='zoom'):
         super().__init__()
+        self.adjust_mode = adjust_mode
         layout = QVBoxLayout(self)
 
         # Stacked layout to switch between image and video
@@ -29,7 +32,7 @@ class MediaWidget(QWidget):
         layout.addLayout(self.stacked)
 
         # Image widget
-        self.image_widget = ImageWidget()
+        self.image_widget = ImageWidget(adjust_mode=self.adjust_mode)
         self.stacked.addWidget(self.image_widget)
 
         # Video widget
@@ -95,11 +98,12 @@ class ImageWidget(QLabel):
     """
     Custom Widget for Displaying an Image
     """
-    def __init__(self, image_path=None, width=600, height=400):
+    def __init__(self, image_path=None, width=600, height=400, adjust_mode='zoom'):
         super().__init__()
         self.default_width = width
         self.default_height = height
         self.image_path = image_path
+        self.adjust_mode = adjust_mode
         self.rel_bbox = None
         self.bbox = None
         self.crop_to_bbox = False
@@ -253,74 +257,134 @@ class ImageWidget(QLabel):
             target_rect = pixmap.rect()
             target_rect.moveCenter(self.rect().center() + self.image_offset.toPoint())
             painter.drawPixmap(target_rect.topLeft(), pixmap)
-            # not cropped but draw bbox
-            if self.bbox is not None and not self.crop_to_bbox:
-                scaled_bbox = QRectF(self.bbox)
-                scale_factor_x = target_rect.width() / self.qimage.width()
-                scale_factor_y = target_rect.height() / self.qimage.height()
-                scaled_bbox.setRect(
-                    target_rect.left() + scaled_bbox.left() * scale_factor_x,
-                    target_rect.top() + scaled_bbox.top() * scale_factor_y,
-                    scaled_bbox.width() * scale_factor_x,
-                    scaled_bbox.height() * scale_factor_y)
+            # set pen for drawing bounding boxes
+            painter.setPen(QPen(Qt.GlobalColor.green, 3))
+            
+            # bbox drawing mode
+            if self.adjust_mode == 'bbox':                 # Draw preview box while drawing
+                if self.drawing and self.start_pos and self.end_pos:
+                    preview_rect = QRect(self.start_pos, self.end_pos).normalized()
+                    painter.drawRect(preview_rect)
 
-                painter.setPen(QPen(Qt.GlobalColor.green, 3))
-                painter.drawRect(scaled_bbox)
+            # not cropped but draw bbox
+            elif self.adjust_mode == 'zoom':
+                if self.bbox is not None and not self.crop_to_bbox:
+                    scaled_bbox = QRectF(self.bbox)
+                    scale_factor_x = target_rect.width() / self.qimage.width()
+                    scale_factor_y = target_rect.height() / self.qimage.height()
+                    scaled_bbox.setRect(
+                        target_rect.left() + scaled_bbox.left() * scale_factor_x,
+                        target_rect.top() + scaled_bbox.top() * scale_factor_y,
+                        scaled_bbox.width() * scale_factor_x,
+                        scaled_bbox.height() * scale_factor_y) 
+                    painter.drawRect(scaled_bbox)
+            else:
+                pass
+
+            painter.end()
 
     def wheelEvent(self, event):
         """
         Zoom in or out based on the scroll wheel movement.
         """
-        # Calculate the zoom delta
-        zoom_delta = 0.1 if event.angleDelta().y() > 0 else -0.1
-        new_zoom_factor = self.zoom_factor + zoom_delta
-        if new_zoom_factor < 0.5:  # Prevent zooming too far out
+        if self.adjust_mode == 'zoom':
+            # Calculate the zoom delta
+            zoom_delta = 0.1 if event.angleDelta().y() > 0 else -0.1
+            new_zoom_factor = self.zoom_factor + zoom_delta
+            if new_zoom_factor < 0.5:  # Prevent zooming too far out
+                return
+
+            # Calculate the image position relative to the center
+            mouse_pos = event.position()
+            widget_center = QPointF(self.width() / 2, self.height() / 2)
+            mouse_relative_pos = mouse_pos - widget_center
+
+            # Adjust offset based on zoom
+            scale_change = new_zoom_factor / self.zoom_factor
+            self.image_offset += mouse_relative_pos * (1 - scale_change)
+
+            # Update zoom factor
+            self.zoom_factor = new_zoom_factor
+            self.update()
+        
+        else:
+            event.ignore()  # Don't process the event
             return
-
-        # Calculate the image position relative to the center
-        mouse_pos = event.position()
-        widget_center = QPointF(self.width() / 2, self.height() / 2)
-        mouse_relative_pos = mouse_pos - widget_center
-
-        # Adjust offset based on zoom
-        scale_change = new_zoom_factor / self.zoom_factor
-        self.image_offset += mouse_relative_pos * (1 - scale_change)
-
-        # Update zoom factor
-        self.zoom_factor = new_zoom_factor
-        self.update()
 
     def mousePressEvent(self, event):
         """
         Start dragging the image.
         """
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.drag_start_position = event.position()
+        if self.adjust_mode == 'zoom':
+            if event.button() == Qt.MouseButton.LeftButton:
+                self.drag_start_position = event.position()
+        # Handle bounding box drawing mode
+        elif self.adjust_mode == 'bbox':
+            if event.button() == Qt.MouseButton.LeftButton:
+                self.drawing = True
+                self.start_pos = event.pos()
+                self.end_pos = event.pos()
+        else:
+            event.ignore()  # Don't process the event
+            return
 
     def mouseMoveEvent(self, event):
         """
         Handle dragging to move the image.
         """
-        if hasattr(self, "drag_start_position"):
-            drag_delta = event.position() - self.drag_start_position
-            self.image_offset += drag_delta
-            self.drag_start_position = event.position()
-            self.update()
+        # Handle zoom mode
+        if self.adjust_mode == 'zoom':
+            if hasattr(self, "drag_start_position"):
+                drag_delta = event.position() - self.drag_start_position
+                self.image_offset += drag_delta
+                self.drag_start_position = event.position()
+                self.update()
+        # Handle bounding box drawing mode
+        elif self.adjust_mode == 'bbox':
+            if self.drawing:
+                self.end_pos = event.pos()
+                self.update()
+        else:
+            event.ignore()  # Don't process the event
+            return
 
     def mouseReleaseEvent(self, event):
         """
         End dragging the image.
         """
-        if event.button() == Qt.MouseButton.LeftButton:
-            del self.drag_start_position
+        if self.adjust_mode == 'zoom':
+            if event.button() == Qt.MouseButton.LeftButton:
+                del self.drag_start_position
+        # Handle bounding box drawing mode
+        elif self.adjust_mode == 'bbox':
+            if event.button() == Qt.MouseButton.LeftButton and self.drawing:
+                self.drawing = False
+                self.end_pos = event.pos()
+                
+                # Create rectangle
+                rect = QRect(self.start_pos, self.end_pos).normalized()
+                
+                # Only save if box has area
+                if rect.width() > 5 and rect.height() > 5:
+                    self.boxes.append(rect)
+                    self.box_drawn.emit(rect)
+                
+                self.update()
+        else:
+            event.ignore()  # Don't process the event
+            return
 
     def mouseDoubleClickEvent(self, event):
         """
         Handle double-click events.
         """
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.reset()
-        super().mouseDoubleClickEvent(event)
+        if self.adjust_mode == 'zoom':
+            if event.button() == Qt.MouseButton.LeftButton:
+                self.reset()
+            super().mouseDoubleClickEvent(event)
+        else:
+            event.ignore()  # Don't process the event
+            return
 
 
 # ==============================================================================

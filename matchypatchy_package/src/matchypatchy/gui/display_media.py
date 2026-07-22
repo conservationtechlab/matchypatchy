@@ -322,7 +322,7 @@ class DisplayMedia(QWidget):
             data = self.media_table.data_filtered.iloc[[row]]
             current_image_index = 0
 
-        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
+        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index, adjust_mode='bbox')
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
             del dialog
@@ -340,7 +340,7 @@ class DisplayMedia(QWidget):
         data = self.media_table.data_filtered.iloc[selected_rows]
         current_image_index = 0
 
-        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
+        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index, adjust_mode='bbox')
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
             edit_stack = self.media_table.transpose_edit_stack(edit_stack)

@@ -17,15 +17,19 @@ from matchypatchy.database.location import fetch_station_names_from_id
 
 
 class MediaEditPopup(QDialog):
-    def __init__(self, parent, data, data_type, current_image_index=0, crop=False):
+    def __init__(self, parent, data, data_type, current_image_index=0, crop=False, adjust_mode='zoom'):
         super().__init__(parent)
-        self.setWindowTitle("View ROI")
+        if data_type == 1:
+            self.setWindowTitle("View ROI")
+        else:
+            self.setWindowTitle("View Media")
         self.setFixedSize(1000, 500)
         self.mpDB = parent.mpDB
         self.data = data
         self.data_type = data_type
         self.ids = data["id"].tolist()
         self.crop = crop
+        self.adjust_mode = adjust_mode
         self.current_image_index = current_image_index
         self.individuals = []
 
@@ -46,7 +50,7 @@ class MediaEditPopup(QDialog):
 
         # Image ----------------------------------------------------------------
         content_layout = QHBoxLayout()
-        self.image = MediaWidget()
+        self.image = MediaWidget(adjust_mode=adjust_mode)
         content_layout.addWidget(self.image, 1)
         # Metadata
         self.metadatapanel = MetadataPanel(self)
