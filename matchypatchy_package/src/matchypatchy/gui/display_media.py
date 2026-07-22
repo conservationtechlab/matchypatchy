@@ -210,15 +210,15 @@ class DisplayMedia(QWidget):
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
                 self.home()
-                del dialog
+            del dialog
             return False
         else:
             if self.data_type == 1 and roi_n == 0:
                 # no rois, default to full images
                 self.data_type = 0
                 dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
-                if dialog.exec():
-                    del dialog
+                dialog.exec()
+                del dialog
                 self.show_type.blockSignals(True)
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
@@ -322,7 +322,7 @@ class DisplayMedia(QWidget):
             data = self.media_table.data_filtered.iloc[[row]]
             current_image_index = 0
 
-        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index, adjust_mode='bbox')
+        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
             del dialog
@@ -340,7 +340,7 @@ class DisplayMedia(QWidget):
         data = self.media_table.data_filtered.iloc[selected_rows]
         current_image_index = 0
 
-        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index, adjust_mode='bbox')
+        dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
             edit_stack = self.media_table.transpose_edit_stack(edit_stack)

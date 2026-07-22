@@ -218,8 +218,8 @@ class ConfigPopup(QDialog):
 
             else:
                 dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
-                if dialog.exec():
-                    del dialog
+                dialog.exec()
+                del dialog
                 self.logger.warning(f"Database at {new_db} is invalid. User prompted to select another path or delete.")
 
     def new_project(self):
@@ -246,8 +246,8 @@ class ConfigPopup(QDialog):
                 config.update(self.cfg)
             else:
                 dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
-                if dialog.exec():
-                    del dialog
+                dialog.exec()
+                del dialog
 
     def update_nummatches(self):
         """Update max number of matches setting"""

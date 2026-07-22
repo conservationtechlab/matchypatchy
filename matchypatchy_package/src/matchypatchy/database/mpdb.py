@@ -276,6 +276,7 @@ class MatchyPatchyDB():
         """
         try:
             db = sqlite3.connect(self.filepath)
+            db.execute("PRAGMA foreign_keys = ON")
             cursor = db.cursor()
             command = """INSERT INTO media
                         (filepath, sha256, ext, timestamp, station_id,
@@ -309,8 +310,10 @@ class MatchyPatchyDB():
                 db.close()
             return None
 
-    def add_roi(self, media_id: int,
-                frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
+    def add_roi(self,
+                media_id: int,
+                frame: int,
+                bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
                 viewpoint: Optional[str] = None,
                 reviewed: int = 0,
                 favorite: int = 0,
@@ -332,6 +335,7 @@ class MatchyPatchyDB():
         """
         try:
             db = sqlite3.connect(self.filepath)
+            db.execute("PRAGMA foreign_keys = ON")  # ← Add this
             cursor = db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
@@ -375,6 +379,7 @@ class MatchyPatchyDB():
         """
         try:
             db = sqlite3.connect(self.filepath)
+            db.execute("PRAGMA foreign_keys = ON")
             cursor = db.cursor()
             command = """INSERT INTO camera (name, station_id) VALUES (?, ?);"""
             data_tuple = (name, station_id)
@@ -399,6 +404,7 @@ class MatchyPatchyDB():
         """
         try:
             db = sqlite3.connect(self.filepath, timeout=10)
+            db.execute("PRAGMA foreign_keys = ON")
             cursor = db.cursor()
             command = f"""INSERT INTO {table}_thumbnails (fid, filepath) VALUES (?, ?);"""
             data_tuple = (fid, filepath)
