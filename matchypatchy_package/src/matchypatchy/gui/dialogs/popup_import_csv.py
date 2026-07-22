@@ -30,6 +30,7 @@ class ImportCSVPopup(QDialog):
         self.selected_external_id = self.columns[0]
         self.selected_viewpoint = self.columns[0]
         self.selected_individual = self.columns[0]
+        self.selected_favorite = self.columns[0]
         self.selected_comment = self.columns[0]
 
         self.setWindowTitle("Import from CSV")
@@ -144,12 +145,21 @@ class ImportCSVPopup(QDialog):
         individual_layout.addWidget(self.individual)
         layout.addLayout(individual_layout)
         layout.addSpacing(5)
+        # Favorite
+        favorite_layout = QHBoxLayout()
+        favorite_layout.addWidget(QLabel("Favorite:"))
+        self.favorite = QComboBox()
+        self.favorite.addItems(self.columns)
+        self.favorite.currentTextChanged.connect(self.select_favorite)
+        favorite_layout.addWidget(self.favorite)
+        layout.addLayout(favorite_layout)
+        layout.addSpacing(5)
         # Comment
         comment_layout = QHBoxLayout()
         comment_layout.addWidget(QLabel("Comment:"))
         self.comment = QComboBox()
         self.comment.addItems(self.columns)
-        self.comment.currentTextChanged.connect(self.select_sequence)
+        self.comment.currentTextChanged.connect(self.select_comment)
         comment_layout.addWidget(self.comment)
         layout.addLayout(comment_layout)
 
