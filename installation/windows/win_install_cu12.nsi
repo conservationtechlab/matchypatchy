@@ -89,126 +89,26 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   CreateDirectory "$INSTDIR\wheels"
   File /r "installation\windows\wheels\*.*"
 
+  ; Include python
+  DetailPrint "Installing Python 3.13.."
+  SetOutPath "$INSTDIR\python"
+  CreateDirectory "$INSTDIR\python"
+  File /r "installation\windows\python-portable\*.*"
+
+  ; Include wheels
+  DetailPrint "Copying dependencies..."
+  SetOutPath "$INSTDIR\wheels"
+  CreateDirectory "$INSTDIR\wheels"
+  File /r "installation\windows\wheels\*.*"
+
   ; -------------------------------------------------------------
-  ; --- Require Python >= 3.12 check ---
-  DetailPrint "Locating Python 3.12+ ..."
-  
-  ; Try direct path first - check if Python 3.13 exists in common location
-  IfFileExists "$LOCALAPPDATA\Programs\Python\Python313\python.exe" 0 try_python312
-    DetailPrint "Found Python 3.13 in LocalAppData"
-    StrCpy $PYLAUNCHER "$LOCALAPPDATA\Programs\Python\Python313\python.exe"
-    Goto test_python
-
-  try_python312:
-    IfFileExists "$LOCALAPPDATA\Programs\Python\Python312\python.exe" 0 try_programfiles
-      DetailPrint "Found Python 3.12 in LocalAppData"
-      StrCpy $PYLAUNCHER "$LOCALAPPDATA\Programs\Python\Python312\python.exe"
-      Goto test_python
-  
-  try_programfiles:
-    ; Check Program Files locations
-    IfFileExists "$PROGRAMFILES\Python313\python.exe" 0 try_pf_312
-      DetailPrint "Found Python 3.13 in Program Files"
-      StrCpy $PYLAUNCHER "$PROGRAMFILES\Python313\python.exe"
-      Goto test_python
-  
-  try_pf_312:
-    IfFileExists "$PROGRAMFILES\Python312\python.exe" 0 python_not_found
-      DetailPrint "Found Python 3.12 in Program Files"
-      StrCpy $PYLAUNCHER "$PROGRAMFILES\Python312\python.exe"
-      Goto test_python
-
-  test_python:
-    ; Test if the python.exe at the direct path works and get version
-    DetailPrint "Testing Python at: $PYLAUNCHER"
-    nsExec::ExecToStack '$PYLAUNCHER -c "import sys; print(sys.version_info[0]*10000 + sys.version_info[1]*100 + sys.version_info[2])"'
-    Pop $0  ; exit code
-    Pop $PYVER_STR  ; output
-    IntCmp $0 0 parse_version python_not_found python_not_found
-
-  python_not_found:
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Python 3.12 or newer was not found.$\n$\nPlease install Python 3.12+ from python.org.$\n$\nMake sure to install for all users or current user."
-    Abort
-
-  parse_version:
-    ; Trim loop - remove all trailing whitespace
-    trim_loop:
-      StrCpy $R4 "$PYVER_STR" 1 -1  ; get last char
-      StrCmp $R4 "$\r" 0 +3
-        StrCpy $PYVER_STR "$PYVER_STR" -1
-        Goto trim_loop
-      StrCmp $R4 "$\n" 0 +3
-        StrCpy $PYVER_STR "$PYVER_STR" -1
-        Goto trim_loop
-      StrCmp $R4 " " 0 +3
-        StrCpy $PYVER_STR "$PYVER_STR" -1
-        Goto trim_loop
-    
-    StrLen $R3 $PYVER_STR
-    IntCmp $R3 0 py_version_missing 0 0
-    
-    ; convert $PYVER_STR to integer and compare to 3.12.0 => 31200
-    IntOp $R3 $PYVER_STR + 0
-    IntCmp 31200 $PYVER_STR py_version_ok py_version_ok py_version_lt
-
-  py_version_ok:
-    DetailPrint "Found Python >= 3.12 (version code: $PYVER_STR) at $PYLAUNCHER"
-    Goto create_venv
-
-  py_version_lt:
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Python 3 found but is older than 3.12 (detected version code: $PYVER_STR). Please install Python 3.12 or newer."
-    Abort
-
-  py_version_missing:
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to detect Python version. Please ensure Python 3.12+ is installed correctly."
-    Abort
-
-  create_venv:
-    DetailPrint "Creating virtual environment using: $PYLAUNCHER"
-    ; Use the chosen launcher to create the venv
-    nsExec::ExecToLog '$PYLAUNCHER -m venv "$INSTDIR\venv"'
-    Pop $0
-    IntCmp $0 0 venv_ok venv_failed venv_failed
-
-  venv_ok:
-    DetailPrint "Virtual environment created successfully."
-    Goto select_wheels
-
-  venv_failed:
-    ; Try ensurepip then retry venv creation (common on some constrained installs)
-    DetailPrint "venv creation failed (exit $0). Attempting ensurepip and retry..."
-    nsExec::ExecToLog '$PYLAUNCHER -m ensurepip --default-pip'
-    Pop $1
-    IntCmp $1 0 retry_venv venv_final_failed venv_final_failed
-    
-  retry_venv:
-    ; ensurepip succeeded (exit 0) -> retry venv
-    nsExec::ExecToLog '$PYLAUNCHER -m venv "$INSTDIR\venv"'
-    Pop $0
-    IntCmp $0 0 venv_ok venv_final_failed venv_final_failed
-
-  venv_final_failed:
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to create a Python virtual environment. Check the installer details for more information."
-    Abort
-
-  select_wheels:
-    ; Determine which wheels to use based on detected Python version
-    ${If} $PYVER_STR >= 31300
-      DetailPrint "Using Python 3.13 wheels..."
-      StrCpy $R5 "$INSTDIR\wheels"
-      StrCpy $R6 "$INSTDIR\win_py313_cpu_requirements.txt"
-    ${Else}
-      DetailPrint "Using Python 3.12 wheels..."
-      StrCpy $R5 "$INSTDIR\wheels"
-      StrCpy $R6 "$INSTDIR\win_py312_cpu_requirements.txt"
-    ${EndIf}
-  Goto install_requirements
-
-  install_requirements:
-    DetailPrint "Installing package requirements with GPU support..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-index --find-links "$R5" -r "$R6"'
-    Pop $1
-    IntCmp $1 0 install_onnxruntime_gpu pip_install_failed pip_install_failed
+  ; Begin Install
+  DetailPrint "Installing dependencies..."
+  StrCpy $R5 "$INSTDIR\wheels"
+  StrCpy $R6 "$INSTDIR\win_cpu_requirements.txt"
+  ExecToLog "$INSTDIR\python\python.exe -m pip install --no-index --find-links "$R5" -r "$R6"'
+  Pop $0
+  IntCmp $0 0 install_onnxruntime_gpu pip_install_failed pip_install_failed
 
   install_onnxruntime_gpu:
     DetailPrint "Installing GPU requirements.."
