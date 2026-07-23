@@ -32,7 +32,8 @@ share/python-wheels/
 *.egg
 MANIFEST
 MatchyPatchy-Share/
-
+installation/windows/python-portable/
+installation/windows/wheels/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
