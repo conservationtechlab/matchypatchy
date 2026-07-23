@@ -15,9 +15,6 @@ Page directory
 Page components
 Page instfiles
 
-Var PYLAUNCHER
-Var PYVER_STR
-
 ; -------------------------
 ; .onInit - optional checks
 ; -------------------------
@@ -63,94 +60,37 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SetOutPath "$INSTDIR"
 
   ; Include pip requirements
-  File "installation\windows\win_py312_cpu_requirements.txt"
-  File "installation\windows\win_py313_cpu_requirements.txt"
   File "installation\windows\win_cuda12_requirements.txt"
   File "installation\windows\launcher.vbs"
-  File "ABOUT.md"
-  File "README.md"
-  File "LICENSE"
 
-  ; Recursively include and extract the 'matchypatchy' package directory
-  DetailPrint "Installing matchypatchy files..."
-  SetOutPath "$INSTDIR\matchypatchy"
-  CreateDirectory "$INSTDIR\matchypatchy"
-  File /r "matchypatchy_package\*.*"
-
-  ; Recursively include and extract the 'assets' directory
-  DetailPrint "Installing assets..."
-  SetOutPath "$INSTDIR\assets"
-  CreateDirectory "$INSTDIR\assets"
-  File /r "assets\*.*"
-
-  ; Include wheels
-  DetailPrint "Installing Python 3.12 wheels..."
-  SetOutPath "$INSTDIR\wheels"
-  CreateDirectory "$INSTDIR\wheels"
-  File /r "installation\windows\wheels\*.*"
-
-  ; Include python
+  ; Include python env
   DetailPrint "Installing Python 3.13.."
-  SetOutPath "$INSTDIR\python"
-  CreateDirectory "$INSTDIR\python"
-  File /r "installation\windows\python-portable\*.*"
+  SetOutPath "$INSTDIR\python_env"
+  CreateDirectory "$INSTDIR\python_env"
+  File /r "installation\windows\python_env\*.*"
 
-  ; Include wheels
-  DetailPrint "Copying dependencies..."
-  SetOutPath "$INSTDIR\wheels"
-  CreateDirectory "$INSTDIR\wheels"
-  File /r "installation\windows\wheels\*.*"
 
   ; -------------------------------------------------------------
   ; Begin Install
-  DetailPrint "Installing dependencies..."
-  StrCpy $R5 "$INSTDIR\wheels"
-  StrCpy $R6 "$INSTDIR\win_cpu_requirements.txt"
-  ExecToLog "$INSTDIR\python\python.exe -m pip install --no-index --find-links "$R5" -r "$R6"'
-  Pop $0
-  IntCmp $0 0 install_onnxruntime_gpu pip_install_failed pip_install_failed
-
-  install_onnxruntime_gpu:
-    DetailPrint "Installing GPU requirements.."
+  DetailPrint "Installing GPU requirements.."
     
-    ; Uninstall CPU version
-    DetailPrint "Uninstalling onnxruntime (CPU)..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip uninstall -y onnxruntime'
-    Pop $0
-    ; Ignore errors
+  ; Uninstall CPU version
+  DetailPrint "Uninstalling onnxruntime (CPU)..."
+  nsExec::ExecToLog '"$INSTDIR\python_env\python.exe" -m pip uninstall -y onnxruntime'
+  Pop $0
+  ; Ignore errors
   
-    ; Install GPU version
-    DetailPrint "Installing onnxruntime-gpu..."
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install -r "$INSTDIR\win_cuda12_requirements.txt"'
-    Pop $1
-    IntCmp $1 0 install_mp pip_install_failed pip_install_failed
+  ; Install GPU version
+  DetailPrint "Installing onnxruntime-gpu..."
+  nsExec::ExecToLog '"$INSTDIR\python_env\python.exe" -m pip install -r "$INSTDIR\win_cuda12_requirements.txt"'
+  Pop $1
+  IntCmp $1 0 install_gpu_ok pip_install_failed pip_install_failed
 
   pip_install_failed:
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install Python requirements online (exit code $1). Check the installer details for more information."
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install GPU requirements online (exit code $1). Check the installer details for more information."
     Abort
 
-  install_mp:
-    ; continue with install of matchypatchy
-    DetailPrint "Requirements installed successfully."
-    DetailPrint "Installing packaged project from $INSTDIR\matchypatchy (log: $R0)..."
-
-    ; Recommended for production: non-editable installation from directory (builds a wheel)
-    nsExec::ExecToLog '"$INSTDIR\venv\Scripts\python.exe" -m pip install --no-deps -e "$INSTDIR\\matchypatchy"'
-    Pop $0
-    IntCmp $0 0 install_mp_ok install_mp_failed install_mp_failed
-
-  install_mp_ok:
-      DetailPrint "MatchyPatchy package installed successfully."
-      Goto local_done
-
-  install_mp_failed:
-      MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install from $INSTDIR\\matchypatchy (see $R0 for pip output). The installer will abort."
-      Abort
-
-  local_done:
-      ; (continue)
-      StrCpy $R2 "" ; clear helper var
-
+  install_gpu_ok:
     ; Write uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 
@@ -161,11 +101,11 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
     ; Register in Add/Remove Programs
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayName" "MatchyPatchy"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayVersion" "${APP_VERSION}"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "Conservation Technology Lab"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "SDZWA Conservation Technology Lab"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\assets\graphics\desktop_icon.ico"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\python_env\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico"
 
     DetailPrint "Installation complete."
 
@@ -178,7 +118,7 @@ Section "Desktop Shortcut" SEC_DESKTOP
   CreateShortCut "$DESKTOP\MatchyPatchy.lnk" \
     "$INSTDIR\launcher.vbs" \
     "" \
-    "$INSTDIR\assets\graphics\desktop_icon.ico" \
+    "$INSTDIR\python_env\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico" \
     0 \
     SW_SHOWNORMAL \
     "" \
@@ -190,7 +130,7 @@ Section "Start Menu Shortcuts" SEC_STARTMENU
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" \
     "$INSTDIR\launcher.vbs" \
     "" \
-    "$INSTDIR\assets\graphics\desktop_icon.ico" \
+    "$INSTDIR\python_env\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico" \
     0 \
     SW_SHOWNORMAL \
     "" \
@@ -219,16 +159,11 @@ Section "Uninstall"
 
   ; Remove files
   Delete "$INSTDIR\launcher.vbs"
-  Delete "$INSTDIR\win_py312_cu12_requirements.txt"
-  Delete "$INSTDIR\win_py313_cu12_requirements.txt"
+  Delete "$INSTDIR\win_cuda12_requirements.txt"
   Delete "$INSTDIR\matchypatchy.log"
   Delete "$INSTDIR\launcher.log"
-  
-  ; Remove directories
-  RMDir /r "$INSTDIR\venv"
-  RMDir /r "$INSTDIR\assets"
-  RMDir /r "$INSTDIR\wheels"
-  RMDir /r "$INSTDIR\matchypatchy"
+  RMDir /r "$INSTDIR\python_env"
+
 
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
