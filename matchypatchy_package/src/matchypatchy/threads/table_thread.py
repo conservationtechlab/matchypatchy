@@ -9,7 +9,7 @@ from PyQt6.QtCore import QThread, pyqtSignal, Qt
 
 from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
 from matchypatchy.database import thumbnails
-from matchypatchy.config import resource_path
+from matchypatchy.config import asset_path
 
 
 class FetchTableThread(QThread):
@@ -118,7 +118,7 @@ class LoadTableThread(QThread):
         elif column == 'thumbnail':
             thumbnail_path = roi['thumbnail_path']
             if not thumbnail_path:
-                thumbnail_path = str(resource_path(THUMBNAIL_NOTFOUND))
+                thumbnail_path = str(asset_path(thumbnails.THUMBNAIL_NOTFOUND))
             qtw = QImage(thumbnail_path)
 
         # filepath and Timestamp not editable

@@ -22,6 +22,7 @@ class AboutPopup(QDialog):
 
     def display_readme(self):
         about_path = config.resource_path("ABOUT.md")
+        print(about_path)
         try:
             with open(about_path, "r") as file:
                 readme_text = file.read()
