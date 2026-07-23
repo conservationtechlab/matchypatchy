@@ -17,9 +17,9 @@ def resource_path(relative_path):
         return os.path.join(sys._MEIPASS, relative_path)
     
     if "__file__" in globals() or "__file__" in locals():
-        # Path(__file__).resolve().parent is robust (resolves symlinks)
-        install_dir = Path(__file__).resolve().parents[3]
-        return install_dir / Path(relative_path)
+        # Assumes this function is in src/matchypatchy/
+        matchypatchy_dir = Path(__file__).resolve().parents[0]  # Go up 1 level to src/matchypatchy
+        return matchypatchy_dir / relative_path
     
     return os.path.abspath(relative_path)
 
