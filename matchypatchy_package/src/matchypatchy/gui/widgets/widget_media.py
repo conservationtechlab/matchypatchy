@@ -259,11 +259,32 @@ class ImageWidget(QLabel):
         """
         if self.drawn_bbox is None:
             return None
-        x = min(max(self.drawn_bbox.x() / self.scaled_image.width(), 0), 1)
-        y = min(max(self.drawn_bbox.y() / self.scaled_image.height(), 0), 1)
-        w = min(self.drawn_bbox.width() / self.scaled_image.width(), 1 - x)
-        h = min(self.drawn_bbox.height() / self.scaled_image.height(), 1 - y)
+        
+        # Calculate the image position in widget space (from your paintEvent)
+        pixmap = QPixmap.fromImage(self.scaled_image)
+        target_rect = pixmap.rect()
+        target_rect.moveCenter(self.rect().center() + self.image_offset.toPoint())
+        
+        # Convert widget coords to scaled image coords
+        image_x = self.drawn_bbox.x() - target_rect.left()
+        image_y = self.drawn_bbox.y() - target_rect.top()
+        image_w = self.drawn_bbox.width()
+        image_h = self.drawn_bbox.height()
+        
+        # Clamp to image bounds
+        image_x = max(0, min(image_x, self.scaled_image.width()))
+        image_y = max(0, min(image_y, self.scaled_image.height()))
+        image_w = min(image_w, self.scaled_image.width() - image_x)
+        image_h = min(image_h, self.scaled_image.height() - image_y)
+        
+        # Convert to relative coords (0-1)
+        x = image_x / self.scaled_image.width()
+        y = image_y / self.scaled_image.height()
+        w = image_w / self.scaled_image.width()
+        h = image_h / self.scaled_image.height()
+        
         return {"bbox_x": x, "bbox_y": y, "bbox_w": w, "bbox_h": h}
+
 
     # IMAGE ADJUSTMENTS ========================================================
     def reset(self):
@@ -301,17 +322,16 @@ class ImageWidget(QLabel):
             # set pen for drawing bounding boxes
             painter.setPen(QPen(Qt.GlobalColor.green, 3))
             
-            
             # bbox drawing mode
-            if self.adjust_mode == 'bbox':                 # Draw preview box while drawing
+            if self.adjust_mode == 'bbox':
                 if self.drawing and self.start_pos and self.end_pos:
                     preview_rect = QRect(self.start_pos, self.end_pos).normalized()
+                    # draw preview
                     painter.drawRect(preview_rect)
                 else:
                     bbox = self.drawn_bbox
-                    if bbox is None:
-                        bbox = QRect()
-                    painter.drawRect(bbox)
+                    if bbox is not None:
+                        painter.drawRect(bbox)
 
             # not cropped but draw bbox
             elif self.adjust_mode == 'zoom':

@@ -14,13 +14,12 @@ from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator
 from matchypatchy.threads.model_download_thread import load_model
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
-from matchypatchy.database.thumbnails import save_roi_thumbnail
-from matchypatchy import config
 
 
 class MediaEditPopup(QDialog):
     def __init__(self, parent, data, data_type, current_image_index=0, crop=False):
         super().__init__(parent)
+        self.parent = parent
         # image roi == 1
         if data_type == 1:
             self.setWindowTitle("View ROI")
@@ -208,6 +207,7 @@ class MediaEditPopup(QDialog):
     def capture_new_bbox(self, bbox):
         """Capture the new bounding box from the image widget and enable save button"""
         self.new_bbox = bbox
+        print(f"New bbox captured: {self.new_bbox}")
         self.save_roi_btn.setEnabled(True)
 
     def save_roi(self):
@@ -223,39 +223,25 @@ class MediaEditPopup(QDialog):
                 del dialog
 
             else:
-                print(self.data)
                 prompt = "This will create a new ROI. You will need to rerun step 2. Process to get new embeddings."
                 dialog = AlertPopup(self, prompt=prompt)
                 
-                rows, cols = self.mpDB.all_media()
-                print(f"Total media rows: {len(rows)}, columns: {cols}")
                 if dialog.exec():
                     media_id = self.data.iloc[self.current_image_index]["id"]  # media
-                    
+                    filepath = self.data.iloc[self.current_image_index]["filepath"]
+                    ext = self.data.iloc[self.current_image_index]["ext"]
 
                     frame = 0
 
-                    bbox_x = self.new_bbox['bbox_x']
-                    bbox_y = self.new_bbox['bbox_y']
-                    bbox_w = self.new_bbox['bbox_w']
-                    bbox_h = self.new_bbox['bbox_h']
+                    bbox_x = float(self.new_bbox['bbox_x'])
+                    bbox_y = float(self.new_bbox['bbox_y'])
+                    bbox_w = float(self.new_bbox['bbox_w'])
+                    bbox_h = float(self.new_bbox['bbox_h'])
 
                     # do not add emb_id, to be determined later
-                    roi_id = self.mpDB.add_roi(media_id, frame,
-                                              bbox_x, bbox_y, bbox_w, bbox_h,
-                                              viewpoint=None,
-                                              individual_id=None,
-                                              emb=0)
-                    print(f"New ROI created with id: {roi_id}")
-                    rows, cols = self.mpDB.all_media()
-                    print(f"Total media rows: {len(rows)}, columns: {cols}")
-
+                    roi_id = self.mpDB.add_roi(int(media_id), frame,
+                                               bbox_x, bbox_y, bbox_w, bbox_h)
                     
-                    # # save thumbnail
-                    #roi_thumbnail = save_roi_thumbnail(config.load_cfg('THUMBNAIL_DIR'),
-                    #                                   filepath, ext, frame,
-                    #                                   bbox_x, bbox_y, bbox_w, bbox_h)
-                    #self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
                 del dialog
                 
             # turn off drawing mode and disable save button
@@ -281,12 +267,13 @@ class MediaEditPopup(QDialog):
 
             # close if no more images left
             if len(self.data) == 0:
+                self.parent.load_table()
                 self.close()
                 return
 
             if self.current_image_index >= len(self.data):
                 self.current_image_index = len(self.data) - 1
-            self.refresh()
+            
         del dialog
 
 
