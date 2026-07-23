@@ -5,7 +5,7 @@
 
 Name "MatchyPatchy"
 OutFile "MatchyPatchy-v0.1.4-CPU-Setup.exe"
-; Per-user install (no admin required). Change to RequestExecutionLevel admin + SetShellVarContext all if you want system-wide install.
+; Per-user install (no admin required)
 InstallDir "$LOCALAPPDATA\MatchyPatchy"
 
 !include "MUI2.nsh"
@@ -14,9 +14,6 @@ InstallDir "$LOCALAPPDATA\MatchyPatchy"
 Page directory
 Page components
 Page instfiles
-
-Var PYLAUNCHER
-Var PYVER_STR
 
 ; -------------------------
 ; .onInit - optional checks
@@ -64,12 +61,6 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   ; Include pip requirements and launcher
   File "installation\windows\launcher.vbs"
 
-  ; Recursively include and extract the 'assets' directory
-  DetailPrint "Installing assets..."
-  SetOutPath "$INSTDIR\assets"
-  CreateDirectory "$INSTDIR\assets"
-  File /r "assets\*.*"
-
   ; Include python
   DetailPrint "Installing Python 3.13.."
   SetOutPath "$INSTDIR\python_env"
@@ -90,7 +81,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\assets\graphics\desktop_icon.ico"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico"
 
   DetailPrint "Installation complete."
 
@@ -103,7 +94,7 @@ Section "Desktop Shortcut" SEC_DESKTOP
   CreateShortCut "$DESKTOP\MatchyPatchy.lnk" \
     "$INSTDIR\launcher.vbs" \
     "" \
-    "$INSTDIR\assets\graphics\desktop_icon.ico" \
+    "$INSTDIR\python_env\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico" \
     0 \
     SW_SHOWNORMAL \
     "" \
@@ -115,7 +106,7 @@ Section "Start Menu Shortcuts" SEC_STARTMENU
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" \
     "$INSTDIR\launcher.vbs" \
     "" \
-    "$INSTDIR\assets\graphics\desktop_icon.ico" \
+    "$INSTDIR\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico" \
     0 \
     SW_SHOWNORMAL \
     "" \
@@ -146,10 +137,7 @@ Section "Uninstall"
   Delete "$INSTDIR\launcher.vbs"
   Delete "$INSTDIR\matchypatchy.log"
   Delete "$INSTDIR\launcher.log"
-  
-  ; Remove directories
   RMDir /r "$INSTDIR\python_env"
-  RMDir /r "$INSTDIR\assets"
 
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
