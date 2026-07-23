@@ -98,6 +98,7 @@ class DisplayCompare(QWidget):
         self.filterbar.individual_visible(False)
         self.filterbar.unidentified_visible(False)
         self.filterbar.favorites_visible(False)
+        self.filterbar.no_roi_visible(False)
 
         first_layer.addWidget(self.filterbar)
         # get initial filters
@@ -488,7 +489,7 @@ class DisplayCompare(QWidget):
                             cancel_only=False)
         if dialog.exec():
             self.QueryContainer.unmatch()
-            del dialog
+        del dialog
         # reload data
         self.QueryContainer.load_data()
         self.QueryContainer.filter()
@@ -634,16 +635,16 @@ class DisplayCompare(QWidget):
         data["id"] = rid
         data = data.to_frame().T
         filepath = self.QueryContainer.get_info(rid, "filepath")
-        dialog = MediaEditPopup(self, data, data_type=1 if Path(filepath).suffix.lower() in IMAGE_EXT else 2)
+        dialog = MediaEditPopup(self, data, data_type=1 if Path(filepath).suffix.lower() in IMAGE_EXT else 0)
         if dialog.exec():
             self.edit_stack = dialog.get_edit_stack()
             self.save_changes()
-            del dialog
             # reload data
             self.QueryContainer.load_data()
             self.QueryContainer.filter()
             self.load_query()
             self.load_match()
+        del dialog
 
 
     def save_changes(self):

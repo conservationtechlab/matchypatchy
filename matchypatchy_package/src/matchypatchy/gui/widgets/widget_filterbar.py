@@ -17,6 +17,7 @@ class FilterBar(QWidget):
         self.mpDB = parent.mpDB
         self.size = size
         self.filters = {}
+        self.no_roi_mids = [] # empty list
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
 
         layout = QHBoxLayout()
@@ -49,6 +50,11 @@ class FilterBar(QWidget):
         self.individual_select.currentIndexChanged.connect(self.select_individual)
         layout.addWidget(self.individual_select, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # No ROI Filter
+        self.no_roi = QCheckBox("No ROI")
+        self.no_roi.toggled.connect(self.select_no_roi)
+        layout.addWidget(self.no_roi, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         # UNIDENTIFIED
         self.unidentified = QCheckBox("Unidentified")
         self.unidentified.toggled.connect(self.select_unidentified)
@@ -59,12 +65,14 @@ class FilterBar(QWidget):
         self.favorites.toggled.connect(self.select_favorites)
         self.favorites_only = False
         layout.addWidget(self.favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         self.setLayout(layout)
 
     def refresh_filters(self, prefilter=None):
         """
         Clear and Refresh Filters on Re-entry
         """
+        #print("Refreshing filters with prefilter:", prefilter)
         # block signals to prevent triggers
         self.region_select.blockSignals(True)
         self.survey_select.blockSignals(True)
@@ -73,6 +81,7 @@ class FilterBar(QWidget):
         self.individual_select.blockSignals(True)
         self.unidentified.blockSignals(True)
         self.favorites.blockSignals(True)
+        self.no_roi.blockSignals(True)
 
         # reset all filter selections to default, reload region, survey and individual lists in case they have changed
         self.region_select.clear()
@@ -99,6 +108,8 @@ class FilterBar(QWidget):
         self.favorites_only = False
         self.unidentified.setChecked(False)
         self.favorites.setChecked(False)
+        self.no_roi.setChecked(False)
+        self.no_roi_mids = [] # empty list
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
@@ -106,10 +117,14 @@ class FilterBar(QWidget):
                         'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
-                        'favorites_only': self.favorites_only}
+                        'favorites_only': self.favorites_only,
+                        'no_roi_mids': self.no_roi_mids}
 
         if prefilter:
             # TODO: Implement prefiltering for other filter types as needed
+            if 'no_roi_mids' in prefilter.keys():
+                self.no_roi_mids = prefilter['no_roi_mids']
+                self.no_roi.setChecked(len(self.no_roi_mids) > 0)
 
             if 'unidentified_only' in prefilter.keys():
                 self.unidentified_only = prefilter['unidentified_only']
@@ -128,6 +143,7 @@ class FilterBar(QWidget):
         self.individual_select.blockSignals(False)
         self.unidentified.blockSignals(False)
         self.favorites.blockSignals(False)
+        self.no_roi.blockSignals(False)
 
     def select_region(self):
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
@@ -152,6 +168,15 @@ class FilterBar(QWidget):
 
     def select_favorites(self):
         self.favorites_only = not self.favorites_only
+
+    def select_no_roi(self):
+        """Toggle No ROI filter"""
+        if self.no_roi.isChecked():
+            mids = self.mpDB._command("""SELECT m.id
+                                      FROM media m
+                                      LEFT JOIN roi r ON m.id = r.media_id
+                                      WHERE r.media_id IS NULL;""")
+            self.no_roi_mids = [mid[0] for mid in mids]
 
     def filter_surveys(self):
         """Filter surveys based on active region"""
@@ -195,7 +220,8 @@ class FilterBar(QWidget):
                         'active_viewpoint': self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()],
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
-                        'favorites_only': self.favorites_only}
+                        'favorites_only': self.favorites_only,
+                        'no_roi_mids': self.no_roi_mids}
         return self.filters
 
     def get_valid_stations(self):
@@ -216,6 +242,10 @@ class FilterBar(QWidget):
     def favorites_visible(self, visible: bool):
         """Set favorites checkbox visibility"""
         self.favorites.setVisible(visible)
+
+    def no_roi_visible(self, visible: bool):
+        """Set no ROI checkbox visibility"""
+        self.no_roi.setVisible(visible)
 
 
 class FilterBox(QComboBox):

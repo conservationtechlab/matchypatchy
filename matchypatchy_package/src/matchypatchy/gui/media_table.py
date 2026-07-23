@@ -197,25 +197,31 @@ class MediaTable(QWidget):
             # no valid stations, empty dataframe
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
-        # Viewpoint Filter
-        if filters['active_viewpoint'][0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'] == filters['active_viewpoint'][0] - 1]
-        elif filters['active_viewpoint'][0] is None:
-            self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'].isna()]
+        # ROI-only filters
+        if self.data_type == 1:
+            # Viewpoint Filter
+            if filters['active_viewpoint'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'] == filters['active_viewpoint'][0] - 1]
+            elif filters['active_viewpoint'][0] is None:
+                self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'].isna()]
 
-        # Individual Filter
-        if filters['active_individual'][0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == filters['active_individual'][0]]
-        elif filters['active_individual'][0] is None:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
+            # Individual Filter
+            if filters['active_individual'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == filters['active_individual'][0]]
+            elif filters['active_individual'][0] is None:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
-        # Unidentified Filter
-        if filters['unidentified_only']:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
+            # Unidentified Filter
+            if filters['unidentified_only']:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
-        # Favorites Filter
-        if filters['favorites_only']:
-            self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
+            # Favorites Filter
+            if filters['favorites_only']:
+                self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
+
+        else:
+            if len(filters['no_roi_mids']) > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['id'].isin(filters['no_roi_mids'])]
 
         self.data_filtered.reset_index(inplace=True)
 

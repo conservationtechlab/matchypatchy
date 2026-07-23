@@ -5,6 +5,7 @@ import datetime
 from typing import Optional
 import sqlite3
 import chromadb
+import threading
 from pathlib import Path
 from random import randrange
 import numpy as np
@@ -19,17 +20,44 @@ class MatchyPatchyDB():
         self.filepath = Path(DB_PATH) / 'matchypatchy.db'
         self.chroma_filepath = Path(DB_PATH) / 'emb.db'
         self.logger = logger
+        self.local = threading.local()  # Thread-local storage
+        
+        # load existing databases if they exist
         if self.filepath.is_file() and self.chroma_filepath.is_dir():
+            # initialize
+            self.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
+            # check key
             self.key = self.validate()
+
+        # initialize new databases
         else:
             self.key = '{:05}'.format(randrange(1, 10 ** 5))
-            setup_database(self.key, self.filepath)
-            setup_chromadb(self.key, self.chroma_filepath)
-            # add default region and survey
-            timezone = str(datetime.datetime.now().astimezone().tzname())
-            timezone = TZ_CONVERT_DICT.get(timezone, timezone)
-            id = self.add_region("Default Region", timezone)
-            self.add_survey("Default Survey", id, None, None)
+            self._setup_new_databases()
+
+    def _setup_new_databases(self):
+        """Helper to set up new databases (uses thread-local db via property)"""
+        self.db  # Trigger property initialization
+        setup_database(self.key, self.filepath, self.db)
+        self.chroma = setup_chromadb(self.key, self.chroma_filepath)
+        # add default region and survey
+        timezone = str(datetime.datetime.now().astimezone().tzname())
+        timezone = TZ_CONVERT_DICT.get(timezone, timezone)
+        id = self.add_region("Default Region", timezone)
+        self.add_survey("Default Survey", id, None, None)
+
+    @property
+    def db(self):
+        """Get or create a connection for the current thread"""
+        if not hasattr(self.local, 'db') or self.local.db is None:
+            self.local.db = sqlite3.connect(self.filepath)
+            self.local.db.execute("PRAGMA foreign_keys = ON")
+        return self.local.db
+    
+    def close(self):
+        """Close the thread-local connection"""
+        if hasattr(self.local, 'db') and self.local.db:
+            self.local.db.close()
+            self.local.db = None
 
     def update_paths(self, DB_PATH):
         """Update database paths, create new database if not found"""
@@ -41,6 +69,9 @@ class MatchyPatchyDB():
                 self.key = valid
                 self.filepath = filepath
                 self.chroma_filepath = chroma_filepath
+                self.db = sqlite3.connect(self.filepath)
+                self.db.execute("PRAGMA foreign_keys = ON")
+                self.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
                 return True
             else:
                 return False
@@ -49,28 +80,24 @@ class MatchyPatchyDB():
             self.filepath = filepath
             self.chroma_filepath = chroma_filepath
             self.key = '{:05}'.format(randrange(1, 10 ** 5))
-            setup_database(self.key, self.filepath)
-            setup_chromadb(self.key, self.chroma_filepath)
+            self.db = setup_database(self.key, self.filepath)
+            self.chroma = setup_chromadb(self.key, self.chroma_filepath)
             return True
 
     def retrieve_key(self):
         """Retrieve key from both databases to confirm match"""
-        db = sqlite3.connect(self.filepath)
-        cursor = db.cursor()
+        cursor = self.db.cursor()
         cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
         db_build_version, mpkey = cursor.fetchone()
-        db.close()
 
-        client = chromadb.PersistentClient(str(self.chroma_filepath))
-        collection = client.get_collection(name="embedding_collection")
+        collection = self.chroma.get_collection(name="embedding_collection")
         chroma_key = collection.metadata['key']
 
         return db_build_version, mpkey, chroma_key
 
     def info(self):
         """Get current counts of media and roi in database"""
-        db = sqlite3.connect(self.filepath)
-        cursor = db.cursor()
+        cursor = self.db.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = cursor.fetchall()
         self.logger.info(tables)
@@ -82,15 +109,12 @@ class MatchyPatchyDB():
         roi = cursor.fetchone()[0]
         print(f"ROI: {roi}")
         self.logger.info(f"ROI: {roi}")
-        db.close()
 
     def validate(self):
         """Confirm that the database schema matches expected schema"""
-        db = sqlite3.connect(self.filepath)
-        cursor = db.cursor()
+        cursor = self.db.cursor()
         cursor.execute("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger')")
         schema = cursor.fetchall()
-        db.close()
 
         # compare schema to expected schema
         s = ""
@@ -129,23 +153,21 @@ class MatchyPatchyDB():
         try:
             if not quiet:
                 print(command)
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             cursor.execute(command)
             self.logger.info(f"Executed command: {command}")
             rows = cursor.fetchall()
-            db.commit()
-            db.close()
+            self.db.commit()
             return rows
         except sqlite3.OperationalError as error:
-            self.logger.error("Operational error executing command.", error)
-            if db:
-                db.close()
+            if not quiet:
+                print(f"Operational error executing command: {error}")  
+            self.logger.error(f"Operational error executing command: {error}")
             return None
         except sqlite3.Error as error:
+            if not quiet:
+                print(f"Failed to execute command: {error}")
             self.logger.error("Failed to execute command.", error)
-            if db:
-                db.close()
             return None
 
     # INSERT -------------------------------------------------------------------
@@ -158,22 +180,18 @@ class MatchyPatchyDB():
             - year_end (int)
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = """INSERT INTO survey
                         (name, region_id, year_start, year_end)
                         VALUES (?, ?, ?, ?);"""
             data_tuple = (name, region_id, year_start, year_end)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             self.logger.info(f"Added survey: {name} with region_id: {region_id}, year_start: {year_start}, year_end: {year_end}")
             return id
         except sqlite3.Error as error:
-            self.logger.error("Failed to add survey: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to add survey: {error}")
             return None
 
     def add_region(self, name: str, timezone: str):
@@ -183,20 +201,16 @@ class MatchyPatchyDB():
             - timezone (str) Optional
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = """INSERT INTO region (name, timezone) VALUES (?, ?);"""
             data_tuple = (name, timezone)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             self.logger.info(f"Added region: {name} with timezone: {timezone}")
             return id
         except sqlite3.Error as error:
-            self.logger.error("Failed to add region: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to add region: {error}")
             return None
 
     def add_station(self, name: str, lat: float, long: float, survey_id: int):
@@ -208,22 +222,18 @@ class MatchyPatchyDB():
             - survey_id (int) NOT NULL
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = """INSERT INTO station
                         (name, lat, long, survey_id)
                         VALUES (?, ?, ?, ?);"""
             data_tuple = (name, lat, long, survey_id)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             self.logger.info(f"Added station: {name} with lat: {lat}, long: {long}, survey_id: {survey_id}")
             return id
         except sqlite3.Error as error:
-            self.logger.error("Failed to add station: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to add station: {error}")
             return None
 
     def add_individual(self, name: str, sex: Optional[str] = None, age: Optional[str] = None):
@@ -234,21 +244,17 @@ class MatchyPatchyDB():
             - age (str)
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = """INSERT INTO individual
                         (name, sex, age)
                         VALUES (?, ?, ?);"""
             data_tuple = (name, sex, age)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             return id
         except sqlite3.Error as error:
-            self.logger.error("Failed to add individual: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to add individual: {error}")
             return None
 
     def add_media(self,
@@ -275,8 +281,7 @@ class MatchyPatchyDB():
             comment TEXT,
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = """INSERT INTO media
                         (filepath, sha256, ext, timestamp, station_id,
                         camera_id, sequence_id, external_id, comment)
@@ -285,32 +290,27 @@ class MatchyPatchyDB():
                           camera_id, sequence_id, external_id, comment)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             return id
 
         # filepath already exists
         except sqlite3.IntegrityError as error:
             if 'UNIQUE constraint failed: media.filepath' in error.args[0]:
                 self.logger.error(f"Failed to add {filepath}, already exists in database.")
-                if db:
-                    db.close()
                 return "duplicate_error"
             
             if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
                 self.logger.error(f"Failed to add {filepath}, file is a duplicate.")
-                if db:
-                    db.close()
                 return "duplicate_error"
 
         except sqlite3.Error as error:
-            self.logger.error("Failed to add media: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to add media: {error}")
             return None
 
-    def add_roi(self, media_id: int,
-                frame: int, bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
+    def add_roi(self,
+                media_id: int,
+                frame: int,
+                bbox_x: float, bbox_y: float, bbox_w: float, bbox_h: float,
                 viewpoint: Optional[str] = None,
                 reviewed: int = 0,
                 favorite: int = 0,
@@ -331,40 +331,33 @@ class MatchyPatchyDB():
             - emb (int) references chroma embedding id
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
                          viewpoint, reviewed, favorite, individual_id, emb)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
+            data_tuple = (int(media_id), int(frame), float(bbox_x), float(bbox_y), float(bbox_w), float(bbox_h),
                           viewpoint, reviewed, favorite, individual_id, emb)
+            
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             return id
         except sqlite3.Error as error:
-            self.logger.error(f"Failed to add roi for media: {media_id}.", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to add roi for media: {media_id}. {error}")
             return None
 
     def add_sequence(self):
         """Increase sequence counter table, return value"""
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = """INSERT INTO sequence DEFAULT VALUES;"""
             cursor.execute(command)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             return id
         except sqlite3.Error as error:
-            self.logger.error("Failed to add sequence: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to add sequence: {error}")
             return None
 
     def add_camera(self, name: str, station_id: int):
@@ -374,19 +367,15 @@ class MatchyPatchyDB():
             - station_id (int) NOT NULL
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = """INSERT INTO camera (name, station_id) VALUES (?, ?);"""
             data_tuple = (name, station_id)
             cursor.execute(command, data_tuple)
             camera_id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             return camera_id
         except sqlite3.Error as error:
             self.logger.error(f"Failed to add camera: {error}")
-            if db:
-                db.close()
             return None
 
     def add_thumbnail(self, table, fid, filepath):
@@ -398,49 +387,37 @@ class MatchyPatchyDB():
             - filepath (str): path to thumbnail image
         """
         try:
-            db = sqlite3.connect(self.filepath, timeout=10)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = f"""INSERT INTO {table}_thumbnails (fid, filepath) VALUES (?, ?);"""
             data_tuple = (fid, filepath)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             return id
         
         # filepath already exists
         except sqlite3.IntegrityError as error:
             if 'UNIQUE constraint failed: media_thumbnails.fid' in error.args[0]:
                 self.logger.error("Failed to add thumbnail, already exists in database.")
-                if db:
-                    db.close()
                 return "duplicate_error"
             if 'UNIQUE constraint failed: roi_thumbnails.fid' in error.args[0]:
                 self.logger.error("Failed to add thumbnail, already exists in database.")
-                if db:
-                    db.close()
                 return "duplicate_error"
         except sqlite3.Error as error:
-            self.logger.error("Failed to add thumbnail: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to add thumbnail: {error}")
             return None
 
     def copy(self, table, id):
         """Copy a row from a table by id"""
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = f"""INSERT INTO {table} SELECT * FROM table WHERE id={id};"""
             cursor.execute(command)
             id = cursor.lastrowid
-            db.commit()
-            db.close()
+            self.db.commit()
             return id
         except sqlite3.Error as error:
-            self.logger.error("Failed to copy row: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to copy row: {error}")
             return None
 
     # EDIT ---------------------------------------------------------------------
@@ -456,8 +433,7 @@ class MatchyPatchyDB():
             - quiet (bool): if False, prints the executed command
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             # convert empty values to SQL NULL
             for key, value in replace.items():
                 if value in (None, ''):
@@ -471,13 +447,10 @@ class MatchyPatchyDB():
             if not quiet:
                 print(command)
             cursor.execute(command)
-            db.commit()
-            db.close()
+            self.db.commit()
             return True
         except sqlite3.Error as error:
-            self.logger.error("Failed to update table: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to update table: {error}")
             return False
 
     def select(self, table: str, columns: str = "*", row_cond: Optional[str] = None, quiet=True):
@@ -492,8 +465,7 @@ class MatchyPatchyDB():
             - quiet (bool): if False, prints the executed command
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             if row_cond:
                 command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
             else:
@@ -502,12 +474,9 @@ class MatchyPatchyDB():
                 print(command)
             cursor.execute(command)
             rows = cursor.fetchall()
-            db.close()
             return rows
         except sqlite3.Error as error:
             self.logger.error("Failed fetch: ", error)
-            if db:
-                db.close()
             return None
 
     def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None, quiet=True):
@@ -524,8 +493,7 @@ class MatchyPatchyDB():
             - quiet (bool): if False, prints the executed command
         """
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             if row_cond:
                 command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond} WHERE {row_cond};'
             else:
@@ -535,19 +503,15 @@ class MatchyPatchyDB():
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
-            db.close()
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error("Failed fetch: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed fetch: {error}")
             return None, None
 
     def all_media(self, row_cond: Optional[str] = None):
         """Return joined roi and media info for Media Table"""
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
                          roi.media_id, roi.individual_id, emb, filepath, ext, timestamp,
                          station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age"""
@@ -561,19 +525,15 @@ class MatchyPatchyDB():
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
-            db.close()
             return rows, column_names
         except sqlite3.Error as error:
             self.logger.error("Failed all_media fetch:", error)
-            if db:
-                db.close()
             return None, None
 
     def stations(self, row_cond=None):
         """Return joined station, survey, region info"""
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             columns = """station.id, station.name, lat, long, station.survey_id, survey.name, region.name"""
             if row_cond:
                 command = f"""SELECT {columns} FROM station LEFT JOIN survey ON station.survey_id = survey.id
@@ -585,82 +545,64 @@ class MatchyPatchyDB():
             cursor.execute(command)
             column_names = columns.split(", ")
             rows = cursor.fetchall()  # returns in tuple
-            db.close()
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error("Failed all_media fetch:", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed all_media fetch: {error}")
             return None, None
 
     def count(self, table):
         """Return the number of entries in a given table"""
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
             row_count = cursor.fetchone()[0]
-            db.close()
             return row_count
         except sqlite3.Error as error:
-            self.logger.error(f"Failed to count for {table}:", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to count for {table}: {error}")
             return None
 
     # DELETE -------------------------------------------------------------------
     def delete(self, table, cond):
         """Delete Entries From table Given condition"""
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = f'DELETE FROM {table} WHERE {cond};'
             print(command)
             cursor.execute(command)
-            db.commit()
-            db.close()
+            self.db.commit()
             self.logger.info(f"Deleted from {table} where {cond}")
             return True
         except sqlite3.Error as error:
-            self.logger.error("Failed delete: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed delete: {error}")
             return False
 
     def clear(self, table):
         """Clear a table without dropping it"""
         try:
-            db = sqlite3.connect(self.filepath)
-            cursor = db.cursor()
+            cursor = self.db.cursor()
             command = f'DELETE FROM {table};'
             cursor.execute(command)
-            db.commit()
-            db.close()
+            self.db.commit()
             self.logger.info(f"Cleared table {table}")
             return True
         except sqlite3.Error as error:
-            self.logger.error(f"Failed to clear {table}: ", error)
-            if db:
-                db.close()
+            self.logger.error(f"Failed to clear {table}: {error}")
             return False
 
     # EMBEDDINGS ===============================================================
     def add_emb(self, id, embedding):
         """Add embedding to chroma vector database"""
-        client = chromadb.PersistentClient(str(self.chroma_filepath))
-        collection = client.get_collection(name="embedding_collection")
+        collection = self.chroma.get_collection(name="embedding_collection")
         collection.add(embeddings=[embedding], ids=[str(id)])
 
     def delete_emb(self, id):
         """Delete embedding from chroma vector database"""
-        client = chromadb.PersistentClient(str(self.chroma_filepath))
-        collection = client.get_collection(name="embedding_collection")
+        collection = self.chroma.get_collection(name="embedding_collection")
         collection.delete(ids=[str(id)])
 
     def knn(self, query_id, k=3):
         """Get k nearest neighbors of a query ROI from chroma vector database"""
-        client = chromadb.PersistentClient(str(self.chroma_filepath))
-        collection = client.get_collection(name="embedding_collection")
+        collection = self.chroma.get_collection(name="embedding_collection")
         query = collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
         # Check if query is empty, ie false positives
         if len(query) == 0:
@@ -669,8 +611,7 @@ class MatchyPatchyDB():
         return knn
 
     def calculate_similarity(self, query_id, match_id):
-        client = chromadb.PersistentClient(str(self.chroma_filepath))
-        collection = client.get_collection(name="embedding_collection")
+        collection = self.chroma.get_collection(name="embedding_collection")
 
         results1 = collection.get(ids=[str(query_id)], include=["embeddings"])
         results2 = collection.get(ids=[str(match_id)], include=["embeddings"])
@@ -689,7 +630,6 @@ class MatchyPatchyDB():
 
     def clear_emb(self):
         """Clear vector database and rebuild (no way to delete)"""
-        client = chromadb.PersistentClient(str(self.chroma_filepath))
-        client.delete_collection(name="embedding_collection")
-        setup_chromadb(self.key, self.chroma_filepath)
+        self.chroma.delete_collection(name="embedding_collection")
+        self.chroma = setup_chromadb(self.key, self.chroma_filepath)
         self.logger.info("Chroma vector database cleared and rebuilt.")

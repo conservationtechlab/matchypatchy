@@ -86,15 +86,19 @@ class DisplayMedia(QWidget):
         second_layer = QHBoxLayout()
         second_layer.addSpacing(5)
 
-        self.filterbar = FilterBar(self, 200)
+        self.filterbar = FilterBar(self, 180)
         second_layer.addWidget(self.filterbar, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.filters = self.filterbar.get_filters()  # get initial filters
 
         button_filter = QPushButton("Apply Filters")
         button_filter.clicked.connect(self.filter_table)
+
+        button_clear_filter = QPushButton("Clear Filters")
+        button_clear_filter.clicked.connect(self.clear_filters)
         
         second_layer.addWidget(button_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(button_clear_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         second_layer.addStretch()
         layout.addLayout(second_layer)
@@ -165,7 +169,7 @@ class DisplayMedia(QWidget):
         # get current filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
-
+        self.toggle_filterbar_datatype()
 
     def filter_table(self):
         """
@@ -173,10 +177,24 @@ class DisplayMedia(QWidget):
         Run after any setting is changed and filter button is pressed
         """
         self.filters = self.filterbar.get_filters()
-        self.valid_stations = self.filterbar.get_valid_stations()
+        self.valid_stations = self.filterbar.get_valid_stations() 
+        self.toggle_filterbar_datatype()
         self.media_table.filter()
         self.update_count_label()
 
+    def toggle_filterbar_datatype(self):
+        """Toggle visibility of filter bar elements based on data type"""
+        self.filterbar.individual_visible(self.data_type == 1)
+        self.filterbar.unidentified_visible(self.data_type == 1)
+        self.filterbar.favorites_visible(self.data_type == 1)
+        self.filterbar.viewpoint_visible(self.data_type == 1)
+        self.filterbar.no_roi_visible(self.data_type == 0)
+
+    def clear_filters(self):
+        """Clear all filters and refresh the table"""
+        self.refresh_filters()
+        self.media_table.filter()
+        self.update_count_label()
     # =========================================================================
     # MEDIA TABLE HANDLERS
     # =========================================================================
@@ -192,15 +210,15 @@ class DisplayMedia(QWidget):
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
                 self.home()
-                del dialog
+            del dialog
             return False
         else:
             if self.data_type == 1 and roi_n == 0:
                 # no rois, default to full images
                 self.data_type = 0
                 dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
-                if dialog.exec():
-                    del dialog
+                dialog.exec()
+                del dialog
                 self.show_type.blockSignals(True)
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
@@ -228,10 +246,12 @@ class DisplayMedia(QWidget):
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
                 return
-
+            
+        # change type to selected
         self.data_type = self.show_type.currentIndex()
         # reload table
         self.load_table()
+        self.toggle_filterbar_datatype()
         # Disable "Edit Rows" if not in ROI mode
         self.update_buttons()
         self.update_count_label()
@@ -376,22 +396,20 @@ class DisplayMedia(QWidget):
                 for row in self.selected_rows:
                     if self.data_type == 0:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                        self.mpDB.delete('media', f'id={id}')
                         # delete all rois associated with this media
                         rois = fetch_roi(self.mpDB, media_id=id)
                         if len(rois) > 0:
                             for roi in rois['roi_id']:
-                                self.mpDB.delete('roi', f"id={roi}")
                                 self.mpDB.delete_emb(id=roi)
+                        # cascade delete will handle associated roi_thumbnails and roi entries
+                        self.mpDB.delete('media', f'id={id}')
+                        
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                        self.mpDB.delete('roi', f'id={id}')
                         self.mpDB.delete_emb(id=id)
-
-                del dialog
-                # Clear selection and update UI
-                self.media_table.table.clearSelection()
+                        self.mpDB.delete('roi', f'id={id}')
                 # Reload updated data
                 self.load_table()
                 self.update_buttons()
                 self.update_count_label()
+            del dialog
