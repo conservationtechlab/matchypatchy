@@ -10,7 +10,7 @@ from random import randrange
 import numpy as np
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
-from matchypatchy.config import resource_path
+from matchypatchy.config import asset_path
 from matchypatchy.database.location import TZ_CONVERT_DICT
 from matchypatchy import __version__
 
@@ -97,7 +97,7 @@ class MatchyPatchyDB():
         for name, obj_type, sql in schema:
             s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
 
-        schema_path = resource_path('assets/schema.txt')
+        schema_path = asset_path('schema.txt')
         with open(schema_path, 'r') as file:
             content = file.read()
         match_schema = (content==s)

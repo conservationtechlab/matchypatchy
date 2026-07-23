@@ -9,10 +9,10 @@ from pathlib import Path
 from PyQt6.QtGui import QImage
 from PyQt6.QtCore import Qt, QRect
 
-from matchypatchy.config import resource_path
+from matchypatchy.config import asset_path
 
 
-THUMBNAIL_NOTFOUND = "assets/graphics/thumbnail_notfound.png"
+THUMBNAIL_NOTFOUND = "graphics/thumbnail_notfound.png"
 THUMBNAIL_SIZE = 150
 
 
@@ -39,7 +39,7 @@ def save_media_thumbnail(thumbnail_dir, filepath, ext):
         # save the image
         scaled_image.save(thumbnail_filepath, format="JPG")
     else:
-        thumbnail_filepath = str(resource_path(THUMBNAIL_NOTFOUND))
+        thumbnail_filepath = str(asset_path(THUMBNAIL_NOTFOUND))
 
     return thumbnail_filepath
 
@@ -74,7 +74,7 @@ def save_roi_thumbnail(thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox
         # save the image
         scaled_image.save(thumbnail_filepath, format="JPG")
     else:
-        thumbnail_filepath = str(resource_path(THUMBNAIL_NOTFOUND))
+        thumbnail_filepath = str(asset_path(THUMBNAIL_NOTFOUND))
 
     return thumbnail_filepath
 
