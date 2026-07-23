@@ -14,24 +14,35 @@ HOME_DIR = Path.cwd()
 def resource_path(relative_path):
     """ Get path to resource whether running in dev or PyInstaller bundle """
     if getattr(sys, 'frozen', False):
+        print("frozen")
         return os.path.join(sys._MEIPASS, relative_path)
     
     if "__file__" in globals() or "__file__" in locals():
+        current_location = Path(__file__).resolve()
+        if 'site-packages' in current_location.parts:
+            matchypatchy_dir = current_location.parents[0]  # Go up 1 level
+        else:
+            matchypatchy_dir = current_location.parents[2]  # Go up 2 levels
         # Assumes this function is in src/matchypatchy/
-        matchypatchy_dir = Path(__file__).resolve().parents[2]  # Go up 1 level to src/matchypatchy
-        print(matchypatchy_dir)
         return matchypatchy_dir / relative_path
     
     return os.path.abspath(relative_path)
 
 def asset_path(relative_path):
     """ Get path to resource whether running in dev or PyInstaller bundle """
+    print(relative_path)
     if getattr(sys, 'frozen', False):
         return os.path.join(sys._MEIPASS, relative_path)
     
     if "__file__" in globals() or "__file__" in locals():
         # Assumes this function is in src/matchypatchy/
-        matchypatchy_dir = Path(__file__).resolve().parents[0]  # Go up 1 level to src/matchypatchy
+        current_location = Path(__file__).resolve()
+        
+        if 'site-packages' in current_location.parts:
+            matchypatchy_dir = current_location.parents[0]  # Go up 1 level
+        else:
+            matchypatchy_dir =current_location
+
         return matchypatchy_dir / 'assets' / relative_path
     
     return os.path.abspath(relative_path)

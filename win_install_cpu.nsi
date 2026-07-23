@@ -4,8 +4,8 @@
 !define APP_VERSION "0.1.4"
 
 Name "MatchyPatchy"
-OutFile "MatchyPatchy-v0.1.4-GPU-Setup.exe"
-; Per-user install (no admin required). Change to RequestExecutionLevel admin + SetShellVarContext all if you want system-wide install.
+OutFile "MatchyPatchy-v0.1.4-CPU-Setup.exe"
+; Per-user install (no admin required)
 InstallDir "$LOCALAPPDATA\MatchyPatchy"
 
 !include "MUI2.nsh"
@@ -53,61 +53,37 @@ FunctionEnd
 ; -------------------------
 Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SectionIn RO  ; This section is required (read-only, can't be unchecked)
-  AddSize 3015000;
 
   ; Create install folder
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
-  ; Include pip requirements
-  File "installation\windows\win_cuda12_requirements.txt"
+  ; Include pip requirements and launcher
   File "installation\windows\launcher.vbs"
 
-  ; Include python env
+  ; Include python
   DetailPrint "Installing Python 3.13.."
   SetOutPath "$INSTDIR\python_env"
   CreateDirectory "$INSTDIR\python_env"
   File /r "installation\windows\python_env\*.*"
 
+  ; Write uninstaller
+  WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-  ; -------------------------------------------------------------
-  ; Begin Install
-  DetailPrint "Installing GPU requirements.."
-    
-  ; Uninstall CPU version
-  DetailPrint "Uninstalling onnxruntime (CPU)..."
-  nsExec::ExecToLog '"$INSTDIR\python_env\python.exe" -m pip uninstall -y onnxruntime'
-  Pop $0
-  ; Ignore errors
-  
-  ; Install GPU version
-  DetailPrint "Installing onnxruntime-gpu..."
-  nsExec::ExecToLog '"$INSTDIR\python_env\python.exe" -m pip install -r "$INSTDIR\win_cuda12_requirements.txt"'
-  Pop $1
-  IntCmp $1 0 install_gpu_ok pip_install_failed pip_install_failed
+  ; Write registry keys for version tracking and Add/Remove Programs
+  WriteRegStr HKCU "Software\MatchyPatchy" "Version" "${APP_VERSION}"
+  WriteRegStr HKCU "Software\MatchyPatchy" "Install_Dir" "$INSTDIR"
 
-  pip_install_failed:
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install GPU requirements online (exit code $1). Check the installer details for more information."
-    Abort
+  ; Register in Add/Remove Programs
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayName" "MatchyPatchy"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayVersion" "${APP_VERSION}"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "Conservation Technology Lab"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico"
 
-  install_gpu_ok:
-    ; Write uninstaller
-    WriteUninstaller "$INSTDIR\Uninstall.exe"
-
-    ; Write registry keys for version tracking and Add/Remove Programs
-    WriteRegStr HKCU "Software\MatchyPatchy" "Version" "${APP_VERSION}"
-    WriteRegStr HKCU "Software\MatchyPatchy" "Install_Dir" "$INSTDIR"
-
-    ; Register in Add/Remove Programs
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayName" "MatchyPatchy"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayVersion" "${APP_VERSION}"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "SDZWA Conservation Technology Lab"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
-    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
-    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\python_env\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico"
-
-    DetailPrint "Installation complete."
+  DetailPrint "Installation complete."
 
 SectionEnd
 
@@ -130,7 +106,7 @@ Section "Start Menu Shortcuts" SEC_STARTMENU
   CreateShortCut "$SMPROGRAMS\MatchyPatchy\MatchyPatchy.lnk" \
     "$INSTDIR\launcher.vbs" \
     "" \
-    "$INSTDIR\python_env\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico" \
+    "$INSTDIR\Lib\site_packages\matchypatchy\assets\graphics\desktop_icon.ico" \
     0 \
     SW_SHOWNORMAL \
     "" \
@@ -159,11 +135,9 @@ Section "Uninstall"
 
   ; Remove files
   Delete "$INSTDIR\launcher.vbs"
-  Delete "$INSTDIR\win_cuda12_requirements.txt"
   Delete "$INSTDIR\matchypatchy.log"
   Delete "$INSTDIR\launcher.log"
   RMDir /r "$INSTDIR\python_env"
-
 
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
