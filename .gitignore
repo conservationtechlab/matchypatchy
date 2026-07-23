@@ -13,6 +13,7 @@ Models/
 MatchyPatchy-Share/
 installation/windows/python_env/
 installation/windows/python_env_base/
+installation/windows/python_env_gpu/
 installation/windows/wheels/
 config.yml
 

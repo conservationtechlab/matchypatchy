@@ -4,7 +4,7 @@
 !define APP_VERSION "0.1.4"
 
 Name "MatchyPatchy"
-OutFile "MatchyPatchy-v0.1.4-CPU-Setup.exe"
+OutFile "MatchyPatchy-v0.1.4-GPU-Setup.exe"
 ; Per-user install (no admin required)
 InstallDir "$LOCALAPPDATA\MatchyPatchy"
 
@@ -61,11 +61,11 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   ; Include pip requirements and launcher
   File "installation\windows\launcher.vbs"
 
-  ; Include python env
+  ; Include python
   DetailPrint "Installing Python 3.13.."
   SetOutPath "$INSTDIR\python_env"
   CreateDirectory "$INSTDIR\python_env"
-  File /r "installation\windows\python_env\*.*"
+  File /r "installation\windows\python_env_gpu\*.*"
 
   ; Write uninstaller
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -77,7 +77,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   ; Register in Add/Remove Programs
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayName" "MatchyPatchy"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayVersion" "${APP_VERSION}"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "SDZWA Conservation Technology Lab"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "Conservation Technology Lab"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
