@@ -246,7 +246,8 @@ class DisplayMedia(QWidget):
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
                 return
-
+            
+        # change type to selected
         self.data_type = self.show_type.currentIndex()
         # reload table
         self.load_table()
@@ -395,22 +396,20 @@ class DisplayMedia(QWidget):
                 for row in self.selected_rows:
                     if self.data_type == 0:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                        self.mpDB.delete('media', f'id={id}')
                         # delete all rois associated with this media
                         rois = fetch_roi(self.mpDB, media_id=id)
                         if len(rois) > 0:
                             for roi in rois['roi_id']:
-                                self.mpDB.delete('roi', f"id={roi}")
                                 self.mpDB.delete_emb(id=roi)
+                        # cascade delete will handle associated roi_thumbnails and roi entries
+                        self.mpDB.delete('media', f'id={id}')
+                        
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                        self.mpDB.delete('roi', f'id={id}')
                         self.mpDB.delete_emb(id=id)
-
-                del dialog
-                # Clear selection and update UI
-                self.media_table.table.clearSelection()
+                        self.mpDB.delete('roi', f'id={id}')
                 # Reload updated data
                 self.load_table()
                 self.update_buttons()
                 self.update_count_label()
+            del dialog
