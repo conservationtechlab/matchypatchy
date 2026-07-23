@@ -62,17 +62,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SetOutPath "$INSTDIR"
 
   ; Include pip requirements and launcher
-  File "installation\windows\win_cpu_requirements.txt"
   File "installation\windows\launcher.vbs"
-  File "ABOUT.md"
-  File "README.md"
-  File "LICENSE"
-
-  ; Recursively include and extract the 'matchypatchy' package directory
-  DetailPrint "Installing matchypatchy files..."
-  SetOutPath "$INSTDIR\matchypatchy"
-  CreateDirectory "$INSTDIR\matchypatchy"
-  File /r "matchypatchy_package\*.*"
 
   ; Recursively include and extract the 'assets' directory
   DetailPrint "Installing assets..."
@@ -82,68 +72,27 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
 
   ; Include python
   DetailPrint "Installing Python 3.13.."
-  SetOutPath "$INSTDIR\python"
-  CreateDirectory "$INSTDIR\python"
-  File /r "installation\windows\python-portable\*.*"
+  SetOutPath "$INSTDIR\python_env"
+  CreateDirectory "$INSTDIR\python_env"
+  File /r "installation\windows\python_env\*.*"
 
-  ; Include wheels
-  DetailPrint "Copying dependencies..."
-  SetOutPath "$INSTDIR\wheels"
-  CreateDirectory "$INSTDIR\wheels"
-  File /r "installation\windows\wheels\*.*"
+  ; Write uninstaller
+  WriteUninstaller "$INSTDIR\Uninstall.exe"
 
-  ; -------------------------------------------------------------
-  ; Begin Install
-  DetailPrint "Installing dependencies..."
-  StrCpy $R5 "$INSTDIR\wheels"
-  StrCpy $R6 "$INSTDIR\win_cpu_requirements.txt"
-  ExecToLog "$INSTDIR\python\python.exe -m pip install --no-index --find-links "$R5" -r "$R6"'
-  Pop $0
-  IntCmp $0 0 install_mp pip_install_failed pip_install_failed
+  ; Write registry keys for version tracking and Add/Remove Programs
+  WriteRegStr HKCU "Software\MatchyPatchy" "Version" "${APP_VERSION}"
+  WriteRegStr HKCU "Software\MatchyPatchy" "Install_Dir" "$INSTDIR"
 
-  pip_install_failed:
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install Python requirements (exit code $1). Check the installer details for more information."
-    Abort
+  ; Register in Add/Remove Programs
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayName" "MatchyPatchy"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayVersion" "${APP_VERSION}"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "Conservation Technology Lab"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\assets\graphics\desktop_icon.ico"
 
-  install_mp:
-    ; continue with install of matchypatchy
-    DetailPrint "Requirements installed successfully."
-    DetailPrint "Installing packaged project from $INSTDIR\matchypatchy (log: $R0)..."
-
-    ; Recommended for production: non-editable installation from directory (builds a wheel)
-    nsExec::ExecToLog '"$INSTDIR\python\python.exe" -m pip install --no-deps -e "$INSTDIR\\matchypatchy"'
-    Pop $0
-    IntCmp $0 0 install_mp_ok install_mp_failed install_mp_failed
-
-  install_mp_ok:
-      DetailPrint "MatchyPatchy package installed successfully."
-      Goto local_done
-
-  install_mp_failed:
-      MessageBox MB_OK|MB_ICONEXCLAMATION "Failed to install from $INSTDIR\\matchypatchy (see $R0 for pip output). The installer will abort."
-      Abort
-
-  local_done:
-      ; (continue)
-      StrCpy $R2 "" ; clear helper var
-
-    ; Write uninstaller
-    WriteUninstaller "$INSTDIR\Uninstall.exe"
-
-    ; Write registry keys for version tracking and Add/Remove Programs
-    WriteRegStr HKCU "Software\MatchyPatchy" "Version" "${APP_VERSION}"
-    WriteRegStr HKCU "Software\MatchyPatchy" "Install_Dir" "$INSTDIR"
-
-    ; Register in Add/Remove Programs
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayName" "MatchyPatchy"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayVersion" "${APP_VERSION}"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "Conservation Technology Lab"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
-    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
-    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayIcon" "$INSTDIR\assets\graphics\desktop_icon.ico"
-
-    DetailPrint "Installation complete."
+  DetailPrint "Installation complete."
 
 SectionEnd
 
@@ -195,16 +144,12 @@ Section "Uninstall"
 
   ; Remove files
   Delete "$INSTDIR\launcher.vbs"
-  Delete "$INSTDIR\win_py312_cpu_requirements.txt"
-  Delete "$INSTDIR\win_py313_cpu_requirements.txt"
   Delete "$INSTDIR\matchypatchy.log"
   Delete "$INSTDIR\launcher.log"
   
   ; Remove directories
-  RMDir /r "$INSTDIR\venv"
+  RMDir /r "$INSTDIR\python_env"
   RMDir /r "$INSTDIR\assets"
-  RMDir /r "$INSTDIR\wheels"
-  RMDir /r "$INSTDIR\matchypatchy"
 
   Delete "$INSTDIR\Uninstall.exe"
   RMDir "$INSTDIR"
