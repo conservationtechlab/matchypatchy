@@ -12,9 +12,9 @@ import animl
 HOME_DIR = Path.cwd()
 
 def resource_path(relative_path):
-    """ Get path to resource whether running in dev or PyInstaller bundle """
+    # TODO: test with installer 
+    """ Get path to resource whether running in dev or installed bundle """
     if getattr(sys, 'frozen', False):
-        print("frozen")
         return os.path.join(sys._MEIPASS, relative_path)
     
     if "__file__" in globals() or "__file__" in locals():
@@ -28,20 +28,19 @@ def resource_path(relative_path):
     
     return os.path.abspath(relative_path)
 
+
 def asset_path(relative_path):
-    """ Get path to resource whether running in dev or PyInstaller bundle """
-    print(relative_path)
+    """ Get path to resource whether running in dev or installed bundle """
     if getattr(sys, 'frozen', False):
         return os.path.join(sys._MEIPASS, relative_path)
     
     if "__file__" in globals() or "__file__" in locals():
-        # Assumes this function is in src/matchypatchy/
         current_location = Path(__file__).resolve()
         
         if 'site-packages' in current_location.parts:
-            matchypatchy_dir = current_location.parents[0]  # Go up 1 level
+            matchypatchy_dir = current_location.parents[0]  # tbd
         else:
-            matchypatchy_dir =current_location
+            matchypatchy_dir =current_location.parents[0]
 
         return matchypatchy_dir / 'assets' / relative_path
     

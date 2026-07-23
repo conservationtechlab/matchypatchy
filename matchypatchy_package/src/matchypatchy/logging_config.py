@@ -2,6 +2,7 @@ import logging
 import logging.handlers
 from pathlib import Path
 
+
 def setup_logger(log_file="matchypatchy.log", log_level=logging.INFO):
     """
     Setup application-wide logger that all modules can use.
@@ -43,6 +44,7 @@ def setup_logger(log_file="matchypatchy.log", log_level=logging.INFO):
     root_logger.addHandler(console_handler)
     
     return root_logger
+
 
 def get_logger(name):
     """
