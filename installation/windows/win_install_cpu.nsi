@@ -61,7 +61,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   ; Include pip requirements and launcher
   File "installation\windows\launcher.vbs"
 
-  ; Include python
+  ; Include python env
   DetailPrint "Installing Python 3.13.."
   SetOutPath "$INSTDIR\python_env"
   CreateDirectory "$INSTDIR\python_env"
@@ -77,7 +77,7 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   ; Register in Add/Remove Programs
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayName" "MatchyPatchy"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "DisplayVersion" "${APP_VERSION}"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "Conservation Technology Lab"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "Publisher" "SDZWA Conservation Technology Lab"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "UninstallString" "$INSTDIR\Uninstall.exe"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy" "NoRepair" 1
