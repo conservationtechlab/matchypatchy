@@ -26,6 +26,7 @@ class MatchyPatchyDB():
         if self.filepath.is_file() and self.chroma_filepath.is_dir():
             # initialize
             self.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
+            self.collection = self.chroma.get_collection(name="embedding_collection")
             # check key
             self.key = self.validate()
 
@@ -39,6 +40,7 @@ class MatchyPatchyDB():
         self.db  # Trigger property initialization
         setup_database(self.key, self.filepath, self.db)
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
+        self.collection = self.chroma.get_collection(name="embedding_collection")
         # add default region and survey
         timezone = str(datetime.datetime.now().astimezone().tzname())
         timezone = TZ_CONVERT_DICT.get(timezone, timezone)
@@ -592,29 +594,24 @@ class MatchyPatchyDB():
     # EMBEDDINGS ===============================================================
     def add_emb(self, id, embedding):
         """Add embedding to chroma vector database"""
-        collection = self.chroma.get_collection(name="embedding_collection")
-        collection.add(embeddings=[embedding], ids=[str(id)])
+        self.collection.add(embeddings=[embedding], ids=[str(id)])
 
     def delete_emb(self, id):
         """Delete embedding from chroma vector database"""
-        collection = self.chroma.get_collection(name="embedding_collection")
-        collection.delete(ids=[str(id)])
+        self.collection.delete(ids=[str(id)])
 
     def knn(self, query_id, k=3):
         """Get k nearest neighbors of a query ROI from chroma vector database"""
-        collection = self.chroma.get_collection(name="embedding_collection")
-        query = collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
+        query = self.collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
         # Check if query is empty, ie false positives
         if len(query) == 0:
             return {'ids': [[]], 'distances': [[]]}
-        knn = collection.query(query_embeddings=query, n_results=k + 1)
+        knn = self.collection.query(query_embeddings=query, n_results=k + 1)
         return knn
 
     def calculate_similarity(self, query_id, match_id):
-        collection = self.chroma.get_collection(name="embedding_collection")
-
-        results1 = collection.get(ids=[str(query_id)], include=["embeddings"])
-        results2 = collection.get(ids=[str(match_id)], include=["embeddings"])
+        results1 = self.collection.get(ids=[str(query_id)], include=["embeddings"])
+        results2 = self.collection.get(ids=[str(match_id)], include=["embeddings"])
 
         emb1 = results1['embeddings'][0]
         emb2 = results2['embeddings'][0]
@@ -626,10 +623,11 @@ class MatchyPatchyDB():
         norm1 = np.linalg.norm(emb1)
         norm2 = np.linalg.norm(emb2)
         similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
-        return similarity
+        return float(similarity)
 
     def clear_emb(self):
         """Clear vector database and rebuild (no way to delete)"""
         self.chroma.delete_collection(name="embedding_collection")
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
+        self.collection = self.chroma.get_collection(name="embedding_collection")
         self.logger.info("Chroma vector database cleared and rebuilt.")

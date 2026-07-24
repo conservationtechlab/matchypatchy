@@ -220,7 +220,7 @@ class MediaTable(QWidget):
                 self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
 
         else:
-            if len(filters['no_roi_mids']) > 0:
+            if filters['no_roi_mids'] is not False:
                 self.data_filtered = self.data_filtered[self.data_filtered['id'].isin(filters['no_roi_mids'])]
 
         self.data_filtered.reset_index(inplace=True)

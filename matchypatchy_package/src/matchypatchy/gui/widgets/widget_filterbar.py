@@ -17,7 +17,6 @@ class FilterBar(QWidget):
         self.mpDB = parent.mpDB
         self.size = size
         self.filters = {}
-        self.no_roi_mids = [] # empty list
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
 
         layout = QHBoxLayout()
@@ -53,6 +52,7 @@ class FilterBar(QWidget):
         # No ROI Filter
         self.no_roi = QCheckBox("No ROI")
         self.no_roi.toggled.connect(self.select_no_roi)
+        self.no_roi_mids = False
         layout.addWidget(self.no_roi, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # UNIDENTIFIED
@@ -106,10 +106,11 @@ class FilterBar(QWidget):
         # Reset unidentified and favorites checkboxes
         self.unidentified_only = False
         self.favorites_only = False
+        self.no_roi_mids = False
         self.unidentified.setChecked(False)
         self.favorites.setChecked(False)
         self.no_roi.setChecked(False)
-        self.no_roi_mids = [] # empty list
+
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
@@ -124,7 +125,10 @@ class FilterBar(QWidget):
             # TODO: Implement prefiltering for other filter types as needed
             if 'no_roi_mids' in prefilter.keys():
                 self.no_roi_mids = prefilter['no_roi_mids']
-                self.no_roi.setChecked(len(self.no_roi_mids) > 0)
+                if self.no_roi_mids is not False:
+                    self.no_roi.setChecked(True)
+                else:
+                    self.no_roi.setChecked(False)
 
             if 'unidentified_only' in prefilter.keys():
                 self.unidentified_only = prefilter['unidentified_only']
@@ -177,6 +181,8 @@ class FilterBar(QWidget):
                                       LEFT JOIN roi r ON m.id = r.media_id
                                       WHERE r.media_id IS NULL;""")
             self.no_roi_mids = [mid[0] for mid in mids]
+        else:
+            self.no_roi_mids = False
 
     def filter_surveys(self):
         """Filter surveys based on active region"""

@@ -2,7 +2,6 @@
 Class Definition for Query Object
 """
 import pandas as pd
-from itertools import product
 from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
