@@ -12,9 +12,9 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
-from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
 class ConfigPopup(QDialog):
@@ -58,6 +58,14 @@ class ConfigPopup(QDialog):
         button_add.setFixedWidth(30)
         directory_layout.addWidget(button_add)
         layout.addLayout(directory_layout)
+
+        # UPDATE UPLOADS DIRECTORIES -------------------------------------------
+        uploads_layout = QHBoxLayout()
+        self.button_uploads = QPushButton("Edit Source Directories")
+        self.button_uploads.setFixedWidth(self.column1_width)
+        self.button_uploads.clicked.connect(self.edit_uploads)
+        uploads_layout.addWidget(self.button_uploads, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addLayout(uploads_layout)
 
         # Visualizer Model
         visualizer_layout = QHBoxLayout()
@@ -131,7 +139,7 @@ class ConfigPopup(QDialog):
         cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(cuda_layout)
 
-        # MPDB KEY -----------------------------------------------------------------
+        # MPDB KEY -------------------------------------------------------------
         mpdbkey_layout = QHBoxLayout()
         mpdbkey_label = QLabel("Database Key:")
         mpdbkey_label.setToolTip("Unique identifier for the current database.")
@@ -280,3 +288,9 @@ class ConfigPopup(QDialog):
         elif selected_device == "CUDA-enabled GPU":
             self.cfg['DEVICE'] = "CUDAExecutionProvider"
         config.update(self.cfg)
+
+    def edit_uploads(self):
+        """Open the upload directories manager popup."""
+        dialog = UploadManagerPopup(self)
+        dialog.exec()
+        del dialog

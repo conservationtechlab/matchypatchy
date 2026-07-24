@@ -14,10 +14,10 @@ from matchypatchy.database.media import get_sha256
 class CSVImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, unique_images, selected_columns, logger):
+    def __init__(self, parent, unique_images, selected_columns):
         super().__init__()
-        self.mpDB = mpDB
-        self.logger = logger
+        self.mpDB = parent.mpDB
+        self.logger = parent.logger
         self.unique_images = unique_images
         self.selected_columns = selected_columns
         self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
@@ -199,10 +199,10 @@ class CSVImportThread(QThread):
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, active_survey, data, station_level, camera_level, logger):
+    def __init__(self, parent, active_survey, data, station_level, camera_level):
         super().__init__()
-        self.mpDB = mpDB
-        self.logger = logger
+        self.mpDB = parent.mpDB
+        self.logger = parent.logger
         self.active_survey = active_survey
         self.data = data
         self.station_level = station_level

@@ -300,7 +300,7 @@ class ImportCSVPopup(QDialog):
         print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
         self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
 
-        self.import_thread = CSVImportThread(self.mpDB, unique_images, selected_columns, self.logger)
+        self.import_thread = CSVImportThread(self, unique_images, selected_columns)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.close)
         self.import_thread.start()

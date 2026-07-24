@@ -213,8 +213,8 @@ class DisplayBase(QWidget):
         survey_selected = self.select_survey()
         if not survey_selected:
             dialog = AlertPopup(self, "Please select a survey before importing.")
-            if dialog.exec():
-                del dialog
+            dialog.exec()
+            del dialog
             return
         else:
             manifest = QFileDialog.getOpenFileName(self, "Open File",
@@ -223,8 +223,8 @@ class DisplayBase(QWidget):
             if manifest:
                 self.logger.info(f"Importing from manifest: {manifest}")
                 dialog = ImportCSVPopup(self, manifest)
-                if dialog.exec():
-                    del dialog
+                dialog.exec()
+                del dialog
 
     # STEP 1: Import from FOLDER
     def import_folder(self):
@@ -232,8 +232,8 @@ class DisplayBase(QWidget):
         survey_selected = self.select_survey()
         if not survey_selected:
             dialog = AlertPopup(self, "Please select a survey before importing.")
-            if dialog.exec():
-                del dialog
+            dialog.exec()
+            del dialog
             return
         else:
             directory = QFileDialog.getExistingDirectory(self, "Open File",
@@ -256,12 +256,9 @@ class DisplayBase(QWidget):
         result = ml_options_dialog.exec()
         if result == QDialog.DialogCode.Accepted:
             mloptions = ml_options_dialog.return_selections()
-            del ml_options_dialog
             self.process_images(mloptions)
 
-        # processing rejected
-        else:
-            del ml_options_dialog
+        del ml_options_dialog
 
     def process_images(self, mloptions):
         """Process images using selected machine learning options"""

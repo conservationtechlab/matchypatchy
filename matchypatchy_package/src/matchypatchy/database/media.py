@@ -9,8 +9,8 @@ IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
 
-def get_sha256(path: str | Path, 
-                chunk_size: int = 1024 * 1024) -> str:
+def get_sha256(path: str | Path,
+               chunk_size: int = 1024 * 1024) -> str:
     """
     Calculate the SHA256 hash of a file in chunks and return the hexadecimal to avoid adding duplicate files
     """
