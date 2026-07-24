@@ -1,20 +1,25 @@
+"""
+Class definition for MatchObject and FavoriteMatchObject
+"""
+
+
 class MatchObject():
+    """
+    Class definition for MatchObject, contains all matches for a given query sequence
+    """
     def __init__(self, sequence_id, filtered_neighbors, query_data, match_data):
-        self.sequence_id = sequence_id
-        self.query_data = query_data
-         # rank by distance first
-        self.neighbors = filtered_neighbors
-        self.query_data = query_data
-        self.match_data = match_data
+        self.sequence_id = sequence_id  # ID of the query sequence
+        self.neighbors = filtered_neighbors  # valid matches, will padded with full sequences
+        self.query_data = query_data # query ROI rows
+        self.match_data = match_data # match ROI rois
 
-        self.match_viewpoint_map = dict(zip(self.match_data['id'], self.match_data['viewpoint']))
-        self.query_viewpoint_map = dict(zip(self.query_data['id'], self.query_data['viewpoint']))
+        self.zip_viewpoint() # create dict of id:viewpoints for both sides
 
-        self.ranked_query_rids = []
-        self.ranked_matches = []
+        self.ranked_query_rids = []  # ranked query ROI IDs after ordering by viewpoint
+        self.ranked_matches = []  # ranked match tuples (roi_id, distance) after ordering by viewpoint
 
-        self.og_ranked_query_ids = []
-        self.og_ranked_matches = []
+        self.og_ranked_query_rids = []  # original ranked query ROI IDs
+        self.og_ranked_matches = []  # original ranked match tuples (roi_id, distance)
 
     def get_ranked_query_rids(self):
         return self.ranked_query_rids
@@ -102,12 +107,94 @@ class MatchObject():
             return True
         else: 
             selected_viewpoint = 1 if selected_viewpoint == 2 else selected_viewpoint # adjust for 1:any indexing in GUI
-            print(f"Toggling to {selected_viewpoint} viewpoint")
             available_queries = [rid for rid in self.og_ranked_query_rids if self.query_viewpoint_map[rid] == selected_viewpoint]
             available_matches = [match for match in self.og_ranked_matches if self.match_viewpoint_map[match[0]] == selected_viewpoint]
+            
+            # if no matches or query rois for selected viewpoint, show all matches and query rois
+            if len(available_matches) == 0 or len(available_queries) == 0:
+                self.ranked_matches = self.og_ranked_matches
+                self.ranked_query_rids = self.og_ranked_query_rids
+                return False
+            else:
+                self.ranked_query_rids = available_queries
+                self.ranked_matches = available_matches
+                return True
 
-            print(f"Available queries for selected viewpoint: {available_queries}")
-            print(f"Available matches for selected viewpoint: {available_matches}")
+
+class FavoriteMatchObject():
+    """
+    Class definition for FavoriteMatchObject, contains all favorited ROIS
+    """
+    def __init__(self, sequence_id, filtered_neighbors, query_data, match_data):
+        self.sequence_id = sequence_id
+        self.query_data = query_data
+        self.match_data = match_data
+        self.neighbors = filtered_neighbors # favorited rois and precalced distances
+        
+        # rank by distance first
+        self.zip_viewpoint()
+
+        self.ranked_query_rids = []
+        self.ranked_matches = []
+
+        self.og_ranked_query_rids = []
+        self.og_ranked_matches = []
+
+    def update(self, new_data):
+        self.neighbors = new_data[new_data['favorite'] == 1]
+
+    def zip_viewpoint(self):
+        self.query_viewpoint_map = dict(zip(self.query_data['id'], self.query_data['viewpoint']))
+        self.match_viewpoint_map = dict(zip(self.match_data.index, self.match_data['viewpoint']))
+
+    def get_ranked_query_rids(self):
+        if not self.ranked_query_rids:
+            self.order_matches()
+
+        return self.ranked_query_rids
+    
+    def get_ranked_matches(self):
+        if not self.ranked_matches:
+            self.order_matches()
+
+        return self.ranked_matches
+
+    def order_matches(self):        
+        """
+        Order neighbors by viewpoint 
+        """
+        # rezip in case data has changed
+        self.zip_viewpoint()
+
+        # determine viewpoint matches between query sequence and matched sequence
+        viewpoint_matches = {x for x in self.query_data['viewpoint'].values if x in self.match_data['viewpoint'].values}
+        viewpoint_matches.discard(None)  # remove unknown viewpoint category
+   
+        # reorder query sequence by viewpoint
+        self.og_ranked_query_rids = sorted(self.query_data['id'].values.astype(int).tolist(), 
+                                        key=lambda x: self.query_viewpoint_map[x] in viewpoint_matches, reverse=True)
+        # reorder matches by viewpoint
+        self.og_ranked_matches = sorted(self.neighbors,
+                                        key=lambda x: (self.match_viewpoint_map[x[0]] if self.match_viewpoint_map[x[0]] in viewpoint_matches 
+                                                       else float('inf')))
+        self.ranked_matches = self.og_ranked_matches
+        self.ranked_query_rids = self.og_ranked_query_rids
+        
+    def show_viewpoint(self, selected_viewpoint):
+        """
+        Toggle between viewpoints in match stack
+        """
+        # rezip in case data has changed
+        self.zip_viewpoint()
+        # reset to og order
+        if selected_viewpoint == 1:
+            self.ranked_matches = self.og_ranked_matches
+            self.ranked_query_rids = self.og_ranked_query_rids
+            return True
+        else: 
+            selected_viewpoint = 1 if selected_viewpoint == 2 else selected_viewpoint # adjust for 1:any indexing in GUI
+            available_queries = [rid for rid in self.og_ranked_query_rids if self.query_viewpoint_map[rid] == selected_viewpoint]
+            available_matches = [match for match in self.og_ranked_matches if self.match_viewpoint_map[match[0]] == selected_viewpoint]
             
             # if no matches or query rois for selected viewpoint, show all matches and query rois
             if len(available_matches) == 0 or len(available_queries) == 0:

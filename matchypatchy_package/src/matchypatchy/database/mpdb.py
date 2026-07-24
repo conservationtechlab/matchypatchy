@@ -623,7 +623,7 @@ class MatchyPatchyDB():
         norm1 = np.linalg.norm(emb1)
         norm2 = np.linalg.norm(emb2)
         similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
-        return similarity
+        return float(similarity)
 
     def clear_emb(self):
         """Clear vector database and rebuild (no way to delete)"""

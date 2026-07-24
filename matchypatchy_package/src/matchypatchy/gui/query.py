@@ -9,6 +9,7 @@ from matchypatchy.database.location import fetch_station_names_from_id
 
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
+from matchypatchy.threads.match_object import FavoriteMatchObject
 
 
 class QueryContainer(QObject):
@@ -47,12 +48,17 @@ class QueryContainer(QObject):
         self.empty_query = 0
         self.empty_match = 0
 
+        # FAVORITE Toggle
+        self.favorite_match_object = None
+        self.knn_match_object = None
+
     # STEP 0
     def load_data(self):
         """
         Calculates knn for all unvalidated images, ranks by smallest distance to NN
         """
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
+        # create favorite match object of user's favorited ROIs
         self.loaded_data.emit(self.data_raw)
         # no data
         if self.data_raw.empty:
@@ -200,6 +206,42 @@ class QueryContainer(QObject):
         self.update_matches()
 
         return viewpoint_available
+    
+    # FAVORITES ----------------------------------------------------------------
+    def set_match_favorites(self, active):
+        """Set the match favorites active state"""
+        
+        if active:
+            # reload data for updated favorites, no need to filter
+            self.load_data()
+            favorites = self.data_raw[self.data_raw['favorite'] == 1]
+            if favorites.empty:
+                # no favorite matches available, exit early
+                return
+
+            # store the current match object before switching to favorites
+            self.knn_match_object = self.current_match_object
+
+            # get "filtered neighbors", [(match_id, distance)]
+            filtered_neighbors = []
+            for index, _ in favorites.iterrows():
+                distance = 1 - self.mpDB.calculate_similarity(self.knn_match_object.query_data.iloc[0]['id'], index)
+                filtered_neighbors.append((index, distance))
+            
+            # create the favorite match object with the filtered neighbors
+            self.favorite_match_object = FavoriteMatchObject(self.knn_match_object.sequence_id,
+                                                             filtered_neighbors,
+                                                             query_data = self.knn_match_object.query_data,
+                                                             match_data = favorites)
+            # switch the current match object to the favorite match object
+            self.current_match_object = self.favorite_match_object
+        else:
+            # restore the original match object when deactivating favorites
+            self.current_match_object = self.knn_match_object
+            self.knn_match_object = None
+            self.favorite_match_object = None
+
+        self.update_matches()
 
     # RETURN INFO --------------------------------------------------------------------
     def is_existing_match(self):
