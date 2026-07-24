@@ -19,7 +19,15 @@ from matchypatchy.database.location import fetch_station_names_from_id
 class MediaEditPopup(QDialog):
     def __init__(self, parent, data, data_type, current_image_index=0, crop=False):
         super().__init__(parent)
-        self.setWindowTitle("View ROI")
+        self.parent = parent
+        # image roi == 1
+        if data_type == 1:
+            self.setWindowTitle("View ROI")
+            self.adjust_mode = 'zoom'
+        # media or video == 0  
+        else:
+            self.setWindowTitle("View Media")
+            self.adjust_mode = 'bbox'
         self.setFixedSize(1000, 500)
         self.mpDB = parent.mpDB
         self.data = data
@@ -28,6 +36,7 @@ class MediaEditPopup(QDialog):
         self.crop = crop
         self.current_image_index = current_image_index
         self.individuals = []
+        self.new_bbox = None
 
         # Layout ---------------------------------------------------------------
         container_layout = QVBoxLayout()
@@ -46,7 +55,8 @@ class MediaEditPopup(QDialog):
 
         # Image ----------------------------------------------------------------
         content_layout = QHBoxLayout()
-        self.image = MediaWidget()
+        self.image = MediaWidget(adjust_mode=self.adjust_mode)
+        self.image.new_bbox.connect(self.capture_new_bbox)
         content_layout.addWidget(self.image, 1)
         # Metadata
         self.metadatapanel = MetadataPanel(self)
@@ -67,6 +77,27 @@ class MediaEditPopup(QDialog):
         self.next_btn.clicked.connect(self.show_next_image)
         button_layout.addWidget(self.next_btn)
         self.check_next_buttons()
+
+        button_layout.addWidget(HorizontalSeparator())
+
+        self.edit_btn = QPushButton("Edit ROI")
+        self.edit_btn.clicked.connect(self.edit_roi)
+        self.edit_btn.setCheckable(True)
+        button_layout.addWidget(self.edit_btn)
+
+        self.save_roi_btn = QPushButton("Save ROI")
+        self.save_roi_btn.clicked.connect(self.save_roi)
+        self.save_roi_btn.setEnabled(False)
+        button_layout.addWidget(self.save_roi_btn)
+
+        self.reset_btn = QPushButton("Reset Image")
+        self.reset_btn.clicked.connect(self.reset)
+        button_layout.addWidget(self.reset_btn)
+
+        # Delete button
+        self.delete_btn = QPushButton("Delete Image")
+        self.delete_btn.clicked.connect(self.delete)
+        button_layout.addWidget(self.delete_btn)
 
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -167,6 +198,83 @@ class MediaEditPopup(QDialog):
         """Show next image in data"""
         self.current_image_index = (self.current_image_index + 1) % len(self.data)
         self.refresh()
+
+    def edit_roi(self):
+        """Edit current ROI"""
+        self.edit_btn.setChecked(True)
+        self.image.enable_drawing_mode(True)
+
+    def capture_new_bbox(self, bbox):
+        """Capture the new bounding box from the image widget and enable save button"""
+        self.new_bbox = bbox
+        print(f"New bbox captured: {self.new_bbox}")
+        self.save_roi_btn.setEnabled(True)
+
+    def save_roi(self):
+        """Save the drawn ROI"""
+        if self.new_bbox is not None:
+            # update an roi
+            if self.data_type == 1:
+                prompt = "This will update the existing ROI. Remember to save your changes and rerun step 2. Process to get new embeddings."
+                dialog = AlertPopup(self, prompt=prompt)
+                if dialog.exec():
+                    id = self.data.iloc[self.current_image_index]["id"] 
+                    self.metadatapanel.edit_stack.append({"id": id, "bbox": self.new_bbox})
+                del dialog
+
+            else:
+                prompt = "This will create a new ROI. You will need to rerun step 2. Process to get new embeddings."
+                dialog = AlertPopup(self, prompt=prompt)
+                
+                if dialog.exec():
+                    media_id = self.data.iloc[self.current_image_index]["id"]  # media
+                    filepath = self.data.iloc[self.current_image_index]["filepath"]
+                    ext = self.data.iloc[self.current_image_index]["ext"]
+
+                    frame = 0
+
+                    bbox_x = float(self.new_bbox['bbox_x'])
+                    bbox_y = float(self.new_bbox['bbox_y'])
+                    bbox_w = float(self.new_bbox['bbox_w'])
+                    bbox_h = float(self.new_bbox['bbox_h'])
+
+                    # do not add emb_id, to be determined later
+                    roi_id = self.mpDB.add_roi(int(media_id), frame,
+                                               bbox_x, bbox_y, bbox_w, bbox_h)
+                    
+                del dialog
+                
+            # turn off drawing mode and disable save button
+            self.image.enable_drawing_mode(False)
+            self.edit_btn.setChecked(False)
+            self.save_roi_btn.setEnabled(False)
+
+    def reset(self):
+        """Reset the image to its original state"""
+        self.new_bbox = None
+        self.image.reset()
+    
+    def delete(self):
+        """Delete current ROI"""
+        dialog = AlertPopup(self, prompt="Are you sure you want to delete this ROI? This action cannot be undone.")
+        if dialog.exec():
+            rid = self.data.iloc[self.current_image_index]["id"]  # roi
+            self.mpDB.delete('roi', f"id={rid}")
+            self.mpDB.delete_emb(id=rid)
+
+            self.data = self.data.drop(self.data.index[self.current_image_index]).reset_index(drop=True)
+            self.rids = self.data["id"].tolist()
+
+            # close if no more images left
+            if len(self.data) == 0:
+                self.parent.load_table()
+                self.close()
+                return
+
+            if self.current_image_index >= len(self.data):
+                self.current_image_index = len(self.data) - 1
+            
+        del dialog
 
 
 class MetadataPanel(QWidget):

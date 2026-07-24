@@ -145,6 +145,12 @@ class MainWindow(QMainWindow):
         self.Compare.refresh_filters()
         self.Compare.calculate_neighbors()
 
+    def _set_manual_view(self, selected_ids=None):
+        self.pages.setCurrentIndex(2)
+        self.Compare.setFocus()
+        self.Compare.refresh_filters()
+        self.Compare.compare_manual(selected_ids=selected_ids)
+
     # FILE =====================================================================
     def new(self):
         pass
@@ -169,17 +175,17 @@ class MainWindow(QMainWindow):
                 self.logger.info(f"Data exported to: {file_path}")
         else:
             dialog = AlertPopup(self, prompt="No data to export.")
-            if dialog.exec():
-                del dialog
+            dialog.exec()
+            del dialog
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)
-        if dialog.exec():
-            del dialog
+        dialog.exec()
+        del dialog
 
     # EDIT =====================================================================
     def new_project(self, filepath):
-        cfg = config.initiate(home_dir=filepath)
+        cfg = config.initiate(parent_dir=filepath)
         mpDB = MatchyPatchyDB(cfg['DB_DIR'], self.logger)
         self.Base.update_db(mpDB)
         self.Media.update_db(mpDB)
@@ -193,15 +199,15 @@ class MainWindow(QMainWindow):
 
     def manage_survey(self):
         dialog = SurveyPopup(self)
-        if dialog.exec():
-            self.Base.update_survey()
-            del dialog
+        dialog.exec()
+        self.Base.update_survey()
+        del dialog
 
     def manage_station(self):
         self.Base.select_survey()
         dialog = StationPopup(self, active_survey=self.Base.active_survey)
-        if dialog.exec():
-            del dialog
+        dialog.exec()
+        del dialog
 
     def manage_media(self):
         self._set_media_view()
@@ -212,17 +218,17 @@ class MainWindow(QMainWindow):
     def about(self):
         """Open About Popup"""
         dialog = AboutPopup(self)
-        if dialog.exec():
-            del dialog
+        dialog.exec()
+        del dialog
 
     def help(self):
         """Open README Popup"""
         dialog = READMEPopup(self)
-        if dialog.exec():
-            del dialog
+        dialog.exec()
+        del dialog
 
     def license(self):
         """Open License Popup"""
         dialog = LicensePopup(self)
-        if dialog.exec():
-            del dialog
+        dialog.exec()
+        del dialog

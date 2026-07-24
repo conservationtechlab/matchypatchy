@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.database.media import IMAGE_EXT
+from matchypatchy.database.media import IMAGE_EXT, fetch_roi
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
@@ -15,6 +15,8 @@ from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
 
 class DisplayMedia(QWidget):
+    SAVE_STYLE = """ QPushButton { background-color: #2a3e5e; color: white; }"""
+
     def __init__(self, parent, data_type=1):
         super().__init__()
         self.parent = parent
@@ -46,9 +48,9 @@ class DisplayMedia(QWidget):
         first_layer.addWidget(VerticalSeparator())
 
         # Save
-        button_save = StandardButton("Save")
-        button_save.clicked.connect(self.save)
-        first_layer.addWidget(button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.button_save = StandardButton("Save")
+        self.button_save.clicked.connect(self.save)
+        first_layer.addWidget(self.button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # Undo
         self.button_undo = StandardButton("Undo")
         self.button_undo.clicked.connect(self.undo)
@@ -82,15 +84,21 @@ class DisplayMedia(QWidget):
 
         # FILTERS --------------------------------------------------------------
         second_layer = QHBoxLayout()
-        second_layer.addSpacing(20)
+        second_layer.addSpacing(5)
 
-        self.filterbar = FilterBar(self, 200)
+        self.filterbar = FilterBar(self, 180)
         second_layer.addWidget(self.filterbar, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+
         self.filters = self.filterbar.get_filters()  # get initial filters
 
         button_filter = QPushButton("Apply Filters")
         button_filter.clicked.connect(self.filter_table)
-        second_layer.addWidget(button_filter)
+
+        button_clear_filter = QPushButton("Clear Filters")
+        button_clear_filter.clicked.connect(self.clear_filters)
+        
+        second_layer.addWidget(button_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        second_layer.addWidget(button_clear_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         second_layer.addStretch()
         layout.addLayout(second_layer)
@@ -125,7 +133,24 @@ class DisplayMedia(QWidget):
                 del dialog
             return
         else:
-            self.parent._set_compare_view()
+            rois = None
+            if self.data_type == 1:
+                selected_rows = self.media_table.selectedRows()
+                rois = self.media_table.data_filtered.loc[selected_rows, "id"]
+                rois = rois.tolist()
+                if len(rois) > 1:
+                    dialog = AlertPopup(self, prompt=f"Would you like to compare the {len(rois)} selected ROIs?")
+                    if dialog.exec() == QDialog.DialogCode.Accepted:
+                        print("Comparing rois:", rois)
+                        self.parent._set_manual_view(selected_ids=rois)
+                    del dialog
+                else:
+                    print("Not enough ROIs selected for comparison. Defaulting to full compare view.")
+                    self.parent._set_compare_view()
+            # if data type is media go to default compare view
+            else:
+                self.parent._set_compare_view()
+            
 
     def update_db(self, mpDB):
         """Update database object"""
@@ -144,7 +169,7 @@ class DisplayMedia(QWidget):
         # get current filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
-
+        self.toggle_filterbar_datatype()
 
     def filter_table(self):
         """
@@ -152,10 +177,24 @@ class DisplayMedia(QWidget):
         Run after any setting is changed and filter button is pressed
         """
         self.filters = self.filterbar.get_filters()
-        self.valid_stations = self.filterbar.get_valid_stations()
+        self.valid_stations = self.filterbar.get_valid_stations() 
+        self.toggle_filterbar_datatype()
         self.media_table.filter()
         self.update_count_label()
 
+    def toggle_filterbar_datatype(self):
+        """Toggle visibility of filter bar elements based on data type"""
+        self.filterbar.individual_visible(self.data_type == 1)
+        self.filterbar.unidentified_visible(self.data_type == 1)
+        self.filterbar.favorites_visible(self.data_type == 1)
+        self.filterbar.viewpoint_visible(self.data_type == 1)
+        self.filterbar.no_roi_visible(self.data_type == 0)
+
+    def clear_filters(self):
+        """Clear all filters and refresh the table"""
+        self.refresh_filters()
+        self.media_table.filter()
+        self.update_count_label()
     # =========================================================================
     # MEDIA TABLE HANDLERS
     # =========================================================================
@@ -171,15 +210,15 @@ class DisplayMedia(QWidget):
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
                 self.home()
-                del dialog
+            del dialog
             return False
         else:
             if self.data_type == 1 and roi_n == 0:
                 # no rois, default to full images
                 self.data_type = 0
                 dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
-                if dialog.exec():
-                    del dialog
+                dialog.exec()
+                del dialog
                 self.show_type.blockSignals(True)
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
@@ -207,10 +246,12 @@ class DisplayMedia(QWidget):
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
                 return
-
+            
+        # change type to selected
         self.data_type = self.show_type.currentIndex()
         # reload table
         self.load_table()
+        self.toggle_filterbar_datatype()
         # Disable "Edit Rows" if not in ROI mode
         self.update_buttons()
         self.update_count_label()
@@ -243,8 +284,10 @@ class DisplayMedia(QWidget):
         """Enable/Disable Undo button based on edit stack"""
         if len(self.media_table.edit_stack) > 0:
             self.button_undo.setEnabled(True)
+            self.button_save.setStyleSheet(self.SAVE_STYLE)
         else:
             self.button_undo.setEnabled(False)
+            self.button_save.setStyleSheet("")
 
     def update_buttons(self):
         """Enable/Disable Edit, Duplicate, Delete buttons based on selection and mode"""
@@ -304,9 +347,8 @@ class DisplayMedia(QWidget):
             edit_stack = self.media_table.transpose_edit_stack(edit_stack)
             self.check_undo_button()
             del dialog
-            # reload data
-            self.load_table()
-        # update buttons and count
+        # reload data and update buttons
+        self.load_table()
         self.update_buttons()
         self.update_count_label()
 
@@ -333,7 +375,6 @@ class DisplayMedia(QWidget):
             self.button_delete.setEnabled(False)
             self.update_count_label()
 
-
     def duplicate(self):
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"Are you sure you want to duplicate {len(self.selected_rows)} files?", title="Warning")
@@ -354,26 +395,21 @@ class DisplayMedia(QWidget):
             if dialog.exec():
                 for row in self.selected_rows:
                     if self.data_type == 0:
-                        id = int(self.media_table.data_filtered.at[row, "media_id"])
-                        rois = self.media_table.data[self.media_table.data['media_id'] == id]
-                        embs = rois['emb_id']
+                        id = int(self.media_table.data_filtered.at[row, "id"])
+                        # delete all rois associated with this media
+                        rois = fetch_roi(self.mpDB, media_id=id)
+                        if len(rois) > 0:
+                            for roi in rois['roi_id']:
+                                self.mpDB.delete_emb(id=roi)
+                        # cascade delete will handle associated roi_thumbnails and roi entries
                         self.mpDB.delete('media', f'id={id}')
-                        for i, row in rois.iterrows():
-                            self.mpDB.delete('roi', f"id={row['id']}")
-                        for emb in embs:
-                            if emb is not None:
-                                self.mpDB.delete_emb(id=emb)
-
+                        
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
-                        emb = int(self.media_table.data_filtered.at[row, "emb_id"])
+                        self.mpDB.delete_emb(id=id)
                         self.mpDB.delete('roi', f'id={id}')
-                        if emb is not None:
-                            self.mpDB.delete_emb(id=emb)
-                del dialog
-                # Clear selection and update UI
-                self.media_table.table.clearSelection()
                 # Reload updated data
                 self.load_table()
                 self.update_buttons()
                 self.update_count_label()
+            del dialog

@@ -15,8 +15,8 @@ logPath = scriptDir & "\launcher.log"
 wsh.CurrentDirectory = scriptDir
 
 ' Build candidate python executables
-pythonwPath = scriptDir & "\venv\Scripts\pythonw.exe"
-pythonPath  = scriptDir & "\venv\Scripts\python.exe"
+pythonwPath = scriptDir & "\python_env\pythonw.exe"
+pythonPath  = scriptDir & "\python_env\python.exe"
 
 ' Prepare command to run __main__.py
 If fso.FileExists(pythonwPath) Then
