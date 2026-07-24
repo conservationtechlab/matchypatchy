@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     except Exception as e:
         logger.error(f"Fatal error during startup: {e}", exc_info=True)
-        sys.exit(1)
+        exit_code = 1
     
     finally:
         logger.info("MatchyPatchy shutting down")
