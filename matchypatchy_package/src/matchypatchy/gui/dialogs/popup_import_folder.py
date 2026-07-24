@@ -91,6 +91,7 @@ class ImportFolderPopup(QDialog):
             dialog = AlertPopup(self, "No images found! Choose another directory.", title="Alert")
             if dialog.exec():
                 self.reject()
+            del dialog
 
     # 3. Offer Station Options
     def get_options(self):

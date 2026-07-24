@@ -1,6 +1,7 @@
 TABLE: metadata
 CREATE TABLE metadata (
                         id INTEGER PRIMARY KEY,
+                        mp_version TEXT NOT NULL,
                         key TEXT UNIQUE NOT NULL )
 INDEX: sqlite_autoindex_metadata_1
 None
@@ -62,8 +63,8 @@ CREATE TABLE roi (
                         favorite INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb INTEGER,
-                        FOREIGN KEY(media_id) REFERENCES media (id),
-                        FOREIGN KEY(individual_id) REFERENCES individual (id))
+                        FOREIGN KEY(media_id) REFERENCES media (id) ON DELETE CASCADE,
+                        FOREIGN KEY(individual_id) REFERENCES individual (id) ON DELETE SET NULL)
 TABLE: individual
 CREATE TABLE individual (
                         id INTEGER PRIMARY KEY,
@@ -84,7 +85,7 @@ CREATE TABLE media_thumbnails (
                         id INTEGER PRIMARY KEY,
                         fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
-                        FOREIGN KEY(fid) REFERENCES media (id))
+                        FOREIGN KEY(fid) REFERENCES media (id) ON DELETE CASCADE)
 INDEX: sqlite_autoindex_media_thumbnails_1
 None
 TABLE: roi_thumbnails
@@ -92,6 +93,6 @@ CREATE TABLE roi_thumbnails (
                         id INTEGER PRIMARY KEY,
                         fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
-                        FOREIGN KEY(fid) REFERENCES roi (id))
+                        FOREIGN KEY(fid) REFERENCES roi (id) ON DELETE CASCADE)
 INDEX: sqlite_autoindex_roi_thumbnails_1
 None

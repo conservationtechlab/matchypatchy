@@ -30,7 +30,7 @@ from matchypatchy import config
 
 
 class DisplayBase(QWidget):
-    LOGO = str(config.resource_path("assets/graphics/logo.png"))
+    LOGO = str(config.asset_path("graphics/logo.png"))
 
     def __init__(self, parent):
         super().__init__()
@@ -154,6 +154,10 @@ class DisplayBase(QWidget):
         self.setLayout(main_layout)
 
         self.update_survey()
+
+    def update_db(self, mpDB):
+        """Update database object"""
+        self.mpDB = mpDB
 
     # ==========================================================================
     # Database Management Functions

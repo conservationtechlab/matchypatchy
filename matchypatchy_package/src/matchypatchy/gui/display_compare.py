@@ -22,6 +22,7 @@ from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
 from matchypatchy.gui.query import QueryContainer
 from matchypatchy.gui.qc_query import QC_QueryContainer
+from matchypatchy.gui.manual_query import ManualQueryContainer
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
 from matchypatchy.config import load_cfg
@@ -29,6 +30,7 @@ from matchypatchy.config import load_cfg
 
 class DisplayCompare(QWidget):
     MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
+    FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
     VIEWPOINT_DICT = {0: 'Left', 1: 'Any', 2: 'Right'}
 
     def __init__(self, parent):
@@ -41,7 +43,7 @@ class DisplayCompare(QWidget):
         self.distance_metric = 'cosine'
         self.threshold = 50
         self.current_viewpoint = 1
-        self.qc = False  # whether in QC mode
+        self.compare_type = 'default'  # whether 'default', 'qc' or 'manual'
         self.QueryContainer = QueryContainer(self)
         self.progress = None   # placeholder for progress popup
         self.edit_stack = []  # placeholder for media edit stack
@@ -63,11 +65,11 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(VerticalSeparator())
 
         # OPTIONS
-        first_layer.addWidget(QLabel("Similarity Metric:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.option_distance_metric = QComboBox()
-        self.option_distance_metric.addItems(['Cosine', 'L2'])
-        self.option_distance_metric.currentIndexChanged.connect(self.change_metric)
-        first_layer.addWidget(self.option_distance_metric, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # first_layer.addWidget(QLabel("Similarity Metric:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # self.option_distance_metric = QComboBox()
+        # self.option_distance_metric.addItems(['Cosine', 'L2'])
+        # self.option_distance_metric.currentIndexChanged.connect(self.change_metric)
+        # first_layer.addWidget(self.option_distance_metric, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addWidget(QLabel("Similarity Threshold:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
@@ -85,7 +87,7 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(button_recalc)
 
         button_recalc = QPushButton("Quality Control by Individual")
-        button_recalc.clicked.connect(self.recalculate_by_individual)
+        button_recalc.clicked.connect(self.calculate_by_individual)
         first_layer.addWidget(button_recalc)
 
         # FILTERBAR --------------------------------------------------------------
@@ -97,6 +99,7 @@ class DisplayCompare(QWidget):
         self.filterbar.individual_visible(False)
         self.filterbar.unidentified_visible(False)
         self.filterbar.favorites_visible(False)
+        self.filterbar.no_roi_visible(False)
 
         first_layer.addWidget(self.filterbar)
         # get initial filters
@@ -181,13 +184,10 @@ class DisplayCompare(QWidget):
         middle_column.addWidget(self.match_counter, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.button_match = QPushButton("Match")
+        self.button_match.pressed.connect(self.press_match_button)
         self.button_match.setCheckable(True)
         self.button_match.setChecked(False)
-        self.button_match.blockSignals(True)
-        self.button_match.pressed.connect(self.press_match_button)
-        self.button_match.blockSignals(False)
-        self.button_match.setFixedHeight(50)
-        self.button_match.setMaximumWidth(50)
+        self.button_match.setFixedSize(50, 50)
         middle_column.addWidget(self.button_match,
                                 alignment=Qt.AlignmentFlag.AlignCenter)
         middle_column.addStretch()
@@ -205,7 +205,6 @@ class DisplayCompare(QWidget):
         match_options.addStretch()
 
         # Viewpoint Toggle
-        match_options.addWidget(QLabel("Viewpoint: "))
         self.button_viewpoint = ThreePointSlider(initial=1)
         self.button_viewpoint.state_changed.connect(self.toggle_viewpoint)
         match_options.addWidget(self.button_viewpoint)
@@ -230,6 +229,14 @@ class DisplayCompare(QWidget):
         self.match_distance = QLabel("Similarity: ")
         self.match_distance.setStyleSheet("border: 1px solid black;")
         match_options.addWidget(self.match_distance)
+
+        self.button_match_favorites = QPushButton("Show ♥")
+        self.button_match_favorites.setCheckable(True)
+        self.button_match_favorites.setChecked(False)
+        self.button_match_favorites.clicked.connect(self.toggle_match_favorites_button)
+        self.button_match.setFixedHeight(50)
+        self.button_match.setMaximumWidth(50)        
+        match_options.addWidget(self.button_match_favorites)
 
         match_options.addStretch()
         match_layout.addLayout(match_options)
@@ -272,6 +279,10 @@ class DisplayCompare(QWidget):
             if isinstance(child, (QPushButton)):
                 child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
+    def update_db(self, mpDB):
+        """Update database object"""
+        self.mpDB = mpDB
+
     # ==========================================================================
     # GUI
     # ==========================================================================
@@ -295,15 +306,15 @@ class DisplayCompare(QWidget):
         if dialog.exec():
             del dialog
 
-    def change_metric(self):
-        """
-        Select L2 or Cosine distance metric, update threshold slider appropriately
-        """
-        self.distance_metric = self.option_distance_metric.currentText().lower()
-        if self.distance_metric == 'l2':
-            self.threshold_slider.setValue(30)
-        else:
-            self.threshold_slider.setValue(50)
+    #def change_metric(self):
+        # """
+        # Select L2 or Cosine distance metric, update threshold slider appropriately
+        # """
+        # self.distance_metric = self.option_distance_metric.currentText().lower()
+        # if self.distance_metric == 'l2':
+        #     self.threshold_slider.setValue(30)
+        # else:
+        #     self.threshold_slider.setValue(50)
 
     def change_threshold_slider(self):
         """
@@ -338,8 +349,14 @@ class DisplayCompare(QWidget):
     def calculate_neighbors(self):
         """Calculate neighbors for all query ROIs, load first query and match"""
         # Disable individual select until feature is implemented on QC
-        self.qc = False
+        self.compare_type = 'default'
+        # show favorite toggle and reset its state
+        self.button_match_favorites.setVisible(True)
+        self.button_match_favorites.setChecked(False)
+        self.button_match_favorites.setStyleSheet("")
+        # hide individual filter
         self.filterbar.individual_visible(False)
+        # run knn thread on entry
         self.k = load_cfg('KNN')  # can be changed in configuration
         self.QueryContainer = QueryContainer(self)  # re-establish object
         self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded) 
@@ -369,18 +386,78 @@ class DisplayCompare(QWidget):
         else:
             self.warn(prompt="No data to compare, all available data from same sequence/capture.")
 
-    def recalculate_by_individual(self):
+    def calculate_by_individual(self):
         """Enter QC mode, recalculate matches by individual IDs"""
+        # must have inviduals to enter QC mode
         if not fetch_individual(self.mpDB).empty:
+            self.compare_type = 'qc'
+            self.button_match_favorites.setVisible(False) # hide favorite toggle
             self.QueryContainer = QC_QueryContainer(self)
             self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
-            self.qc = True
             self.filterbar.individual_visible(True)
             self.QueryContainer.load_data()
+            filtered = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
+            # no match thread, have to check success manually
+            if filtered:
+                self.change_query(0)
+            else:
+                self.warn(prompt="No data to compare within filter.")
+        else:
+            self.warn(prompt="No data to compare, no named individuals to analyze.")
+
+    def compare_manual(self, selected_ids=None):
+        """Enter manual comparison mode, recalculate matches manually"""
+        self.compare_type = 'manual'
+        self.button_match_favorites.setVisible(False) # hide favorite toggle
+        self.filterbar.individual_visible(False)
+        self.QueryContainer = ManualQueryContainer(self, selected_ids=selected_ids)  # re-establish object
+        self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
+        emb_exist = self.QueryContainer.load_data()
+        if emb_exist:
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
+            self.QueryContainer.calculate_neighbors()
             self.change_query(0)
         else:
-            self.warn(prompt="No data to compare, all available data from same sequence/capture.")
+            self.warn(prompt="No data to compare within filter.")
+
+    def toggle_match_favorites_button(self):
+        """
+        Change Match Favorites button to indicate whether it is active
+        """
+        if self.button_match_favorites.isChecked():
+            # NEED TO ADD FOR BOTH QUERY CONTAINER
+            self.button_match_favorites.setText("Show KNN")
+            self.button_match_favorites.setStyleSheet(self.FAVORITE_STYLE)
+            self.QueryContainer.set_match_favorites(True)
+        else:
+            self.button_match_favorites.setText("Show ♥")
+            self.button_match_favorites.setStyleSheet("")
+            self.QueryContainer.set_match_favorites(False)
+        # reload the current match to reflect any changes in favorites
+        self.change_match(0)
+
+    # ==========================================================================
+    # FILTERS
+    # ==========================================================================
+    def refresh_filters(self):
+        """Clear and re-apply filters from filterbar"""
+        self.filterbar.refresh_filters()
+        self.filters = self.filterbar.get_filters()
+        self.valid_stations = self.filterbar.get_valid_stations()
+
+
+    def filter_neighbors(self):
+        """Apply filters from filterbar to current neighbor dict"""
+        self.filters = self.filterbar.get_filters()
+        self.valid_stations = self.filterbar.get_valid_stations()
+
+        if self.compare_type == 'qc':
+            self.calculate_by_individual()
+        elif self.compare_type == 'manual':
+            self.compare_manual()
+        else:
+            self.calculate_neighbors()
+
 
     # ==========================================================================
     # MATCHING PROCESS
@@ -441,7 +518,7 @@ class DisplayCompare(QWidget):
                             cancel_only=False)
         if dialog.exec():
             self.QueryContainer.unmatch()
-            del dialog
+        del dialog
         # reload data
         self.QueryContainer.load_data()
         self.QueryContainer.filter()
@@ -488,6 +565,7 @@ class DisplayCompare(QWidget):
         """Load nth match within the current match queue"""
         self.QueryContainer.set_match(n)
         self.match_image_bar.reset()
+        self.match_n.setText("/ " + str(len(self.QueryContainer.current_match_rois)))
         self.match_number.setText(str(self.QueryContainer.current_match + 1))
         self.match_counter.setText(str(self.QueryContainer.current_match + 1) + " / " + str(len(self.QueryContainer.current_match_rois)))
         self.load_match()
@@ -535,8 +613,8 @@ class DisplayCompare(QWidget):
         # update gui counts
         self.query_sequence_n.setText('/ ' + str(len(self.QueryContainer.current_query_rois)))
         self.match_n.setText('/ ' + str(len(self.QueryContainer.current_match_rois)))
-        self.query_seq_number.setText('1')
-        self.match_number.setText('1')
+        self.query_seq_number.setText(str(self.QueryContainer.current_query_sn + 1))
+        self.match_number.setText(str(self.QueryContainer.current_match + 1))
 
         # load images and data
         self.load_query()
@@ -575,23 +653,6 @@ class DisplayCompare(QWidget):
         return html_text
 
     # ==========================================================================
-    # FILTERS
-    # ==========================================================================
-    def refresh_filters(self):
-        """Clear and re-apply filters from filterbar"""
-        self.filterbar.refresh_filters()
-
-    def filter_neighbors(self):
-        """Apply filters from filterbar to current neighbor dict"""
-        self.filters = self.filterbar.get_filters()
-        self.valid_stations = self.filterbar.get_valid_stations()
-
-        if self.qc:
-            self.recalculate_by_individual()
-        else:
-            self.calculate_neighbors()
-
-    # ==========================================================================
     # IMAGE MANIPULATION
     # ==========================================================================
     def edit_image(self, rid):
@@ -603,16 +664,16 @@ class DisplayCompare(QWidget):
         data["id"] = rid
         data = data.to_frame().T
         filepath = self.QueryContainer.get_info(rid, "filepath")
-        dialog = MediaEditPopup(self, data, data_type=1 if Path(filepath).suffix.lower() in IMAGE_EXT else 2)
+        dialog = MediaEditPopup(self, data, data_type=1 if Path(filepath).suffix.lower() in IMAGE_EXT else 0)
         if dialog.exec():
             self.edit_stack = dialog.get_edit_stack()
             self.save_changes()
-            del dialog
             # reload data
             self.QueryContainer.load_data()
             self.QueryContainer.filter()
             self.load_query()
             self.load_match()
+        del dialog
 
 
     def save_changes(self):

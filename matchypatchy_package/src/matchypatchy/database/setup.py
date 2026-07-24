@@ -4,19 +4,32 @@ Set Up matchypatchy Database
 import sqlite3
 import chromadb
 from datetime import datetime
+from matchypatchy import __version__
 
 
-def setup_database(key, filepath):
-    """Set up SQLite database with required tables"""
-    # Connect to SQLite database
-    db = sqlite3.connect(filepath)
+def setup_database(key, filepath, db=None):
+    """Set up SQLite database with required tables
+    
+    Args:
+        key: Database key/version identifier
+        filepath: Path to SQLite database file
+        db: Optional existing connection (for thread-local usage)
+    """
+    # Use provided connection or create new one
+    created_connection = db is None
+    
+    # Use provided connection or create new one
+    if created_connection:
+        db = sqlite3.connect(filepath)
+    
     cursor = db.cursor()
 
     # add key to database
     cursor.execute('''CREATE TABLE IF NOT EXISTS metadata (
                         id INTEGER PRIMARY KEY,
+                        mp_version TEXT NOT NULL,
                         key TEXT UNIQUE NOT NULL );''')
-    cursor.execute(f"""INSERT INTO metadata (key) VALUES ({key});""")
+    cursor.execute(f"""INSERT INTO metadata (mp_version, key) VALUES ('{__version__}', '{key}');""")
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS uploads (
                         id INTEGER PRIMARY KEY,
@@ -79,8 +92,8 @@ def setup_database(key, filepath):
                         favorite INTEGER NOT NULL,
                         individual_id INTEGER,
                         emb INTEGER,
-                        FOREIGN KEY(media_id) REFERENCES media (id),
-                        FOREIGN KEY(individual_id) REFERENCES individual (id));''')
+                        FOREIGN KEY(media_id) REFERENCES media (id) ON DELETE CASCADE,
+                        FOREIGN KEY(individual_id) REFERENCES individual (id) ON DELETE SET NULL);''')
 
     # INDIVIDUAL
     cursor.execute('''CREATE TABLE IF NOT EXISTS individual (
@@ -105,18 +118,21 @@ def setup_database(key, filepath):
                         id INTEGER PRIMARY KEY,
                         fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
-                        FOREIGN KEY(fid) REFERENCES media (id));''')
+                        FOREIGN KEY(fid) REFERENCES media (id) ON DELETE CASCADE);''')
 
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi_thumbnails (
                         id INTEGER PRIMARY KEY,
                         fid INTEGER UNIQUE NOT NULL,
                         filepath TEXT NOT NULL,
-                        FOREIGN KEY(fid) REFERENCES roi (id));''')
+                        FOREIGN KEY(fid) REFERENCES roi (id) ON DELETE CASCADE);''')
 
     # Commit changes and close connection
     db.commit()
-    db.close()
-    return True
+    # Only close if we created the connection
+    if created_connection:
+        db.close()
+
+    return db
 
 
 def setup_chromadb(key, filepath):
@@ -131,3 +147,4 @@ def setup_chromadb(key, filepath):
             "key": key
         }
     )
+    return client
