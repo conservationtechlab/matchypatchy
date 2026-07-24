@@ -603,7 +603,6 @@ class MatchyPatchyDB():
     def knn(self, query_id, k=3):
         """Get k nearest neighbors of a query ROI from chroma vector database"""
         query = self.collection.get(ids=[str(query_id)], include=['embeddings'])['embeddings']
-        print(query)
         # Check if query is empty, ie false positives
         if len(query) == 0:
             return {'ids': [[]], 'distances': [[]]}
