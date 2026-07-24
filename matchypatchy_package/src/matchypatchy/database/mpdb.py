@@ -254,13 +254,33 @@ class MatchyPatchyDB():
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             self.db.commit()
+            self.logger.info(f"Added individual: {name} with sex: {sex}, age: {age}")
             return id
         except sqlite3.Error as error:
             self.logger.error(f"Failed to add individual: {error}")
             return None
+        
+    def add_upload(self, base_dir: str):
+        """
+        Add an upload with:
+            - base_dir (str) NOT NULL
+        """
+        try:
+            cursor = self.db.cursor()
+            command = """INSERT INTO uploads (base_dir) VALUES (?);"""
+            data_tuple = (base_dir,)
+            cursor.execute(command, data_tuple)
+            id = cursor.lastrowid
+            self.db.commit()
+            self.logger.info(f"Added upload with base_dir: {base_dir}")
+            return id
+        except sqlite3.Error as error:
+            self.logger.error(f"Failed to add upload: {error}")
+            return None
 
     def add_media(self,
-                  filepath: str,
+                  base_dir_id: int,
+                  relative_path: str,
                   sha256: str,
                   ext: str,
                   timestamp: str,
@@ -272,7 +292,8 @@ class MatchyPatchyDB():
         """
         Media has 10 attributes not including id:
             id INTEGER PRIMARY KEY,
-            filepath TEXT UNIQUE NOT NULL,
+            base_dir_id INTEGER NOT NULL,
+            relative_path TEXT UNIQUE NOT NULL,
             sha256 TEXT UNIQUE NOT NULL,
             ext TEXT NOT NULL,
             timestamp TEXT NOT NULL,
@@ -285,11 +306,11 @@ class MatchyPatchyDB():
         try:
             cursor = self.db.cursor()
             command = """INSERT INTO media
-                        (filepath, sha256, ext, timestamp, station_id,
+                        (base_dir_id, relative_path, sha256, ext, timestamp, station_id,
                         camera_id, sequence_id, external_id, comment)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, sha256, ext, timestamp, station_id,
-                          camera_id, sequence_id, external_id, comment)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+            data_tuple = (int(base_dir_id), str(relative_path), str(sha256), str(ext), str(timestamp), 
+                          station_id, camera_id, sequence_id, external_id, comment)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             self.db.commit()
@@ -297,17 +318,21 @@ class MatchyPatchyDB():
 
         # filepath already exists
         except sqlite3.IntegrityError as error:
-            if 'UNIQUE constraint failed: media.filepath' in error.args[0]:
-                self.logger.error(f"Failed to add {filepath}, already exists in database.")
+            print(f"DEBUG: IntegrityError caught: {error}")
+            if 'UNIQUE constraint failed: media.relative_path' in error.args[0]:
+                self.logger.error(f"Failed to add {relative_path}, already exists in database.")
                 return "duplicate_error"
             
             if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
-                self.logger.error(f"Failed to add {filepath}, file is a duplicate.")
+                self.logger.error(f"Failed to add {relative_path}, file is a duplicate.")
                 return "duplicate_error"
+            return None
 
         except sqlite3.Error as error:
+            print(f"Failed to add media: {error}")
             self.logger.error(f"Failed to add media: {error}")
             return None
+        
 
     def add_roi(self,
                 media_id: int,
@@ -509,21 +534,51 @@ class MatchyPatchyDB():
         except sqlite3.Error as error:
             self.logger.error(f"Failed fetch: {error}")
             return None, None
+        
+    def get_media_with_filepath(self, row_cond: Optional[str] = None):
+        """
+        Get media along with its full file path based on an optional row condition.
+
+        Args
+            - row_cond (str): optional condition for WHERE clause
+
+        Returns
+            - rows (list of tuples): fetched rows
+            - column_names (list of str): column names
+        """
+        try:
+            cursor = self.db.cursor()
+            command = f"""SELECT m.*, u.base_dir || '/' || m.relative_path AS filepath
+                          FROM media m
+                          LEFT JOIN uploads u ON m.base_dir_id = u.id
+                          WHERE {row_cond};"""
+            cursor.execute(command)
+            column_names = [description[0] for description in cursor.description]
+            rows = cursor.fetchall()  # returns in tuple
+            return rows, column_names
+        except sqlite3.Error as error:
+            self.logger.error(f"Failed get_media_with_filepath fetch: {error}")
+            return None, None
 
     def all_media(self, row_cond: Optional[str] = None):
         """Return joined roi and media info for Media Table"""
         try:
             cursor = self.db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                         roi.media_id, roi.individual_id, emb, filepath, ext, timestamp,
-                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age"""
+                        roi.media_id, roi.individual_id, emb, base_dir_id, relative_path, ext, timestamp,
+                        station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age,
+                        uploads.base_dir || '/' || media.relative_path AS filepath"""
             if row_cond:
-                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                            LEFT JOIN individual ON roi.individual_id = individual.id
-                                            WHERE {row_cond};"""
+                command = f"""SELECT {columns} FROM roi 
+                            INNER JOIN media ON roi.media_id = media.id
+                            LEFT JOIN uploads ON media.base_dir_id = uploads.id
+                            LEFT JOIN individual ON roi.individual_id = individual.id
+                            WHERE {row_cond};"""
             else:
-                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                            LEFT JOIN individual ON roi.individual_id = individual.id;"""
+                command = f"""SELECT {columns} FROM roi 
+                            INNER JOIN media ON roi.media_id = media.id
+                            LEFT JOIN uploads ON media.base_dir_id = uploads.id
+                            LEFT JOIN individual ON roi.individual_id = individual.id;"""
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
@@ -531,6 +586,28 @@ class MatchyPatchyDB():
         except sqlite3.Error as error:
             self.logger.error("Failed all_media fetch:", error)
             return None, None
+        
+    def get_full_path(self, media_id):
+        """Get the full filepath for a given media id"""
+        cursor = self.db.cursor()
+        cursor.execute("""SELECT u.base_dir || '/' || m.relative_path
+                       FROM media m
+                       JOIN uploads u ON m.base_dir_id = u.id
+                       WHERE m.id = ?""", (media_id,))
+        return cursor.fetchone()[0]
+    
+    def update_base_dir(self, base_dir_id, new_base_dir):
+        """Update the base path for a given base_dir_id"""
+        try:
+            cursor = self.db.cursor()
+            command = f'UPDATE uploads SET base_dir = ? WHERE id = ?;'
+            cursor.execute(command, (new_base_dir, base_dir_id))
+            self.db.commit()
+            self.logger.info(f"Updated base path for id {base_dir_id} to {new_base_dir}")
+            return True
+        except sqlite3.Error as error:
+            self.logger.error(f"Failed to update base path for id {base_dir_id}: {error}")
+            return False
 
     def stations(self, row_cond=None):
         """Return joined station, survey, region info"""

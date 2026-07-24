@@ -39,9 +39,17 @@ class ReIDThread(QThread):
             self.done.emit()
             return
 
-        media, _ = self.mpDB.select_join("roi", "media", "roi.media_id = media.id",
-                                         columns="roi.id, media_id, filepath, external_id, camera_id, sequence_id")
+        # need only media that has corresponding ROIs
+        media = self.mpDB._command("""
+            SELECT roi.id, roi.media_id, 
+                uploads.base_dir || '/' || media.relative_path AS filepath,
+                media.external_id, media.camera_id, media.sequence_id
+            FROM roi
+            JOIN media ON roi.media_id = media.id
+            LEFT JOIN uploads ON media.base_dir_id = uploads.id
+        """)
         self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
+
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
         self.rois['filepath'] = self.rois['roi_id'].map(self.image_paths)
 

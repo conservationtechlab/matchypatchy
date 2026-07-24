@@ -48,10 +48,9 @@ class AnimlThread(QThread):
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
 
         # select media that do not have rois
-        media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
-                                 (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
-        self.media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp", "station_id", "camera_id",
-                                                  "sequence_id", "external_id", "comment"])
+        media, column_names = self.mpDB.get_media_with_filepath(row_cond="NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
+        self.media = pd.DataFrame(media, columns=column_names)
+        
         # select rois that do not have bbox
         rois = fetch_roi_media(mpDB, reset_index=False)
         self.rois = rois[rois['bbox_x'] == -1]  # imported without bbox

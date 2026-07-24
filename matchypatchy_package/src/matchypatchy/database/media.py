@@ -8,9 +8,6 @@ from pathlib import Path
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
-COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
-           "comment", "viewpoint", "individual_id"]
-
 
 def get_sha256(path: str | Path, 
                 chunk_size: int = 1024 * 1024) -> str:
@@ -26,18 +23,34 @@ def get_sha256(path: str | Path,
 
 def fetch_media(mpDB, ids=None):
     """
-    Fetches all media info, converts to dataframe
+    Fetches all media info with full paths, converts to dataframe
     """
     if ids:
         ids_str = ', '.join(map(str, ids))
-        media = mpDB.select("media", row_cond=f"id IN ({ids_str})")
+        condition = f"id IN ({ids_str})"
     else:
-        media = mpDB.select("media")
-
+        condition = None
+    
+    # Query media with joined full paths
+    query = """
+        SELECT 
+            m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
+            m.timestamp, m.station_id, m.camera_id, m.sequence_id,
+            m.external_id, m.comment,
+            u.base_dir || '/' || m.relative_path AS filepath
+        FROM media m
+        LEFT JOIN uploads u ON m.base_dir_id = u.id
+    """
+    
+    if condition:
+        query += f" WHERE {condition}"
+    
+    media = mpDB._command(query)
+    
     if media:
-        media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
-                                             'station_id', "camera_id", 'sequence_id',
-                                             "external_id", 'comment'])
+        media = pd.DataFrame(media, columns=["id", "base_dir_id", "relative_path", "sha256", "ext",
+                                             "timestamp", 'station_id', "camera_id", 'sequence_id',
+                                             "external_id", 'comment', 'filepath'])
         media = media.replace({float('nan'): None})
         return media
     else:
@@ -46,15 +59,26 @@ def fetch_media(mpDB, ids=None):
 
 def fetch_roi(mpDB, media_id=None):
     """
-    Fetches roi table, converts to dataframe
+    Fetches roi table with media filepaths, converts to dataframe
     """
+    query = """
+        SELECT 
+            r.id, r.media_id, r.frame, r.bbox_x, r.bbox_y, r.bbox_w, r.bbox_h,
+            r.viewpoint, r.reviewed, r.favorite, r.individual_id, r.emb,
+            u.base_dir || '/' || m.relative_path AS filepath
+        FROM roi r
+        JOIN media m ON r.media_id = m.id
+        LEFT JOIN uploads u ON m.base_dir_id = u.id
+    """
+    
     if media_id:
-        manifest = mpDB.select("roi", row_cond=f"media_id={media_id}")
-    else:
-        manifest = mpDB.select("roi")
+        query += f" WHERE r.media_id = {media_id}"
+    
+    manifest = mpDB._command(query)
+    
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
-                                               "viewpoint", "reviewed", "favorite", "individual_id", "emb"])
+                                               "viewpoint", "reviewed", "favorite", "individual_id", "emb", "filepath"])
         rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
         rois = rois.replace({float('nan'): None})
         return rois
@@ -94,13 +118,15 @@ def fetch_individual(mpDB):
 
 
 def export_data(mpDB):
+    # TODO: update 
     """
     Fetch Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-               'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
+               'base_dir', 'relative_path', 'sha256', 'ext', 'timestamp', 'station_id', 
+               'camera_id', 'sequence_id', 'external_id',
                'comment', 'name', 'sex', 'age',
-                'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
+               'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
     """
     media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
