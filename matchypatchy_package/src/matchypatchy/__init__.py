@@ -1,4 +1,4 @@
-__version__ = "0.1.4_dev"
+__version__ = "0.1.5_dev"
 
 from matchypatchy import config
 from matchypatchy import database
