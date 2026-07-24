@@ -8,7 +8,7 @@ from matchypatchy import threads
 
 from matchypatchy.config import (HOME_DIR, add, asset_path, initiate, load_cfg,
                                  resource_path, update, update_project_folder,)
-from matchypatchy.database import (COLUMNS, IMAGE_EXT, MatchyPatchyDB,
+from matchypatchy.database import (IMAGE_EXT, MatchyPatchyDB,
                                    THUMBNAIL_NOTFOUND, THUMBNAIL_SIZE,
                                    TZ_CONVERT_DICT, VIDEO_EXT,
                                    check_missing_thumbnails, export_data,
@@ -62,7 +62,7 @@ from matchypatchy.threads import (AnimlThread, BuildManifestThread,
                                   update_model_yml,)
 
 __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
-           'COLUMNS', 'CSVImportThread', 'ClickableSlider', 'ComboBoxDelegate',
+           'CSVImportThread', 'ClickableSlider', 'ComboBoxDelegate',
            'ComboBoxSeparator', 'ConfigPopup', 'DisplayBase', 'DisplayCompare',
            'DisplayMedia', 'DownloadMLThread', 'FavoriteMatchObject',
            'FetchTableThread', 'FilterBar', 'FilterBox', 'FolderImportThread',

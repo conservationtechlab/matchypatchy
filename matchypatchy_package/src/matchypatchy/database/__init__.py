@@ -7,7 +7,7 @@ from matchypatchy.database import thumbnails
 from matchypatchy.database.location import (TZ_CONVERT_DICT, fetch_regions,
                                             fetch_station_names_from_id,
                                             fetch_stations, fetch_surveys,)
-from matchypatchy.database.media import (COLUMNS, IMAGE_EXT, VIDEO_EXT,
+from matchypatchy.database.media import (IMAGE_EXT, VIDEO_EXT,
                                          export_data, fetch_individual,
                                          fetch_media, fetch_roi,
                                          fetch_roi_media, get_roi_bbox,
@@ -24,7 +24,7 @@ from matchypatchy.database.thumbnails import (THUMBNAIL_NOTFOUND,
                                               save_media_thumbnail,
                                               save_roi_thumbnail,)
 
-__all__ = ['COLUMNS', 'IMAGE_EXT', 'MatchyPatchyDB', 'THUMBNAIL_NOTFOUND',
+__all__ = ['IMAGE_EXT', 'MatchyPatchyDB', 'THUMBNAIL_NOTFOUND',
            'THUMBNAIL_SIZE', 'TZ_CONVERT_DICT', 'VIDEO_EXT',
            'check_missing_thumbnails', 'export_data', 'fetch_individual',
            'fetch_media', 'fetch_media_thumbnails', 'fetch_regions',
