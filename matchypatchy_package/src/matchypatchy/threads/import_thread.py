@@ -2,6 +2,7 @@
 QThreads for Importing Data
 
 """
+import os
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -23,13 +24,23 @@ class CSVImportThread(QThread):
 
     def run(self):
         roi_counter = 0  # progressbar counter
-        for filepath, group in self.unique_images:
 
+        # get base directory for the files being imported
+        base_dir = self._get_base_dir(self.data['filepath'].tolist())
+        try:
+            base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir="{base_dir}"')[0][0]
+        except IndexError:
+            base_dir_id = self.mpDB.add_upload(base_dir)
+
+        for filepath, group in self.unique_images:
             if not self.isInterruptionRequested():
                 # check to see if file exists
                 if not Path(filepath).exists():
                     self.logger.warning(f"File {filepath} does not exist, skipping import...")
                     continue
+
+                # get the relative path of the file with respect to the base directory
+                relative_path = self._get_relative_path(filepath, base_dir)
 
                 # get file extension
                 ext = Path(filepath).suffix.lower()
@@ -51,7 +62,8 @@ class CSVImportThread(QThread):
                 hash = get_sha256(filepath)  # Calculate the SHA256 hash of the file
 
                 # insert into table
-                media_id = self.mpDB.add_media(filepath,
+                media_id = self.mpDB.add_media(base_dir_id,
+                                               relative_path,
                                                hash,
                                                ext,
                                                timestamp,
@@ -116,6 +128,20 @@ class CSVImportThread(QThread):
         if not self.isInterruptionRequested():
             # finished adding media
             self.finished.emit()
+
+    def _get_base_dir(self, filepaths):
+        """Get the common base directory for a list of filepaths"""
+        if not filepaths:
+            return None
+        
+        paths = [Path(p) for p in filepaths]
+        common = Path(os.path.commonpath([p.parent for p in paths]))
+        
+        return str(common)
+    
+    def _get_relative_path(self, filepath, base_dir):
+        """Get the relative path of a file given its base directory"""
+        return str(Path(filepath).relative_to(base_dir))
 
     def survey(self, exemplar):
         """Get or create survey"""
@@ -186,18 +212,30 @@ class FolderImportThread(QThread):
         # get timezone for timestamp parsing
 
     def run(self):
+        # get base directory for the files being imported
+        base_dir = self._get_base_dir(self.data['filepath'].tolist())
+        try:
+            base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir="{base_dir}"')[0][0]
+        except IndexError:
+            base_dir_id = self.mpDB.add_upload(base_dir)
+
         for i, file in self.data.iterrows():
             if not self.isInterruptionRequested():
-                filepath = file['filepath']
-                timestamp = file['datetime']
 
+                filepath = file['filepath']
                 # check to see if file exists
                 if not Path(filepath).exists():
                     self.logger.warning(f"File {filepath} does not exist")
                     continue
 
+                # get the relative path of the file with respect to the base directory
+                relative_path = self._get_relative_path(filepath, base_dir)
+                hash = get_sha256(filepath)  # Calculate the SHA256 hash of the file
+
                 # get file extension
                 ext = Path(filepath).suffix.lower()
+                
+                timestamp = file['datetime']
 
                 survey_id = self.active_survey[0]
 
@@ -215,10 +253,10 @@ class FolderImportThread(QThread):
                         self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
                     station_id = self.default_station
 
-                hash = get_sha256(filepath)  # Calculate the SHA256 hash of the file
 
                 # insert into table, force type
-                media_id = self.mpDB.add_media(filepath,
+                media_id = self.mpDB.add_media(base_dir_id,
+                                               relative_path,
                                                hash,
                                                ext,
                                                str(timestamp),
@@ -235,6 +273,20 @@ class FolderImportThread(QThread):
 
         # finished adding media
         self.finished.emit()
+
+    def _get_base_dir(self, filepaths):
+        """Get the common base directory for a list of filepaths"""
+        if not filepaths:
+            return None
+        
+        paths = [Path(p) for p in filepaths]
+        common = Path(os.path.commonpath([p.parent for p in paths]))
+        
+        return str(common)
+    
+    def _get_relative_path(self, filepath, base_dir):
+        """Get the relative path of a file given its base directory"""
+        return str(Path(filepath).relative_to(base_dir))
 
     def station(self, filepath, survey_id):
         """Get or create station"""
@@ -258,3 +310,20 @@ class FolderImportThread(QThread):
 
         return camera_id
 
+
+# BASE PATH UPDATE =============================================================
+class BasePathUpdateThread(QThread):
+    progress_update = pyqtSignal(int)
+    finished = pyqtSignal()
+
+    def __init__(self, mpDB, base_dir_id, new_base_dir):
+        super().__init__()
+        self.mpDB = mpDB
+        self.base_dir_id = base_dir_id
+        self.new_base_dir = new_base_dir
+
+    def run(self):
+        if not self.isInterruptionRequested():
+            success = self.mpDB.update_base_dir(self.base_dir_id, self.new_base_dir)
+            self.progress_update.emit(1 if success else 0)
+        self.finished.emit()
