@@ -9,9 +9,7 @@ import yaml
 import animl
 
 
-
 class mpConfig():
-
     def __init__(self, home_dir):
         """Initiate configuration file with default values if not present"""
 
@@ -44,10 +42,8 @@ class mpConfig():
         # create a new project folder and save
         else:
             home_dir.mkdir(parents=True, exist_ok=True)
-            self.DB_DIR.mkdir(parents=True, exist_ok=True)
-            self.ML_DIR.mkdir(parents=True, exist_ok=True)
-            self.THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
-            self.FRAME_DIR.mkdir(parents=True, exist_ok=True)
+            # create necessary project folders
+            self.create_folders()
             # save to yaml
             self.save()
 
@@ -68,10 +64,16 @@ class mpConfig():
                 self.SEQUENCE_DURATION = cfg.get('SEQUENCE_DURATION', 60)
                 self.SEQUENCE_N = cfg.get('SEQUENCE_N', 3)
                 self.DEVICE = cfg.get('DEVICE', "CPUExecutionProvider")
+
         # config file not found, save the current defaults
         else:
             print(f"Configuration file not found at {self.CONFIG_PATH}. Saving default configuration.")
+            self.HOME_DIR.mkdir(parents=True, exist_ok=True)
+            self.set_default()
             self.save()
+
+        # make sure all necessary directories exist
+        self.create_folders()
 
 
     def save(self):
@@ -92,36 +94,31 @@ class mpConfig():
         }
         with open(self.CONFIG_PATH, 'w') as cfg_file:
             yaml.dump(output_cfg, cfg_file)
-    
 
-
-    def update_project_folder(new_project, new_db):
-        # Update home dir and config path
-
-
-        if not Path(CONFIG_PATH).exists():
-            cfg = initiate(parent_dir=Path(new_project).parent, 
-                    project_name=Path(new_project).name)
+    def set_default(self):
+        """Reset the configuration to default values."""
+        self.DB_DIR = self.HOME_DIR / 'Database'
+        self.ML_DIR = self.HOME_DIR /  'Models'
+        self.THUMBNAIL_DIR = self.HOME_DIR / 'Thumbnails'
+        self.FRAME_DIR = self.HOME_DIR / 'Frames'
+        self.VIDEO_FRAMES = 3
+        self.REID_KEY = None
+        self.VIEWPOINT_KEY = None
+        self.DETECTOR_KEY = None
+        self.KNN = 100
+        self.SEQUENCE_DURATION = 60
+        self.SEQUENCE_N = 3
+        if "CUDAExecutionProvider" in animl.get_onnx_device(quiet=True):
+            self.DEVICE = "CUDAExecutionProvider"
         else:
-            cfg = load_cfg()
-            cfg['HOME_DIR'] = str(new_project)
-            cfg['DB_DIR'] = str(new_db)
+            self.DEVICE = "CPUExecutionProvider"
 
-        # Check or create ML, Thumbnail and Frame folders
-        new_ml = HOME_DIR / "Models"
-        new_ml.mkdir(exist_ok=True)
-        cfg['ML_DIR'] = str(new_ml)
-
-        new_thumb = HOME_DIR / "Thumbnails"
-        new_thumb.mkdir(exist_ok=True)
-        cfg['THUMBNAIL_DIR'] = str(new_thumb)
-
-        new_frame = HOME_DIR / "Frames"
-        new_frame.mkdir(exist_ok=True)
-        cfg['FRAME_DIR'] = str(new_frame)
-        # save changes to yml
-        self.save()
-
+    def create_folders(self):
+        """Create necessary project folders if they do not exist."""
+        self.DB_DIR.mkdir(parents=True, exist_ok=True)
+        self.ML_DIR.mkdir(parents=True, exist_ok=True)
+        self.THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
+        self.FRAME_DIR.mkdir(parents=True, exist_ok=True)
 
     def update(self, key_dict):
         """Update the configuration with new key-value pairs."""
@@ -132,6 +129,7 @@ class mpConfig():
         self.save()
 
 
+# ==============================================================================
 def resource_path(relative_path):
     # TODO: test with installer 
     """ Get path to resource whether running in dev or installed bundle """

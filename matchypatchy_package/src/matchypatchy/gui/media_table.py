@@ -67,31 +67,12 @@ class MediaTable(QWidget):
         self.loaded_data.connect(parent.handle_loaded_data)
 
     # RUN ON ENTRY -------------------------------------------------------------
-    def load_data(self, data_type):
-        """
-        Fetch table, format, and filter data
-        data_type: 0 = media, 1 = rois
-        Returns True if data loaded, False if no media
-        """
+    def clear_contents(self, data_type):
+        """Clear all contents of the media table"""
         # clear old view
         self.data_type = data_type
         self.table.clearContents()
         self.table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
-        self.format_table()
-
-        # fetch data
-        self.individual_list = fetch_individual(self.mpDB)
-        self.dataloader = FetchTableThread(self)
-        self.dataloader.done.connect(self.filter)
-        self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
-        self.dataloader.loaded_data.connect(self.loaded_data.emit)
-        self.dataloader.start()
-
-    # STEP 2 - CALLED BY load_data()
-    def format_table(self):
-        """
-        Format table for media or roi display, add delegates for combos, and load thumbnails
-        """
         if self.data_type == 1:
             # corresponding mpDB column names
             self.columns = {0: "select",
@@ -112,9 +93,9 @@ class MediaTable(QWidget):
 
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
-                                                  "Station", "Camera", "Sequence ID", "External ID",
-                                                  "Viewpoint", "Individual", "Sex", "Age",
-                                                  "Reviewed", "Favorite", "Comment"])
+                                                    "Station", "Camera", "Sequence ID", "External ID",
+                                                    "Viewpoint", "Individual", "Sex", "Age",
+                                                    "Reviewed", "Favorite", "Comment"])
             VIEWPOINT_COLUMN = 8
             SEX_COLUMN = 10
             AGE_COLUMN = 11
@@ -142,8 +123,8 @@ class MediaTable(QWidget):
                             8: "comment"}
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
-                                                  "Station", "Camera", "Sequence ID",
-                                                  "External ID", "Comment"])
+                                                    "Station", "Camera", "Sequence ID",
+                                                    "External ID", "Comment"])
         # adjust widths
         self.table.resizeColumnsToContents()
         for col in range(self.table.columnCount()):
@@ -156,9 +137,29 @@ class MediaTable(QWidget):
 
         # increase checkbox size
         self.table.setStyleSheet(""" QTableWidget::indicator {
-                                 width: 25px;
-                                 height: 25px;}
-                                 """)
+                                    width: 25px;
+                                    height: 25px;}
+                                    """)
+
+        
+    # =========================================================================
+    # DATA LOADING AND FILTERING
+    # =========================================================================
+    def load_data(self, data_type):
+        """
+        Fetch table, format, and filter data
+        data_type: 0 = media, 1 = rois
+        Returns True if data loaded, False if no media
+        """
+        # fetch data
+        self.data_type = data_type
+        self.individual_list = fetch_individual(self.mpDB)
+        self.dataloader = FetchTableThread(self)
+        self.dataloader.done.connect(self.filter)
+        self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
+        self.dataloader.loaded_data.connect(self.loaded_data.emit)
+        self.dataloader.start()
+
 
     # Step 3 - Filter and Display ------------------------------------------------------
     def filter(self):
@@ -436,6 +437,7 @@ class MediaTable(QWidget):
 
         # reload data and refresh table
         self.edit_stack = []
+        self.clear_contents(self.data_type)
         self.load_data(self.data_type)
 
     def select_row(self, row, overwrite=None):

@@ -214,12 +214,44 @@ class MainWindow(QMainWindow):
         self.settings.setValue("home_dir", str(path))
         self.HOME_DIR = path
 
-    def new_project(self, filepath):
-        self.cfg = mpConfig(filepath)
-        self.mpDB = MatchyPatchyDB(cfg.DB_DIR, self.logger)
+    def new_project(self, home_dir):
+        # close existing database connection before creating a new project
+        self.mpDB.close()
+
+        home_dir = Path(home_dir) / "MatchyPatchy-Share"  # Fallback to current working directory
+        self.settings.setValue("home_dir", str(home_dir))
+        self.logger.info(f"Creating project folder: {str(home_dir)}.")
+
+        self.cfg = mpConfig(home_dir)
+        self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
         self.Base.update_project(self.cfg, self.mpDB)
         self.Media.update_project(self.cfg, self.mpDB)
         self.Compare.update_project(self.cfg, self.mpDB)
+
+    def change_project(self, project_folder):
+        # close existing database connection before creating a new project
+        self.mpDB.close()
+
+        cfg = mpConfig(project_folder)
+        mpDB = MatchyPatchyDB(cfg.DB_DIR, self.logger)
+        valid = mpDB.key
+        # Check if the database key is valid
+        if valid:
+            print(f"Changing project to {str(project_folder)}")
+            self.settings.setValue("home_dir", str(project_folder))
+            self.logger.info(f"Updating project folder to {str(project_folder)}.")
+            self.cfg = cfg
+            self.mpDB = mpDB
+            self.Base.update_project(self.cfg, self.mpDB)
+            self.Media.update_project(self.cfg, self.mpDB)
+            self.Compare.update_project(self.cfg, self.mpDB)
+            return True
+        
+        else:
+            self.logger.warning(f"Database at {str(project_folder)} is invalid. User prompted to select another path or delete.")
+            dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
+            dialog.exec()
+            return False
 
     def edit_config(self):
         dialog = ConfigPopup(self)

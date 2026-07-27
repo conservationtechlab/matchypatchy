@@ -216,18 +216,13 @@ class ConfigPopup(QDialog):
         new_project = QFileDialog.getExistingDirectory(self, "Get Project Folder",
                                                        os.path.expanduser('~'),)
         if new_project:
-            new_db = Path(new_project) / "Database"
-            valid = self.mpDB.update_paths(new_db)
-            if valid:
-                self.logger.info(f"Updating project folder to {new_project} with database at {new_db}")
-                self.cfg.update_project_folder(new_project, new_db)
-                self.refresh()
-
-            else:
-                self.logger.warning(f"Database at {new_db} is invalid. User prompted to select another path or delete.")
-                dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
-                if dialog.exec(): 
-                    return
+            valid = self.parent.change_project(new_project)
+            if not valid:
+                return
+            # Update local references to the new project's database and config
+            self.mpDB = self.parent.mpDB
+            self.cfg = self.parent.cfg
+            self.refresh()
 
     def new_project(self):
         """Create new project directory"""
@@ -235,6 +230,9 @@ class ConfigPopup(QDialog):
                                                        os.path.expanduser('~'),)
         if parent_dir:
             self.parent.new_project(parent_dir)
+            # Update local references to the new project's database and config
+            self.mpDB = self.parent.mpDB
+            self.cfg = self.parent.cfg
             self.refresh()
 
     def set_visualizer_model(self):

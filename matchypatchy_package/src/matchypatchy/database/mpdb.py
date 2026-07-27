@@ -61,48 +61,12 @@ class MatchyPatchyDB():
         return self.local.db
     
     def close(self):
-        """Close the thread-local connection"""
-        if hasattr(self.local, 'db') and self.local.db:
-            self.local.db.close()
-            self.local.db = None
-
-    def update_paths(self, DB_PATH):
-        """Update database paths, create new database if not found"""
-        # Update the file paths for the databases
-        self.filepath = Path(DB_PATH) / 'matchypatchy.db'
-        self.chroma_filepath = Path(DB_PATH) / 'emb.db'
-
-        # close existing thread-local connection if any
+        """Close database and Chroma connections"""
         if hasattr(self.local, 'db') and self.local.db is not None:
             self.local.db.close()
             self.local.db = None
-
-        if self.filepath.is_file() and self.chroma_filepath.is_dir():
-            self.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
-            self.collection = self.chroma.get_collection(name="embedding_collection")
-            valid = self.validate()
-            if valid:
-                self.key = valid
-                return True
-            else:
-                return False
-        else:
-            # create new databases
-            self.key = '{:05}'.format(randrange(1, 10 ** 5))
-            self._setup_new_databases()
-            return True
-
-    def retrieve_key(self):
-        """Retrieve key from both databases to confirm match"""
-        cursor = self.db.cursor()
-        cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
-        db_build_version, mpkey = cursor.fetchone()
-
-        collection = self.chroma.get_collection(name="embedding_collection")
-        chroma_key = collection.metadata['key']
-        print(f"Chroma key: {chroma_key}")
-        print(f"Database key: {mpkey}")
-        return db_build_version, mpkey, chroma_key
+        if hasattr(self, 'chroma') and self.chroma is not None:
+            self.chroma = None  # Chroma handles cleanup automatically
 
     def info(self):
         """Get current counts of media and roi in database"""
@@ -136,11 +100,13 @@ class MatchyPatchyDB():
         match_schema = (content==s)
 
         # Check that the database build version and key match
-        db_build_version, mpkey, chromakey = self.retrieve_key()
+        cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
+        db_build_version, mpkey = cursor.fetchone()
+        chroma_key = self.collection.metadata['key']
 
         if match_schema:
             # confirm databases match
-            if mpkey == chromakey:
+            if mpkey == chroma_key:
                 return mpkey
             else:
                 self.logger.error("Key mismatch for Image DB and Emb DB.")
@@ -153,6 +119,7 @@ class MatchyPatchyDB():
                 self.logger.error("Schema of selected DB invalid. Database content does not match expected schema.")
             print(s)
             return False
+
 
     def _command(self, command, quiet=True):
         """
@@ -715,12 +682,3 @@ class MatchyPatchyDB():
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
         self.collection = self.chroma.get_collection(name="embedding_collection")
         self.logger.info("Chroma vector database cleared and rebuilt.")
-
-    # SAFE CLOSEOUT ============================================================
-    def close(self):
-        """Close database and Chroma connections"""
-        if hasattr(self.local, 'db') and self.local.db is not None:
-            self.local.db.close()
-            self.local.db = None
-        if hasattr(self, 'chroma') and self.chroma is not None:
-            self.chroma = None  # Chroma handles cleanup automatically

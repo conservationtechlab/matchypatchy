@@ -199,6 +199,7 @@ class DisplayMedia(QWidget):
     # =========================================================================
     # MEDIA TABLE HANDLERS
     # =========================================================================
+
     # 1. RUN ON ENTRY
     def load_table(self):
         """Load media/roi data into table based on current data_type"""
@@ -208,6 +209,7 @@ class DisplayMedia(QWidget):
 
         if media_n == 0:
             # no media at all
+            self.media_table.clear_contents(self.data_type)
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
                 self.home()
@@ -225,8 +227,10 @@ class DisplayMedia(QWidget):
                 self.show_type.blockSignals(False)
 
             # load table with current data type
+            self.media_table.clear_contents(self.data_type)
             self.media_table.load_data(self.data_type)
             return True
+
 
     def update_count_label(self):
         """Set count label at bottom of media table"""

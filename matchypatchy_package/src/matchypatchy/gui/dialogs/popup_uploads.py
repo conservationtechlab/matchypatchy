@@ -144,6 +144,7 @@ class UploadManagerPopup(QDialog):
         self.verified = True
         self.progress_bar.hide()
         self.colorize()
+        self.log()
 
     def colorize(self):
         """Colorize the rows based on verification results"""
@@ -175,6 +176,20 @@ class UploadManagerPopup(QDialog):
 
         # make the colors visible
         self.list.clearSelection()
+
+    def log(self):
+        """Log the verification results"""
+        if self.contains_errors:
+            dialog = AlertPopup(self, 
+                                prompt=("Some files in the database could not be found in the new directory. ",
+                                        "Results have been saved to the log."))
+            dialog.exec()
+            del dialog
+
+            self.logger.info(f"Verification results for updates: {self.updates}")
+            self.logger.info(f"Errors: {self.errors}")
+            self.logger.info(f"Files discovered not in DB: {self.not_in_db}")
+            self.logger.info(f"Files not in new directory: {self.not_in_new_directory}")
 
 
     def save(self):
