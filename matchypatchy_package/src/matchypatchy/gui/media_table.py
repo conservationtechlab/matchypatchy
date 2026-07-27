@@ -66,6 +66,11 @@ class MediaTable(QWidget):
         self.update_signal.connect(parent.handle_table_change)
         self.loaded_data.connect(parent.handle_loaded_data)
 
+    def update_project(self, cfg, mpDB):
+        """Update database object"""
+        self.cfg = cfg
+        self.mpDB = mpDB
+
     # RUN ON ENTRY -------------------------------------------------------------
     def clear_contents(self, data_type):
         """Clear all contents of the media table"""
@@ -140,7 +145,6 @@ class MediaTable(QWidget):
                                     width: 25px;
                                     height: 25px;}
                                     """)
-
         
     # =========================================================================
     # DATA LOADING AND FILTERING

@@ -137,12 +137,12 @@ class MatchyPatchyDB():
             return rows
         except sqlite3.OperationalError as error:
             if not quiet:
-                print(f"Operational error executing command: {error}")  
+                print(f"DEBUG: Operational error executing command: {error}")  
             self.logger.error(f"Operational error executing command: {error}")
             return None
         except sqlite3.Error as error:
             if not quiet:
-                print(f"Failed to execute command: {error}")
+                print(f"DEBUG: Failed to execute command: {error}")
             self.logger.error("Failed to execute command.", error)
             return None
 

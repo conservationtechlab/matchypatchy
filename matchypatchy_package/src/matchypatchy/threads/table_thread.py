@@ -21,7 +21,6 @@ class FetchTableThread(QThread):
         super().__init__()
         self.mpDB = parent.mpDB
         self.data_type = parent.data_type
-        print(self.data_type)
         self.thumbnail_dir = parent.thumbnail_dir
         self.individual_list = fetch_individual(self.mpDB)
         self.data = pd.DataFrame()
@@ -39,9 +38,6 @@ class FetchTableThread(QThread):
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
             print("Fetched Roi Media, total rows:", len(self.data))
-            if self.data.empty:
-                pass  # skip processing if no ROI media is fetched
-
             # add missing thumbnails
             if missing_thumbnails:
                 for roi_id in missing_thumbnails:
@@ -65,8 +61,6 @@ class FetchTableThread(QThread):
         elif self.data_type == 0:
             self.data = fetch_media(self.mpDB)
             print("Fetched Media, total rows:", len(self.data))
-            if self.data.empty:
-                pass  # skip processing if no media is fetched
             # add missing thumbnails
             if missing_thumbnails:
                 for media_id in missing_thumbnails:

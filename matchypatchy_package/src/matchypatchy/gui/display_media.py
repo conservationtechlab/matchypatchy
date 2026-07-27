@@ -156,6 +156,8 @@ class DisplayMedia(QWidget):
         """Update database object"""
         self.cfg = cfg
         self.mpDB = mpDB
+        self.media_table.update_project(cfg, mpDB)
+        self.filterbar.update_project(mpDB)
 
     # =========================================================================
     # FILTERS
