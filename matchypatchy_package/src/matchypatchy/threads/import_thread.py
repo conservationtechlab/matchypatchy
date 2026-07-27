@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.config import load_cfg
 from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail
 from matchypatchy.database.media import get_sha256
 
@@ -16,11 +15,11 @@ class CSVImportThread(QThread):
 
     def __init__(self, parent, unique_images, selected_columns):
         super().__init__()
-        self.mpDB = parent.mpDB
         self.logger = parent.logger
+        self.mpDB = parent.mpDB
         self.unique_images = unique_images
         self.selected_columns = selected_columns
-        self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
+        self.thumbnail_dir = parent.cfg.THUMBNAIL_DIR
 
     def run(self):
         roi_counter = 0  # progressbar counter
@@ -208,7 +207,7 @@ class FolderImportThread(QThread):
         self.station_level = station_level
         self.camera_level = camera_level
         self.default_station = None
-        self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
+        self.thumbnail_dir = parent.cfg.THUMBNAIL_DIR
         # get timezone for timestamp parsing
 
     def run(self):

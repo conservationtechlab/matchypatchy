@@ -14,8 +14,9 @@ from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
 class ImportCSVPopup(QDialog):
     def __init__(self, parent, manifest):
         super().__init__(parent)
-        self.mpDB = parent.mpDB
         self.logger = parent.logger
+        self.cfg = parent.cfg
+        self.mpDB = parent.mpDB
         self.data = pd.read_csv(manifest)
         self.columns = ["None"] + list(self.data.columns)
         self.survey_columns = [str(parent.active_survey[1])] + list(self.data.columns)

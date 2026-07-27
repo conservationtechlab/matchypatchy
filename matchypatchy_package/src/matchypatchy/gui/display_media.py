@@ -21,6 +21,7 @@ class DisplayMedia(QWidget):
         super().__init__()
         self.parent = parent
         self.logger = parent.logger
+        self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         # 0 for Media, 1 for ROI
         self.data_type = data_type
@@ -151,9 +152,9 @@ class DisplayMedia(QWidget):
             else:
                 self.parent._set_compare_view()
             
-
-    def update_db(self, mpDB):
+    def update_project(self, cfg, mpDB):
         """Update database object"""
+        self.cfg = cfg
         self.mpDB = mpDB
 
     # =========================================================================

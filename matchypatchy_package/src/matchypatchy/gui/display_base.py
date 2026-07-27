@@ -36,6 +36,7 @@ class DisplayBase(QWidget):
         super().__init__()
         self.parent = parent
         self.logger = parent.logger
+        self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         padding = 120
 
@@ -155,8 +156,9 @@ class DisplayBase(QWidget):
 
         self.update_survey()
 
-    def update_db(self, mpDB):
+    def update_project(self, cfg, mpDB):
         """Update database object"""
+        self.cfg = cfg
         self.mpDB = mpDB
 
     # ==========================================================================
@@ -263,7 +265,7 @@ class DisplayBase(QWidget):
     def process_images(self, mloptions):
         """Process images using selected machine learning options"""
         if self.mpDB.count("media") > 0:
-            config.add(mloptions)
+            self.cfg.update(mloptions)
             dialog = AlertPopup(self, "Processing Images...",
                                 title="Processing Images",
                                 progressbar=True, cancel_only=True)
@@ -271,7 +273,7 @@ class DisplayBase(QWidget):
 
             # 1. SEQUENCE
             dialog.set_max(0)
-            self.sequence_thread = SequenceThread(self.mpDB, mloptions['sequence_checked'])
+            self.sequence_thread = SequenceThread(self.mpDB, self.cfg, mloptions['sequence_checked'])
             self.sequence_thread.prompt_update.connect(dialog.update_prompt)
             self.sequence_thread.start()
             # 2. ANIML (BBOX)
@@ -283,7 +285,9 @@ class DisplayBase(QWidget):
             # 3. REID AND VIEWPOINT
             dialog.set_max(100)
             dialog.set_counter(0)
-            self.miew_thread = ReIDThread(self.mpDB, mloptions['REID_KEY'],
+            self.miew_thread = ReIDThread(self.mpDB, 
+                                          self.cfg.ML_DIR,
+                                          mloptions['REID_KEY'],
                                           mloptions['VIEWPOINT_KEY'])
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)

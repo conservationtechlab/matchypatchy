@@ -4,14 +4,12 @@ QThread Class for Processing BBox, Frames, BuildFileManifest with ANIML
 """
 import animl
 import pandas as pd
-from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.database.media import fetch_roi_media, get_sha256
 from matchypatchy.threads.model_download_thread import get_path
-from matchypatchy import config
 
 
 MEGADETECTORv1000_SIZE = 960
@@ -80,12 +78,12 @@ class AnimlThread(QThread):
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, DETECTOR_KEY):
+    def __init__(self, mpDB, cfg, DETECTOR_KEY):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = Path(config.load_cfg('ML_DIR'))
-        self.n_frames = config.load_cfg('VIDEO_FRAMES')
-        self.thumbnail_dir = config.load_cfg('THUMBNAIL_DIR')
+        self.ml_dir = cfg.ML_DIR
+        self.n_frames = cfg.VIDEO_FRAMES
+        self.thumbnail_dir = cfg.THUMBNAIL_DIR
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)

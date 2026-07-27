@@ -9,7 +9,6 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.database.media import fetch_individual
 from matchypatchy.threads.model_download_thread import load_model
-from matchypatchy.config import load_cfg
 from matchypatchy.threads.table_thread import FetchTableThread, LoadTableThread
 
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
@@ -22,8 +21,9 @@ class MediaTable(QWidget):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.mpDB = parent.mpDB
         self.parent = parent
+        self.cfg = parent.cfg
+        self.mpDB = parent.mpDB
         self.data = pd.DataFrame()
         self.data_filtered = pd.DataFrame()
         self.individual_list = pd.DataFrame()
@@ -31,7 +31,7 @@ class MediaTable(QWidget):
         self.data_type = 1
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         self.thumbnail_size = 150
-        self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
+        self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
 
         self.edit_stack = []
 

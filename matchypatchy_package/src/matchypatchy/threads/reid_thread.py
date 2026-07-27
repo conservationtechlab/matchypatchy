@@ -4,13 +4,11 @@ Thread Class for Processing Viewpoint and Miew Embedding
 """
 import animl
 from numpy import argmax
-from pathlib import Path
 import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.threads.model_download_thread import get_path
-from matchypatchy import config
 from matchypatchy.database.media import fetch_roi
 
 # from matchypatchy.pairx.core import explain
@@ -22,10 +20,10 @@ class ReIDThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     done = pyqtSignal()
 
-    def __init__(self, mpDB, REID_KEY, VIEWPOINT_KEY):
+    def __init__(self, mpDB, ML_DIR, REID_KEY, VIEWPOINT_KEY):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        self.ml_dir = ML_DIR
         self.reid_filepath = get_path(self.ml_dir, REID_KEY)
         self.viewpoint_filepath = get_path(self.ml_dir, VIEWPOINT_KEY)
 

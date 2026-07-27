@@ -15,6 +15,7 @@ from matchypatchy.config import asset_path
 from matchypatchy.database.location import TZ_CONVERT_DICT
 from matchypatchy import __version__
 
+
 class MatchyPatchyDB():
     def __init__(self, DB_PATH, logger):
         self.filepath = Path(DB_PATH) / 'matchypatchy.db'
@@ -37,6 +38,10 @@ class MatchyPatchyDB():
 
     def _setup_new_databases(self):
         """Helper to set up new databases (uses thread-local db via property)"""
+        self.logger.info("Setting up new databases")
+        self.logger.info(f"Database file path: {self.filepath}")
+        self.logger.info(f"Chroma database file path: {self.chroma_filepath}")
+        self.logger.info(f"Using key: {self.key}")
         self.db  # Trigger property initialization
         setup_database(self.key, self.filepath, self.db)
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
@@ -63,27 +68,28 @@ class MatchyPatchyDB():
 
     def update_paths(self, DB_PATH):
         """Update database paths, create new database if not found"""
-        filepath = Path(DB_PATH) / 'matchypatchy.db'
-        chroma_filepath = Path(DB_PATH) / 'emb.db'
-        if filepath.is_file() and chroma_filepath.is_dir():
+        # Update the file paths for the databases
+        self.filepath = Path(DB_PATH) / 'matchypatchy.db'
+        self.chroma_filepath = Path(DB_PATH) / 'emb.db'
+
+        # close existing thread-local connection if any
+        if hasattr(self.local, 'db') and self.local.db is not None:
+            self.local.db.close()
+            self.local.db = None
+
+        if self.filepath.is_file() and self.chroma_filepath.is_dir():
+            self.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
+            self.collection = self.chroma.get_collection(name="embedding_collection")
             valid = self.validate()
             if valid:
                 self.key = valid
-                self.filepath = filepath
-                self.chroma_filepath = chroma_filepath
-                self.db = sqlite3.connect(self.filepath)
-                self.db.execute("PRAGMA foreign_keys = ON")
-                self.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
                 return True
             else:
                 return False
         else:
             # create new databases
-            self.filepath = filepath
-            self.chroma_filepath = chroma_filepath
             self.key = '{:05}'.format(randrange(1, 10 ** 5))
-            self.db = setup_database(self.key, self.filepath)
-            self.chroma = setup_chromadb(self.key, self.chroma_filepath)
+            self._setup_new_databases()
             return True
 
     def retrieve_key(self):
@@ -94,7 +100,8 @@ class MatchyPatchyDB():
 
         collection = self.chroma.get_collection(name="embedding_collection")
         chroma_key = collection.metadata['key']
-
+        print(f"Chroma key: {chroma_key}")
+        print(f"Database key: {mpkey}")
         return db_build_version, mpkey, chroma_key
 
     def info(self):
@@ -708,3 +715,12 @@ class MatchyPatchyDB():
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
         self.collection = self.chroma.get_collection(name="embedding_collection")
         self.logger.info("Chroma vector database cleared and rebuilt.")
+
+    # SAFE CLOSEOUT ============================================================
+    def close(self):
+        """Close database and Chroma connections"""
+        if hasattr(self.local, 'db') and self.local.db is not None:
+            self.local.db.close()
+            self.local.db = None
+        if hasattr(self, 'chroma') and self.chroma is not None:
+            self.chroma = None  # Chroma handles cleanup automatically

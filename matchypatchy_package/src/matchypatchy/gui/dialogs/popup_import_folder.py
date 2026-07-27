@@ -19,6 +19,7 @@ class ImportFolderPopup(QDialog):
     def __init__(self, parent, directory):
         super().__init__(parent)
         self.logger = parent.logger
+        self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         self.active_survey = parent.active_survey
         self.timezone = self.mpDB.select_join("survey", "region", "survey.region_id=region.id",
