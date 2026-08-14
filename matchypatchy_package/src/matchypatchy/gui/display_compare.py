@@ -8,7 +8,7 @@ import pandas as pd
 from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QComboBox, QLineEdit, QSlider)
+                             QLabel, QLineEdit, QSlider)
 from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
@@ -93,7 +93,6 @@ class DisplayCompare(QWidget):
         # FILTERBAR --------------------------------------------------------------
         first_layer.addSpacing(10)
         first_layer.addWidget(VerticalSeparator())
-        #first_layer.addSpacing(10)
         self.filterbar = FilterBar(self, 100)
         self.filterbar.viewpoint_visible(False)
         self.filterbar.individual_visible(False)
@@ -235,7 +234,7 @@ class DisplayCompare(QWidget):
         self.button_match_favorites.setChecked(False)
         self.button_match_favorites.clicked.connect(self.toggle_match_favorites_button)
         self.button_match.setFixedHeight(50)
-        self.button_match.setMaximumWidth(50)        
+        self.button_match.setMaximumWidth(50)
         match_options.addWidget(self.button_match_favorites)
 
         match_options.addStretch()
@@ -306,16 +305,6 @@ class DisplayCompare(QWidget):
         if dialog.exec():
             del dialog
 
-    #def change_metric(self):
-        # """
-        # Select L2 or Cosine distance metric, update threshold slider appropriately
-        # """
-        # self.distance_metric = self.option_distance_metric.currentText().lower()
-        # if self.distance_metric == 'l2':
-        #     self.threshold_slider.setValue(30)
-        # else:
-        #     self.threshold_slider.setValue(50)
-
     def change_threshold_slider(self):
         """
         Set new threshold value
@@ -359,14 +348,14 @@ class DisplayCompare(QWidget):
         # run knn thread on entry
         self.k = load_cfg('KNN')  # can be changed in configuration
         self.QueryContainer = QueryContainer(self)  # re-establish object
-        self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded) 
+        self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
             self.show_progress("Matching embeddings... This may take a while.")
             self.QueryContainer.calculate_neighbors()
             self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
-            self.QueryContainer.thread_signal.connect(self.check_matchthread_success)    
+            self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
         else:
             self.home(warn=True)
 
@@ -391,7 +380,7 @@ class DisplayCompare(QWidget):
         # must have inviduals to enter QC mode
         if not fetch_individual(self.mpDB).empty:
             self.compare_type = 'qc'
-            self.button_match_favorites.setVisible(False) # hide favorite toggle
+            self.button_match_favorites.setVisible(False)  # hide favorite toggle
             self.QueryContainer = QC_QueryContainer(self)
             self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
             self.filterbar.individual_visible(True)
@@ -408,7 +397,7 @@ class DisplayCompare(QWidget):
     def compare_manual(self, selected_ids=None):
         """Enter manual comparison mode, recalculate matches manually"""
         self.compare_type = 'manual'
-        self.button_match_favorites.setVisible(False) # hide favorite toggle
+        self.button_match_favorites.setVisible(False)  # hide favorite toggle
         self.filterbar.individual_visible(False)
         self.QueryContainer = ManualQueryContainer(self, selected_ids=selected_ids)  # re-establish object
         self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
@@ -445,7 +434,6 @@ class DisplayCompare(QWidget):
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
 
-
     def filter_neighbors(self):
         """Apply filters from filterbar to current neighbor dict"""
         self.filters = self.filterbar.get_filters()
@@ -457,7 +445,6 @@ class DisplayCompare(QWidget):
             self.compare_manual()
         else:
             self.calculate_neighbors()
-
 
     # ==========================================================================
     # MATCHING PROCESS
@@ -514,7 +501,7 @@ class DisplayCompare(QWidget):
         """If already matched, unmatch current query from IID"""
         name = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, 'name')
         dialog = AlertPopup(self,
-                            prompt=f"This will remove Match from individual '{name}'. Are you sure?", 
+                            prompt=f"This will remove Match from individual '{name}'. Are you sure?",
                             cancel_only=False)
         if dialog.exec():
             self.QueryContainer.unmatch()
@@ -663,8 +650,7 @@ class DisplayCompare(QWidget):
         data = self.QueryContainer.get_info(rid)
         data["id"] = rid
         data = data.to_frame().T
-        filepath = self.QueryContainer.get_info(rid, "filepath")
-        dialog = MediaEditPopup(self, data, data_type=1 if Path(filepath).suffix.lower() in IMAGE_EXT else 0)
+        dialog = MediaEditPopup(self, data, data_type=1)
         if dialog.exec():
             self.edit_stack = dialog.get_edit_stack()
             self.save_changes()
@@ -674,7 +660,6 @@ class DisplayCompare(QWidget):
             self.load_query()
             self.load_match()
         del dialog
-
 
     def save_changes(self):
         # commit all changes in self.edit_stack to database
@@ -756,7 +741,6 @@ class DisplayCompare(QWidget):
         self.setFocus()  # ensure window has focus to receive key events
         key = event.key()
         key_text = event.text()
-        #print(f"Key pressed: {key_text} (Qt key code: {key})")
         # Left Arrow
         if key == 16777234:
             self.change_match(self.QueryContainer.current_match - 1)
@@ -771,7 +755,7 @@ class DisplayCompare(QWidget):
             self.change_query(self.QueryContainer.current_query + 1)
 
         # A - Previous Query in Sequence
-        elif key == 65: 
+        elif key == 65:
             self.change_query_in_sequence(self.QueryContainer.current_query_sn - 1)
         # D - Next Query in Sequence
         elif key == 68:
