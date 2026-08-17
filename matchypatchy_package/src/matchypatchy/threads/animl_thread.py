@@ -45,6 +45,7 @@ class AnimlThread(QThread):
         self.fps = config.load_cfg('VIDEO_FPS')
         self.n_frames = config.load_cfg('N_FRAMES')
         self.thumbnail_dir = config.load_cfg('THUMBNAIL_DIR')
+        self.device = config.load_cfg('DEVICE')
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
@@ -67,7 +68,7 @@ class AnimlThread(QThread):
         if self.DETECTOR_KEY is None:
             self.detector = None
         else:
-            self.detector = animl.load_detector(self.md_filepath)
+           self.detector = animl.load_detector(self.md_filepath, device=self.device)
 
     def run(self):
         # pull out images and videos from media

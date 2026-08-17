@@ -486,7 +486,7 @@ class DisplayCompare(QWidget):
                                                          dialog.get_age())
                 # update query and match
                 self.QueryContainer.new_iid(individual_id)
-            del dialog
+                del dialog
 
         # Match has a name
         else:

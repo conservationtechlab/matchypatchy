@@ -18,6 +18,7 @@ from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_m
 
 class ConfigPopup(QDialog):
     ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
+    DEVICE_OPTIONS = {"CPUExecutionProvider": "CPU", "CUDAExecutionProvider": "CUDA-enabled GPU"}
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -167,7 +168,8 @@ class ConfigPopup(QDialog):
         self.device.addItem("CPU")
         if "CUDAExecutionProvider" in providers:
             self.device.addItem("CUDA-enabled GPU")
-            self.device.setCurrentIndex(1)
+        current_device = self.cfg.get('DEVICE', 'CPUExecutionProvider')
+        self.device.setCurrentText(self.DEVICE_OPTIONS.get(current_device, "CPU"))
         self.device.setToolTip("Select the hardware device for running models.")
         self.device.currentTextChanged.connect(self.change_device)
         cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -285,6 +287,7 @@ class ConfigPopup(QDialog):
                 self.visualizer_model.setText(new_model[0])
                 self.cfg['REID_KEY'] = str(Path(new_model[0]).stem)
                 # save changes to yml
+                self.logger.info(f"Re-ID model updated to {self.cfg['REID_KEY']}")
                 config.update(self.cfg)
             else:
                 dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
@@ -297,6 +300,7 @@ class ConfigPopup(QDialog):
             nummatches = int(self.nummatches.text())
             if nummatches > 0:
                 self.cfg['KNN'] = nummatches
+                self.logger.info(f"Max number of matches updated to {nummatches}")
                 config.update(self.cfg)
         except ValueError:
             pass
@@ -309,6 +313,7 @@ class ConfigPopup(QDialog):
             if duration > 0:
                 self.cfg['SEQUENCE_DURATION'] = duration
                 self.cfg['SEQUENCE_N'] = n
+                self.logger.info(f"Sequence settings updated: duration={duration}, n={n}")
                 config.update(self.cfg)
         except ValueError:
             pass
@@ -348,4 +353,5 @@ class ConfigPopup(QDialog):
             self.cfg['DEVICE'] = "CPUExecutionProvider"
         elif selected_device == "CUDA-enabled GPU":
             self.cfg['DEVICE'] = "CUDAExecutionProvider"
+        self.logger.info(f"Device changed to {self.cfg['DEVICE']}")
         config.update(self.cfg)

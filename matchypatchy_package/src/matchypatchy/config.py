@@ -75,13 +75,14 @@ def initiate(parent_dir=None, project_name="MatchyPatchy-Share"):
         'KNN': 100,
         'SEQUENCE_DURATION': 60,
         'SEQUENCE_N': 3,
-        'DEVICE': "CPUExecutionProvider",
     }
 
     # Check if CUDA is available and set DEVICE accordingly
-    providers = animl.get_onnx_device()
+    providers = animl.get_onnx_device(quiet=True)
     if "CUDAExecutionProvider" in providers:
         default_cfg['DEVICE'] = "CUDAExecutionProvider"
+    else:
+        default_cfg['DEVICE'] = "CPUExecutionProvider"
 
     CONFIG_PATH = home_dir / '.config.yml'
     if CONFIG_PATH.exists():
