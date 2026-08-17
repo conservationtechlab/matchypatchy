@@ -128,6 +128,7 @@ class LoadTableThread(QThread):
         elif column == 'station':
             qtw = QTableWidgetItem(self.valid_stations[roi["station_id"]])
         # Camera
+        # TODO: itemdelegate 
         elif column == 'camera_id':
             if roi["camera_id"]:
                 qtw = QTableWidgetItem(self.valid_cameras[int(roi["camera_id"])])
