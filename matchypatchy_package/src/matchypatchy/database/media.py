@@ -35,24 +35,50 @@ def get_sha256(path: str | Path,
     return h.hexdigest()
 
 
-def fetch_media(mpDB, ids=None):
+def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     Fetches all media info, converts to dataframe
     """
+
     if ids:
         ids_str = ', '.join(map(str, ids))
-        media = mpDB.select("media", row_cond=f"id IN ({ids_str})")
+        row_cond=f"id IN ({ids_str})"
     else:
-        media = mpDB.select("media")
+        row_cond=None
 
-    if media:
-        media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
-                                             'station_id', "camera_id", 'sequence_id',
-                                             "external_id", 'comment'])
-        media = media.replace({float('nan'): None})
-        return media
+    # fetch counts for media table data_type=0
+    if counts:
+        if row_cond is not None:
+            media = mpDB._command(("SELECT media.*, COUNT(roi.id) AS count FROM media "
+                                   "LEFT JOIN roi ON roi.media_id = media.id "
+                                   f"GROUP BY media.id WHERE {row_cond};"), quiet=quiet)
+        else:
+            media = mpDB._command(("SELECT media.*, COUNT(roi.id) AS count FROM media "
+                                   "LEFT JOIN roi ON roi.media_id = media.id "
+                                   f"GROUP BY media.id;"), quiet=quiet)
+            
+        if media:
+            media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
+                                                'station_id', "camera_id", 'sequence_id',
+                                                "external_id", 'comment', 'roi_count'])
+            media = media.replace({float('nan'): None})
+            return media
+        else:
+            return pd.DataFrame()
+
+            
+    # just get media table
     else:
-        return pd.DataFrame()
+        media = mpDB.select("media", row_cond)
+
+        if media:
+            media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
+                                                'station_id', "camera_id", 'sequence_id',
+                                                "external_id", 'comment'])
+            media = media.replace({float('nan'): None})
+            return media
+        else:
+            return pd.DataFrame()
 
 
 def fetch_roi(mpDB, media_id=None):
