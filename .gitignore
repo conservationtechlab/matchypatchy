@@ -7,6 +7,7 @@ __pycache__/
 *.db
 
 Jaguar/
+Giraffe/
 examples/
 Models/
 MatchyPatchy-Share/
@@ -31,6 +32,8 @@ share/python-wheels/
 *.egg
 MANIFEST
 MatchyPatchy-Share/
+
+installation/
 
 
 # PyInstaller
