@@ -26,7 +26,6 @@ from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
 from matchypatchy import config
-from matchypatchy.database.media import export_data
 from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
@@ -162,7 +161,7 @@ class MainWindow(QMainWindow):
         pass
 
     def export(self):
-        data = export_data(self.mpDB)
+        data = self.mpDB.export_data()
         if data is not None:
             file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
             if file_path:
