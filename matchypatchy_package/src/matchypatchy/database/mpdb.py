@@ -203,6 +203,9 @@ class MatchyPatchyDB():
             - name (str) Not Null
             - timezone (str) Optional
         """
+        if timezone is None:
+            timezone = str(datetime.datetime.now().astimezone().tzname())
+            timezone = TZ_CONVERT_DICT.get(timezone, timezone)
         try:
             cursor = self.db.cursor()
             command = """INSERT INTO region (name, timezone) VALUES (?, ?);"""
@@ -289,8 +292,15 @@ class MatchyPatchyDB():
                         (filepath, sha256, ext, timestamp, station_id,
                         camera_id, sequence_id, external_id, comment)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, sha256, ext, timestamp, station_id,
-                          camera_id, sequence_id, external_id, comment)
+            data_tuple = (str(filepath),
+                          str(sha256),
+                          str(ext),
+                          str(timestamp),
+                          int(station_id),
+                          camera_id, 
+                          sequence_id,
+                          external_id,
+                          comment)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             self.db.commit()
@@ -339,12 +349,17 @@ class MatchyPatchyDB():
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
                          viewpoint, reviewed, favorite, individual_id, emb)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (int(media_id), int(frame), 
+            data_tuple = (int(media_id), 
+                          int(frame), 
                           float(round(bbox_x, 4)), 
                           float(round(bbox_y, 4)),
                           float(round(bbox_w, 4)),
                           float(round(bbox_h, 4)),
-                          viewpoint, reviewed, favorite, individual_id, emb)
+                          viewpoint, 
+                          int(reviewed), 
+                          int(favorite), 
+                          individual_id, 
+                          emb)
             
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
@@ -574,9 +589,11 @@ class MatchyPatchyDB():
         Fetch Info for Media Table
         columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                    'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-                   'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-                   'comment', 'name', 'sex', 'age',
-                   'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name', 'camera.name']
+                   'filepath', 'ext', 'timestamp', 'sequence_id', 'external_id', 'comment', 
+                   'name', 'sex', 'age',
+                   'station_id', 'station_name', 'lat', 'long', 
+                   'station_survey_id', 'survey_name', 'region_name', 
+                   'camera_id', 'camera_name']
         """
         media, column_names = self.all_media()
         rois = pd.DataFrame(media, columns=column_names)
@@ -584,18 +601,21 @@ class MatchyPatchyDB():
         # merge with stations
         stations, column_names = self.stations()
         stations = pd.DataFrame(stations, columns=column_names)
+        stations.columns = stations.columns.str.replace('.', '_')
         # get camera names
         cameras = self.select("camera")
         if not rois.empty:
-            export_data = pd.merge(rois, stations, left_on="station_id", right_on="station.id")
+            export_data = pd.merge(rois, stations, on="station_id")
             # add camera name
             if cameras:
-                cameras = pd.DataFrame(cameras, columns=["id", "camera.name", "station_id"])
-                export_data = pd.merge(export_data, cameras[["id", "camera.name"]], left_on="camera_id", right_on="id")
+                cameras = pd.DataFrame(cameras, columns=["id", "camera_name", "station_id"])
+                export_data = pd.merge(export_data, cameras[["id", "camera_name"]], left_on="camera_id", right_on="id")
             else:
                 # no camera, set column to blank
-                export_data['camera.name'] = None
+                export_data['camera_name'] = None
             export_data = export_data.replace({float('nan'): None})
+            # rename columns to avoid issues with '.' in column names when importing
+            export_data.columns = export_data.columns.str.replace('.', '_')
             return export_data
         else:
             return None
