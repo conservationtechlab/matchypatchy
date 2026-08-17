@@ -2,9 +2,8 @@
 Custom Widgets for Displaying Media (Image/Video)
 """
 
-from turtle import pen
-
 import cv2
+import pandas as pd
 from pathlib import Path
 from PIL import Image, ImageEnhance
 
@@ -12,7 +11,7 @@ from PyQt6.QtWidgets import (QDialog, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
                              QStackedLayout, QPushButton, QSlider)
 from PyQt6.QtGui import QPixmap, QPainter, QImage, QPen
 from PyQt6.QtCore import Qt, pyqtSignal, QRect, QPointF, QRectF, QUrl
-from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput, QMediaMetaData
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT
@@ -28,6 +27,7 @@ class MediaWidget(QWidget):
         super().__init__()
         self.adjust_mode = adjust_mode
         self.drawing = False
+        self.filepath = None
         layout = QVBoxLayout(self)
 
         # Stacked layout to switch between image and video
@@ -66,21 +66,25 @@ class MediaWidget(QWidget):
             frame (int, optional): Frame number to load from video
             crop (bool, optional): Whether to crop to bbox
         """
+        self.filepath = filepath
+
         # IMAGE
-        if Path(filepath).suffix.lower() in IMAGE_EXT:
+        if Path(self.filepath).suffix.lower() in IMAGE_EXT:
             self.playbackbar.setVisible(False)
-            self.image_widget.load(filepath, bbox=bbox, frame=frame, crop=crop)
+            self.image_widget.load(self.filepath, bbox=bbox, frame=frame, crop=crop)
             self.stacked.setCurrentWidget(self.image_widget)
+
         # VIDEO
-        elif Path(filepath).suffix.lower() in VIDEO_EXT:
-            if bbox is not None:
+        elif Path(self.filepath).suffix.lower() in VIDEO_EXT:
+            if frame is not None:
+                print(f"Loading video frame {frame} for {self.filepath}")
                 # display frame instead of video
                 self.playbackbar.setVisible(False)
-                self.image_widget.load(filepath, bbox=bbox, frame=frame, crop=crop)
+                self.image_widget.load(self.filepath, bbox=bbox, frame=frame, crop=crop)
                 self.stacked.setCurrentWidget(self.image_widget)
             else:
                 self.playbackbar.setVisible(True)
-                self.player.setSource(QUrl.fromLocalFile(filepath))
+                self.player.setSource(QUrl.fromLocalFile(self.filepath))
                 self.stacked.setCurrentWidget(self.video_widget)
                 self.player.play()
         else:
@@ -99,6 +103,12 @@ class MediaWidget(QWidget):
         """Enable or disable drawing mode"""
         self.drawing = enable
         self.adjust_mode = 'bbox' if enable else 'zoom'
+        if self.stacked.currentWidget() == self.video_widget:
+            frame = self.playbackbar.get_frame()
+            # default_bbox = pd.DataFrame(index=[0], data={'bbox_x':0, 'bbox_y':0, 'bbox_w':0, 'bbox_h':0})
+            self.load(self.filepath, bbox=None, frame=frame)
+            self.stacked.setCurrentWidget(self.image_widget)
+
         self.image_widget.enable_drawing_mode(enable)
 
     def capture_bbox(self, bbox):
@@ -106,9 +116,11 @@ class MediaWidget(QWidget):
         if self.stacked.currentWidget() == self.image_widget:
             self.new_bbox.emit(bbox)
 
+
 # ==============================================================================
 # IMAGE
 # ==============================================================================
+
 class ImageWidget(QLabel):
     """
     Custom Widget for Displaying an Image
@@ -122,10 +134,12 @@ class ImageWidget(QLabel):
         self.image_path = image_path
         self.adjust_mode = adjust_mode
         self.drawing = False
+
+        self.frame = None
         self.rel_bbox = None
-        self.loaded_bbox = None # The original bounding box loaded from the media file
+        self.loaded_bbox = None  # The original bounding box loaded from the media file
         self.bbox = None
-        self.drawn_bbox = None
+        self.drawn_bbox = None  # The bounding box drawn by the user
         self.crop_to_bbox = False
         self.pil_image = None
         self.qimage = None
@@ -140,6 +154,10 @@ class ImageWidget(QLabel):
         self.pixmap = QPixmap(self.size())
         self.setPixmap(self.pixmap)
 
+        # Mouse events for drawing bounding boxes
+        self.start_pos = None
+        self.end_pos = None
+
     def load(self, image_path, bbox=None, frame=None, crop=False):
         """
         Load image path with pillow
@@ -150,7 +168,7 @@ class ImageWidget(QLabel):
             frame (int, optional): Frame number to load from video
             crop (bool, optional): Whether to crop to bbox
         """
-        #load new image if path is different
+        # load new image if path is different
         if image_path is not None:
             self.image_path = image_path
 
@@ -158,14 +176,16 @@ class ImageWidget(QLabel):
         if self.image_path is None:
             return
 
-        if frame is not None:
-            self.pil_image = self.load_from_video(frame)
+        self.frame = frame
+
+        if self.frame is not None:
+            self.pil_image = self.load_from_video(self.frame)
         else:
             self.pil_image = Image.open(self.image_path)
 
         self.drawn_bbox = None
-        self.loaded_bbox = bbox
         self.rel_bbox = bbox
+        self.loaded_bbox = bbox
         self.crop_to_bbox = crop
         self.adjust()
 
@@ -182,7 +202,7 @@ class ImageWidget(QLabel):
         self.pil_image = Image.fromarray(img_array)
         self.adjust()
 
-    def load_from_video(self, frame):
+    def load_from_video(self, selected_frame):
         """
         Load a specific frame from a video file
 
@@ -190,7 +210,7 @@ class ImageWidget(QLabel):
             frame (int): Frame number to load
         """
         cap = cv2.VideoCapture(self.image_path)
-        cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(selected_frame))
         ret, frame = cap.read()
         cap.release()
         if ret:
@@ -205,9 +225,6 @@ class ImageWidget(QLabel):
 
         Connected to sliders in imageadjustmentbar widget
         """
-        # Reload original image
-        self.pil_image = Image.open(self.image_path)
-
         enhancer = ImageEnhance.Brightness(self.pil_image)
         self.pil_image = enhancer.enhance(brightness)
         enhancer = ImageEnhance.Contrast(self.pil_image)
@@ -252,39 +269,40 @@ class ImageWidget(QLabel):
             return self.drawn_bbox
         else:
             return None
-        
+
     def convert_bbox_for_signal(self):
         """
         Convert the drawn bounding box to relative coordinates.
         """
         if self.drawn_bbox is None:
             return None
-        
+
         # Calculate the image position in widget space (from your paintEvent)
         pixmap = QPixmap.fromImage(self.scaled_image)
         target_rect = pixmap.rect()
         target_rect.moveCenter(self.rect().center() + self.image_offset.toPoint())
-        
+
         # Convert widget coords to scaled image coords
         image_x = self.drawn_bbox.x() - target_rect.left()
         image_y = self.drawn_bbox.y() - target_rect.top()
         image_w = self.drawn_bbox.width()
         image_h = self.drawn_bbox.height()
-        
+
         # Clamp to image bounds
         image_x = max(0, min(image_x, self.scaled_image.width()))
         image_y = max(0, min(image_y, self.scaled_image.height()))
         image_w = min(image_w, self.scaled_image.width() - image_x)
         image_h = min(image_h, self.scaled_image.height() - image_y)
-        
+
         # Convert to relative coords (0-1)
         x = image_x / self.scaled_image.width()
         y = image_y / self.scaled_image.height()
         w = image_w / self.scaled_image.width()
         h = image_h / self.scaled_image.height()
-        
-        return {"bbox_x": x, "bbox_y": y, "bbox_w": w, "bbox_h": h}
 
+        frame = self.frame if self.frame is not None else 0
+
+        return {"bbox_x": x, "bbox_y": y, "bbox_w": w, "bbox_h": h, "frame": frame}
 
     # IMAGE ADJUSTMENTS ========================================================
     def reset(self):
@@ -294,7 +312,7 @@ class ImageWidget(QLabel):
         self.image_offset = QPointF(0, 0)
         self.rel_bbox = self.loaded_bbox  # reset to original bbox
         # reload image
-        self.load(image_path=self.image_path, bbox=self.rel_bbox, crop=self.crop_to_bbox)
+        self.load(image_path=self.image_path, bbox=self.rel_bbox, frame=self.frame, crop=self.crop_to_bbox)
 
     def enable_drawing_mode(self, enable):
         self.drawing = enable
@@ -310,8 +328,8 @@ class ImageWidget(QLabel):
 
         if self.qimage:
             self.scaled_image = self.qimage.scaled(self.size() * self.zoom_factor,
-                                              Qt.AspectRatioMode.KeepAspectRatio,
-                                              Qt.TransformationMode.SmoothTransformation)
+                                                   Qt.AspectRatioMode.KeepAspectRatio,
+                                                   Qt.TransformationMode.SmoothTransformation)
             # set black background
             painter.fillRect(self.rect(), Qt.GlobalColor.black)
             # draw image
@@ -321,7 +339,7 @@ class ImageWidget(QLabel):
             painter.drawPixmap(target_rect.topLeft(), pixmap)
             # set pen for drawing bounding boxes
             painter.setPen(QPen(Qt.GlobalColor.green, 3))
-            
+
             # bbox drawing mode
             if self.adjust_mode == 'bbox':
                 if self.drawing and self.start_pos and self.end_pos:
@@ -343,7 +361,7 @@ class ImageWidget(QLabel):
                         target_rect.left() + scaled_bbox.left() * scale_factor_x,
                         target_rect.top() + scaled_bbox.top() * scale_factor_y,
                         scaled_bbox.width() * scale_factor_x,
-                        scaled_bbox.height() * scale_factor_y) 
+                        scaled_bbox.height() * scale_factor_y)
                     painter.drawRect(scaled_bbox)
             else:
                 pass
@@ -388,8 +406,8 @@ class ImageWidget(QLabel):
         # Handle bounding box drawing mode
         elif self.adjust_mode == 'bbox':
             if self.drawing and event.button() == Qt.MouseButton.LeftButton:
-                    self.start_pos = event.pos()
-                    self.end_pos = event.pos()
+                self.start_pos = event.pos()
+                self.end_pos = event.pos()
         else:
             event.ignore()  # Don't process the event
             return
@@ -424,19 +442,17 @@ class ImageWidget(QLabel):
         # Handle bounding box drawing mode
         elif self.adjust_mode == 'bbox':
             if event.button() == Qt.MouseButton.LeftButton and self.drawing:
-                #self.drawing = False
+                # get the final position of the mouse
                 self.end_pos = event.pos()
-                
-                # Create rectangle
+                # create rectangle
                 rect = QRect(self.start_pos, self.end_pos).normalized()
-                
                 # Only save if box has area
                 if rect.width() > 5 and rect.height() > 5:
                     self.rel_bbox = None
                     self.drawn_bbox = rect
                     converted_bbox = self.convert_bbox_for_signal()
                     self.box_drawn.emit(converted_bbox)
-                
+                # update the widget to show the drawn box
                 self.update()
         else:
             event.ignore()  # Don't process the event
@@ -547,9 +563,9 @@ class VideoPlayerBar(QWidget):
 
     def get_frame(self):
         """Get current frame number based on position"""
-        cap = cv2.VideoCapture('/path/to/video.mp4')
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        cap.release()
+        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate))
+        if fps <= 0:
+            fps = 30
         return int(self.player.position() / 1000 * fps)
 
 

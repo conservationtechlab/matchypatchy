@@ -338,7 +338,11 @@ class MatchyPatchyDB():
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
                          viewpoint, reviewed, favorite, individual_id, emb)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (int(media_id), int(frame), float(bbox_x), float(bbox_y), float(bbox_w), float(bbox_h),
+            data_tuple = (int(media_id), int(frame), 
+                          float(round(bbox_x, 4)), 
+                          float(round(bbox_y, 4)),
+                          float(round(bbox_w, 4)),
+                          float(round(bbox_h, 4)),
                           viewpoint, reviewed, favorite, individual_id, emb)
             
             cursor.execute(command, data_tuple)
