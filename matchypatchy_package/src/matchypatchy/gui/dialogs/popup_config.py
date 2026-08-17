@@ -162,7 +162,7 @@ class ConfigPopup(QDialog):
         cuda_label = QLabel("Hardware Device:")
         cuda_label.setFixedWidth(self.label_width)
         cuda_layout.addWidget(cuda_label)
-        providers = animl.get_onnx_device()
+        providers = animl.get_onnx_device(quiet=True)
         self.device = QComboBox()
         self.device.setFixedWidth(self.edit_width)
         self.device.addItem("CPU")
