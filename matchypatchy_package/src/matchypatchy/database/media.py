@@ -130,35 +130,12 @@ def fetch_individual(mpDB):
         return pd.DataFrame(columns=["id", "name", "sex", "age"]).set_index("id")
 
 
-def export_data(mpDB):
-    """
-    Fetch Info for Media Table
-    columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-               'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-               'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-               'comment', 'name', 'sex', 'age',
-                'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
-    """
-    media, column_names = mpDB.all_media()
-    rois = pd.DataFrame(media, columns=column_names)
-    rois = rois.replace({float('nan'): None})
-    stations, column_names = mpDB.stations()
-    stations = pd.DataFrame(stations, columns=column_names)
-    stations = stations.replace({float('nan'): None})
-    if not rois.empty:
-        export_data = pd.merge(rois, stations, left_on="station_id", right_on="station.id")
-        return export_data
-    else:
-        return None
-
-
 def get_roi_bbox(roi):
     """Return the bbox coordinates for a given roi row"""
     if {'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'}.issubset(roi.columns) and \
         roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']].notnull().all(axis=None):
         return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
     return None
-
 
 
 def get_sequence(id, roi_media):
