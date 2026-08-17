@@ -315,13 +315,17 @@ class MediaTable(QWidget):
         # apply edits to current data_filtered
         for edit in self.edit_stack:
             row, column = self.get_edit_table_item(edit)
+            # item not found in current filter
             if row is None or column is None:
-                print(f"Edit {edit} not found in current data_filtered, skipping")
                 continue
-            print(f"Applying edit: {edit} to row: {row}, column: {column}")
-            print(f"Current data_filtered before edit: {self.data_filtered.loc[row, column]}")
+            # not relevant to this data type view
+            if column not in self.data_filtered.columns:
+                continue
+
+            print(f"DEBUG Applying edit: {edit} to row: {row}, column: {column}")
+            print(f"DEBUG Current data_filtered before edit: {self.data_filtered.loc[row, column]}")
             self.data_filtered.loc[row, column] = edit.new_value
-            print(f"Current data_filtered after edit: {self.data_filtered.loc[row, column]}")
+            print(f"DEBUG Current data_filtered after edit: {self.data_filtered.loc[row, column]}")
 
     def undo(self):
         """
