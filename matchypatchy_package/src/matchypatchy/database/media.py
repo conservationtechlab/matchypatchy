@@ -4,12 +4,23 @@ Functions for Manipulating and Processing ROIs
 import hashlib
 import pandas as pd
 from pathlib import Path
+from dataclasses import dataclass
 
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
 COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
            "comment", "viewpoint", "individual_id"]
+
+
+@dataclass
+class EditObject:
+    """Class to represent an edit made to a media/ROI"""
+    rid: int
+    mid: int
+    reference: str
+    previous_value: any
+    new_value: any
 
 
 def get_sha256(path: str | Path, 
@@ -122,12 +133,6 @@ def get_roi_bbox(roi):
         return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
     return None
 
-
-def get_roi_frame(roi):
-    """Return the frame for a given roi row"""
-    if {'frame'}.issubset(roi.columns):
-        return roi['frame'].values[0]
-    return None
 
 
 def get_sequence(id, roi_media):
