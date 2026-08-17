@@ -90,6 +90,10 @@ class MediaTable(QWidget):
         """
         Format table for media or roi display, add delegates for combos, and load thumbnails
         """
+        VIEWPOINT_COLUMN = 8
+        SEX_COLUMN = 10
+        AGE_COLUMN = 11
+
         if self.data_type == 1:
             # corresponding mpDB column names
             self.columns = {0: "select",
@@ -113,9 +117,6 @@ class MediaTable(QWidget):
                                                   "Station", "Camera", "Sequence ID", "External ID",
                                                   "Viewpoint", "Individual", "Sex", "Age",
                                                   "Reviewed", "Favorite", "Comment"])
-            VIEWPOINT_COLUMN = 8
-            SEX_COLUMN = 10
-            AGE_COLUMN = 11
             # VIEWPOINT COMBOS
             combo_items = list(self.VIEWPOINTS.values())[1:]
             self.table.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
@@ -137,11 +138,18 @@ class MediaTable(QWidget):
                             5: "camera_id",
                             6: "sequence_id",
                             7: "external_id",
-                            8: "comment"}
+                            8: "comment",
+                            9: "roi_count"}
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
                                                   "Station", "Camera", "Sequence ID",
-                                                  "External ID", "Comment"])
+                                                  "External ID", "Comment", "# of Rois"])
+
+             # clear item delegates (really only necessary for viewpoint)
+            self.table.setItemDelegateForColumn(VIEWPOINT_COLUMN, None)
+            self.table.setItemDelegateForColumn(SEX_COLUMN, None)
+            self.table.setItemDelegateForColumn(AGE_COLUMN, None)
+            
         # adjust widths
         self.table.resizeColumnsToContents()
         for col in range(self.table.columnCount()):
@@ -153,10 +161,7 @@ class MediaTable(QWidget):
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
 
         # increase checkbox size
-        self.table.setStyleSheet(""" QTableWidget::indicator {
-                                 width: 25px;
-                                 height: 25px;}
-                                 """)
+        self.table.setStyleSheet("""QTableWidget::indicator { width: 25px; height: 25px;}""")
 
     # Step 3 - Filter and Display ------------------------------------------------------
     def filter(self):
@@ -372,6 +377,7 @@ class MediaTable(QWidget):
         prompt user to save edits
         """
         reference = self.columns[column]
+        # print(f"DEBUG: row {row}, column {column}, reference {reference}")
                 
         if self.data_type == 1:
             rid = int(self.data_filtered.at[row, "id"])
