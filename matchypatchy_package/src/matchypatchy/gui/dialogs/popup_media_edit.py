@@ -165,6 +165,9 @@ class MediaEditPopup(QDialog):
         # display data
         self.metadatapanel.refresh_values(self.current_image_index)
 
+        # toggle edit roi button
+        self.toggle_edit_roi_button()
+
     def favorite(self):
         """Toggle favorite status of current ROI"""
         rid = self.data.iloc[self.current_image_index]["id"]  # roi
@@ -208,6 +211,14 @@ class MediaEditPopup(QDialog):
         self.current_image_index = (self.current_image_index + 1) % len(self.data)
         self.refresh()
 
+    def toggle_edit_roi_button(self):
+        # video in roi view
+        if pd.isna(self.data.loc[self.current_image_index, "id"]):
+            print("video")
+            self.edit_btn.setEnabled(False)
+        else:
+            self.edit_btn.setEnabled(True)
+
     def edit_roi(self):
         """Edit current ROI"""
         self.edit_btn.setChecked(True)
@@ -220,7 +231,6 @@ class MediaEditPopup(QDialog):
 
     def save_roi(self):
         """Save the drawn ROI"""
-
         if self.new_bbox is not None:
 
             bbox_x = float(self.new_bbox['bbox_x'])
@@ -237,59 +247,55 @@ class MediaEditPopup(QDialog):
                     rid = None
             except KeyError:
                 media_id = self.data.iloc[self.current_image_index]["id"]  # media only
-
                 rid = None
 
+            # edit existing roi
             if rid is not None:
                 prompt = "This will update the existing ROI. You will need to rerun step 2. Process to get new embeddings."
                 dialog = AlertPopup(self, prompt=prompt)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
-                    self.mpDB.edit_row('roi',
-                                       int(rid),
-                                       {"bbox_x": bbox_x,
-                                        "bbox_y": bbox_y,
-                                        "bbox_w": bbox_w,
-                                        "bbox_h": bbox_h,})
-
-                    
+                    # delete roi, cascade to thumbnail
+                    self.mpDB.delete("roi", f"id={rid}")
+                    # add new roi
+                    new_rid = self.mpDB.add_roi(int(media_id), frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     # save thumbnail
                     roi_thumbnail = save_roi_thumbnail(config.load_cfg('THUMBNAIL_DIR'),
-                                                       self.data.iloc[self.current_image_index]["filpath"],
+                                                       self.data.iloc[self.current_image_index]["filepath"],
                                                        self.data.iloc[self.current_image_index]["ext"], 
-                                                       frame,
-                                                       bbox_x, bbox_y, bbox_w, bbox_h)
-                    # delete old thumbnail if exists
-                    self.mpDB.delete('roi_thumbnails', f"fid={rid}")
-                    # add new thumbnail
-                    self.mpDB.add_thumbnail("roi", rid, roi_thumbnail)
-                    
-                del dialog
+                                                       frame, bbox_x, bbox_y, bbox_w, bbox_h)
 
+                    # add new thumbnail
+                    self.mpDB.add_thumbnail("roi", new_rid, roi_thumbnail)
+                    # update internal data
+                    self.data.loc[self.current_image_index, 
+                                  ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]] = [bbox_x, bbox_y, bbox_w, bbox_h]
+
+                del dialog
+    
+            # create new roi
             else:
                 prompt = "This will create a new ROI. You will need to rerun step 2. Process to get new embeddings."
                 dialog = AlertPopup(self, prompt=prompt)
 
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     # do not add emb_id, to be determined later
-                    roi_id = self.mpDB.add_roi(int(media_id),
-                                               int(frame),
-                                               bbox_x, bbox_y, bbox_w, bbox_h)
-
+                    roi_id = self.mpDB.add_roi(int(media_id), int(frame), bbox_x, bbox_y, bbox_w, bbox_h)
                     # save thumbnail
                     roi_thumbnail = save_roi_thumbnail(config.load_cfg('THUMBNAIL_DIR'),
                                                        self.data.iloc[self.current_image_index]["filepath"],
                                                        self.data.iloc[self.current_image_index]["ext"],
                                                        frame, bbox_x, bbox_y, bbox_w, bbox_h)
-
+                    # add new thumbnail
                     self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
-
 
                 del dialog
 
             # turn off drawing mode and disable save button
+            self.refresh()
             self.image.enable_drawing_mode(False)
             self.edit_btn.setChecked(False)
             self.save_roi_btn.setEnabled(False)
+            
 
     def reset(self):
         """Reset the image to its original state"""
