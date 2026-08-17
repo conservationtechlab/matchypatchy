@@ -34,6 +34,7 @@ class MediaTable(QWidget):
         self.thumbnail_size = 150
         self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
 
+        # NOTE: do we want to refresh edit stack on re-entry?
         self.edit_stack = []
 
         # Set up layout
@@ -341,7 +342,7 @@ class MediaTable(QWidget):
             # revert the change in data_filtered
             row, column = self.get_edit_table_item(last)
 
-            self.data_filtered.iloc[row, column] = last['previous_value']
+            self.data_filtered.loc[row, column] = last.previous_value
             self.refresh_table(popup=False)
 
     def get_edit_table_item(self, edit):
