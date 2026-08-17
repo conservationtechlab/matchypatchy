@@ -2,10 +2,10 @@
 Custom assets for the GUI, such as buttons and separators.
 
 """
-from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QWidget,
+from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QWidget, QTextEdit,
                              QSlider, QLabel, QHBoxLayout, QSpacerItem, QStyledItemDelegate)
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 
 class VerticalSeparator(QFrame):
@@ -202,3 +202,30 @@ class ClickableSlider(QSlider):
             event.accept()
         else:
             super().mousePressEvent(event)
+
+
+class TextEditWithSignal(QTextEdit):
+    # Signal emitted when user finishes typing
+    text_finished = pyqtSignal(str)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        
+        # Timer to detect when user stops typing
+        self.timer = QTimer()
+        self.timer.setSingleShot(True)  # Only fire once per typing session
+        self.timer.timeout.connect(self.on_typing_finished)
+        self.timer.setInterval(500)  # 500ms delay after last keystroke
+        
+        # Connect textChanged to restart timer
+        self.textChanged.connect(self.on_text_changed)
+    
+    def on_text_changed(self):
+        """Called every time text changes"""
+        # Restart timer (resets the 500ms countdown)
+        self.timer.stop()
+        self.timer.start()
+    
+    def on_typing_finished(self):
+        """Called when user stops typing for 500ms"""
+        self.text_finished.emit(self.toPlainText())

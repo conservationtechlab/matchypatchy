@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QTableWidget, QVBoxLayout, QWidget, QLabel, QHeader
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.database.media import fetch_individual
+from matchypatchy.database.media import fetch_individual, EditObject
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.config import load_cfg
 from matchypatchy.threads.table_thread import FetchTableThread, LoadTableThread
@@ -18,6 +18,7 @@ from matchypatchy.gui.widgets.gui_assets import ComboBoxDelegate
 
 class MediaTable(QWidget):
     update_signal = pyqtSignal(list)
+    checkbox_signal = pyqtSignal(list)
     loaded_data = pyqtSignal()
 
     def __init__(self, parent):
@@ -62,9 +63,6 @@ class MediaTable(QWidget):
         layout.addWidget(self.table)
         self.setLayout(layout)
 
-        # Connect table.cellchanged to Media View
-        self.update_signal.connect(parent.handle_table_change)
-        self.loaded_data.connect(parent.handle_loaded_data)
 
     # RUN ON ENTRY -------------------------------------------------------------
     def load_data(self, data_type):
@@ -197,25 +195,31 @@ class MediaTable(QWidget):
             # no valid stations, empty dataframe
             self.data_filtered.drop(self.data_filtered.index, inplace=True)
 
-        # Viewpoint Filter
-        if filters['active_viewpoint'][0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'] == filters['active_viewpoint'][0] - 1]
-        elif filters['active_viewpoint'][0] is None:
-            self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'].isna()]
+        # ROI-only filters
+        if self.data_type == 1:
+            # Viewpoint Filter
+            if filters['active_viewpoint'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'] == filters['active_viewpoint'][0] - 1]
+            elif filters['active_viewpoint'][0] is None:
+                self.data_filtered = self.data_filtered[self.data_filtered['viewpoint'].isna()]
 
-        # Individual Filter
-        if filters['active_individual'][0] > 0:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == filters['active_individual'][0]]
-        elif filters['active_individual'][0] is None:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
+            # Individual Filter
+            if filters['active_individual'][0] > 0:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'] == filters['active_individual'][0]]
+            elif filters['active_individual'][0] is None:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
-        # Unidentified Filter
-        if filters['unidentified_only']:
-            self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
+            # Unidentified Filter
+            if filters['unidentified_only']:
+                self.data_filtered = self.data_filtered[self.data_filtered['individual_id'].isna()]
 
-        # Favorites Filter
-        if filters['favorites_only']:
-            self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
+            # Favorites Filter
+            if filters['favorites_only']:
+                self.data_filtered = self.data_filtered[self.data_filtered['favorite'] == 1]
+
+        else:
+            if filters['no_roi_mids'] is not False:
+                self.data_filtered = self.data_filtered[self.data_filtered['id'].isin(filters['no_roi_mids'])]
 
         self.data_filtered.reset_index(inplace=True)
 
@@ -305,27 +309,76 @@ class MediaTable(QWidget):
         """
         Applies all previous edits to the current data_filter if the row is present
         """
+        # if no edits, skip
+        if len(self.edit_stack) == 0:
+            return
+        # apply edits to current data_filtered
         for edit in self.edit_stack:
-            self.data_filtered.loc[edit['row'], edit['reference']] = edit['new_value']
+            row, column = self.get_edit_table_item(edit)
+            # item not found in current filter
+            if row is None or column is None:
+                continue
+            # not relevant to this data type view
+            if column not in self.data_filtered.columns:
+                continue
 
-    def handle_checkbox_change(self, row, column):
-        """ Detect when a checkbox is checked or unchecked """
-        if column == 0:
-            item = self.table.item(row, column)
-            if item is not None:
-                checked = item.checkState() == Qt.CheckState.Checked
-                self.select_row(row, overwrite=checked)
-                self.parent.check_selected_rows()
+            print(f"DEBUG Applying edit: {edit} to row: {row}, column: {column}")
+            print(f"DEBUG Current data_filtered before edit: {self.data_filtered.loc[row, column]}")
+            self.data_filtered.loc[row, column] = edit.new_value
+            print(f"DEBUG Current data_filtered after edit: {self.data_filtered.loc[row, column]}")
+
+    def undo(self):
+        """
+        Undo last edit and refresh table
+        """
+        if len(self.edit_stack) > 0:
+            last = self.edit_stack.pop()
+            # revert the change in data_filtered
+            row, column = self.get_edit_table_item(last)
+
+            self.data_filtered.iloc[row, column] = last['previous_value']
+            self.refresh_table(popup=False)
+
+    def get_edit_table_item(self, edit):
+        """
+        Return Row and Column for a given edit object
+        """
+        # find row and column in current data_filtered
+        if self.data_type == 1:
+            if edit.rid is None:
+                return None, None
+            row = self.data_filtered.index[self.data_filtered['id'] == edit.rid].to_list()
+        else:
+            if edit.mid is None:
+                return None, None
+            row = self.data_filtered.index[self.data_filtered['id'] == edit.mid].to_list()
+        if not row:
+            return None, None
+
+        # TODO - check if multiple rows found for the same edit, and handle accordingly
+        if len(row) > 1:
+            print(f"Warning: multiple rows found for edit {edit}. Using first match.")
+        row = row[0]
+    
+        column = edit.reference
+
+        return row, column
 
     def update_entry(self, row, column):
         """
-        Allows user to edit entry in table
+        Allows user to edit entry directly in table
 
         Save edits in queue, allow undo
         prompt user to save edits
         """
         reference = self.columns[column]
-        rid = int(self.data_filtered.at[row, "id"])
+                
+        if self.data_type == 1:
+            rid = int(self.data_filtered.at[row, "id"])
+            media_id = int(self.data_filtered.at[row, "media_id"]) 
+        else:
+            rid = None
+            media_id = id
 
         if reference == 'select':
             return
@@ -347,65 +400,58 @@ class MediaTable(QWidget):
                 new_value = None
             else:
                 new_value = int(key)
-
         # individual
         elif reference == 'individual_id' or reference == 'sex' or reference == 'age':
-            rid = self.data_filtered.at[row, 'individual_id']
-            if rid is None:
+            iid = self.data_filtered.at[row, "individual_id"]
+            print(iid)
+            if iid is None:
                 dialog = AlertPopup(self, "Please tag the ROI with an individual first.")
-                if dialog.exec():
-                    del dialog
-                    self.apply_edits()
-                    self.refresh_table(popup=False)
-                    return
+                dialog.exec()
+                del dialog
+                self.apply_edits()
+                self.refresh_table(popup=False)
+                return
             else:
                 previous_value = self.data_filtered.at[row, reference]
                 new_value = self.table.item(row, column).text()
-
+        # everything else
         else:
             previous_value = self.data_filtered.at[row, reference]
             new_value = self.table.item(row, column).text()
 
         # add edit to stack
-        edit = {'row': row,
-                'column': column,
-                'id': rid,
-                'reference': reference,
-                'previous_value': previous_value,
-                'new_value': new_value}
+        edit = EditObject(rid=rid,
+                          mid=media_id,
+                          reference=reference,  
+                          previous_value=previous_value,
+                          new_value=new_value)
+        
         self.edit_stack.append(edit)
-        self.update_signal.emit([row, column])
+        self.update_signal.emit([row, column])  # update undo button in DisplayMedia
         self.apply_edits()
         self.refresh_table(popup=False)
 
-    def transpose_edit_stack(self, edit_stack):
+    def add_edit_stack(self, edit_stack):
         """
-        Transpose edit stack from popup_roi to media_table format
+        Add edits from popup to the edit stack and apply to current data_filtered
+        Connected to DisplayMedia.edit_stack_signal
         """
         for edit in edit_stack:
-            print(edit)
-            id = edit['id']
-            row = self.data_filtered.index[self.data_filtered['id'] == id].tolist()
-            column = list(self.columns.keys())[list(self.columns.values()).index(edit['reference'])]
-            if row:
-                row = row[0]
-                new_edit = {'row': row,
-                            'column': column,
-                            'id': id,
-                            'reference': edit['reference'],
-                            'previous_value': edit['previous_value'],
-                            'new_value': edit['new_value']}
-                print(new_edit)
-                self.edit_stack.append(new_edit)
+            self.edit_stack.append(edit)
+        self.apply_edits()
+        self.refresh_table(popup=False)
 
-    def undo(self):
+    def handle_checkbox_change(self, row, column):
+        """ 
+        Detect when a checkbox is checked or unchecked 
+        Connects to DisplayMedia.check_selected_rows to update the selected rows in the media table
         """
-        Undo last edit and refresh table
-        """
-        if len(self.edit_stack) > 0:
-            last = self.edit_stack.pop()
-            self.data_filtered.loc[last['row'], last['reference']] = last['previous_value']
-            self.refresh_table(popup=False)
+        if column == 0:
+            item = self.table.item(row, column)
+            if item is not None:
+                checked = item.checkState() == Qt.CheckState.Checked
+                self.select_row(row, overwrite=checked)
+                self.checkbox_signal.emit([row, column, checked])
 
     def save_changes(self):
         # commit all changes in self.edit_stack to database

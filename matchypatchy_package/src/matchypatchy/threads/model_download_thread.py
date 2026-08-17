@@ -10,7 +10,7 @@ from queue import Queue, Empty
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.config import resource_path
+from matchypatchy.config import asset_path
 
 
 def update_model_yml():
@@ -18,7 +18,7 @@ def update_model_yml():
     Downloads the most recent version of the models.yml file from SDZWA server and updates internal file
     """
     # download current version
-    model_yml_path = resource_path("assets/models.yml")
+    model_yml_path = asset_path("models.yml")
     try:
         urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml", model_yml_path)
         return True
@@ -29,7 +29,7 @@ def update_model_yml():
 
 def load_model(key=None):
     """Loads ML model configuration from models.yml, returns full dict or specific key"""
-    model_yml_path = resource_path("assets/models.yml")
+    model_yml_path = asset_path("models.yml")
 
     with open(model_yml_path, 'r') as cfg_file:
         cfg = yaml.safe_load(cfg_file)
@@ -80,7 +80,7 @@ class DownloadMLThread(QThread):
         self.download_queue = Queue()  # thread-safe queue
         self._shutdown = False  # flag to signal thread to exit gracefully  
         
-        model_yml_path = resource_path("assets/models.yml")
+        model_yml_path = asset_path("models.yml")
         with open(model_yml_path, 'r') as cfg_file:
             ml_cfg = yaml.safe_load(cfg_file)
             self.models = ml_cfg['MODELS']

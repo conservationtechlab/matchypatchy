@@ -30,7 +30,7 @@ from matchypatchy import config
 
 
 class DisplayBase(QWidget):
-    LOGO = str(config.resource_path("assets/graphics/logo.png"))
+    LOGO = str(config.asset_path("graphics/logo.png"))
 
     def __init__(self, parent):
         super().__init__()

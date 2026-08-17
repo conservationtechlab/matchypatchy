@@ -4,12 +4,23 @@ Functions for Manipulating and Processing ROIs
 import hashlib
 import pandas as pd
 from pathlib import Path
+from dataclasses import dataclass
 
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
 COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
            "comment", "viewpoint", "individual_id"]
+
+
+@dataclass
+class EditObject:
+    """Class to represent an edit made to a media/ROI"""
+    rid: int
+    mid: int
+    reference: str
+    previous_value: any
+    new_value: any
 
 
 def get_sha256(path: str | Path, 
@@ -44,11 +55,14 @@ def fetch_media(mpDB, ids=None):
         return pd.DataFrame()
 
 
-def fetch_roi(mpDB):
+def fetch_roi(mpDB, media_id=None):
     """
     Fetches roi table, converts to dataframe
     """
-    manifest = mpDB.select("roi")
+    if media_id:
+        manifest = mpDB.select("roi", row_cond=f"media_id={media_id}")
+    else:
+        manifest = mpDB.select("roi")
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
                                                "viewpoint", "reviewed", "favorite", "individual_id", "emb"])
@@ -119,12 +133,6 @@ def get_roi_bbox(roi):
         return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
     return None
 
-
-def get_roi_frame(roi):
-    """Return the frame for a given roi row"""
-    if {'frame'}.issubset(roi.columns):
-        return roi['frame'].values[0]
-    return None
 
 
 def get_sequence(id, roi_media):
