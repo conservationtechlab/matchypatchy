@@ -574,9 +574,9 @@ class MatchyPatchyDB():
         Fetch Info for Media Table
         columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                    'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-                   'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
+                   'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                    'comment', 'name', 'sex', 'age',
-                   'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
+                   'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name', 'camera.name']
         """
         media, column_names = self.all_media()
         rois = pd.DataFrame(media, columns=column_names)
