@@ -298,30 +298,25 @@ class DisplayMedia(QWidget):
 
     def edit_row(self, row):
         """Edit a single row"""
+        
+        data = self.media_table.data_filtered.iloc[[row]].reset_index(drop=True)
+        current_image_index = 0
+
         # EDIT ROI
         if self.data_type == 1:
             ext = self.media_table.data_filtered.at[row, "ext"]
             data = self.media_table.data_filtered.iloc[[row]]
-            if ext in IMAGE_EXT:
-                # only show single roi
-                current_image_index = 0
-            else:
-                # display the video as well
+            # display the video for frame rois for context
+            if ext not in IMAGE_EXT:
                 mid = int(self.media_table.data_filtered.at[row, "media_id"])
                 video = self.media_table.data_filtered[self.media_table.data_filtered['media_id'] == mid]
-                video_row = video.iloc[[0]].copy()
+                video_row = video.iloc[[0]].copy().reset_index(drop=True)
                 video_row['media_id'] = mid
                 # clear out roi columns for video row so mediawidget behaves correctly
                 video_row[['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 
                            'viewpoint', 'individual_id', 'age', 'sex']] = pd.NA
-                current_image_index = data.index.get_loc(row) # account for video row
                 data = pd.concat([data, video_row], ignore_index=True)  # add video row
                 
-        # EDIT MEDIA
-        else:
-            data = self.media_table.data_filtered.iloc[[row]]
-            current_image_index = 0
-
         # Launch Media Edit Popup
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
@@ -330,14 +325,14 @@ class DisplayMedia(QWidget):
             self.check_undo_button()
             del dialog
         # reload data and update buttons
-        self.media_table.apply_edits()
+        self.load_table()
         self.update_buttons()
         self.update_count_label()
 
     def edit_row_multiple(self):
         """Edit multiple selected rows"""
         selected_rows = self.media_table.selectedRows()
-        data = self.media_table.data_filtered.iloc[selected_rows]
+        data = self.media_table.data_filtered.iloc[selected_rows].reset_index(drop=True)
         current_image_index = 0
         # Launch Media Edit Popup
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
@@ -347,7 +342,7 @@ class DisplayMedia(QWidget):
             self.check_undo_button()
             del dialog
         # reload data and update buttons
-        self.media_table.apply_edits()
+        self.load_table()
         self.update_buttons()
         self.update_count_label()
 
