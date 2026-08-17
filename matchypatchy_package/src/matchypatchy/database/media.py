@@ -23,11 +23,13 @@ class EditObject:
     new_value: any
 
 
-def get_sha256(path: str | Path, 
-                chunk_size: int = 1024 * 1024) -> str:
+def get_sha256(path: str | Path,
+               chunk_size: int = 1024 * 1024) -> str:
     """
     Calculate the SHA256 hash of a file in chunks and return the hexadecimal to avoid adding duplicate files
     """
+    if not Path(path).exists():
+        return None
     h = hashlib.sha256()
     with Path(path).open("rb") as f:
         while chunk := f.read(chunk_size):
