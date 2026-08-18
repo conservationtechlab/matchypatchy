@@ -4,12 +4,23 @@ Functions for Manipulating and Processing ROIs
 import hashlib
 import pandas as pd
 from pathlib import Path
+from dataclasses import dataclass
 
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
 COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
            "comment", "viewpoint", "individual_id"]
+
+
+@dataclass
+class EditObject:
+    """Class to represent an edit made to a media/ROI"""
+    rid: int
+    mid: int
+    reference: str
+    previous_value: any
+    new_value: any
 
 
 def get_sha256(path: str | Path, 
@@ -24,24 +35,50 @@ def get_sha256(path: str | Path,
     return h.hexdigest()
 
 
-def fetch_media(mpDB, ids=None):
+def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     Fetches all media info, converts to dataframe
     """
+
     if ids:
         ids_str = ', '.join(map(str, ids))
-        media = mpDB.select("media", row_cond=f"id IN ({ids_str})")
+        row_cond=f"id IN ({ids_str})"
     else:
-        media = mpDB.select("media")
+        row_cond=None
 
-    if media:
-        media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
-                                             'station_id', "camera_id", 'sequence_id',
-                                             "external_id", 'comment'])
-        media = media.replace({float('nan'): None})
-        return media
+    # fetch counts for media table data_type=0
+    if counts:
+        if row_cond is not None:
+            media = mpDB._command(("SELECT media.*, COUNT(roi.id) AS count FROM media "
+                                   "LEFT JOIN roi ON roi.media_id = media.id "
+                                   f"GROUP BY media.id WHERE {row_cond};"), quiet=quiet)
+        else:
+            media = mpDB._command(("SELECT media.*, COUNT(roi.id) AS count FROM media "
+                                   "LEFT JOIN roi ON roi.media_id = media.id "
+                                   f"GROUP BY media.id;"), quiet=quiet)
+            
+        if media:
+            media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
+                                                'station_id', "camera_id", 'sequence_id',
+                                                "external_id", 'comment', 'roi_count'])
+            media = media.replace({float('nan'): None})
+            return media
+        else:
+            return pd.DataFrame()
+
+            
+    # just get media table
     else:
-        return pd.DataFrame()
+        media = mpDB.select("media", row_cond)
+
+        if media:
+            media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
+                                                'station_id', "camera_id", 'sequence_id',
+                                                "external_id", 'comment'])
+            media = media.replace({float('nan'): None})
+            return media
+        else:
+            return pd.DataFrame()
 
 
 def fetch_roi(mpDB, media_id=None):
@@ -122,12 +159,6 @@ def get_roi_bbox(roi):
         return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
     return None
 
-
-def get_roi_frame(roi):
-    """Return the frame for a given roi row"""
-    if {'frame'}.issubset(roi.columns):
-        return roi['frame'].values[0]
-    return None
 
 
 def get_sequence(id, roi_media):

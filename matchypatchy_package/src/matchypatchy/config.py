@@ -7,20 +7,43 @@ import sys
 from pathlib import Path
 import yaml
 import animl
-        
+
 
 HOME_DIR = Path.cwd()
 
 def resource_path(relative_path):
-    """ Get path to resource whether running in dev or PyInstaller bundle """
+    # TODO: test with installer
+    """ Get path to resource whether running in dev or installed bundle """
     if getattr(sys, 'frozen', False):
         return os.path.join(sys._MEIPASS, relative_path)
-    
+
     if "__file__" in globals() or "__file__" in locals():
-        # Path(__file__).resolve().parent is robust (resolves symlinks)
-        install_dir = Path(__file__).resolve().parents[3]
-        return install_dir / Path(relative_path)
-    
+        current_location = Path(__file__).resolve()
+        if 'site-packages' in current_location.parts:
+            matchypatchy_dir = current_location.parents[0]  # Go up 1 level
+        else:
+            matchypatchy_dir = current_location.parents[2]  # Go up 2 levels
+        # Assumes this function is in src/matchypatchy/
+        return matchypatchy_dir / relative_path
+
+    return os.path.abspath(relative_path)
+
+
+def asset_path(relative_path):
+    """ Get path to resource whether running in dev or installed bundle """
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, relative_path)
+
+    if "__file__" in globals() or "__file__" in locals():
+        current_location = Path(__file__).resolve()
+
+        if 'site-packages' in current_location.parts:
+            matchypatchy_dir = current_location.parents[0]  # tbd
+        else:
+            matchypatchy_dir =current_location.parents[0]
+
+        return matchypatchy_dir / 'assets' / relative_path
+
     return os.path.abspath(relative_path)
 
 
@@ -33,7 +56,7 @@ def initiate(parent_dir=None, project_name="MatchyPatchy-Share"):
 
     # Append MatchyPatchy-Share to parent_dir
     home_dir = Path(parent_dir) / project_name
-    
+
     # Set global variable for home_dir
     global HOME_DIR
     HOME_DIR = home_dir
@@ -43,20 +66,23 @@ def initiate(parent_dir=None, project_name="MatchyPatchy-Share"):
         'DB_DIR': str(home_dir / 'Database'),
         'ML_DIR': str(home_dir / 'Models'),
         'THUMBNAIL_DIR': str(home_dir / 'Thumbnails'),
-        'VIDEO_FRAMES': 3,
+        'SMART_FRAMES': True,
+        'VIDEO_FPS': 1,
+        'N_FRAMES': 3,
         'REID_KEY': None,
         'VIEWPOINT_KEY': None,
         'DETECTOR_KEY': None,
         'KNN': 100,
         'SEQUENCE_DURATION': 60,
         'SEQUENCE_N': 3,
-        'DEVICE': "CPUExecutionProvider",
     }
 
     # Check if CUDA is available and set DEVICE accordingly
-    providers = animl.get_onnx_device()
+    providers = animl.get_onnx_device(quiet=True)
     if "CUDAExecutionProvider" in providers:
         default_cfg['DEVICE'] = "CUDAExecutionProvider"
+    else:
+        default_cfg['DEVICE'] = "CPUExecutionProvider"
 
     CONFIG_PATH = home_dir / '.config.yml'
     if CONFIG_PATH.exists():
@@ -101,8 +127,8 @@ def update_project_folder(new_project, new_db):
     CONFIG_PATH = HOME_DIR / '.config.yml'
 
     if not Path(CONFIG_PATH).exists():
-        cfg = initiate(parent_dir=Path(new_project).parent, 
-                 project_name=Path(new_project).name)
+        cfg = initiate(parent_dir=Path(new_project).parent,
+                       project_name=Path(new_project).name)
     else:
         cfg = load_cfg()
         cfg['HOME_DIR'] = str(new_project)

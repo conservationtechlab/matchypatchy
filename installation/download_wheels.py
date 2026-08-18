@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-def download_wheels(requirements, python_version="3.12", platform="win_amd64"):
+def download_wheels(requirements, python_version="3.13", platform="win_amd64"):
     """Download wheels for the specified platform"""
     wheels_dir = Path('new_wheels')
     wheels_dir.mkdir(exist_ok=True)
@@ -47,8 +47,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "-p", "--python_version", 
         type=str, 
-        default="3.12", 
-        help="Python version to use (default: 3.12)."
+        default="3.13", 
+        help="Python version to use (default: 3.13)."
     )
 
     # 4. Add a boolean flag (True if present, False if absent)

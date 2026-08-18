@@ -58,4 +58,7 @@ if __name__ == "__main__":
     finally:
         logger.info("MatchyPatchy shutting down")
         logger.info("=" * 70)
+        # close out database connection
+        if 'mpDB' in locals():
+            mpDB.close()
         sys.exit(exit_code)
