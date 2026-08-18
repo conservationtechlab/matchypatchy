@@ -42,10 +42,10 @@ def setup_database(key, filepath, db=None):
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL,
-                        region_id INTEGER NOT NULL,
+                        region_id INTEGER,
                         year_start INTEGER,
                         year_end INTEGER,
-                        FOREIGN KEY (region_id) REFERENCES region (id) );''')
+                        FOREIGN KEY (region_id) REFERENCES region (id) ON DELETE SET NULL);''')
 
     # STATION
     cursor.execute('''CREATE TABLE IF NOT EXISTS station (
@@ -54,7 +54,7 @@ def setup_database(key, filepath, db=None):
                         lat REAL,
                         long REAL,
                         survey_id INTEGER NOT NULL,
-                        FOREIGN KEY (survey_id) REFERENCES survey (id) );''')
+                        FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);''')
 
     # MEDIA
     cursor.execute('''CREATE TABLE IF NOT EXISTS media (
@@ -68,9 +68,9 @@ def setup_database(key, filepath, db=None):
                         sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
-                        FOREIGN KEY (station_id) REFERENCES station (id),
-                        FOREIGN KEY (camera_id) REFERENCES camera (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id));''')
+                        FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
+                        FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
@@ -105,7 +105,7 @@ def setup_database(key, filepath, db=None):
                         id INTEGER PRIMARY KEY,
                         name TEXT NOT NULL,
                         station_id INTEGER NOT NULL,
-                        FOREIGN KEY (station_id) REFERENCES station (id));''')
+                        FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE);''')
 
     # THUMBNAILS
     cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
