@@ -608,8 +608,8 @@ class MatchyPatchyDB():
             export_data = pd.merge(rois, stations, on="station_id")
             # add camera name
             if cameras:
-                cameras = pd.DataFrame(cameras, columns=["id", "camera_name", "station_id"])
-                export_data = pd.merge(export_data, cameras[["id", "camera_name"]], left_on="camera_id", right_on="id")
+                cameras = pd.DataFrame(cameras, columns=["camera_id", "camera_name", "station_id"])
+                export_data = pd.merge(export_data, cameras[["camera_id", "camera_name"]], on="camera_id")
             else:
                 # no camera, set column to blank
                 export_data['camera_name'] = None
