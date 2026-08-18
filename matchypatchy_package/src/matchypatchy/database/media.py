@@ -71,7 +71,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
             
     # just get media table
     else:
-        media = mpDB.select("media", row_cond)
+        media = mpDB.select("media", row_cond=row_cond)
 
         if media:
             media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",

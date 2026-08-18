@@ -488,7 +488,7 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            if row_cond:
+            if row_cond is not None:
                 command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
             else:
                 command = f'SELECT {columns} FROM {table};'
@@ -516,7 +516,7 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            if row_cond:
+            if row_cond is not None:
                 command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond} WHERE {row_cond};'
             else:
                 command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
@@ -535,7 +535,7 @@ class MatchyPatchyDB():
         try:
             cursor = self.db.cursor()
             columns = """station.id, station.name, lat, long, station.survey_id, survey.name, region.name"""
-            if row_cond:
+            if row_cond is not None:
                 command = f"""SELECT {columns} FROM station LEFT JOIN survey ON station.survey_id = survey.id
                                                 LEFT JOIN region ON survey.region_id = region.id
                                                 WHERE {row_cond};"""
@@ -569,7 +569,7 @@ class MatchyPatchyDB():
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
                          roi.media_id, roi.individual_id, emb, filepath, ext, timestamp,
                          station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age"""
-            if row_cond:
+            if row_cond is not None:
                 command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
                                             LEFT JOIN individual ON roi.individual_id = individual.id
                                             WHERE {row_cond};"""
