@@ -32,6 +32,7 @@ class CSVMigrateThread(QThread):
         self.station_ref = {}  # dictionary to store survey name to id mapping
         self.camera_ref = {}  # dictionary to store camera name to id mapping
         self.individual_ref = {}  # dictionary to store individual name to id mapping
+        self.sequence_ref = {}  # dictionary to store sequence id mapping
         self.errors = []  # list to store errors encountered during import
 
     def run(self):
@@ -56,6 +57,9 @@ class CSVMigrateThread(QThread):
                     self.errors.append(row.filepath)
                     continue
 
+                # new sequence id 
+                sequence_id = self.sequence(row.sequence_id)
+
                 # media
                 media_id = self.mpDB.add_media(row.filepath,
                                                hash,
@@ -63,9 +67,9 @@ class CSVMigrateThread(QThread):
                                                row.timestamp,
                                                station_id=new_station_id,
                                                camera_id=new_camera_id,
-                                               sequence_id=row.sequence_id,
-                                               external_id=row.external_id,
-                                               comment=row.comment)
+                                               sequence_id=sequence_id,
+                                               external_id=row.external_id if not pd.isna(row.external_id) else None,
+                                               comment=row.comment if not pd.isna(row.comment) else None)
 
                 if media_id == "duplicate_error":
                     media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{row.filepath}"')[0][0]
@@ -76,21 +80,27 @@ class CSVMigrateThread(QThread):
 
                 # individual
                 individual_id = self.individual(row.individual_id, row.name, row.sex, row.age)
+
+                # get bounding box coordinates, if any are missing, set to -1
+                bbox_x = row.bbox_x if not pd.isna(row.bbox_x) else -1
+                bbox_y = row.bbox_y if not pd.isna(row.bbox_y) else -1
+                bbox_w = row.bbox_w if not pd.isna(row.bbox_w) else -1
+                bbox_h = row.bbox_h if not pd.isna(row.bbox_h) else -1
                     
                 # roi
                 rid = self.mpDB.add_roi(media_id,
                                         row.frame,
-                                        row.bbox_x, 
-                                        row.bbox_y, 
-                                        row.bbox_w, 
-                                        row.bbox_h,
-                                        viewpoint=row.viewpoint,
-                                        reviewed=row.reviewed,
+                                        bbox_x, 
+                                        bbox_y, 
+                                        bbox_w, 
+                                        bbox_h,
+                                        viewpoint=row.viewpoint if not pd.isna(row.viewpoint) else None,
+                                        reviewed=row.reviewed if not pd.isna(row.reviewed) else 0,
                                         individual_id=individual_id,
                                         emb=0)  # do not add emb, must be reprocessed in new project
                 # save thumbnail for new roi
                 roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, row.filepath, row.ext, 
-                                                   row.frame, row.bbox_x, row.bbox_y, row.bbox_w, row.bbox_h)
+                                                   row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
                 self.mpDB.add_thumbnail("roi", rid, roi_thumbnail)
 
                 roi_counter += 1
@@ -127,7 +137,10 @@ class CSVMigrateThread(QThread):
             try:
                 station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
             except IndexError:
-                station_id = self.mpDB.add_station(str(station_name), lat, long, survey_id)
+                station_id = self.mpDB.add_station(str(station_name), 
+                                                   lat if not pd.isna(lat) else None, 
+                                                   long if not pd.isna(long) else None,
+                                                   survey_id)
             self.station_ref[old_station_id] = station_id
         return station_id
 
@@ -167,12 +180,27 @@ class CSVMigrateThread(QThread):
                     individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{name}"')[0][0]
                 # if not in database, add individual
                 except IndexError:
-                    individual_id = self.mpDB.add_individual(str(name), sex, age)
-        
+                    individual_id = self.mpDB.add_individual(str(name), 
+                                                             sex if not pd.isna(sex) else None,
+                                                             age if not pd.isna(age) else None)
             return individual_id
         # if no individual name, return None
         else:
             return None
+
+    def sequence(self, old_sequence_id):
+        """Get or create sequence ID, not required for import"""
+        if not pd.isna(old_sequence_id):
+            try:
+                # get sequence id from reference dictionary first
+                sequence_id = self.sequence_ref[old_sequence_id]
+            except KeyError:
+                sequence_id = self.mpDB.add_sequence()
+                self.sequence_ref[old_sequence_id] = sequence_id
+            return sequence_id
+        else:
+            return None
+
 
 
 # CSV IMPORT ===================================================================
