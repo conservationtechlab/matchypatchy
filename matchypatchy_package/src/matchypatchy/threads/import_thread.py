@@ -96,6 +96,7 @@ class CSVMigrateThread(QThread):
                                         bbox_h,
                                         viewpoint=row.viewpoint if not pd.isna(row.viewpoint) else None,
                                         reviewed=row.reviewed if not pd.isna(row.reviewed) else 0,
+                                        favorite=row.favorite if not pd.isna(row.favorite) else 0,
                                         individual_id=individual_id,
                                         emb=0)  # do not add emb, must be reprocessed in new project
                 # save thumbnail for new roi
