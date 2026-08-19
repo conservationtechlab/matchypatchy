@@ -63,12 +63,22 @@ class MatchyPatchyDB():
             self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
         return self.local.chroma
 
+    @chroma.setter
+    def chroma(self, value):
+        """Store a Chroma client in thread-local storage"""
+        self.local.chroma = value
+
     @property
     def collection(self):
         """Get or create the embedding collection"""
         if not hasattr(self.local, 'collection') or self.local.collection is None:
             self.local.collection = self.chroma.get_collection(name="embedding_collection")
         return self.local.collection
+
+    @collection.setter
+    def collection(self, value):
+        """Store an embedding collection in thread-local storage"""
+        self.local.collection = value
     
     def close(self):
         """Close the thread-local connection"""

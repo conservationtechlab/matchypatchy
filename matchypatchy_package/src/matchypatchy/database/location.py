@@ -17,9 +17,9 @@ def fetch_regions(mpDB):
     """Fetches region Table, Converts to DataFrame"""
     regions = mpDB.select("region")
     if regions:
-        return pd.DataFrame(regions, columns=["id", "name"])
+        return pd.DataFrame(regions, columns=["id", "name", "timezone"])
     else:
-        return pd.DataFrame(columns=["id", "name"])
+        return pd.DataFrame(columns=["id", "name", "timezone"])
 
 
 def fetch_stations(mpDB, survey_id=None):
