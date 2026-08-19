@@ -122,7 +122,11 @@ class LoadTableThread(QThread):
             qtw = QImage(thumbnail_path)
         # not editable
         elif column in ['filepath', 'timestamp', 'sequence_id', 'roi_count']:
-            qtw = QTableWidgetItem(str(roi[column]))
+            # NOTE: language settings may cause filepath to be displayed differently, e.g. "C:\Users\..." vs "C:/Users/..."
+            text = str(roi[column])
+           # if column == 'filepath':
+           #     text = text.replace("\\", "/")   # display-only, do not write back to DB
+            qtw = QTableWidgetItem(text)
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
         # Station
         elif column == 'station':

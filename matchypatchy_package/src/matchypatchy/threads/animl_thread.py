@@ -88,7 +88,7 @@ class AnimlThread(QThread):
             self.videos = animl.extract_frames(self.videos, frames=self.n_frames)
 
         if self.to_process > 0:
-            self.prompt_update.emit("Detecting images...")
+            self.prompt_update.emit("Detecting animals...")
             self.detect_images()
             self.prompt_update.emit("Selecting best video frames...")
             self.detect_videos()

@@ -9,6 +9,7 @@ import threading
 from pathlib import Path
 from random import randrange
 import numpy as np
+import pandas as pd
 
 from matchypatchy.database.setup import setup_database, setup_chromadb
 from matchypatchy.config import asset_path
@@ -202,6 +203,9 @@ class MatchyPatchyDB():
             - name (str) Not Null
             - timezone (str) Optional
         """
+        if timezone is None:
+            timezone = str(datetime.datetime.now().astimezone().tzname())
+            timezone = TZ_CONVERT_DICT.get(timezone, timezone)
         try:
             cursor = self.db.cursor()
             command = """INSERT INTO region (name, timezone) VALUES (?, ?);"""
@@ -288,8 +292,15 @@ class MatchyPatchyDB():
                         (filepath, sha256, ext, timestamp, station_id,
                         camera_id, sequence_id, external_id, comment)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (filepath, sha256, ext, timestamp, station_id,
-                          camera_id, sequence_id, external_id, comment)
+            data_tuple = (str(filepath),
+                          str(sha256),
+                          str(ext),
+                          str(timestamp),
+                          int(station_id),
+                          camera_id, 
+                          sequence_id,
+                          external_id,
+                          comment)
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
             self.db.commit()
@@ -338,12 +349,17 @@ class MatchyPatchyDB():
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
                          viewpoint, reviewed, favorite, individual_id, emb)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (int(media_id), int(frame), 
+            data_tuple = (int(media_id), 
+                          int(frame), 
                           float(round(bbox_x, 4)), 
                           float(round(bbox_y, 4)),
                           float(round(bbox_w, 4)),
                           float(round(bbox_h, 4)),
-                          viewpoint, reviewed, favorite, individual_id, emb)
+                          viewpoint, 
+                          int(reviewed), 
+                          int(favorite), 
+                          individual_id, 
+                          emb)
             
             cursor.execute(command, data_tuple)
             id = cursor.lastrowid
@@ -472,7 +488,7 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            if row_cond:
+            if row_cond is not None:
                 command = f'SELECT {columns} FROM {table} WHERE {row_cond};'
             else:
                 command = f'SELECT {columns} FROM {table};'
@@ -500,7 +516,7 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            if row_cond:
+            if row_cond is not None:
                 command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond} WHERE {row_cond};'
             else:
                 command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
@@ -514,34 +530,12 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed fetch: {error}")
             return None, None
 
-    def all_media(self, row_cond: Optional[str] = None):
-        """Return joined roi and media info for Media Table"""
-        try:
-            cursor = self.db.cursor()
-            columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                         roi.media_id, roi.individual_id, emb, filepath, ext, timestamp,
-                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age"""
-            if row_cond:
-                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                            LEFT JOIN individual ON roi.individual_id = individual.id
-                                            WHERE {row_cond};"""
-            else:
-                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                            LEFT JOIN individual ON roi.individual_id = individual.id;"""
-            cursor.execute(command)
-            column_names = [description[0] for description in cursor.description]
-            rows = cursor.fetchall()  # returns in tuple
-            return rows, column_names
-        except sqlite3.Error as error:
-            self.logger.error("Failed all_media fetch:", error)
-            return None, None
-
     def stations(self, row_cond=None):
         """Return joined station, survey, region info"""
         try:
             cursor = self.db.cursor()
             columns = """station.id, station.name, lat, long, station.survey_id, survey.name, region.name"""
-            if row_cond:
+            if row_cond is not None:
                 command = f"""SELECT {columns} FROM station LEFT JOIN survey ON station.survey_id = survey.id
                                                 LEFT JOIN region ON survey.region_id = region.id
                                                 WHERE {row_cond};"""
@@ -565,6 +559,65 @@ class MatchyPatchyDB():
             return row_count
         except sqlite3.Error as error:
             self.logger.error(f"Failed to count for {table}: {error}")
+            return None
+
+    # EXPORT -------------------------------------------------------------------
+    def all_media(self, row_cond: Optional[str] = None):
+        """Return joined roi and media info for Media Table"""
+        try:
+            cursor = self.db.cursor()
+            columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
+                         roi.media_id, roi.individual_id, emb, filepath, ext, timestamp,
+                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age"""
+            if row_cond is not None:
+                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
+                                            LEFT JOIN individual ON roi.individual_id = individual.id
+                                            WHERE {row_cond};"""
+            else:
+                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
+                                            LEFT JOIN individual ON roi.individual_id = individual.id;"""
+            cursor.execute(command)
+            column_names = [description[0] for description in cursor.description]
+            rows = cursor.fetchall()  # returns in tuple
+            return rows, column_names
+        except sqlite3.Error as error:
+            self.logger.error("Failed all_media fetch:", error)
+            return None, None
+
+    def export_data(self):
+        """
+        Fetch Info for Media Table
+        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+                   'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
+                   'filepath', 'ext', 'timestamp', 'sequence_id', 'external_id', 'comment', 
+                   'name', 'sex', 'age',
+                   'station_id', 'station_name', 'lat', 'long', 
+                   'station_survey_id', 'survey_name', 'region_name', 
+                   'camera_id', 'camera_name']
+        """
+        media, column_names = self.all_media()
+        rois = pd.DataFrame(media, columns=column_names)
+        rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
+        # merge with stations
+        stations, column_names = self.stations()
+        stations = pd.DataFrame(stations, columns=column_names)
+        stations.columns = stations.columns.str.replace('.', '_')
+        # get camera names
+        cameras = self.select("camera")
+        if not rois.empty:
+            export_data = pd.merge(rois, stations, on="station_id")
+            # add camera name
+            if cameras:
+                cameras = pd.DataFrame(cameras, columns=["camera_id", "camera_name", "station_id"])
+                export_data = pd.merge(export_data, cameras[["camera_id", "camera_name"]], on="camera_id")
+            else:
+                # no camera, set column to blank
+                export_data['camera_name'] = None
+            export_data = export_data.replace({float('nan'): None})
+            # rename columns to avoid issues with '.' in column names when importing
+            export_data.columns = export_data.columns.str.replace('.', '_')
+            return export_data
+        else:
             return None
 
     # DELETE -------------------------------------------------------------------

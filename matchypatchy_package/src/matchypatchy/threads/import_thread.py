@@ -2,6 +2,7 @@
 QThreads for Importing Data
 
 """
+import pandas as pd
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -9,7 +10,201 @@ from matchypatchy.config import load_cfg
 from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail
 from matchypatchy.database.media import get_sha256
 
+# CSV MIGRATE ==================================================================
+class CSVMigrateThread(QThread):
+    progress_update = pyqtSignal(int)  # Signal to update the progress bar
+    error_update = pyqtSignal(list)  # Signal to update the error log
 
+    EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+                        'reviewed', 'favorite', 'media_id',  'emb',
+                        'filepath', 'ext', 'timestamp', 'sequence_id', 'external_id', 'comment', 
+                        'individual_id', 'name', 'sex', 'age',
+                        'station_id', 'station_name', 'lat', 'long', 
+                        'station_survey_id', 'survey_name', 'region_name', 
+                        'camera_id', 'camera_name'}
+
+    def __init__(self, mpDB, data, logger):
+        super().__init__()
+        self.mpDB = mpDB
+        self.logger = logger
+        self.data = data
+        self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
+        self.station_ref = {}  # dictionary to store survey name to id mapping
+        self.camera_ref = {}  # dictionary to store camera name to id mapping
+        self.individual_ref = {}  # dictionary to store individual name to id mapping
+        self.sequence_ref = {}  # dictionary to store sequence id mapping
+        self.errors = []  # list to store errors encountered during import
+
+    def run(self):
+        roi_counter = 0  # progressbar counter
+        for row in self.data.itertuples(index=False):
+            if not self.isInterruptionRequested():
+
+                print(row)
+
+                # get survey id, create if not exists
+                survey_id = self.survey(row.survey_name, row.region_name)
+
+                # station
+                new_station_id = self.station(row.station_id, row.station_name, survey_id, row.lat, row.long)
+
+                # camera
+                new_camera_id = self.camera(new_station_id, row.camera_id, row.camera_name)
+
+                hash = get_sha256(row.filepath)
+                if hash is None:
+                    self.logger.warning(f"File {row.filepath} does not exist, skipping import...")
+                    self.errors.append(row.filepath)
+                    continue
+
+                # new sequence id 
+                sequence_id = self.sequence(row.sequence_id)
+
+                # media
+                media_id = self.mpDB.add_media(row.filepath,
+                                               hash,
+                                               row.ext,
+                                               row.timestamp,
+                                               station_id=new_station_id,
+                                               camera_id=new_camera_id,
+                                               sequence_id=sequence_id,
+                                               external_id=row.external_id if not pd.isna(row.external_id) else None,
+                                               comment=row.comment if not pd.isna(row.comment) else None)
+
+                if media_id == "duplicate_error":
+                    media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{row.filepath}"')[0][0]
+                
+                # save thumbnail for new media
+                media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
+                self.mpDB.add_thumbnail("media", media_id, media_thumbnail)
+
+                # individual
+                individual_id = self.individual(row.individual_id, row.name, row.sex, row.age)
+
+                # get bounding box coordinates, if any are missing, set to -1
+                bbox_x = row.bbox_x if not pd.isna(row.bbox_x) else -1
+                bbox_y = row.bbox_y if not pd.isna(row.bbox_y) else -1
+                bbox_w = row.bbox_w if not pd.isna(row.bbox_w) else -1
+                bbox_h = row.bbox_h if not pd.isna(row.bbox_h) else -1
+                    
+                # roi
+                rid = self.mpDB.add_roi(media_id,
+                                        row.frame,
+                                        bbox_x, 
+                                        bbox_y, 
+                                        bbox_w, 
+                                        bbox_h,
+                                        viewpoint=row.viewpoint if not pd.isna(row.viewpoint) else None,
+                                        reviewed=row.reviewed if not pd.isna(row.reviewed) else 0,
+                                        favorite=row.favorite if not pd.isna(row.favorite) else 0,
+                                        individual_id=individual_id,
+                                        emb=0)  # do not add emb, must be reprocessed in new project
+                # save thumbnail for new roi
+                roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, row.filepath, row.ext, 
+                                                   row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                self.mpDB.add_thumbnail("roi", rid, roi_thumbnail)
+
+                roi_counter += 1
+                self.progress_update.emit(roi_counter)
+
+        if not self.isInterruptionRequested():
+            # finished adding media
+            self.finished.emit()
+            self.error_update.emit(self.errors)  # Emit the list of errors encountered during import
+
+    def survey(self, survey_name, region_name):
+        """Get or create survey"""
+        # get active survey
+        try:
+            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
+        except IndexError:
+            region_id = self.region(region_name) if not pd.isna(region_name) else None
+            survey_id = self.mpDB.add_survey(str(survey_name), region_id, None, None)
+        return survey_id
+
+    def region(self, region_name):
+        """Get or create region"""
+        try:
+            region_id = self.mpDB.select("region", columns="id", row_cond=f'name="{region_name}"')[0][0]
+        except IndexError:
+            region_id = self.mpDB.add_region(str(region_name), None)
+        return region_id
+
+    def station(self, old_station_id, station_name, survey_id, lat, long):
+        """Get or create station"""
+        try:
+            station_id = self.station_ref[old_station_id]
+        except KeyError:
+            try:
+                station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
+            except IndexError:
+                station_id = self.mpDB.add_station(str(station_name), 
+                                                   lat if not pd.isna(lat) else None, 
+                                                   long if not pd.isna(long) else None,
+                                                   survey_id)
+            self.station_ref[old_station_id] = station_id
+        return station_id
+
+    def camera(self, station_id, old_camera_id, camera_name):
+        """Get or create camera, not required for import"""
+        if not pd.isna(old_camera_id):
+            try:
+                # get camera id from reference dictionary first
+                camera_id = self.camera_ref[old_camera_id]
+            except KeyError:
+                # get camera id from database if not in reference dictionary
+                try:
+                    camera_name = str(camera_name).strip()
+                    camera_name = camera_name.replace("'", "''")
+                    row_cond = f"name = '{camera_name}'"
+                    rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
+                    camera_id = rows[0][0]
+                # if not in database, add camera
+                except IndexError:
+                    camera_id = self.mpDB.add_camera(str(camera_name), station_id)
+                # add camera id to reference dictionary
+                self.camera_ref[old_camera_id] = camera_id
+            return camera_id
+        # if no camera name, return None
+        else:
+            return None
+
+    def individual(self, old_individual_id, name, sex, age):
+        """Get or create individual ID, not required for import"""
+        if not pd.isna(old_individual_id):
+            try:
+                # get individual id from reference dictionary first
+                individual_id = self.individual_ref[old_individual_id]
+            except KeyError:
+                # get individual id from database if not in reference dictionary
+                try:
+                    individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{name}"')[0][0]
+                # if not in database, add individual
+                except IndexError:
+                    individual_id = self.mpDB.add_individual(str(name), 
+                                                             sex if not pd.isna(sex) else None,
+                                                             age if not pd.isna(age) else None)
+            return individual_id
+        # if no individual name, return None
+        else:
+            return None
+
+    def sequence(self, old_sequence_id):
+        """Get or create sequence ID, not required for import"""
+        if not pd.isna(old_sequence_id):
+            try:
+                # get sequence id from reference dictionary first
+                sequence_id = self.sequence_ref[old_sequence_id]
+            except KeyError:
+                sequence_id = self.mpDB.add_sequence()
+                self.sequence_ref[old_sequence_id] = sequence_id
+            return sequence_id
+        else:
+            return None
+
+
+
+# CSV IMPORT ===================================================================
 class CSVImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 

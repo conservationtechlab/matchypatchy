@@ -464,22 +464,24 @@ class MediaTable(QWidget):
         # commit all changes in self.edit_stack to database
         while len(self.edit_stack) > 0:
             edit = self.edit_stack.pop()
-            id = edit['id']
-            replace_dict = {edit['reference']: edit['new_value']}
+            replace_dict = {edit.reference: edit.new_value}
+            # roi view
             if self.data_type == 1:
-                if edit['reference'] in {'station_id', 'sequence_id', 'external_id'}:
-                    self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
-                elif edit['reference'] in {'age', 'sex'}:
-                    iid = self.data_filtered.loc[self.data_filtered['id'] == id, 'individual_id'].values[0]
+                # edit media table value
+                if edit.reference in {'station_id', 'sequence_id', 'external_id', 'comment'}:
+                    self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
+                # edit individual table value
+                elif edit.reference in {'age', 'sex'}:
+                    iid = self.data_filtered.loc[self.data_filtered['id'] == edit.rid, 'individual_id'].values[0]
                     iid = int(iid) if pd.notna(iid) else None
                     if iid is not None:
                         self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
-                elif edit['reference'] in {'comment'}:
-                    self.mpDB.edit_row("media", id, replace_dict, allow_none=True, quiet=False)
+                # edit roi table value
                 else:
-                    self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
+                    self.mpDB.edit_row("roi", edit.rid, replace_dict, allow_none=False, quiet=False)
+            # media view
             else:
-                self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
+                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
 
         # reload data and refresh table
         self.edit_stack = []
