@@ -26,11 +26,11 @@ class MatchyPatchyDB():
         # load existing databases if they exist
         if self.filepath.is_file() and self.chroma_filepath.is_dir():
             # initialize
-            self.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
-            self.collection = self.chroma.get_collection(name="embedding_collection")
+            self.db  # Trigger property initialization
+            self.chroma  # Trigger property initialization
+            self.collection  # Trigger property initialization
             # check key
             self.key = self.validate()
-
         # initialize new databases
         else:
             self.key = '{:05}'.format(randrange(1, 10 ** 5))
@@ -55,26 +55,44 @@ class MatchyPatchyDB():
             self.local.db = sqlite3.connect(self.filepath)
             self.local.db.execute("PRAGMA foreign_keys = ON")
         return self.local.db
+
+    @property
+    def chroma(self):
+        """Get or create a Chroma client for the current thread"""
+        if not hasattr(self.local, 'chroma') or self.local.chroma is None:
+            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
+        return self.local.chroma
+
+    @property
+    def collection(self):
+        """Get or create the embedding collection"""
+        if not hasattr(self.local, 'collection') or self.local.collection is None:
+            self.local.collection = self.chroma.get_collection(name="embedding_collection")
+        return self.local.collection
     
     def close(self):
         """Close the thread-local connection"""
         if hasattr(self.local, 'db') and self.local.db:
             self.local.db.close()
             self.local.db = None
+        if hasattr(self.local, 'chroma') and self.local.chroma is not None:
+            self.local.chroma = None
+        if hasattr(self.local, 'collection') and self.local.collection is not None:
+            self.local.collection = None
 
     def update_paths(self, DB_PATH):
         """Update database paths, create new database if not found"""
         filepath = Path(DB_PATH) / 'matchypatchy.db'
         chroma_filepath = Path(DB_PATH) / 'emb.db'
+        # Close existing connection
+        self.close() 
+        # check if new database exists and is valid
         if filepath.is_file() and chroma_filepath.is_dir():
             valid = self.validate()
             if valid:
                 self.key = valid
                 self.filepath = filepath
                 self.chroma_filepath = chroma_filepath
-                self.db = sqlite3.connect(self.filepath)
-                self.db.execute("PRAGMA foreign_keys = ON")
-                self.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
                 return True
             else:
                 return False
@@ -83,8 +101,7 @@ class MatchyPatchyDB():
             self.filepath = filepath
             self.chroma_filepath = chroma_filepath
             self.key = '{:05}'.format(randrange(1, 10 ** 5))
-            self.db = setup_database(self.key, self.filepath)
-            self.chroma = setup_chromadb(self.key, self.chroma_filepath)
+            self._setup_new_databases()
             return True
 
     def retrieve_key(self):
