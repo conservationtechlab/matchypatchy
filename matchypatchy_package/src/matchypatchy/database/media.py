@@ -184,7 +184,10 @@ def media_count(mpDB, survey_id):
     """
     Get number of media files associated with a given survey_id
     """
-    valid_stations = list(mpDB.select("station", columns="id", row_cond=f'survey_id={survey_id}')[0])
+    station_rows = mpDB.select("station", columns="id", row_cond=f'survey_id={survey_id}')
+    if not station_rows:
+        return [], 0
+    valid_stations = [row[0] for row in station_rows]
     survey_list = ",".join([str(s) for s in valid_stations])
     media = mpDB.select("media", columns="id", row_cond=f'station_id IN ({survey_list})')
     return media, len(media)
