@@ -56,10 +56,17 @@ def setup_database(key, filepath, db=None):
                         survey_id INTEGER NOT NULL,
                         FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);''')
 
+    # UPLOADS
+    cursor.execute('''CREATE TABLE IF NOT EXISTS uploads (
+                        id INTEGER PRIMARY KEY,
+                        base_dir TEXT UNIQUE NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
+
     # MEDIA
     cursor.execute('''CREATE TABLE IF NOT EXISTS media (
                         id INTEGER PRIMARY KEY,
-                        filepath TEXT UNIQUE NOT NULL,
+                        base_dir_id INTEGER NOT NULL,
+                        relative_path TEXT UNIQUE NOT NULL,
                         sha256 TEXT UNIQUE NOT NULL,
                         ext TEXT NOT NULL,
                         timestamp TEXT NOT NULL,
@@ -68,6 +75,7 @@ def setup_database(key, filepath, db=None):
                         sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
+                        FOREIGN KEY (base_dir_id) REFERENCES uploads (id),
                         FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
                         FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
                         FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);''')

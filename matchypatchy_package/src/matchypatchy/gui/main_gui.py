@@ -8,11 +8,13 @@ Display Pages:
     1. DisplayMedia
     2. DisplayCompare
 """
+from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction, QGuiApplication
+from PyQt6.QtCore import QSettings
 
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
@@ -25,15 +27,28 @@ from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
-from matchypatchy import config
+from matchypatchy.config import mpConfig
+from matchypatchy.database.media import export_data
 from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, mpDB, logger):
+    def __init__(self, logger):
         super().__init__()
-        self.mpDB = mpDB
+        self.settings = QSettings("SDZWA", "MatchyPatchy")
+        home_dir = self.load_home_dir() # load previous home dir or start fresh
+
         self.logger = logger
+
+        # set up config and create dirs if necessary
+        self.cfg = mpConfig(home_dir)
+        logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
+        
+        # set up database
+        self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
+        logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
+
+        # set up main window
         self.setWindowTitle(f"MatchyPatchy v{__version__}")
         screen_resolution = QGuiApplication.primaryScreen().availableGeometry()
         minimum_height = 768
@@ -183,12 +198,60 @@ class MainWindow(QMainWindow):
         del dialog
 
     # EDIT =====================================================================
-    def new_project(self, filepath):
-        cfg = config.initiate(parent_dir=filepath)
-        mpDB = MatchyPatchyDB(cfg['DB_DIR'], self.logger)
-        self.Base.update_db(mpDB)
-        self.Media.update_db(mpDB)
-        self.Compare.update_db(mpDB)
+
+    def load_home_dir(self):
+        """Load last selected path or use default"""
+        saved_path = self.settings.value("home_dir", None)  # None is default
+        if saved_path and Path(saved_path).exists():
+            return saved_path
+        else:
+            path = str(Path.cwd()) + "/MatchyPatchy-Share"  # Fallback to current working directory
+            self.settings.setValue("home_dir", str(path))
+            return path
+    
+    def save_home_dir(self, path):
+        """Save selected path"""
+        self.settings.setValue("home_dir", str(path))
+        self.HOME_DIR = path
+
+    def new_project(self, home_dir):
+        # close existing database connection before creating a new project
+        self.mpDB.close()
+
+        home_dir = Path(home_dir) / "MatchyPatchy-Share"  # Fallback to current working directory
+        self.settings.setValue("home_dir", str(home_dir))
+        self.logger.info(f"Creating project folder: {str(home_dir)}.")
+
+        self.cfg = mpConfig(home_dir)
+        self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
+        self.Base.update_project(self.cfg, self.mpDB)
+        self.Media.update_project(self.cfg, self.mpDB)
+        self.Compare.update_project(self.cfg, self.mpDB)
+
+    def change_project(self, project_folder):
+        # close existing database connection before creating a new project
+        self.mpDB.close()
+
+        cfg = mpConfig(project_folder)
+        mpDB = MatchyPatchyDB(cfg.DB_DIR, self.logger)
+        valid = mpDB.key
+        # Check if the database key is valid
+        if valid:
+            print(f"Changing project to {str(project_folder)}")
+            self.settings.setValue("home_dir", str(project_folder))
+            self.logger.info(f"Updating project folder to {str(project_folder)}.")
+            self.cfg = cfg
+            self.mpDB = mpDB
+            self.Base.update_project(self.cfg, self.mpDB)
+            self.Media.update_project(self.cfg, self.mpDB)
+            self.Compare.update_project(self.cfg, self.mpDB)
+            return True
+        
+        else:
+            self.logger.warning(f"Database at {str(project_folder)} is invalid. User prompted to select another path or delete.")
+            dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
+            dialog.exec()
+            return False
 
     def edit_config(self):
         dialog = ConfigPopup(self)
@@ -231,3 +294,11 @@ class MainWindow(QMainWindow):
         dialog = LicensePopup(self)
         dialog.exec()
         del dialog
+
+
+    # CLOSE EVENT ================================================================
+    def closeEvent(self, event):
+        """Close database connection when window closes"""
+        if hasattr(self, 'mpDB') and self.mpDB:
+            self.mpDB.close()  # Close DB connection
+        event.accept()

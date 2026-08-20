@@ -19,6 +19,7 @@ class ImportFolderPopup(QDialog):
     def __init__(self, parent, directory):
         super().__init__(parent)
         self.logger = parent.logger
+        self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         self.active_survey = parent.active_survey
         self.timezone = self.mpDB.select_join("survey", "region", "survey.region_id=region.id",
@@ -124,8 +125,7 @@ class ImportFolderPopup(QDialog):
 
         self.logger.info(f"Adding {len(self.data)} files to Database")
 
-        self.import_thread = FolderImportThread(self.mpDB, self.active_survey, 
-                                                self.data, station_level, camera_level, self.logger)
+        self.import_thread = FolderImportThread(self, self.active_survey, self.data, station_level, camera_level)
         self.rejected.connect(self.import_thread.requestInterruption)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
         self.import_thread.finished.connect(self.accept)

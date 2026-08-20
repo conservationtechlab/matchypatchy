@@ -212,15 +212,14 @@ class QueryContainer(QObject):
         """Set the match favorites active state"""
         
         if active:
+            # store the current match object before switching to favorites
+            self.knn_match_object = self.current_match_object
             # reload data for updated favorites, no need to filter
             self.load_data()
             favorites = self.data_raw[self.data_raw['favorite'] == 1]
             if favorites.empty:
                 # no favorite matches available, exit early
                 return
-
-            # store the current match object before switching to favorites
-            self.knn_match_object = self.current_match_object
 
             # get "filtered neighbors", [(match_id, distance)]
             filtered_neighbors = []

@@ -35,6 +35,7 @@ class DisplayBase(QWidget):
         super().__init__()
         self.parent = parent
         self.logger = parent.logger
+        self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         padding = 120
 
@@ -154,8 +155,9 @@ class DisplayBase(QWidget):
 
         self.update_survey()
 
-    def update_db(self, mpDB):
+    def update_project(self, cfg, mpDB):
         """Update database object"""
+        self.cfg = cfg
         self.mpDB = mpDB
 
     # ==========================================================================
@@ -212,8 +214,8 @@ class DisplayBase(QWidget):
         survey_selected = self.select_survey()
         if not survey_selected:
             dialog = AlertPopup(self, "Please select a survey before importing.")
-            if dialog.exec():
-                del dialog
+            dialog.exec()
+            del dialog
             return
         else:
             manifest = QFileDialog.getOpenFileName(self, "Open File",
@@ -222,8 +224,8 @@ class DisplayBase(QWidget):
             if manifest:
                 self.logger.info(f"Importing from manifest: {manifest}")
                 dialog = ImportCSVPopup(self, manifest)
-                if dialog.exec():
-                    del dialog
+                dialog.exec()
+                del dialog
 
     # STEP 1: Import from FOLDER
     def import_folder(self):
@@ -231,8 +233,8 @@ class DisplayBase(QWidget):
         survey_selected = self.select_survey()
         if not survey_selected:
             dialog = AlertPopup(self, "Please select a survey before importing.")
-            if dialog.exec():
-                del dialog
+            dialog.exec()
+            del dialog
             return
         else:
             directory = QFileDialog.getExistingDirectory(self, "Open File",
@@ -255,17 +257,14 @@ class DisplayBase(QWidget):
         result = ml_options_dialog.exec()
         if result == QDialog.DialogCode.Accepted:
             mloptions = ml_options_dialog.return_selections()
-            del ml_options_dialog
             self.process_images(mloptions)
 
-        # processing rejected
-        else:
-            del ml_options_dialog
+        del ml_options_dialog
 
     def process_images(self, mloptions):
         """Process images using selected machine learning options"""
         if self.mpDB.count("media") > 0:
-            config.add(mloptions)
+            self.cfg.update(mloptions)
             dialog = AlertPopup(self, "Processing Images...",
                                 title="Processing Images",
                                 progressbar=True, cancel_only=True)
@@ -273,19 +272,21 @@ class DisplayBase(QWidget):
 
             # 1. SEQUENCE
             dialog.set_max(0)
-            self.sequence_thread = SequenceThread(self.mpDB, mloptions['sequence_checked'])
+            self.sequence_thread = SequenceThread(self.mpDB, self.cfg, mloptions['sequence_checked'])
             self.sequence_thread.prompt_update.connect(dialog.update_prompt)
             self.sequence_thread.start()
             # 2. ANIML (BBOX)
             dialog.set_max(100)
             dialog.set_counter(0)
-            self.animl_thread = AnimlThread(self.mpDB, mloptions['DETECTOR_KEY'])
+            self.animl_thread = AnimlThread(self.mpDB, self.cfg, mloptions['DETECTOR_KEY'])
             self.animl_thread.prompt_update.connect(dialog.update_prompt)
             self.animl_thread.progress_update.connect(dialog.set_value)
             # 3. REID AND VIEWPOINT
             dialog.set_max(100)
             dialog.set_counter(0)
-            self.miew_thread = ReIDThread(self.mpDB, mloptions['REID_KEY'],
+            self.miew_thread = ReIDThread(self.mpDB, 
+                                          self.cfg.ML_DIR,
+                                          mloptions['REID_KEY'],
                                           mloptions['VIEWPOINT_KEY'])
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)

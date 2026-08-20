@@ -3,14 +3,11 @@ Popup for selecting and downloading ML models
 
 """
 
-
-from pathlib import Path
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
 from PyQt6.QtCore import Qt
 
 from matchypatchy.threads import model_download_thread
-from matchypatchy import config
 
 
 class MLDownloadPopup(QDialog):
@@ -20,10 +17,11 @@ class MLDownloadPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.logger = parent.logger
+        self.ml_dir = parent.cfg.ML_DIR
         # update model yml
         update_confirmed = model_download_thread.update_model_yml()
         self.logger.info(f"Model yaml update attempt: {update_confirmed}")
-        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        
         self.ml_cfg = model_download_thread.load_model()
         self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
@@ -148,7 +146,7 @@ class MLOptionsPopup(QDialog):
     """
     def __init__(self, parent):
         super().__init__(parent)
-        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        self.ml_dir = parent.cfg.ML_DIR
         self.ml_cfg = model_download_thread.load_model()
         self.available_models = self.discover_models()
 

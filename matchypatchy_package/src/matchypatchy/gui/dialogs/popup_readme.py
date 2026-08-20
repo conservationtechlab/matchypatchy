@@ -2,7 +2,7 @@
 View README, ABOUT, and LICENSE popups
 
 """
-from matchypatchy import config
+from matchypatchy.config import resource_path
 
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit
 
@@ -21,7 +21,7 @@ class AboutPopup(QDialog):
         self.display_readme()
 
     def display_readme(self):
-        about_path = config.resource_path("ABOUT.md")
+        about_path = resource_path("ABOUT.md")
         print(about_path)
         try:
             with open(about_path, "r") as file:
@@ -46,7 +46,7 @@ class READMEPopup(QDialog):
         self.display_readme()
 
     def display_readme(self):
-        readme_path = config.resource_path("README.md")
+        readme_path = resource_path("README.md")
         try:
             with open(readme_path, "r") as file:
                 readme_text = file.read()
@@ -70,7 +70,7 @@ class LicensePopup(QDialog):
         self.display_readme()
 
     def display_readme(self):
-        license_path = config.resource_path("LICENSE")
+        license_path = resource_path("LICENSE")
         try:
             with open(license_path, "r") as file:
                 readme_text = file.read()

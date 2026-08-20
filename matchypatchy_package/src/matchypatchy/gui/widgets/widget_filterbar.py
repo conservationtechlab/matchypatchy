@@ -68,6 +68,10 @@ class FilterBar(QWidget):
 
         self.setLayout(layout)
 
+    def update_project(self, mpDB):
+        """Update database object"""
+        self.mpDB = mpDB
+
     def refresh_filters(self, prefilter=None):
         """
         Clear and Refresh Filters on Re-entry

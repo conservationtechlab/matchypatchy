@@ -22,7 +22,6 @@ class ImportCSVPopup(QDialog):
 
     def __init__(self, parent, manifest):
         super().__init__(parent)
-        self.mpDB = parent.mpDB
         self.logger = parent.logger
         self.active_survey = parent.active_survey[1]
         self.data = pd.read_csv(manifest)

@@ -9,9 +9,6 @@ from dataclasses import dataclass
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
-COLUMNS = ["filepath", "timestamp", "station_id", "camera_id", "sequence_id", "external_id",
-           "comment", "viewpoint", "individual_id"]
-
 
 @dataclass
 class EditObject:
@@ -39,15 +36,17 @@ def get_sha256(path: str | Path,
 
 def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
-    Fetches all media info, converts to dataframe
+    Fetches all media info with full paths, converts to dataframe
     """
-
+     # select ids
     if ids:
         ids_str = ', '.join(map(str, ids))
         row_cond=f"id IN ({ids_str})"
     else:
         row_cond=None
-
+        
+        
+   # TODO: merge counts and query
     # fetch counts for media table data_type=0
     if counts:
         if row_cond is not None:
@@ -60,40 +59,62 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                                    f"GROUP BY media.id;"), quiet=quiet)
             
         if media:
-            media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
-                                                'station_id', "camera_id", 'sequence_id',
+            media = pd.DataFrame(media, columns=["id","base_dir_id", "relative_path", "sha256", "ext", 
+                                                 "timestamp", 'station_id', "camera_id", 'sequence_id',
                                                 "external_id", 'comment', 'roi_count'])
             media = media.replace({float('nan'): None})
             return media
         else:
             return pd.DataFrame()
+   # Query media with joined full paths
+   else:
+       query = """
+          SELECT 
+              m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
+              m.timestamp, m.station_id, m.camera_id, m.sequence_id,
+              m.external_id, m.comment,
+              u.base_dir || '/' || m.relative_path AS filepath
+          FROM media m
+          LEFT JOIN uploads u ON m.base_dir_id = u.id
+      """
 
-            
-    # just get media table
-    else:
-        media = mpDB.select("media", row_cond=row_cond)
+      if row_cond is not None:
+          query += f" WHERE {condition}"
+    
+      media = mpDB._command(query)
 
-        if media:
-            media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
-                                                'station_id', "camera_id", 'sequence_id',
-                                                "external_id", 'comment'])
-            media = media.replace({float('nan'): None})
-            return media
-        else:
-            return pd.DataFrame()
+      if media:
+          media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp",
+                                              'station_id', "camera_id", 'sequence_id',
+                                              "external_id", 'comment'])
+          media = media.replace({float('nan'): None})
+          return media
+      else:
+          return pd.DataFrame()
 
 
 def fetch_roi(mpDB, media_id=None):
     """
-    Fetches roi table, converts to dataframe
+    Fetches roi table with media filepaths, converts to dataframe
     """
+    query = """
+        SELECT 
+            r.id, r.media_id, r.frame, r.bbox_x, r.bbox_y, r.bbox_w, r.bbox_h,
+            r.viewpoint, r.reviewed, r.favorite, r.individual_id, r.emb,
+            u.base_dir || '/' || m.relative_path AS filepath
+        FROM roi r
+        JOIN media m ON r.media_id = m.id
+        LEFT JOIN uploads u ON m.base_dir_id = u.id
+    """
+    
     if media_id:
-        manifest = mpDB.select("roi", row_cond=f"media_id={media_id}")
-    else:
-        manifest = mpDB.select("roi")
+        query += f" WHERE r.media_id = {media_id}"
+    
+    manifest = mpDB._command(query)
+    
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
-                                               "viewpoint", "reviewed", "favorite", "individual_id", "emb"])
+                                               "viewpoint", "reviewed", "favorite", "individual_id", "emb", "filepath"])
         rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
         rois = rois.replace({float('nan'): None})
         return rois

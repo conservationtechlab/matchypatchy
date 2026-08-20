@@ -9,8 +9,127 @@ import yaml
 import animl
 
 
-HOME_DIR = Path.cwd()
+class mpConfig():
+    def __init__(self, home_dir):
+        """Initiate configuration file with default values if not present"""
 
+        home_dir = Path(home_dir)
+
+        # initiate defualts
+        self.HOME_DIR = home_dir
+        self.CONFIG_PATH = home_dir / '.config.yml'
+        self.DB_DIR = home_dir / 'Database'
+        self.ML_DIR = home_dir /  'Models'
+        self.THUMBNAIL_DIR = home_dir / 'Thumbnails'
+        self.FRAME_DIR = home_dir / 'Frames'
+        self.VIDEO_FRAMES = 3
+        self.REID_KEY = None
+        self.VIEWPOINT_KEY = None
+        self.DETECTOR_KEY = None
+        self.KNN = 100
+        self.SEQUENCE_DURATION = 60
+        self.SEQUENCE_N = 3
+        # Check if CUDA is available and set DEVICE accordingly
+        providers = animl.get_onnx_device(quiet=True)
+        if "CUDAExecutionProvider" in providers:
+            self.DEVICE = "CUDAExecutionProvider"
+        else:
+            self.DEVICE = "CPUExecutionProvider"
+
+        # load configuration if it exists
+        if home_dir.exists():
+            self.load()
+        # create a new project folder and save
+        else:
+            home_dir.mkdir(parents=True, exist_ok=True)
+            # create necessary project folders
+            self.create_folders()
+            # save to yaml
+            self.save()
+
+    def load(self):
+        """Load configuration from the YAML file if it exists."""
+        if self.CONFIG_PATH.exists():
+            with open(self.CONFIG_PATH, 'r') as cfg_file:
+                cfg = yaml.safe_load(cfg_file)
+                self.DB_DIR = Path(cfg.get('DB_DIR', self.HOME_DIR / 'Database'))
+                self.ML_DIR = Path(cfg.get('ML_DIR', self.HOME_DIR / 'Models'))
+                self.THUMBNAIL_DIR = Path(cfg.get('THUMBNAIL_DIR', self.HOME_DIR / 'Thumbnails'))
+                self.FRAME_DIR = Path(cfg.get('FRAME_DIR', self.HOME_DIR / 'Frames'))
+                self.VIDEO_FRAMES = cfg.get('VIDEO_FRAMES', 3)
+                self.REID_KEY = cfg.get('REID_KEY', None)
+                self.VIEWPOINT_KEY = cfg.get('VIEWPOINT_KEY', None)
+                self.DETECTOR_KEY = cfg.get('DETECTOR_KEY', None)
+                self.KNN = cfg.get('KNN', 100)
+                self.SEQUENCE_DURATION = cfg.get('SEQUENCE_DURATION', 60)
+                self.SEQUENCE_N = cfg.get('SEQUENCE_N', 3)
+                self.DEVICE = cfg.get('DEVICE', "CPUExecutionProvider")
+
+        # config file not found, save the current defaults
+        else:
+            print(f"Configuration file not found at {self.CONFIG_PATH}. Saving default configuration.")
+            self.HOME_DIR.mkdir(parents=True, exist_ok=True)
+            self.set_default()
+            self.save()
+
+        # make sure all necessary directories exist
+        self.create_folders()
+
+
+    def save(self):
+        """Save the current configuration to the YAML file."""
+        output_cfg = {
+            'HOME_DIR': str(self.HOME_DIR),
+            'DB_DIR': str(self.DB_DIR),
+            'ML_DIR': str(self.ML_DIR),
+            'THUMBNAIL_DIR': str(self.THUMBNAIL_DIR),
+            'VIDEO_FRAMES': self.VIDEO_FRAMES,
+            'REID_KEY': self.REID_KEY,
+            'VIEWPOINT_KEY': self.VIEWPOINT_KEY,
+            'DETECTOR_KEY': self.DETECTOR_KEY,
+            'KNN': self.KNN,
+            'SEQUENCE_DURATION': self.SEQUENCE_DURATION,
+            'SEQUENCE_N': self.SEQUENCE_N,
+            'DEVICE': self.DEVICE,
+        }
+        with open(self.CONFIG_PATH, 'w') as cfg_file:
+            yaml.dump(output_cfg, cfg_file)
+
+    def set_default(self):
+        """Reset the configuration to default values."""
+        self.DB_DIR = self.HOME_DIR / 'Database'
+        self.ML_DIR = self.HOME_DIR /  'Models'
+        self.THUMBNAIL_DIR = self.HOME_DIR / 'Thumbnails'
+        self.FRAME_DIR = self.HOME_DIR / 'Frames'
+        self.VIDEO_FRAMES = 3
+        self.REID_KEY = None
+        self.VIEWPOINT_KEY = None
+        self.DETECTOR_KEY = None
+        self.KNN = 100
+        self.SEQUENCE_DURATION = 60
+        self.SEQUENCE_N = 3
+        if "CUDAExecutionProvider" in animl.get_onnx_device(quiet=True):
+            self.DEVICE = "CUDAExecutionProvider"
+        else:
+            self.DEVICE = "CPUExecutionProvider"
+
+    def create_folders(self):
+        """Create necessary project folders if they do not exist."""
+        self.DB_DIR.mkdir(parents=True, exist_ok=True)
+        self.ML_DIR.mkdir(parents=True, exist_ok=True)
+        self.THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)
+        self.FRAME_DIR.mkdir(parents=True, exist_ok=True)
+
+    def update(self, key_dict):
+        """Update the configuration with new key-value pairs."""
+        for key, value in key_dict.items():
+            setattr(self, key, value)
+
+        # rewrite config
+        self.save()
+
+
+# ==============================================================================
 def resource_path(relative_path):
     # TODO: test with installer
     """ Get path to resource whether running in dev or installed bundle """
