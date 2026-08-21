@@ -27,30 +27,56 @@ def fetch_media(mpDB, ids=None):
     """
     if ids:
         ids_str = ', '.join(map(str, ids))
-        condition = f"id IN ({ids_str})"
+        row_cond=f"m.id IN ({ids_str})"
     else:
-        condition = None
+        row_cond=None
     
-    # Query media with joined full paths
-    query = """
-        SELECT 
-            m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
-            m.timestamp, m.station_id, m.camera_id, m.sequence_id,
-            m.external_id, m.comment,
-            u.base_dir || '/' || m.relative_path AS filepath
-        FROM media m
-        LEFT JOIN uploads u ON m.base_dir_id = u.id
-    """
-    
-    if condition:
-        query += f" WHERE {condition}"
-    
-    media = mpDB._command(query)
-    
+    # fetch counts for media table data_type=0
+    if counts:
+        query = """
+            SELECT 
+                m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
+                m.timestamp, m.station_id, m.camera_id, m.sequence_id,
+                m.external_id, m.comment,
+                COUNT(roi.id) AS roi_count,
+                u.base_dir || '/' || m.relative_path AS filepath
+            FROM media m
+            LEFT JOIN uploads u ON m.base_dir_id = u.id
+            LEFT JOIN roi ON roi.media_id = m.id
+            GROUP BY m.id
+        """
+        if row_cond is not None:
+            query += f" WHERE {row_cond}"
+
+        columns=["id","base_dir_id", "relative_path", "sha256", "ext", 
+                 "timestamp", 'station_id', "camera_id", 'sequence_id',
+                 "external_id", 'comment', 'roi_count', 'filepath']
+
+        media = mpDB._command(query)
+
+    # Query media with joined full paths no counts
+    else:
+        query = """
+            SELECT 
+                m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
+                m.timestamp, m.station_id, m.camera_id, m.sequence_id,
+                m.external_id, m.comment,
+                u.base_dir || '/' || m.relative_path AS filepath
+            FROM media m
+            LEFT JOIN uploads u ON m.base_dir_id = u.id
+        """
+        if row_cond is not None:
+            query += f" WHERE {row_cond}"
+
+        columns=["id", "base_dir_id", "relative_path", "sha256", "ext",
+                 "timestamp", 'station_id', "camera_id", 'sequence_id',
+                 "external_id", 'comment', 'filepath']
+
+        media = mpDB._command(query)
+
+    # convert to dataframe and return
     if media:
-        media = pd.DataFrame(media, columns=["id", "base_dir_id", "relative_path", "sha256", "ext",
-                                             "timestamp", 'station_id', "camera_id", 'sequence_id',
-                                             "external_id", 'comment', 'filepath'])
+        media = pd.DataFrame(media, columns=columns)
         media = media.replace({float('nan'): None})
         return media
     else:
