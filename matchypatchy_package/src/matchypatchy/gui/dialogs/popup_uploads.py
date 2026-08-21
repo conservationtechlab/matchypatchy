@@ -87,6 +87,9 @@ class UploadManagerPopup(QDialog):
         self.base_dirs = self.mpDB._command("""SELECT u.id, u.base_dir, u.created_at, COUNT(media.id) AS count
                                                  FROM uploads u LEFT JOIN media ON media.base_dir_id = u.id
                                                  GROUP BY media.base_dir_id;""")
+        if self.base_dirs is None:
+            self.base_dirs = []
+            
         self.list.setRowCount(len(self.base_dirs))
 
         for row in range(len(self.base_dirs)):
