@@ -42,10 +42,10 @@ def setup_database(key, filepath, db=None):
     cursor.execute('''CREATE TABLE IF NOT EXISTS survey (
                         id INTEGER PRIMARY KEY,
                         name TEXT UNIQUE NOT NULL,
-                        region_id INTEGER NOT NULL,
+                        region_id INTEGER,
                         year_start INTEGER,
                         year_end INTEGER,
-                        FOREIGN KEY (region_id) REFERENCES region (id) );''')
+                        FOREIGN KEY (region_id) REFERENCES region (id) ON DELETE SET NULL);''')
 
     # STATION
     cursor.execute('''CREATE TABLE IF NOT EXISTS station (
@@ -54,7 +54,14 @@ def setup_database(key, filepath, db=None):
                         lat REAL,
                         long REAL,
                         survey_id INTEGER NOT NULL,
-                        FOREIGN KEY (survey_id) REFERENCES survey (id) );''')
+                        FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);''')
+
+    # CAMERA
+    cursor.execute('''CREATE TABLE IF NOT EXISTS camera (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        station_id INTEGER NOT NULL,
+                        FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE);''')
 
     # UPLOADS
     cursor.execute('''CREATE TABLE IF NOT EXISTS uploads (
@@ -75,10 +82,10 @@ def setup_database(key, filepath, db=None):
                         sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
-                        FOREIGN KEY (base_dir_id) REFERENCES uploads (id),
-                        FOREIGN KEY (station_id) REFERENCES station (id),
-                        FOREIGN KEY (camera_id) REFERENCES camera (id),
-                        FOREIGN KEY (sequence_id) REFERENCES sequence (id));''')
+                        FOREIGN KEY (base_dir_id) REFERENCES uploads (id) ON DELETE CASCADE,
+                        FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
+                        FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
+                        FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);''')
 
     # ROI
     cursor.execute('''CREATE TABLE IF NOT EXISTS roi (
@@ -107,13 +114,6 @@ def setup_database(key, filepath, db=None):
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
-
-    # CAMERA
-    cursor.execute('''CREATE TABLE IF NOT EXISTS camera (
-                        id INTEGER PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        station_id INTEGER NOT NULL,
-                        FOREIGN KEY (station_id) REFERENCES station (id));''')
 
     # THUMBNAILS
     cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
