@@ -19,6 +19,7 @@ from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_m
 
 class ConfigPopup(QDialog):
     ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
+    DEVICE_OPTIONS = {"CPUExecutionProvider": "CPU", "CUDAExecutionProvider": "CUDA-enabled GPU"}
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -26,10 +27,9 @@ class ConfigPopup(QDialog):
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
         self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
-        self.ml_dir = self.cfg.ML_DIR
-        self.column1_width = 150
+        self.cfg = config.load_cfg()
+        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        self.label_width = 130
         self.edit_width = 150
 
         layout = QVBoxLayout()
@@ -37,7 +37,7 @@ class ConfigPopup(QDialog):
         directory_layout = QHBoxLayout()
         directory_label = QLabel("Project Directory:")
         directory_label.setToolTip("Path to the main project folder containing Database, Models, Thumbnails, etc.")
-        directory_label.setFixedWidth(self.column1_width)
+        directory_label.setFixedWidth(self.label_width)
         directory_layout.addWidget(directory_label)
         # Editable line for project directory
         self.home_dir = QLineEdit()
@@ -50,7 +50,6 @@ class ConfigPopup(QDialog):
         button_home_dir.setIcon(QIcon(self.ICON_PENCIL))
         button_home_dir.clicked.connect(self.set_home_dir)
         directory_layout.addWidget(button_home_dir)
-        
         # Add Button
         button_add = QPushButton("+")
         button_add.clicked.connect(self.new_project)
@@ -71,7 +70,7 @@ class ConfigPopup(QDialog):
         visualizer_layout = QHBoxLayout()
         visualizer_label = QLabel("Visualizer Model:")
         visualizer_label.setToolTip("Model used for visualizing and comparing individuals.")
-        visualizer_label.setFixedWidth(self.column1_width)
+        visualizer_label.setFixedWidth(self.label_width)
         visualizer_layout.addWidget(visualizer_label)
         self.visualizer_model = QLineEdit()
         reid_path = get_path(self.ml_dir, self.cfg.REID_KEY)
@@ -90,7 +89,7 @@ class ConfigPopup(QDialog):
         sequence_layout = QHBoxLayout()
         sequence_duration_label = QLabel("Sequence Length (s):")
         sequence_duration_label.setToolTip("Maximum duration of the sequence in seconds.")
-        sequence_duration_label.setFixedWidth(self.column1_width)
+        sequence_duration_label.setFixedWidth(self.label_width)
         sequence_layout.addWidget(sequence_duration_label)
         self.sequence_duration = QLineEdit()
         self.sequence_duration.setFixedWidth(self.edit_width)
@@ -99,6 +98,7 @@ class ConfigPopup(QDialog):
         sequence_layout.addWidget(self.sequence_duration, alignment=Qt.AlignmentFlag.AlignLeft)
         sequence_layout.addWidget(VerticalSeparator())
         sequence_n_label = QLabel("Images per Sequence:")
+        sequence_n_label.setFixedWidth(self.label_width)
         sequence_n_label.setToolTip("Max number of images in each sequence.")
         sequence_layout.addWidget(sequence_n_label)
         self.sequence_n = QLineEdit()
@@ -109,11 +109,54 @@ class ConfigPopup(QDialog):
         sequence_layout.addStretch()
         layout.addLayout(sequence_layout)
 
+        # VIDEOS
+        video_layout = QHBoxLayout()
+        smart_frames_label = QLabel("Smart Frames:")
+        smart_frames_label.setToolTip("If enabled, only frames with ROIs will be processed for video files.")
+        smart_frames_label.setFixedWidth(self.label_width)
+        video_layout.addWidget(smart_frames_label)
+        self.smart_frames = QComboBox()
+        self.smart_frames.setFixedWidth(self.edit_width)
+        self.smart_frames.addItem("Enabled")
+        self.smart_frames.addItem("Disabled")
+        self.smart_frames.setCurrentIndex(0 if self.cfg['SMART_FRAMES'] else 1)
+        self.smart_frames.setToolTip("Enable or disable smart frame processing for video files.")
+        self.smart_frames.currentTextChanged.connect(self.update_smart_frames)
+        video_layout.addWidget(self.smart_frames, alignment=Qt.AlignmentFlag.AlignLeft)
+        video_layout.addWidget(VerticalSeparator())
+        self.video_fps_label = QLabel("Video FPS:")
+        self.video_fps_label.setToolTip("Frames per second to analyze for quality.")
+        self.video_fps_label.setFixedWidth(self.label_width)
+        video_layout.addWidget(self.video_fps_label)
+        self.video_fps = QLineEdit()
+        self.video_fps.setFixedWidth(self.edit_width)
+        self.video_fps.setText(str(self.cfg['VIDEO_FPS']))
+        self.video_fps.textChanged.connect(self.update_video_fps)
+        video_layout.addWidget(self.video_fps, alignment=Qt.AlignmentFlag.AlignLeft)
+        video_layout.addStretch()
+        layout.addLayout(video_layout)
+
+        self.video_fps_label.setVisible(self.cfg['SMART_FRAMES'])
+        self.video_fps.setVisible(self.cfg['SMART_FRAMES'])
+
+        video_frames_layout = QHBoxLayout()
+        video_n_frames_label = QLabel("Video Frames:")
+        video_n_frames_label.setToolTip("Number of frames to extract from each video.")
+        video_n_frames_label.setFixedWidth(self.label_width)
+        video_frames_layout.addWidget(video_n_frames_label)
+        self.n_frames = QLineEdit()
+        self.n_frames.setFixedWidth(self.edit_width)
+        self.n_frames.setText(str(self.cfg['N_FRAMES']))
+        self.n_frames.textChanged.connect(self.update_n_frames)
+        video_frames_layout.addWidget(self.n_frames, alignment=Qt.AlignmentFlag.AlignLeft)
+        video_frames_layout.addStretch()
+        layout.addLayout(video_frames_layout)
+
         # NUM MATCHES
         nummatches_layout = QHBoxLayout()
         nummatches_label = QLabel("Max # of Matches:")
         nummatches_label.setToolTip("Number of nearest neighbors to consider.")
-        nummatches_label.setFixedWidth(self.column1_width)
+        nummatches_label.setFixedWidth(self.label_width)
         nummatches_layout.addWidget(nummatches_label)
         self.nummatches = QLineEdit()
         self.nummatches.setFixedWidth(self.edit_width)
@@ -125,7 +168,7 @@ class ConfigPopup(QDialog):
         # CUDA -----------------------------------------------------------------
         cuda_layout = QHBoxLayout()
         cuda_label = QLabel("Hardware Device:")
-        cuda_label.setFixedWidth(self.column1_width)
+        cuda_label.setFixedWidth(self.label_width)
         cuda_layout.addWidget(cuda_label)
         providers = animl.get_onnx_device(quiet=True)
         self.device = QComboBox()
@@ -133,7 +176,8 @@ class ConfigPopup(QDialog):
         self.device.addItem("CPU")
         if "CUDAExecutionProvider" in providers:
             self.device.addItem("CUDA-enabled GPU")
-            self.device.setCurrentIndex(1)
+        current_device = self.cfg.get('DEVICE', 'CPUExecutionProvider')
+        self.device.setCurrentText(self.DEVICE_OPTIONS.get(current_device, "CPU"))
         self.device.setToolTip("Select the hardware device for running models.")
         self.device.currentTextChanged.connect(self.change_device)
         cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -143,7 +187,7 @@ class ConfigPopup(QDialog):
         mpdbkey_layout = QHBoxLayout()
         mpdbkey_label = QLabel("Database Key:")
         mpdbkey_label.setToolTip("Unique identifier for the current database.")
-        mpdbkey_label.setFixedWidth(self.column1_width)
+        mpdbkey_label.setFixedWidth(self.label_width)
         mpdbkey_layout.addWidget(mpdbkey_label)
         mpdbkey = self.mpDB.validate()
         self.mpdbkey_valid = QLabel(f"{mpdbkey}")
@@ -158,7 +202,7 @@ class ConfigPopup(QDialog):
 
         command_layout = QHBoxLayout()
         self.advanced_command = QLabel("Database Command:")
-        self.advanced_command.setFixedWidth(self.column1_width)
+        self.advanced_command.setFixedWidth(self.label_width)
         self.advanced_command.hide()
         command_layout.addWidget(self.advanced_command)
         self.command_line = QLineEdit()
@@ -227,7 +271,7 @@ class ConfigPopup(QDialog):
     def new_project(self):
         """Create new project directory"""
         parent_dir = QFileDialog.getExistingDirectory(self, "Select new Project location",
-                                                       os.path.expanduser('~'),)
+                                                      os.path.expanduser('~'),)
         if parent_dir:
             self.parent.new_project(parent_dir)
             # Update local references to the new project's database and config
@@ -246,8 +290,10 @@ class ConfigPopup(QDialog):
             if is_valid_reid_model(Path(new_model[0]).stem):
                 # Update config
                 self.visualizer_model.setText(new_model[0])
-                self.cfg.update(
-                    {'REID_KEY': str(Path(new_model[0]).stem)})
+                self.cfg['REID_KEY'] = str(Path(new_model[0]).stem)
+                # save changes to yml
+                self.logger.info(f"Re-ID model updated to {self.cfg['REID_KEY']}")
+                config.update(self.cfg)
             else:
                 dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
                 dialog.exec()
@@ -258,7 +304,9 @@ class ConfigPopup(QDialog):
         try:
             nummatches = int(self.nummatches.text())
             if nummatches > 0:
-                self.cfg.update({'KNN': nummatches})
+                self.cfg['KNN'] = nummatches
+                self.logger.info(f"Max number of matches updated to {nummatches}")
+                config.update(self.cfg)
         except ValueError:
             pass
 
@@ -268,8 +316,37 @@ class ConfigPopup(QDialog):
             duration = int(self.sequence_duration.text())
             n = int(self.sequence_n.text())
             if duration > 0:
-                self.cfg.update({'SEQUENCE_DURATION': duration,
-                                 'SEQUENCE_N': n})
+                self.cfg['SEQUENCE_DURATION'] = duration
+                self.cfg['SEQUENCE_N'] = n
+                self.logger.info(f"Sequence settings updated: duration={duration}, n={n}")
+                config.update(self.cfg)
+        except ValueError:
+            pass
+
+    def update_smart_frames(self):
+        """Update smart frames setting"""
+        self.cfg['SMART_FRAMES'] = True if self.smart_frames.currentText() == "Enabled" else False
+        self.video_fps_label.setVisible(self.cfg['SMART_FRAMES'])
+        self.video_fps.setVisible(self.cfg['SMART_FRAMES'])
+        config.update(self.cfg)
+
+    def update_video_fps(self):
+        """Update video fps setting"""
+        try:
+            fps = int(self.video_fps.text())
+            if fps > 0:
+                self.cfg['VIDEO_FPS'] = fps
+                config.update(self.cfg)
+        except ValueError:
+            pass
+
+    def update_n_frames(self):
+        """Update number of frames setting"""
+        try:
+            n_frames = int(self.n_frames.text())
+            if n_frames > 0:
+                self.cfg['N_FRAMES'] = n_frames
+                config.update(self.cfg)
         except ValueError:
             pass
 
@@ -280,6 +357,9 @@ class ConfigPopup(QDialog):
         if selected_device == "CPU":
             self.cfg.update({'DEVICE': "CPUExecutionProvider"})
         elif selected_device == "CUDA-enabled GPU":
+            self.cfg['DEVICE'] = "CUDAExecutionProvider"
+        self.logger.info(f"Device changed to {self.cfg['DEVICE']}")
+        config.update(self.cfg)
             self.cfg.update({'DEVICE': "CUDAExecutionProvider"})
 
     def edit_uploads(self):

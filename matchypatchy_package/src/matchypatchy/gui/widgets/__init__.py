@@ -8,6 +8,7 @@ from matchypatchy.gui.widgets.gui_assets import (ClickableSlider,
                                                  ComboBoxSeparator,
                                                  HorizontalSeparator,
                                                  StandardButton,
+                                                 TextEditWithSignal,
                                                  ThreePointSlider,
                                                  VerticalSeparator,)
 from matchypatchy.gui.widgets.widget_filterbar import (FilterBar, FilterBox,)
@@ -18,7 +19,7 @@ from matchypatchy.gui.widgets.widget_media import (ImageWidget, MediaWidget,
 
 __all__ = ['ClickableSlider', 'ComboBoxDelegate', 'ComboBoxSeparator',
            'FilterBar', 'FilterBox', 'HorizontalSeparator', 'ImageAdjustBar',
-           'ImageWidget', 'MediaWidget', 'StandardButton', 'ThreePointSlider',
-           'VerticalSeparator', 'VideoPlayerBar', 'VideoViewer', 'VideoWidget',
-           'gui_assets', 'widget_filterbar', 'widget_image_adjustment',
-           'widget_media']
+           'ImageWidget', 'MediaWidget', 'StandardButton',
+           'TextEditWithSignal', 'ThreePointSlider', 'VerticalSeparator',
+           'VideoPlayerBar', 'VideoViewer', 'VideoWidget', 'gui_assets',
+           'widget_filterbar', 'widget_image_adjustment', 'widget_media']

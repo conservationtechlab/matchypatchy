@@ -4,9 +4,20 @@ Functions for Manipulating and Processing ROIs
 import hashlib
 import pandas as pd
 from pathlib import Path
+from dataclasses import dataclass
 
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
+
+
+@dataclass
+class EditObject:
+    """Class to represent an edit made to a media/ROI"""
+    rid: int
+    mid: int
+    reference: str
+    previous_value: any
+    new_value: any
 
 
 def get_sha256(path: str | Path,
@@ -14,6 +25,8 @@ def get_sha256(path: str | Path,
     """
     Calculate the SHA256 hash of a file in chunks and return the hexadecimal to avoid adding duplicate files
     """
+    if not Path(path).exists():
+        return None
     h = hashlib.sha256()
     with Path(path).open("rb") as f:
         while chunk := f.read(chunk_size):
@@ -21,10 +34,11 @@ def get_sha256(path: str | Path,
     return h.hexdigest()
 
 
-def fetch_media(mpDB, ids=None, counts=False):
+def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     Fetches all media info with full paths, converts to dataframe
     """
+     # select ids
     if ids:
         ids_str = ', '.join(map(str, ids))
         row_cond=f"WHERE m.id IN ({ids_str})"
@@ -51,7 +65,7 @@ def fetch_media(mpDB, ids=None, counts=False):
                  "timestamp", 'station_id', "camera_id", 'sequence_id',
                  "external_id", 'comment', 'roi_count', 'filepath']
 
-        media = mpDB._command(query)
+        media = mpDB._command(query, quiet=quiet)
 
     # Query media with joined full paths no counts
     else:
@@ -70,7 +84,7 @@ def fetch_media(mpDB, ids=None, counts=False):
                  "timestamp", 'station_id', "camera_id", 'sequence_id',
                  "external_id", 'comment', 'filepath']
 
-        media = mpDB._command(query)
+        media = mpDB._command(query, quiet=quiet)
 
     # convert to dataframe and return
     if media:
@@ -141,42 +155,11 @@ def fetch_individual(mpDB):
         return pd.DataFrame(columns=["id", "name", "sex", "age"]).set_index("id")
 
 
-def export_data(mpDB):
-    # TODO: update 
-    """
-    Fetch Info for Media Table
-    columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-               'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-               'base_dir', 'relative_path', 'sha256', 'ext', 'timestamp', 'station_id', 
-               'camera_id', 'sequence_id', 'external_id',
-               'comment', 'name', 'sex', 'age',
-               'station.id', 'station.name', 'lat', 'long', 'station.survey_id', 'survey.name', 'region.name']
-    """
-    media, column_names = mpDB.all_media()
-    rois = pd.DataFrame(media, columns=column_names)
-    rois = rois.replace({float('nan'): None})
-    stations, column_names = mpDB.stations()
-    stations = pd.DataFrame(stations, columns=column_names)
-    stations = stations.replace({float('nan'): None})
-    if not rois.empty:
-        export_data = pd.merge(rois, stations, left_on="station_id", right_on="station.id")
-        return export_data
-    else:
-        return None
-
-
 def get_roi_bbox(roi):
     """Return the bbox coordinates for a given roi row"""
     if {'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'}.issubset(roi.columns) and \
         roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']].notnull().all(axis=None):
         return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
-    return None
-
-
-def get_roi_frame(roi):
-    """Return the frame for a given roi row"""
-    if {'frame'}.issubset(roi.columns):
-        return roi['frame'].values[0]
     return None
 
 

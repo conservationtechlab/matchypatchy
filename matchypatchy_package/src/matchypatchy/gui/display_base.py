@@ -25,7 +25,6 @@ from matchypatchy.threads.sequence_thread import SequenceThread
 from matchypatchy.threads.animl_thread import AnimlThread
 from matchypatchy.threads.reid_thread import ReIDThread
 
-from matchypatchy.database.media import export_data
 from matchypatchy import config
 
 
@@ -320,7 +319,7 @@ class DisplayBase(QWidget):
     # STEP 5: Export Button
     def export(self):
         """Export database to CSV"""
-        data = export_data(self.mpDB)
+        data = self.mpDB.export_data()
         if data is not None:
             file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
             if file_path:
@@ -329,7 +328,7 @@ class DisplayBase(QWidget):
                     file_path += ".csv"
 
                 with open(file_path, 'w') as file:
-                    data.to_csv(file)
+                    data.to_csv(file, index=False)
                 self.logger.info(f"Data exported to: {file_path}")
         else:
             dialog = AlertPopup(self, prompt="No data to export.")

@@ -4,7 +4,7 @@ GUI Window for viewing images
 import pandas as pd
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QComboBox, QDialog)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.database.media import IMAGE_EXT, fetch_roi
 from matchypatchy.gui.media_table import MediaTable
@@ -16,6 +16,7 @@ from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
 class DisplayMedia(QWidget):
     SAVE_STYLE = """ QPushButton { background-color: #2a3e5e; color: white; }"""
+    edit_stack_signal = pyqtSignal(list)  # Signal to send edit stack to main GUI
 
     def __init__(self, parent, data_type=1):
         super().__init__()
@@ -86,26 +87,25 @@ class DisplayMedia(QWidget):
         # FILTERS --------------------------------------------------------------
         second_layer = QHBoxLayout()
         second_layer.addSpacing(5)
-
         self.filterbar = FilterBar(self, 180)
         second_layer.addWidget(self.filterbar, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
         self.filters = self.filterbar.get_filters()  # get initial filters
-
         button_filter = QPushButton("Apply Filters")
         button_filter.clicked.connect(self.filter_table)
-
         button_clear_filter = QPushButton("Clear Filters")
         button_clear_filter.clicked.connect(self.clear_filters)
-        
         second_layer.addWidget(button_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         second_layer.addWidget(button_clear_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
         second_layer.addStretch()
         layout.addLayout(second_layer)
 
         # display rois or media
         self.media_table = MediaTable(self)
+        self.edit_stack_signal.connect(self.media_table.add_edit_stack)
+        # connect signals from media table to handlers in this class
+        self.media_table.update_signal.connect(self.handle_table_change)
+        self.media_table.loaded_data.connect(self.handle_loaded_data)
+        self.media_table.checkbox_signal.connect(self.check_selected_rows)
         layout.addWidget(self.media_table, stretch=1)
 
         # Count Label at Bottom
@@ -180,7 +180,7 @@ class DisplayMedia(QWidget):
         Run after any setting is changed and filter button is pressed
         """
         self.filters = self.filterbar.get_filters()
-        self.valid_stations = self.filterbar.get_valid_stations() 
+        self.valid_stations = self.filterbar.get_valid_stations()
         self.toggle_filterbar_datatype()
         self.media_table.filter()
         self.update_count_label()
@@ -198,6 +198,7 @@ class DisplayMedia(QWidget):
         self.refresh_filters()
         self.media_table.filter()
         self.update_count_label()
+
     # =========================================================================
     # MEDIA TABLE HANDLERS
     # =========================================================================
@@ -253,7 +254,6 @@ class DisplayMedia(QWidget):
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
                 return
-            
         # change type to selected
         self.data_type = self.show_type.currentIndex()
         # reload table
@@ -306,52 +306,47 @@ class DisplayMedia(QWidget):
 
     def edit_row(self, row):
         """Edit a single row"""
-        # EDIT ROI
-        ext = self.media_table.data_filtered.at[row, "ext"]
-        if self.data_type == 1:
-            if ext in IMAGE_EXT:
-                # only show single roi
-                data = self.media_table.data_filtered.iloc[[row]]
-                current_image_index = 0
-            else:
-                # TODO Only show multiple frames if selected
-                # display frames as well as video
-                mid = int(self.media_table.data_filtered.at[row, "media_id"])
-                data = self.media_table.data_filtered[self.media_table.data_filtered['media_id'] == mid]
-                current_image_index = data.index.get_loc(row) + 1  # account for video row
-                video_row = data.iloc[[0]].copy()
-                for col in video_row.columns:
-                    # clear columns so row registers as video
-                    if col in ['frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']:
-                        video_row.at[video_row.index[0], col] = None
-                data = pd.concat([video_row, data], ignore_index=True)
-        else:
-            # full image mode/video only mode
-            data = self.media_table.data_filtered.iloc[[row]]
-            current_image_index = 0
+        
+        data = self.media_table.data_filtered.iloc[[row]].reset_index(drop=True)
+        current_image_index = 0
 
+        # EDIT ROI
+        if self.data_type == 1:
+            ext = self.media_table.data_filtered.at[row, "ext"]
+            data = self.media_table.data_filtered.iloc[[row]]
+            # display the video for frame rois for context
+            if ext not in IMAGE_EXT:
+                mid = int(self.media_table.data_filtered.at[row, "media_id"])
+                video = self.media_table.data_filtered[self.media_table.data_filtered['media_id'] == mid]
+                video_row = video.iloc[[0]].copy().reset_index(drop=True)
+                video_row['media_id'] = mid
+                # clear out roi columns for video row so mediawidget behaves correctly
+                video_row[['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 
+                           'viewpoint', 'individual_id', 'age', 'sex']] = pd.NA
+                data = pd.concat([data, video_row], ignore_index=True)  # add video row
+                
+        # Launch Media Edit Popup
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
+            self.edit_stack_signal.emit(edit_stack)  # send to media table
+            self.check_undo_button()
             del dialog
-
-            if edit_stack:
-                edit_stack = self.media_table.transpose_edit_stack(edit_stack)
-                self.check_undo_button()
-
-                # if changes made, reload table
-                self.load_table()
+        # reload data and update buttons
+        self.load_table()
+        self.update_buttons()
+        self.update_count_label()
 
     def edit_row_multiple(self):
         """Edit multiple selected rows"""
         selected_rows = self.media_table.selectedRows()
-        data = self.media_table.data_filtered.iloc[selected_rows]
+        data = self.media_table.data_filtered.iloc[selected_rows].reset_index(drop=True)
         current_image_index = 0
-
+        # Launch Media Edit Popup
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
-            edit_stack = self.media_table.transpose_edit_stack(edit_stack)
+            self.edit_stack_signal.emit(edit_stack)  # send to media table
             self.check_undo_button()
             del dialog
         # reload data and update buttons
@@ -410,7 +405,6 @@ class DisplayMedia(QWidget):
                                 self.mpDB.delete_emb(id=roi)
                         # cascade delete will handle associated roi_thumbnails and roi entries
                         self.mpDB.delete('media', f'id={id}')
-                        
                     else:
                         id = int(self.media_table.data_filtered.at[row, "id"])
                         self.mpDB.delete_emb(id=id)

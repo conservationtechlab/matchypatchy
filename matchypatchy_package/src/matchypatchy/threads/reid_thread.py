@@ -26,6 +26,7 @@ class ReIDThread(QThread):
         self.ml_dir = ML_DIR
         self.reid_filepath = get_path(self.ml_dir, REID_KEY)
         self.viewpoint_filepath = get_path(self.ml_dir, VIEWPOINT_KEY)
+        self.device = config.load_cfg('DEVICE')
 
     def run(self):
         """Process viewpoint and embeddings for ROIs"""
@@ -72,7 +73,7 @@ class ReIDThread(QThread):
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
 
-            model, classes = animl.load_classifier(self.viewpoint_filepath)
+            model, classes = animl.load_classifier(self.viewpoint_filepath, device=self.device)
             dataloader = animl.manifest_dataloader(filtered_rois, resize_width=480, resize_height=480, crop=True)
 
             for i, batch in enumerate(dataloader):
@@ -98,7 +99,7 @@ class ReIDThread(QThread):
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
-            model = animl.load_miew(self.reid_filepath)
+            model = animl.load_miew(self.reid_filepath, device=self.device)
 
             for i in range(len(filtered_rois)):
                 if not self.isInterruptionRequested():
@@ -115,6 +116,7 @@ class ReIDThread(QThread):
 
 
 """
+# NOTE: Currently disabled until torch is returned as a dependency
 class PairXThread(QThread):
     explained_img = pyqtSignal(list)  # Signal to update the alert prompt
     done = pyqtSignal()
@@ -124,6 +126,7 @@ class PairXThread(QThread):
         self.query = query
         self.match = match
         self.model = model
+        self.device = config.load_cfg('DEVICE')
         self.img_transforms = transforms.Compose([transforms.Resize((440, 440)),
                                                   transforms.ToTensor(),
                                                   transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -135,11 +138,9 @@ class PairXThread(QThread):
         self.done.emit()
 
     def explain(self):
-        device = animl.get_device()
-
-        img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(device, self.query, self.match,
+        img_0, img_1, img_np_0, img_np_1 = xai_dataset.get_img_pair_from_paths(self.device, self.query, self.match,
                                                                                (440,440), self.img_transforms)
-        explained_imgs = explain(device, img_0, img_1,
+        explained_imgs = explain(self.device, img_0, img_1,
                                  img_np_0, img_np_1,
                                  self.model, ["backbone.blocks.3"],
                                  k_lines=20, k_colors=10)
