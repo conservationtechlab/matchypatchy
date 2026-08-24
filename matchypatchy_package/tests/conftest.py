@@ -2,7 +2,7 @@
 Pytest fixtures for MatchyPatchy database tests.
 
 PyQt6 and cv2 are hard dependencies pulled in via matchypatchy's top-level
-__init__.py but are not needed for database-layer tests.  We stub out those
+__init__.py but are not needed for database-layer tests. We stub out those
 modules here at collection time (module level) so that the database layer can
 be imported without a display server or OpenCV installation.
 """
@@ -15,9 +15,24 @@ from unittest.mock import MagicMock
 import pytest
 
 
+class _VersionMock(int):
+    """A subclass of int that can be compared with other integers."""
+    def __new__(cls, value=0x060900):
+        return super().__new__(cls, value)
+
+
 class _MockModule(types.ModuleType):
     """A stub module whose attribute access always returns a fresh MagicMock."""
     def __getattr__(self, name: str):
+        # Return version integers for known version attributes so they can be compared
+        if name in ('PYQT_VERSION', 'QT_VERSION', 'PYQT_VERSION_STR', 'QT_VERSION_STR'):
+            return _VersionMock(0x060900)  # PyQt6 6.9.0
+        # For QtCore specifically, return a module-like object with PYQT_VERSION
+        if name == 'QtCore':
+            mock = MagicMock()
+            mock.PYQT_VERSION = _VersionMock(0x060900)
+            mock.QT_VERSION = _VersionMock(0x060900)
+            return mock
         return MagicMock()
 
 
@@ -41,7 +56,9 @@ def _stub_gui_dependencies():
             sys.modules[name] = _MockModule(name)
 
 
+# Stub BEFORE pytest-qt plugin initializes (which happens during collection)
 _stub_gui_dependencies()
+
 
 from matchypatchy.database.mpdb import MatchyPatchyDB  # noqa: E402
 
