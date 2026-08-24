@@ -21,19 +21,19 @@ def get_sha256(path: str | Path,
     return h.hexdigest()
 
 
-def fetch_media(mpDB, ids=None):
+def fetch_media(mpDB, ids=None, counts=False):
     """
     Fetches all media info with full paths, converts to dataframe
     """
     if ids:
         ids_str = ', '.join(map(str, ids))
-        row_cond=f"m.id IN ({ids_str})"
+        row_cond=f"WHERE m.id IN ({ids_str})"
     else:
         row_cond=None
     
     # fetch counts for media table data_type=0
     if counts:
-        query = """
+        query = f"""
             SELECT 
                 m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
@@ -43,10 +43,9 @@ def fetch_media(mpDB, ids=None):
             FROM media m
             LEFT JOIN uploads u ON m.base_dir_id = u.id
             LEFT JOIN roi ON roi.media_id = m.id
+            {row_cond if row_cond else ''}
             GROUP BY m.id
         """
-        if row_cond is not None:
-            query += f" WHERE {row_cond}"
 
         columns=["id","base_dir_id", "relative_path", "sha256", "ext", 
                  "timestamp", 'station_id', "camera_id", 'sequence_id',
@@ -56,7 +55,7 @@ def fetch_media(mpDB, ids=None):
 
     # Query media with joined full paths no counts
     else:
-        query = """
+        query = f"""
             SELECT 
                 m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
@@ -64,9 +63,8 @@ def fetch_media(mpDB, ids=None):
                 u.base_dir || '/' || m.relative_path AS filepath
             FROM media m
             LEFT JOIN uploads u ON m.base_dir_id = u.id
+            {row_cond if row_cond else ''}
         """
-        if row_cond is not None:
-            query += f" WHERE {row_cond}"
 
         columns=["id", "base_dir_id", "relative_path", "sha256", "ext",
                  "timestamp", 'station_id', "camera_id", 'sequence_id',
