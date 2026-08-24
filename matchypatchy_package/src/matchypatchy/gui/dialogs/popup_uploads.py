@@ -225,8 +225,7 @@ class UploadManagerPopup(QDialog):
             missing = self.errors[u]
             # Only update if there are no errors
             if len(missing) == 0:  
-                self.mpDB._command("""UPDATE uploads SET base_dir = ? WHERE id = ?""",
-                                    (update[1], update[0]))
+                self.mpDB.update_base_dir(update[0], update[1])
             # WARN USER: Skipping update due to missing files
             else:
                 self.logger.warning(f"Skipping update for {update} due to missing files: {missing}")

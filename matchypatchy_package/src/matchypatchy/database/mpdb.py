@@ -606,6 +606,55 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed get_media_with_filepath fetch: {error}")
             return None, None
 
+    def all_media(self, row_cond: Optional[str] = None):
+        """Return joined roi and media info for Media Table"""
+        try:
+            cursor = self.db.cursor()
+            columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
+                        roi.media_id, roi.individual_id, emb, base_dir_id, relative_path, ext, timestamp,
+                        station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age,
+                        uploads.base_dir || '/' || media.relative_path AS filepath"""
+            if row_cond:
+                command = f"""SELECT {columns} FROM roi 
+                            INNER JOIN media ON roi.media_id = media.id
+                            LEFT JOIN uploads ON media.base_dir_id = uploads.id
+                            LEFT JOIN individual ON roi.individual_id = individual.id
+                            WHERE {row_cond};"""
+            else:
+                command = f"""SELECT {columns} FROM roi 
+                            INNER JOIN media ON roi.media_id = media.id
+                            LEFT JOIN uploads ON media.base_dir_id = uploads.id
+                            LEFT JOIN individual ON roi.individual_id = individual.id;"""
+            cursor.execute(command)
+            column_names = [description[0] for description in cursor.description]
+            rows = cursor.fetchall()  # returns in tuple
+            return rows, column_names
+        except sqlite3.Error as error:
+            self.logger.error("Failed all_media fetch:", error)
+            return None, None
+        
+    def get_full_path(self, media_id):
+        """Get the full filepath for a given media id"""
+        cursor = self.db.cursor()
+        cursor.execute("""SELECT u.base_dir || '/' || m.relative_path
+                       FROM media m
+                       JOIN uploads u ON m.base_dir_id = u.id
+                       WHERE m.id = ?""", (media_id,))
+        return cursor.fetchone()[0]
+    
+    def update_base_dir(self, base_dir_id, new_base_dir):
+        """Update the base path for a given base_dir_id"""
+        try:
+            cursor = self.db.cursor()
+            command = f'UPDATE uploads SET base_dir=? WHERE id=?;'
+            cursor.execute(command, (new_base_dir, base_dir_id))
+            self.db.commit()
+            self.logger.info(f"Updated base path for id {base_dir_id} to {new_base_dir}")
+            return True
+        except sqlite3.Error as error:
+            self.logger.error(f"Failed to update base path for id {base_dir_id}: {error}")
+            return False
+
     def stations(self, row_cond=None):
         """Return joined station, survey, region info"""
         try:
