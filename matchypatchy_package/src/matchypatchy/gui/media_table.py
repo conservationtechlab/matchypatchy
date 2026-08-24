@@ -27,6 +27,10 @@ class MediaTable(QWidget):
         self.parent = parent
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
+        # threads
+        self.dataloader = None
+        self.table_loader_thread = None
+
         self.data = pd.DataFrame()
         self.data_filtered = pd.DataFrame()
         self.individual_list = pd.DataFrame()
@@ -78,19 +82,19 @@ class MediaTable(QWidget):
     # RUN ON ENTRY -------------------------------------------------------------
     def clear_and_load_contents(self, data_type):
         """Clear all contents of the media table"""
-        # clear old view
+        # clear old view and reformat
         self.data_type = data_type
         self.table.clearContents()
         self.table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
+        # run step 2
         self.format_table()
 
         # fetch data
         self.individual_list = fetch_individual(self.mpDB)
-        dataloader = FetchTableThread(self)
-        dataloader.done.connect(self.filter)
-        dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
-        dataloader.loaded_data.connect(self.loaded_data.emit)
-        dataloader.start()
+        self.dataloader = FetchTableThread(self)
+        self.dataloader.done.connect(self.filter)
+        self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
+        self.dataloader.start()
 
     # STEP 2 - CALLED BY load_data()
     def format_table(self):
@@ -180,6 +184,8 @@ class MediaTable(QWidget):
         if filter == 0: do not filter
         if filter is None: select None
         """
+        print("Filtering media with current filters:", self.parent.filters)
+        print("Original data size:", self.data.shape)
         # create new copy of full dataset
         self.data_filtered = self.data.copy()
 
@@ -235,6 +241,9 @@ class MediaTable(QWidget):
 
         self.data_filtered.reset_index(inplace=True)
 
+        # let display_media know about the new filtered data
+        self.loaded_data.emit()
+
         # refresh table contents
         self.refresh_table()
 
@@ -257,19 +266,19 @@ class MediaTable(QWidget):
             station_delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
             self.table.setItemDelegateForColumn(4, station_delegate)
 
-            table_loader_thread = LoadTableThread(self)
-            table_loader_thread.loaded_cell.connect(self.add_cell)
-            table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
-            table_loader_thread.done.connect(self.loaded_data.emit)
+            self.table_loader_thread = LoadTableThread(self)
+            self.table_loader_thread.loaded_cell.connect(self.add_cell)
+            self.table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
+            self.table_loader_thread.done.connect(self.loaded_data.emit)
 
             if popup:
                 loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
                 loading_bar.set_max(n_rows)
-                table_loader_thread.progress_update.connect(loading_bar.set_counter)
-                loading_bar.rejected.connect(table_loader_thread.requestInterruption)
+                self.table_loader_thread.progress_update.connect(loading_bar.set_counter)
+                loading_bar.rejected.connect(self.table_loader_thread.requestInterruption)
                 loading_bar.show()
 
-            table_loader_thread.start()
+            self.table_loader_thread.start()
 
     def sort(self, column):
         """
