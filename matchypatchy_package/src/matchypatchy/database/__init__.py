@@ -7,11 +7,11 @@ from matchypatchy.database import thumbnails
 from matchypatchy.database.location import (TZ_CONVERT_DICT, fetch_regions,
                                             fetch_station_names_from_id,
                                             fetch_stations, fetch_surveys,)
-from matchypatchy.database.media import (IMAGE_EXT, VIDEO_EXT,
-                                         export_data, fetch_individual,
-                                         fetch_media, fetch_roi,
-                                         fetch_roi_media, get_roi_bbox,
-                                         get_roi_frame, get_sequence,
+from matchypatchy.database.media import (COLUMNS, EditObject, IMAGE_EXT,
+                                         VIDEO_EXT,
+                                         fetch_individual, fetch_media,
+                                         fetch_roi, fetch_roi_media,
+                                         get_roi_bbox, get_sequence,
                                          get_sha256, individual_roi_dict,
                                          media_count, sequence_roi_dict,)
 from matchypatchy.database.mpdb import (MatchyPatchyDB,)
@@ -24,14 +24,14 @@ from matchypatchy.database.thumbnails import (THUMBNAIL_NOTFOUND,
                                               save_media_thumbnail,
                                               save_roi_thumbnail,)
 
-__all__ = ['IMAGE_EXT', 'MatchyPatchyDB', 'THUMBNAIL_NOTFOUND',
-           'THUMBNAIL_SIZE', 'TZ_CONVERT_DICT', 'VIDEO_EXT',
-           'check_missing_thumbnails', 'export_data', 'fetch_individual',
-           'fetch_media', 'fetch_media_thumbnails', 'fetch_regions',
-           'fetch_roi', 'fetch_roi_media', 'fetch_roi_thumbnails',
-           'fetch_station_names_from_id', 'fetch_stations', 'fetch_surveys',
-           'get_frame', 'get_roi_bbox', 'get_roi_frame', 'get_sequence',
-           'get_sha256', 'individual_roi_dict', 'location', 'media',
-           'media_count', 'mpdb', 'save_media_thumbnail', 'save_roi_thumbnail',
-           'sequence_roi_dict', 'setup', 'setup_chromadb', 'setup_database',
-           'thumbnails']
+__all__ = ['COLUMNS', 'EditObject', 'IMAGE_EXT', 'MatchyPatchyDB',
+           'THUMBNAIL_NOTFOUND', 'THUMBNAIL_SIZE', 'TZ_CONVERT_DICT',
+           'VIDEO_EXT', 'check_missing_thumbnails', 
+           'fetch_individual', 'fetch_media', 'fetch_media_thumbnails',
+           'fetch_regions', 'fetch_roi', 'fetch_roi_media',
+           'fetch_roi_thumbnails', 'fetch_station_names_from_id',
+           'fetch_stations', 'fetch_surveys', 'get_frame', 'get_roi_bbox',
+           'get_sequence', 'get_sha256', 'individual_roi_dict', 'location',
+           'media', 'media_count', 'mpdb', 'save_media_thumbnail',
+           'save_roi_thumbnail', 'sequence_roi_dict', 'setup',
+           'setup_chromadb', 'setup_database', 'thumbnails']

@@ -59,7 +59,7 @@ class FetchTableThread(QThread):
 
         # MEDIA
         elif self.data_type == 0:
-            self.data = fetch_media(self.mpDB)
+            self.data = fetch_media(self.mpDB, counts=True)
             print("Fetched Media, total rows:", len(self.data))
             # add missing thumbnails
             if missing_thumbnails:
@@ -119,15 +119,19 @@ class LoadTableThread(QThread):
             if not thumbnail_path:
                 thumbnail_path = str(asset_path(thumbnails.THUMBNAIL_NOTFOUND))
             qtw = QImage(thumbnail_path)
-
-        # filepath and Timestamp not editable
-        elif column == 'filepath' or column == 'timestamp':
-            qtw = QTableWidgetItem(roi[column])
+        # not editable
+        elif column in ['filepath', 'timestamp', 'sequence_id', 'roi_count']:
+            # NOTE: language settings may cause filepath to be displayed differently, e.g. "C:\Users\..." vs "C:/Users/..."
+            text = str(roi[column])
+           # if column == 'filepath':
+           #     text = text.replace("\\", "/")   # display-only, do not write back to DB
+            qtw = QTableWidgetItem(text)
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
         # Station
         elif column == 'station':
             qtw = QTableWidgetItem(self.valid_stations[roi["station_id"]])
         # Camera
+        # TODO: itemdelegate 
         elif column == 'camera_id':
             if roi["camera_id"]:
                 qtw = QTableWidgetItem(self.valid_cameras[int(roi["camera_id"])])
@@ -136,16 +140,13 @@ class LoadTableThread(QThread):
         # Viewpoint
         elif column == 'viewpoint':
             vp_raw = roi["viewpoint"]
-
             if pd.isna(vp_raw) or vp_raw is None or str(vp_raw) == "None":
                 vp_key = "None"
             else:
                 vp_key = str(int(vp_raw))  # convert float 1.0 → int 1 → str "1"
-
             vp_value = self.VIEWPOINTS.get(vp_key, "None")
             qtw = QTableWidgetItem(vp_value)
-
-        # name not editable here
+        # Name - not editable here
         elif column == "individual_id":
             if roi['individual_id'] is not None:
                 name = self.individual_list.loc[roi['individual_id'], 'name']
@@ -153,21 +154,20 @@ class LoadTableThread(QThread):
             else:
                 qtw = QTableWidgetItem("Unknown")
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
-
+        # Sex and Age
         elif column == "sex" or column == 'age':
             if roi['individual_id'] is not None:
                 qtw = QTableWidgetItem(str(roi[column]))
             else:
                 qtw = QTableWidgetItem("Unknown")
-
         # Reviewed and Favorite Checkbox
         elif column == 'reviewed' or column == 'favorite':
             qtw = QTableWidgetItem()
             qtw.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
             qtw.setCheckState(self.set_checkstate(roi[column]))
+        # everything else 
         else:
             qtw = QTableWidgetItem(str(roi[column]))
-
         # return widget
         return qtw
 

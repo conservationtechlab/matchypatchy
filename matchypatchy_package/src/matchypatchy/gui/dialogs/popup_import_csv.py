@@ -7,169 +7,119 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
                              QComboBox, QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.threads.import_thread import CSVImportThread
+from matchypatchy.threads.import_thread import CSVImportThread, CSVMigrateThread
 from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
 
 
 class ImportCSVPopup(QDialog):
+
+    EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+                        'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
+                        'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
+                        'comment', 'name', 'sex', 'age',
+                        'station_id', 'station_name', 'lat', 'long', 'station_survey_id', 
+                        'survey_name', 'region_name', 'camera_name'}
+
     def __init__(self, parent, manifest):
         super().__init__(parent)
         self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.active_survey = parent.active_survey[1]
         self.data = pd.read_csv(manifest)
-        self.columns = ["None"] + list(self.data.columns)
-        self.survey_columns = [str(parent.active_survey[1])] + list(self.data.columns)
 
-        self.selected_filepath = self.columns[0]
-        self.selected_timestamp = self.columns[0]
-        self.selected_station = self.columns[0]
-        self.selected_survey = self.survey_columns[0]
-        self.selected_region = self.columns[0]
-        self.selected_sequence_id = self.columns[0]
-        self.selected_camera = self.columns[0]
-        self.selected_external_id = self.columns[0]
-        self.selected_viewpoint = self.columns[0]
-        self.selected_individual = self.columns[0]
-        self.selected_favorite = self.columns[0]
-        self.selected_comment = self.columns[0]
-
+        # setup layout
         self.setWindowTitle("Import from CSV")
         layout = QVBoxLayout()
-
-        # Create a label
-        self.label = QLabel("Select Columns to Import Data")
+         # Create a label
+        self.label = QLabel("")
         layout.addWidget(self.label)
         layout.addSpacing(5)
 
-        # Filepath
-        filepath_layout = QHBoxLayout()
-        filepath_layout.addWidget(QLabel("Filepath:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        filepath_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.filepath = QComboBox()
-        self.filepath.addItems(self.columns)
-        self.filepath.currentTextChanged.connect(self.select_filepath)
-        filepath_layout.addWidget(self.filepath)
-        layout.addLayout(filepath_layout)
-        layout.addSpacing(5)
-        # Timestamp
-        timestamp_layout = QHBoxLayout()
-        timestamp_layout.addWidget(QLabel("Timestamp:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        timestamp_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.timestamp = QComboBox()
-        self.timestamp.addItems(self.columns)
-        self.timestamp.currentTextChanged.connect(self.select_timestamp)
-        timestamp_layout.addWidget(self.timestamp)
-        layout.addLayout(timestamp_layout)
-        layout.addSpacing(5)
-        # Survey
-        survey_layout = QHBoxLayout()
-        survey_layout.addWidget(QLabel("Survey:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        survey_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.survey = ComboBoxSeparator()
-        self.survey.addItem(str(parent.active_survey[1]))
-        self.survey.add_separator()
-        self.survey.addItems(self.columns)
-        self.survey.currentTextChanged.connect(self.select_survey)
-        survey_layout.addWidget(self.survey)
-        layout.addLayout(survey_layout)
-        layout.addSpacing(5)
-        # Station
-        station_layout = QHBoxLayout()
-        station_layout.addWidget(QLabel("Station:"))
-        asterisk = QLabel("*")
-        asterisk.setStyleSheet("QLabel { color : red; }")
-        station_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-        self.station = QComboBox()
-        self.station.addItems(self.columns)
-        self.station.currentTextChanged.connect(self.select_station)
-        station_layout.addWidget(self.station)
-        layout.addLayout(station_layout)
-        layout.addSpacing(5)
-        # Region
-        region_layout = QHBoxLayout()
-        region_layout.addWidget(QLabel("Region:"))
-        self.region = QComboBox()
-        self.region.addItems(self.columns)
-        self.region.currentTextChanged.connect(self.select_region)
-        region_layout.addWidget(self.region)
-        layout.addLayout(region_layout)
-        layout.addSpacing(5)
-        # Camera
-        camera_layout = QHBoxLayout()
-        camera_layout.addWidget(QLabel("Camera:"))
-        self.camera = QComboBox()
-        self.camera.addItems(self.columns)
-        self.camera.currentTextChanged.connect(self.select_camera)
-        camera_layout.addWidget(self.camera)
-        layout.addLayout(camera_layout)
-        layout.addSpacing(5)
-        # Sequence
-        sequence_layout = QHBoxLayout()
-        sequence_layout.addWidget(QLabel("Sequence ID:"))
-        self.sequence_id = QComboBox()
-        self.sequence_id.addItems(self.columns)
-        self.sequence_id.currentTextChanged.connect(self.select_sequence)
-        sequence_layout.addWidget(self.sequence_id)
-        layout.addLayout(sequence_layout)
-        layout.addSpacing(5)
-        # External ID
-        external_layout = QHBoxLayout()
-        external_layout.addWidget(QLabel("External ID:"))
-        self.external_id = QComboBox()
-        self.external_id.addItems(self.columns)
-        self.external_id.currentTextChanged.connect(self.select_external)
-        external_layout.addWidget(self.external_id)
-        layout.addLayout(external_layout)
-        layout.addSpacing(5)
-        # Viewpoint
-        viewpoint_layout = QHBoxLayout()
-        viewpoint_layout.addWidget(QLabel("Viewpoint:"))
-        self.viewpoint = QComboBox()
-        self.viewpoint.addItems(self.columns)
-        self.viewpoint.currentTextChanged.connect(self.select_viewpoint)
-        viewpoint_layout.addWidget(self.viewpoint)
-        layout.addLayout(viewpoint_layout)
-        layout.addSpacing(5)
-        # Individual
-        individual_layout = QHBoxLayout()
-        individual_layout.addWidget(QLabel("Individual:"))
-        self.individual = QComboBox()
-        self.individual.addItems(self.columns)
-        self.individual.currentTextChanged.connect(self.select_individual)
-        individual_layout.addWidget(self.individual)
-        layout.addLayout(individual_layout)
-        layout.addSpacing(5)
-        # Favorite
-        favorite_layout = QHBoxLayout()
-        favorite_layout.addWidget(QLabel("Favorite:"))
-        self.favorite = QComboBox()
-        self.favorite.addItems(self.columns)
-        self.favorite.currentTextChanged.connect(self.select_favorite)
-        favorite_layout.addWidget(self.favorite)
-        layout.addLayout(favorite_layout)
-        layout.addSpacing(5)
-        # Comment
-        comment_layout = QHBoxLayout()
-        comment_layout.addWidget(QLabel("Comment:"))
-        self.comment = QComboBox()
-        self.comment.addItems(self.columns)
-        self.comment.currentTextChanged.connect(self.select_comment)
-        comment_layout.addWidget(self.comment)
-        layout.addLayout(comment_layout)
+        # exported mpdb, import directly
+        if set(self.data.columns) == self.EXPECTED_COLUMNS:
+            self.label.setStyleSheet("QLabel { font-size : 12pt; }")
+            self.label.setText("Found an exported MatchyPatchy Database. Do you want to migrate to this database?")
+            self.migrate = True
+
+        else:
+            self.label.setText("Select Columns to Import Data")
+            self.migrate = False
+            self.columns = ["None"] + list(self.data.columns)
+            self.survey_columns = [str(self.active_survey)] + list(self.data.columns)
+            self.selected_filepath = self.columns[0]
+            self.selected_timestamp = self.columns[0]
+            self.selected_survey = self.survey_columns[0]
+            self.selected_station = self.columns[0]
+            self.selected_region = self.columns[0]
+            self.selected_sequence_id = self.columns[0]
+            self.selected_camera = self.columns[0]
+            self.selected_external_id = self.columns[0]
+            self.selected_viewpoint = self.columns[0]
+            self.selected_individual = self.columns[0]
+            self.selected_favorite = self.columns[0]
+            self.selected_comment = self.columns[0]
+
+            # Survey
+            survey_layout = QHBoxLayout()
+            survey_layout.addWidget(QLabel("Survey:"))
+            asterisk = QLabel("*")
+            asterisk.setStyleSheet("QLabel { color : red; }")
+            survey_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
+            self.survey = ComboBoxSeparator()
+            self.survey.addItem(str(self.active_survey))
+            self.survey.add_separator()
+            self.survey.addItems(self.columns)
+            self.survey.currentTextChanged.connect(self.select_survey)
+            survey_layout.addWidget(self.survey)
+            layout.addLayout(survey_layout)
+            layout.addSpacing(5)
+
+            required_fields = [("Filepath", "filepath", self.select_region),
+                               ("Timestamp", "camera", self.select_camera),
+                               ("Station", "external_id", self.select_external),]
+
+            for label_text, attr_name, callback in required_fields:
+                field_layout = QHBoxLayout()
+                field_layout.addWidget(QLabel(f"{label_text}:"))
+                asterisk = QLabel("*")
+                asterisk.setStyleSheet("QLabel { color : red; }")
+                field_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
+                combo = QComboBox()
+                combo.addItems(self.columns)
+                combo.currentTextChanged.connect(callback)
+                field_layout.addWidget(combo)
+                layout.addLayout(field_layout)
+                layout.addSpacing(5)
+                setattr(self, attr_name, combo)
+
+            additional_fields = [
+                ("Region", "region", self.select_region),
+                ("Camera", "camera", self.select_camera),
+                ("Sequence ID", "sequence_id", self.select_sequence),
+                ("External ID", "external_id", self.select_external),
+                ("Viewpoint", "viewpoint", self.select_viewpoint),
+                ("Individual", "individual", self.select_individual),
+                ("Favorite", "favorite", self.select_individual), 
+                ("Comment", "comment", self.select_comment)
+            ]
+
+            for label_text, attr_name, callback in additional_fields:
+                field_layout = QHBoxLayout()
+                field_layout.addWidget(QLabel(f"{label_text}:"))
+                combo = QComboBox()
+                combo.addItems(self.columns)
+                combo.currentTextChanged.connect(callback)
+                field_layout.addWidget(combo)
+                layout.addLayout(field_layout)
+                layout.addSpacing(5)
+
+                setattr(self, attr_name, combo)
 
         # Ok/Cancel
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
-        layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
-        buttonBox.accepted.connect(self.import_manifest)
-        buttonBox.rejected.connect(self.reject)
-        self.okButton = buttonBox.button(buttonBox.StandardButton.Ok)
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.buttonBox.accepted.connect(self.import_manifest)
+        self.buttonBox.rejected.connect(self.reject)
+        self.okButton = self.buttonBox.button(self.buttonBox.StandardButton.Ok)
         self.okButton.setEnabled(False)
 
         # Progress Bar (hidden at start)
@@ -178,8 +128,8 @@ class ImportCSVPopup(QDialog):
         self.progress_bar.setTextVisible(False)
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
-
         self.setLayout(layout)
+        self.check_ok_button()
 
     # would this be better as a switch statement? probably
     def select_filepath(self):
@@ -261,6 +211,13 @@ class ImportCSVPopup(QDialog):
         except IndexError:
             return False
 
+    def select_favorite(self):
+        try:
+            self.selected_favorite = self.columns[self.favorite.currentIndex()]
+            return True
+        except IndexError:
+            return False
+
     def select_comment(self):
         try:
             self.selected_comment = self.columns[self.comment.currentIndex()]
@@ -274,13 +231,17 @@ class ImportCSVPopup(QDialog):
 
         Must include filepath, timestamp, station
         """
-        if self.survey.currentIndex() == 0:
-            self.select_survey()
-        if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
-           (self.selected_station != "None") and (self.selected_survey != "None"):
+        if self.migrate:
             self.okButton.setEnabled(True)
+
         else:
-            self.okButton.setEnabled(False)
+            if self.survey.currentIndex() == 0:
+                self.select_survey()
+            if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
+            (self.selected_station != "None") and (self.selected_survey != "None"):
+                self.okButton.setEnabled(True)
+            else:
+                self.okButton.setEnabled(False)
 
     def collate_selections(self):
         """Collate selected columns into a dictionary"""
@@ -294,6 +255,7 @@ class ImportCSVPopup(QDialog):
                 "external_id": self.selected_external_id,
                 "viewpoint": self.selected_viewpoint,
                 "individual": self.selected_individual,
+                "favorite": self.selected_favorite,
                 "comment": self.selected_comment}
 
     def import_manifest(self):
@@ -302,16 +264,41 @@ class ImportCSVPopup(QDialog):
         """
         # assert bbox in manifest.columns
         self.progress_bar.show()
-        selected_columns = self.collate_selections()
 
-        self.data.sort_values(by=[selected_columns['filepath']])
+        # migrate from exported mpdb
+        if self.migrate:
+            self.logger.info(f"Migrating {len(self.data.groupby("filepath"))} files and {self.data.shape[0]} ROIs to Database")
+            self.import_thread = CSVMigrateThread(self.mpDB, self.data, self.logger)
+            self.import_thread.progress_update.connect(self.progress_bar.setValue)
+            self.import_thread.error_update.connect(self.show_errors)  # Connect error signal
+            #self.import_thread.finished.connect(self.close)
+            self.import_thread.start()
+            return
 
-        unique_images = self.data.groupby(selected_columns["filepath"])
+        # import from manifest with user-selected columns
+        else:
+            selected_columns = self.collate_selections()
+            self.data.sort_values(by=[selected_columns['filepath']])
+            unique_images = self.data.groupby(selected_columns["filepath"])
+            print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
+            self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
+            self.import_thread = CSVImportThread(self.mpDB, unique_images, selected_columns, self.logger)
+            self.import_thread.progress_update.connect(self.progress_bar.setValue)
+            self.import_thread.finished.connect(self.close)
+            self.import_thread.start()
 
-        print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
-        self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
+    def show_errors(self, errors):
+        """
+        Show errors encountered during migration in the popup.
+        This method is connected to the error_update signal of the CSVMigrateThread.
+        """
+        if len(errors) > 0:
+            self.progress_bar.hide()
+            error_message = f"{len(errors)} file(s) could not be imported because they do not exist. View the log for details."
+            self.label.setText(error_message)
+        else:
+            self.label.setText("Import completed successfully.")
 
-        self.import_thread = CSVImportThread(self, unique_images, selected_columns)
-        self.import_thread.progress_update.connect(self.progress_bar.setValue)
-        self.import_thread.finished.connect(self.close)
-        self.import_thread.start()
+        # Disconnect the import_manifest slot and connect the close slot to the accepted signal
+        self.buttonBox.accepted.disconnect(self.import_manifest)
+        self.buttonBox.accepted.connect(self.close)

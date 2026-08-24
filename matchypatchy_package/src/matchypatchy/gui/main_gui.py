@@ -176,7 +176,7 @@ class MainWindow(QMainWindow):
         pass
 
     def export(self):
-        data = export_data(self.mpDB)
+        data = self.mpDB.export_data()
         if data is not None:
             file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
             if file_path:

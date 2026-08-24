@@ -123,19 +123,12 @@ class SurveyPopup(QDialog):
         """Delete selected survey"""
         selected_survey = self.list.currentRow()
         id, selected = self.survey_list_ordered[selected_survey]
-        media, n = media_count(self.mpDB, id)
+        _, n = media_count(self.mpDB, id)
         dialog = AlertPopup(self, f'Are you sure you want to delete {selected}? This will remove {n} images.')
-        if dialog.exec():
-            # delete survey
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # delete survey, should cascade to stations and media
             self.mpDB.delete("survey", f'id={id}')
-            # also delete associated media and roi
-            for m in media:
-                rois = self.mpDB.select("roi", columns="emb_id", row_cond=f'media_id={m[0]}')
-                for r in rois:
-                    if r[0] is not None:
-                        self.mpDB.delete_emb(r[0])
-                self.mpDB.delete("roi", f'media_id={m[0]}')
-                self.mpDB.delete("media", f'id={m[0]}')
+
         del dialog
         self.update()
 

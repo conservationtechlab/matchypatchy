@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QTableWidget, QVBoxLayout, QWidget, QLabel, QHeader
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.database.media import fetch_individual
+from matchypatchy.database.media import fetch_individual, EditObject
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.table_thread import FetchTableThread, LoadTableThread
 
@@ -17,6 +17,7 @@ from matchypatchy.gui.widgets.gui_assets import ComboBoxDelegate
 
 class MediaTable(QWidget):
     update_signal = pyqtSignal(list)
+    checkbox_signal = pyqtSignal(list)
     loaded_data = pyqtSignal()
 
     def __init__(self, parent):
@@ -33,6 +34,7 @@ class MediaTable(QWidget):
         self.thumbnail_size = 150
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
 
+        # NOTE: do we want to refresh edit stack on re-entry?
         self.edit_stack = []
 
         # Set up layout
@@ -62,9 +64,6 @@ class MediaTable(QWidget):
         layout.addWidget(self.table)
         self.setLayout(layout)
 
-        # Connect table.cellchanged to Media View
-        self.update_signal.connect(parent.handle_table_change)
-        self.loaded_data.connect(parent.handle_loaded_data)
 
     def update_project(self, cfg, mpDB):
         """Update database object"""
@@ -78,6 +77,25 @@ class MediaTable(QWidget):
         self.data_type = data_type
         self.table.clearContents()
         self.table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
+        self.format_table()
+
+        # fetch data
+        self.individual_list = fetch_individual(self.mpDB)
+        self.dataloader = FetchTableThread(self)
+        self.dataloader.done.connect(self.filter)
+        self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
+        self.dataloader.loaded_data.connect(self.loaded_data.emit)
+        self.dataloader.start()
+
+    # STEP 2 - CALLED BY load_data()
+    def format_table(self):
+        """
+        Format table for media or roi display, add delegates for combos, and load thumbnails
+        """
+        VIEWPOINT_COLUMN = 8
+        SEX_COLUMN = 10
+        AGE_COLUMN = 11
+
         if self.data_type == 1:
             # corresponding mpDB column names
             self.columns = {0: "select",
@@ -98,12 +116,9 @@ class MediaTable(QWidget):
 
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
-                                                    "Station", "Camera", "Sequence ID", "External ID",
-                                                    "Viewpoint", "Individual", "Sex", "Age",
-                                                    "Reviewed", "Favorite", "Comment"])
-            VIEWPOINT_COLUMN = 8
-            SEX_COLUMN = 10
-            AGE_COLUMN = 11
+                                                  "Station", "Camera", "Sequence ID", "External ID",
+                                                  "Viewpoint", "Individual", "Sex", "Age",
+                                                  "Reviewed", "Favorite", "Comment"])
             # VIEWPOINT COMBOS
             combo_items = list(self.VIEWPOINTS.values())[1:]
             self.table.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
@@ -125,11 +140,18 @@ class MediaTable(QWidget):
                             5: "camera_id",
                             6: "sequence_id",
                             7: "external_id",
-                            8: "comment"}
+                            8: "comment",
+                            9: "roi_count"}
             self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
             self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
-                                                    "Station", "Camera", "Sequence ID",
-                                                    "External ID", "Comment"])
+                                                  "Station", "Camera", "Sequence ID",
+                                                  "External ID", "Comment", "# of Rois"])
+
+             # clear item delegates (really only necessary for viewpoint)
+            self.table.setItemDelegateForColumn(VIEWPOINT_COLUMN, None)
+            self.table.setItemDelegateForColumn(SEX_COLUMN, None)
+            self.table.setItemDelegateForColumn(AGE_COLUMN, None)
+            
         # adjust widths
         self.table.resizeColumnsToContents()
         for col in range(self.table.columnCount()):
@@ -141,29 +163,7 @@ class MediaTable(QWidget):
                 self.table.setColumnWidth(col, max(self.table.columnWidth(col), 80))
 
         # increase checkbox size
-        self.table.setStyleSheet(""" QTableWidget::indicator {
-                                    width: 25px;
-                                    height: 25px;}
-                                    """)
-        
-    # =========================================================================
-    # DATA LOADING AND FILTERING
-    # =========================================================================
-    def load_data(self, data_type):
-        """
-        Fetch table, format, and filter data
-        data_type: 0 = media, 1 = rois
-        Returns True if data loaded, False if no media
-        """
-        # fetch data
-        self.data_type = data_type
-        self.individual_list = fetch_individual(self.mpDB)
-        self.dataloader = FetchTableThread(self)
-        self.dataloader.done.connect(self.filter)
-        self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
-        self.dataloader.loaded_data.connect(self.loaded_data.emit)
-        self.dataloader.start()
-
+        self.table.setStyleSheet("""QTableWidget::indicator { width: 25px; height: 25px;}""")
 
     # Step 3 - Filter and Display ------------------------------------------------------
     def filter(self):
@@ -316,27 +316,77 @@ class MediaTable(QWidget):
         """
         Applies all previous edits to the current data_filter if the row is present
         """
+        # if no edits, skip
+        if len(self.edit_stack) == 0:
+            return
+        # apply edits to current data_filtered
         for edit in self.edit_stack:
-            self.data_filtered.loc[edit['row'], edit['reference']] = edit['new_value']
+            row, column = self.get_edit_table_item(edit)
+            # item not found in current filter
+            if row is None or column is None:
+                continue
+            # not relevant to this data type view
+            if column not in self.data_filtered.columns:
+                continue
 
-    def handle_checkbox_change(self, row, column):
-        """ Detect when a checkbox is checked or unchecked """
-        if column == 0:
-            item = self.table.item(row, column)
-            if item is not None:
-                checked = item.checkState() == Qt.CheckState.Checked
-                self.select_row(row, overwrite=checked)
-                self.parent.check_selected_rows()
+            print(f"DEBUG Applying edit: {edit} to row: {row}, column: {column}")
+            print(f"DEBUG Current data_filtered before edit: {self.data_filtered.loc[row, column]}")
+            self.data_filtered.loc[row, column] = edit.new_value
+            print(f"DEBUG Current data_filtered after edit: {self.data_filtered.loc[row, column]}")
+
+    def undo(self):
+        """
+        Undo last edit and refresh table
+        """
+        if len(self.edit_stack) > 0:
+            last = self.edit_stack.pop()
+            # revert the change in data_filtered
+            row, column = self.get_edit_table_item(last)
+
+            self.data_filtered.loc[row, column] = last.previous_value
+            self.refresh_table(popup=False)
+
+    def get_edit_table_item(self, edit):
+        """
+        Return Row and Column for a given edit object
+        """
+        # find row and column in current data_filtered
+        if self.data_type == 1:
+            if edit.rid is None:
+                return None, None
+            row = self.data_filtered.index[self.data_filtered['id'] == edit.rid].to_list()
+        else:
+            if edit.mid is None:
+                return None, None
+            row = self.data_filtered.index[self.data_filtered['id'] == edit.mid].to_list()
+        if not row:
+            return None, None
+
+        # TODO - check if multiple rows found for the same edit, and handle accordingly
+        if len(row) > 1:
+            print(f"Warning: multiple rows found for edit {edit}. Using first match.")
+        row = row[0]
+    
+        column = edit.reference
+
+        return row, column
 
     def update_entry(self, row, column):
         """
-        Allows user to edit entry in table
+        Allows user to edit entry directly in table
 
         Save edits in queue, allow undo
         prompt user to save edits
         """
         reference = self.columns[column]
-        rid = int(self.data_filtered.at[row, "id"])
+        # print(f"DEBUG: row {row}, column {column}, reference {reference}")
+                
+        if self.data_type == 1:
+            rid = int(self.data_filtered.at[row, "id"])
+            media_id = int(self.data_filtered.at[row, "media_id"]) 
+        else:
+            rid = None
+            media_id = id
 
         if reference == 'select':
             return
@@ -358,86 +408,81 @@ class MediaTable(QWidget):
                 new_value = None
             else:
                 new_value = int(key)
-
         # individual
         elif reference == 'individual_id' or reference == 'sex' or reference == 'age':
-            rid = self.data_filtered.at[row, 'individual_id']
-            if rid is None:
+            iid = self.data_filtered.at[row, "individual_id"]
+            print(iid)
+            if iid is None:
                 dialog = AlertPopup(self, "Please tag the ROI with an individual first.")
-                if dialog.exec():
-                    del dialog
-                    self.apply_edits()
-                    self.refresh_table(popup=False)
-                    return
+                dialog.exec()
+                del dialog
+                self.apply_edits()
+                self.refresh_table(popup=False)
+                return
             else:
                 previous_value = self.data_filtered.at[row, reference]
                 new_value = self.table.item(row, column).text()
-
+        # everything else
         else:
             previous_value = self.data_filtered.at[row, reference]
             new_value = self.table.item(row, column).text()
 
         # add edit to stack
-        edit = {'row': row,
-                'column': column,
-                'id': rid,
-                'reference': reference,
-                'previous_value': previous_value,
-                'new_value': new_value}
+        edit = EditObject(rid=rid,
+                          mid=media_id,
+                          reference=reference,  
+                          previous_value=previous_value,
+                          new_value=new_value)
+        
         self.edit_stack.append(edit)
-        self.update_signal.emit([row, column])
+        self.update_signal.emit([row, column])  # update undo button in DisplayMedia
         self.apply_edits()
         self.refresh_table(popup=False)
 
-    def transpose_edit_stack(self, edit_stack):
+    def add_edit_stack(self, edit_stack):
         """
-        Transpose edit stack from popup_roi to media_table format
+        Add edits from popup to the edit stack and apply to current data_filtered
+        Connected to DisplayMedia.edit_stack_signal
         """
         for edit in edit_stack:
-            print(edit)
-            id = edit['id']
-            row = self.data_filtered.index[self.data_filtered['id'] == id].tolist()
-            column = list(self.columns.keys())[list(self.columns.values()).index(edit['reference'])]
-            if row:
-                row = row[0]
-                new_edit = {'row': row,
-                            'column': column,
-                            'id': id,
-                            'reference': edit['reference'],
-                            'previous_value': edit['previous_value'],
-                            'new_value': edit['new_value']}
-                print(new_edit)
-                self.edit_stack.append(new_edit)
+            self.edit_stack.append(edit)
+        self.apply_edits()
+        self.refresh_table(popup=False)
 
-    def undo(self):
+    def handle_checkbox_change(self, row, column):
+        """ 
+        Detect when a checkbox is checked or unchecked 
+        Connects to DisplayMedia.check_selected_rows to update the selected rows in the media table
         """
-        Undo last edit and refresh table
-        """
-        if len(self.edit_stack) > 0:
-            last = self.edit_stack.pop()
-            self.data_filtered.loc[last['row'], last['reference']] = last['previous_value']
-            self.refresh_table(popup=False)
+        if column == 0:
+            item = self.table.item(row, column)
+            if item is not None:
+                checked = item.checkState() == Qt.CheckState.Checked
+                self.select_row(row, overwrite=checked)
+                self.checkbox_signal.emit([row, column, checked])
 
     def save_changes(self):
         # commit all changes in self.edit_stack to database
         while len(self.edit_stack) > 0:
             edit = self.edit_stack.pop()
-            id = edit['id']
-            replace_dict = {edit['reference']: edit['new_value']}
+            replace_dict = {edit.reference: edit.new_value}
+            # roi view
             if self.data_type == 1:
-                if edit['reference'] in {'station_id', 'sequence_id', 'external_id'}:
-                    self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
-                elif edit['reference'] in {'age', 'sex'}:
-                    iid = self.data_filtered.loc[self.data_filtered['id'] == id, 'individual_id'].values[0]
+                # edit media table value
+                if edit.reference in {'station_id', 'sequence_id', 'external_id', 'comment'}:
+                    self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
+                # edit individual table value
+                elif edit.reference in {'age', 'sex'}:
+                    iid = self.data_filtered.loc[self.data_filtered['id'] == edit.rid, 'individual_id'].values[0]
                     iid = int(iid) if pd.notna(iid) else None
                     if iid is not None:
                         self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
-                elif edit['reference'] in {'comment'}:
-                    self.mpDB.edit_row("media", id, replace_dict, allow_none=True, quiet=False)
+                # edit roi table value
                 else:
-                    self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
+                    self.mpDB.edit_row("roi", edit.rid, replace_dict, allow_none=False, quiet=False)
+            # media view
             else:
-                self.mpDB.edit_row("media", id, replace_dict, allow_none=False, quiet=False)
+                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
 
         # reload data and refresh table
         self.edit_stack = []
