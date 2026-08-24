@@ -182,7 +182,8 @@ class TestCascadeDeletes:
     def test_delete_station_cascades_to_media_and_roi(self, tmp_db):
         db, _ = tmp_db
         st_id = db.add_station("MediaStation", 0.0, 0.0, 1)
-        mid = db.add_media("/img/cascade.jpg", "cascade_sha" * 6, ".jpg",
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "cascade.jpg", "cascade_sha" * 6, ".jpg",
                            "2024-01-01", st_id)
         rid = db.add_roi(mid, 0, 0.1, 0.2, 0.3, 0.4)
 
@@ -195,7 +196,8 @@ class TestCascadeDeletes:
         db, _ = tmp_db
         st_id = db.add_station("IndStation", 0.0, 0.0, 1)
         iid = db.add_individual("Wolf-7", "M", None)
-        mid = db.add_media("/img/ind.jpg", "ind_sha" * 8, ".jpg",
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "ind.jpg", "ind_sha" * 8, ".jpg",
                            "2024-01-01", st_id)
         rid = db.add_roi(mid, 0, 0.1, 0.2, 0.3, 0.4, individual_id=iid)
 

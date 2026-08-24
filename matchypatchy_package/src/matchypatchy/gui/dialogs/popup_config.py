@@ -360,7 +360,6 @@ class ConfigPopup(QDialog):
             self.cfg['DEVICE'] = "CUDAExecutionProvider"
         self.logger.info(f"Device changed to {self.cfg['DEVICE']}")
         config.update(self.cfg)
-            self.cfg.update({'DEVICE': "CUDAExecutionProvider"})
 
     def edit_uploads(self):
         """Open the upload directories manager popup."""

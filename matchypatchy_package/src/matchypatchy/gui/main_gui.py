@@ -28,7 +28,6 @@ from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
 from matchypatchy.config import mpConfig
-from matchypatchy.database.media import export_data
 from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
