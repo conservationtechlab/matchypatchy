@@ -9,6 +9,7 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 
 
 class StationPopup(QDialog):
+    """Popup dialog for managing stations (add/edit/delete)"""
     def __init__(self, parent, active_survey):
         super().__init__(parent)
         self.setWindowTitle("Manage stations")
@@ -75,20 +76,22 @@ class StationPopup(QDialog):
             self.mpDB.add_station(dialog.get_name(), dialog.get_lat(),
                                   dialog.get_long(), self.survey_id[0])
         del dialog
-        self.stations = self.update()
+        # refresh the station list after adding a new station
+        self.update()
 
     def edit(self):
         """Edit selected station"""
         selected_station = self.list.currentRow()
-        id = self.station_list_ordered[selected_station][0]
-        cond = f'id={id}'
-        id, name, lat, long = self.mpDB.select('station', columns='id, name, lat, long', row_cond=cond)[0]
+        station_id = self.station_list_ordered[selected_station][0]
+        cond = f'id={station_id}'
+        station_id, name, lat, long = self.mpDB.select('station', columns='id, name, lat, long', row_cond=cond)[0]
         dialog = StationFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
             replace_dict = {"name": dialog.get_name(), "lat": dialog.get_lat(), "long": dialog.get_long()}
-            self.mpDB.edit_row("station", id, replace_dict)
+            self.mpDB.edit_row("station", station_id, replace_dict)
         del dialog
-        self.stations = self.update()
+        # refresh the station list after editing a station
+        self.update()
 
     def delete(self):
         """Delete selected station"""
@@ -98,10 +101,14 @@ class StationPopup(QDialog):
             row = self.station_list_ordered[self.list.currentRow()][0]
             self.mpDB.delete("station", f'id={row}')
         del dialog
+        # refresh the station list after deleting a station
         self.update()
 
 
 class StationFillPopup(QDialog):
+    """
+    Popup dialog for adding or editing a station.
+    """
     def __init__(self, parent, name="", lat="", long=""):
         super().__init__(parent)
         self.setWindowTitle("Edit station")
@@ -141,26 +148,31 @@ class StationFillPopup(QDialog):
         self.lat.textChanged.connect(self.checkInput)
         self.long.textChanged.connect(self.checkInput)
 
-        self.name.returnPressed.connect(lambda: self.lat.setFocus())
-        self.lat.returnPressed.connect(lambda: self.long.setFocus())
+        self.name.returnPressed.connect(self.lat.setFocus)
+        self.lat.returnPressed.connect(self.long.setFocus)
         self.long.returnPressed.connect(self.accept_verify)
         self.name.setFocus()
 
         self.setLayout(layout)
 
     def checkInput(self):
+        """Check if all input fields have values and enable/disable the OK button accordingly"""
         # year end not necessary
         self.okButton.setEnabled(bool(self.get_name() and self.get_lat() and self.get_long()))
 
     def get_name(self):
+        """Get the name value"""
         return self.name.text()
 
     def get_lat(self):
+        """Get the latitude value"""
         return self.lat.text()
 
     def get_long(self):
+        """Get the longitude value"""
         return self.long.text()
 
     def accept_verify(self):
+        """Verify the input fields and accept the dialog if all fields have values"""
         if self.get_name() and self.get_lat() and self.get_long():
             self.accept()

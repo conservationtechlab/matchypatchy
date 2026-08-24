@@ -1,9 +1,9 @@
 '''
 Popup to add or edit config settings
 '''
-import animl
 import os
 from pathlib import Path
+import animl
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QComboBox,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
@@ -18,6 +18,10 @@ from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_m
 
 
 class ConfigPopup(QDialog):
+    """
+    Popup for adding or editing configuration settings.
+    """
+
     ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
     DEVICE_OPTIONS = {"CPUExecutionProvider": "CPU", "CUDAExecutionProvider": "CUDA-enabled GPU"}
 
@@ -27,6 +31,7 @@ class ConfigPopup(QDialog):
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
         self.logger = parent.logger
+        self.mpDB = parent.mpDB
         self.cfg = config.load_cfg()
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
         self.label_width = 130
@@ -351,16 +356,16 @@ class ConfigPopup(QDialog):
             pass
 
     def change_device(self):
+        """Change hardware device for running models between CPU and CUDA-enabled GPU"""
         self.logger.info(f"Device changed to {self.device.currentText()}")
         """Change hardware device for running models"""
         selected_device = self.device.currentText()
         if selected_device == "CPU":
-            self.cfg.update({'DEVICE': "CPUExecutionProvider"})
+            self.cfg['DEVICE'] = "CPUExecutionProvider"
         elif selected_device == "CUDA-enabled GPU":
             self.cfg['DEVICE'] = "CUDAExecutionProvider"
         self.logger.info(f"Device changed to {self.cfg['DEVICE']}")
         config.update(self.cfg)
-            self.cfg.update({'DEVICE': "CUDAExecutionProvider"})
 
     def edit_uploads(self):
         """Open the upload directories manager popup."""

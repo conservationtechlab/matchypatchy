@@ -22,13 +22,12 @@ from matchypatchy.gui.display_compare import DisplayCompare
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_config import ConfigPopup
 from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
-from matchypatchy.gui.dialogs.popup_readme import AboutPopup, READMEPopup, LicensePopup
+from matchypatchy.gui.dialogs.popup_readme import READMEPopup
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
 from matchypatchy.config import mpConfig
-from matchypatchy.database.media import export_data
 from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
@@ -279,19 +278,19 @@ class MainWindow(QMainWindow):
     # HELP =====================================================================
     def about(self):
         """Open About Popup"""
-        dialog = AboutPopup(self)
+        dialog = READMEPopup(self, doc_type="ABOUT")
         dialog.exec()
         del dialog
 
     def help(self):
         """Open README Popup"""
-        dialog = READMEPopup(self)
+        dialog = READMEPopup(self, doc_type="README")
         dialog.exec()
         del dialog
 
     def license(self):
         """Open License Popup"""
-        dialog = LicensePopup(self)
+        dialog = READMEPopup(self, doc_type="LICENSE")
         dialog.exec()
         del dialog
 

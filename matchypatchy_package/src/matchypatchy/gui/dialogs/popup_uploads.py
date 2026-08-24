@@ -2,8 +2,8 @@
 Popup to manage upload directories
 """
 import os
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
-                             QHeaderView, QFileDialog, QProgressBar, 
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+                             QHeaderView, QFileDialog, QProgressBar,
                              QAbstractItemView, QDialogButtonBox, QTableWidget, QTableWidgetItem)
 from PyQt6.QtGui import QBrush, QColor
 
@@ -12,6 +12,8 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 
 
 class UploadManagerPopup(QDialog):
+    """Popup dialog for managing upload directories"""
+
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Manage upload directories")
@@ -26,6 +28,7 @@ class UploadManagerPopup(QDialog):
         self.base_dirs = None
         self.updates = []
         self.errors = []
+        self.build_thread = None
 
         layout = QVBoxLayout()
         # Individuals Table
@@ -36,7 +39,7 @@ class UploadManagerPopup(QDialog):
         self.list.setColumnWidth(1, 150)  # Set width for the 'Date Added' column
         self.list.setColumnWidth(2, 100)  # Set width for the 'Count' column
         self.list.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        
+
         layout.addWidget(self.list)
         self.list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.list.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -93,10 +96,10 @@ class UploadManagerPopup(QDialog):
 
         self.list.setRowCount(len(self.base_dirs))
 
-        for row in range(len(self.base_dirs)):
-            self.list.setItem(row, 0, QTableWidgetItem(str(self.base_dirs[row][1])))
-            self.list.setItem(row, 1, QTableWidgetItem(str(self.base_dirs[row][2])))
-            self.list.setItem(row, 2, QTableWidgetItem(str(self.base_dirs[row][3])))
+        for row, base_dir in enumerate(self.base_dirs):
+            self.list.setItem(row, 0, QTableWidgetItem(str(base_dir[1])))
+            self.list.setItem(row, 1, QTableWidgetItem(str(base_dir[2])))
+            self.list.setItem(row, 2, QTableWidgetItem(str(base_dir[3])))
 
     def edit(self):
         """Edit selected individual"""
@@ -116,14 +119,14 @@ class UploadManagerPopup(QDialog):
             # No updates to verify, good to go
             self.colorize(self.updates)
             return
-        
+
         # Reset verification status and lists
         self.verified = False
         self.contains_errors = False
         self.errors = []
         self.not_in_db = []
         self.not_in_new_directory = []
-        
+
         self.logger.info("Starting verification of new base directories")
 
         self.progress_bar.setRange(0, 0)
@@ -152,13 +155,13 @@ class UploadManagerPopup(QDialog):
 
     def colorize(self):
         """Colorize the rows based on verification results"""
-        # set to green by default 
+        # set to green by default
         for row in range(self.list.rowCount()):
             for col in range(self.list.columnCount()):
                 self.list.item(row, col).setBackground(QColor("#155206"))
                 self.list.item(row, col).setForeground(QBrush(QColor("white")))
 
-        # go through updated directories 
+        # go through updated directories
         for u, update in enumerate(self.updates):
             row = next((i for i, base_dir in enumerate(self.base_dirs) if base_dir[0] == update[0]), None)
             if row is not None:
@@ -194,7 +197,6 @@ class UploadManagerPopup(QDialog):
             self.logger.info(f"Files discovered not in DB: {self.not_in_db}")
             self.logger.info(f"Files not in new directory: {self.not_in_new_directory}")
 
-
     def save(self):
         """Save changes to the selected upload directory"""
         # no updates, return early
@@ -203,7 +205,7 @@ class UploadManagerPopup(QDialog):
 
         # confirm if not verified before saving
         if not self.verified:
-            dialog = AlertPopup(self, 
+            dialog = AlertPopup(self,
                                 prompt=("Verification not completed. Saving without verification may cause "
                                         "inconsistencies in the database. Would you like to proceed?"))
             if dialog.exec() == QDialog.rejected:
@@ -213,7 +215,7 @@ class UploadManagerPopup(QDialog):
         # if there are errors, warn the user
         # TODO: Choose what will happen
         if self.contains_errors:
-            dialog = AlertPopup(self, 
+            dialog = AlertPopup(self,
                                 prompt=("There are missing files in the new directories. This will only update "
                                         "chosen paths with all available files. Would you like to proceed?"))
             if dialog.exec() == QDialog.rejected:
@@ -224,7 +226,7 @@ class UploadManagerPopup(QDialog):
         for u, update in enumerate(self.updates):
             missing = self.errors[u]
             # Only update if there are no errors
-            if len(missing) == 0:  
+            if len(missing) == 0:
                 self.mpDB.update_base_dir(update[0], update[1])
             # WARN USER: Skipping update due to missing files
             else:

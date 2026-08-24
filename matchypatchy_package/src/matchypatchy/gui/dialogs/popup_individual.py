@@ -12,11 +12,17 @@ from PyQt6 import QtWidgets
 
 
 class IndividualPopup(QDialog):
+    """
+    Popup for managing individuals in the database.
+    Triggered from display_base
+    """
+
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Manage Individuals")
         self.parent = parent
         self.mpDB = parent.mpDB
+        self.selected_ind = None
 
         layout = QVBoxLayout()
         # Individuals Table
@@ -60,6 +66,10 @@ class IndividualPopup(QDialog):
 
     def update(self):
         """Update table with individuals from database"""
+        # Clear the list before repopulating it
+        self.list.clearContents()
+        self.list.setRowCount(0)
+        # Fetch individuals from the database
         self.individuals = self.mpDB._command("""SELECT individual.name, individual.id, COUNT(roi.individual_id) AS count
                                                  FROM individual LEFT JOIN roi ON roi.individual_id = individual.id
                                                  GROUP BY roi.individual_id;""")
@@ -70,9 +80,9 @@ class IndividualPopup(QDialog):
         self.list.setItem(0, 0, QTableWidgetItem("Unidentified"))
         self.list.setItem(0, 1, QTableWidgetItem(str(self.nulls)))
         # Add data to rows
-        for row in range(len(self.individuals)):
-            self.list.setItem(row + 1, 0, QTableWidgetItem(self.individuals[row][0]))
-            self.list.setItem(row + 1, 1, QTableWidgetItem(str(self.individuals[row][2])))
+        for row, individual in enumerate(self.individuals):
+            self.list.setItem(row + 1, 0, QTableWidgetItem(individual[0]))
+            self.list.setItem(row + 1, 1, QTableWidgetItem(str(individual[2])))
 
     def edit(self):
         """Edit selected individual"""
@@ -81,7 +91,7 @@ class IndividualPopup(QDialog):
             return
 
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
-        id, name, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
+        iid, name, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
         # open edit dialog with current values
         dialog = IndividualFillPopup(self, name=name, sex=sex, age=age)
         if dialog.exec():
@@ -89,10 +99,10 @@ class IndividualPopup(QDialog):
                             "sex": dialog.get_sex(),
                             "age": dialog.get_age()}
             # update database
-            self.mpDB.edit_row("individual", id, replace_dict)
+            self.mpDB.edit_row("individual", iid, replace_dict)
         del dialog
         # refetch data
-        self.individuals = self.update()
+        self.update()
 
     def view(self):
         """Go to media view filtered by individual"""
@@ -106,6 +116,9 @@ class IndividualPopup(QDialog):
 
 
 class IndividualFillPopup(QDialog):
+    """
+    Popup for adding or editing an individual.
+    """
     def __init__(self, parent, name=None, sex=None, age=None):
         super().__init__(parent)
         self.mpDB = parent.mpDB
@@ -113,6 +126,8 @@ class IndividualFillPopup(QDialog):
         layout = QVBoxLayout()
 
         self.existing_name = name
+        self.existing_sex = sex
+        self.existing_age = age
 
         # Name
         layout.addWidget(QLabel('Name'))
@@ -123,11 +138,15 @@ class IndividualFillPopup(QDialog):
         layout.addWidget(QLabel('Sex'))
         self.sex = QComboBox()
         self.sex.addItems(['Unknown', 'Male', 'Female'])
+        if sex is not None:
+            self.sex.setCurrentText(sex)
         layout.addWidget(self.sex)
         # Age
         layout.addWidget(QLabel('Age'))
         self.age = QComboBox()
         self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
+        if age is not None:
+            self.age.setCurrentText(age)
         layout.addWidget(self.age)
 
         self.secret_text = QLabel('')
@@ -151,20 +170,24 @@ class IndividualFillPopup(QDialog):
         self.setLayout(layout)
 
     def checkInput(self):
-       
+        """Check if the input is valid and enable/disable the OK button accordingly."""
         name_okay = self.check_existing_name()
         self.okButton.setEnabled(name_okay and bool(self.get_name()))
 
     def get_name(self):
+        """Return the current text in the name field."""
         return self.name.text()
 
     def get_sex(self):
+        """Return the currently selected sex."""
         return self.sex.currentText()
 
     def get_age(self):
+        """Return the currently selected age."""
         return self.age.currentText()
 
     def accept_verify(self):
+        """Verify input before accepting."""
         if self.get_name():
             self.accept()
 
