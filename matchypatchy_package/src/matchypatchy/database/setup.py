@@ -1,15 +1,16 @@
 """
 Set Up matchypatchy Database
 """
+from datetime import datetime
 import sqlite3
 import chromadb
-from datetime import datetime
+
 from matchypatchy import __version__
 
 
 def setup_database(key, filepath, db=None):
     """Set up SQLite database with required tables
-    
+
     Args:
         key: Database key/version identifier
         filepath: Path to SQLite database file
@@ -17,11 +18,11 @@ def setup_database(key, filepath, db=None):
     """
     # Use provided connection or create new one
     created_connection = db is None
-    
+
     # Use provided connection or create new one
     if created_connection:
         db = sqlite3.connect(filepath)
-    
+
     cursor = db.cursor()
 
     # add key to database

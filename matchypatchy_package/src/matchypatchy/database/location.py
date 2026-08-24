@@ -9,8 +9,8 @@ def fetch_surveys(mpDB):
     surveys = mpDB.select("survey")
     if surveys:
         return pd.DataFrame(surveys, columns=["id", "name", "region", "year_start", "year_end"])
-    else:
-        return pd.DataFrame(columns=["id", "name", "region", "year_start", "year_end"])
+
+    return pd.DataFrame(columns=["id", "name", "region", "year_start", "year_end"])
 
 
 def fetch_regions(mpDB):
@@ -18,8 +18,8 @@ def fetch_regions(mpDB):
     regions = mpDB.select("region")
     if regions:
         return pd.DataFrame(regions, columns=["id", "name", "timezone"])
-    else:
-        return pd.DataFrame(columns=["id", "name", "timezone"])
+
+    return pd.DataFrame(columns=["id", "name", "timezone"])
 
 
 def fetch_stations(mpDB, survey_id=None):
@@ -33,8 +33,8 @@ def fetch_stations(mpDB, survey_id=None):
 
     if stations:
         return pd.DataFrame(stations, columns=["id", "name", "lat", "long", "survey_id"])
-    else:  # return empty
-        return pd.DataFrame(columns=["id", "name", "lat", "long", "survey_id"])
+
+    return pd.DataFrame(columns=["id", "name", "lat", "long", "survey_id"])
 
 
 def fetch_station_names_from_id(mpDB, station_id):
@@ -56,22 +56,24 @@ TZ_CONVERT_DICT = {
     'Pacific Standard Time': 'America/Los_Angeles',
     'Pacific Daylight Time': 'America/Los_Angeles',
     'Pacific Daylight Time (Mexico)': 'America/Los_Angeles',
-    
+
     # Mountain
     'Mountain Standard Time': 'America/Denver',
     'Mountain Daylight Time': 'America/Denver',
     'Mountain Standard Time (Mexico)': 'America/Chihuahua',
-    
+
     # Central
     'Central Standard Time': 'America/Chicago',
     'Central Daylight Time': 'America/Chicago',
     'Central America Standard Time': 'America/Guatemala',
     'Central Standard Time (Mexico)': 'America/Mexico_City',
-    
+
     # Eastern
     'Eastern Standard Time': 'America/New_York',
     'Eastern Daylight Time': 'America/New_York',
-    
+    'Eastern Standard Time (Mexico)': 'America/Mexico_City',
+    'Eastern Daylight Time (Mexico)': 'America/Mexico_City',
+
     # Other US/Americas
     'Alaska Standard Time': 'America/Anchorage',
     'Alaskan Daylight Time': 'America/Anchorage',
@@ -81,8 +83,7 @@ TZ_CONVERT_DICT = {
     'Chamorro Standard Time': 'Pacific/Guam',
     'Canada Central Standard Time': 'America/Regina',
     'US Eastern Standard Time': 'America/Indianapolis',
-    'US Mountain Standard Time': 'America/Phoenix',
-    
+
     # Europe
     'GMT Standard Time': 'Europe/London',
     'Central Europe Standard Time': 'Europe/Berlin',
@@ -92,7 +93,7 @@ TZ_CONVERT_DICT = {
     'FLE Standard Time': 'Europe/Kiev',
     'GTB Standard Time': 'Europe/Bucharest',
     'Middle East Standard Time': 'Asia/Baghdad',
-    
+
     # Asia
     'China Standard Time': 'Asia/Shanghai',
     'Tokyo Standard Time': 'Asia/Tokyo',
@@ -102,13 +103,13 @@ TZ_CONVERT_DICT = {
     'Bangkok Standard Time': 'Asia/Bangkok',
     'Magadan Standard Time': 'Asia/Magadan',
     'Vladivostok Standard Time': 'Asia/Vladivostok',
-    
+
     # Australia
     'AUS Central Standard Time': 'Australia/Darwin',
     'AUS Eastern Standard Time': 'Australia/Sydney',
     'Tasmania Standard Time': 'Australia/Hobart',
     'W. Australia Standard Time': 'Australia/Perth',
-    
+
     # ============= macOS/Linux TIMEZONE NAMES =============
     # (These are mostly IANA already, but included for completeness)
     'PST': 'America/Los_Angeles',

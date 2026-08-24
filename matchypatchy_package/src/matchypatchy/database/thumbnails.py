@@ -1,10 +1,11 @@
 """
 QThread for saving thumbnails to temp dir for media table
 """
-import cv2
-import random
-import pandas as pd
 from pathlib import Path
+import random
+
+import cv2
+import pandas as pd
 
 from PyQt6.QtGui import QImage
 from PyQt6.QtCore import Qt, QRect
@@ -24,7 +25,7 @@ def save_media_thumbnail(thumbnail_dir, filepath, ext):
     else:
         original = QImage(filepath)
 
-    if not original.isNull():
+    if not original.isNull() and original is not None:
         # crop for rois
         image = original.copy()
         # scale it to 150x150
@@ -52,7 +53,7 @@ def save_roi_thumbnail(thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox
     else:
         original = QImage(filepath)
 
-    if not original.isNull():
+    if not original.isNull() and original is not None:
         # crop for rois
         left = original.width() * bbox_x
         top = original.height() * bbox_y
@@ -91,7 +92,8 @@ def get_frame(video_path, frame=0):
         h, w, ch = rgb_frame.shape
         bytes_per_line = ch * w
         qimg = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-    return qimg
+        return qimg
+    return None
 
 
 def check_missing_thumbnails(mpDB, data_type):
@@ -116,7 +118,7 @@ def check_missing_thumbnails(mpDB, data_type):
     missing_ids = [row[0] for row in missing]
 
     # Also check for files that are listed but the file is missing
-    for t, row in thumbnails.iterrows():
+    for _, row in thumbnails.iterrows():
         if not Path(row['thumbnail_path']).is_file():
             missing_ids.append(row['id'])
 
