@@ -7,6 +7,8 @@ from PyQt6.QtCore import Qt
 
 
 class ImageAdjustBar(QWidget):
+    """Widget for adjusting image properties such as brightness, contrast, and sharpness."""
+    
     FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
 
     def __init__(self, display, mediawidget, side):

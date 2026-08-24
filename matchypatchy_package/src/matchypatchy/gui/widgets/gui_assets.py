@@ -164,16 +164,20 @@ class ThreePointSlider(QWidget):
         self.state_changed.emit(idx)
 
     def set_index(self, idx: int):
+        """Set the current index, clamped to the valid range."""
         idx = max(0, min(2, int(idx)))
         self.slider.setValue(idx)
 
     def index(self) -> int:
+        """Get the current index as an integer."""
         return int(self.slider.value())
 
     def press_left(self):
+        """Handle left button press by setting index to 0."""
         self.set_index(0)
 
     def press_right(self):
+        """Handle right button press by setting index to 2."""
         self.set_index(2)
 
 
@@ -205,27 +209,28 @@ class ClickableSlider(QSlider):
 
 
 class TextEditWithSignal(QTextEdit):
+    """QTextEdit that emits a signal when the user finishes typing."""
     # Signal emitted when user finishes typing
     text_finished = pyqtSignal(str)
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+
         # Timer to detect when user stops typing
         self.timer = QTimer()
         self.timer.setSingleShot(True)  # Only fire once per typing session
         self.timer.timeout.connect(self.on_typing_finished)
         self.timer.setInterval(500)  # 500ms delay after last keystroke
-        
+
         # Connect textChanged to restart timer
         self.textChanged.connect(self.on_text_changed)
-    
+
     def on_text_changed(self):
         """Called every time text changes"""
         # Restart timer (resets the 500ms countdown)
         self.timer.stop()
         self.timer.start()
-    
+
     def on_typing_finished(self):
         """Called when user stops typing for 500ms"""
         self.text_finished.emit(self.toPlainText())
