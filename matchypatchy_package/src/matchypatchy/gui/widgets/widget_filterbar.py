@@ -269,7 +269,7 @@ class FilterBar(QWidget):
 
 
 class FilterBox(QComboBox):
-    """Custom QComboBox for filter selections with fixed width."""'
+    """Custom QComboBox for filter selections with fixed width."""
 
     def __init__(self, initial_list, width):
         super().__init__()

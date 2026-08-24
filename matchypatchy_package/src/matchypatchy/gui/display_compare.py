@@ -28,6 +28,8 @@ from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
 
 
 class DisplayCompare(QWidget):
+    """GUI class for displaying and managing match comparisons."""
+
     MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
     FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
     VIEWPOINT_DICT = {0: 'Left', 1: 'Any', 2: 'Right'}
@@ -63,13 +65,6 @@ class DisplayCompare(QWidget):
         button_validate.pressed.connect(self.validate)
         first_layer.addWidget(button_validate)
         first_layer.addWidget(VerticalSeparator())
-
-        # OPTIONS
-        # first_layer.addWidget(QLabel("Similarity Metric:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # self.option_distance_metric = QComboBox()
-        # self.option_distance_metric.addItems(['Cosine', 'L2'])
-        # self.option_distance_metric.currentIndexChanged.connect(self.change_metric)
-        # first_layer.addWidget(self.option_distance_metric, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         first_layer.addWidget(QLabel("Similarity Threshold:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
@@ -261,12 +256,13 @@ class DisplayCompare(QWidget):
         layout.addLayout(image_layout)
 
         # BOTTOM LAYER =========================================================
+        # PAIRX DEACTIVATED
         # Buttons
-        #bottom_layer = QHBoxLayout()
-        #button_visualize = QPushButton("Visualize Match")
-        #button_visualize.pressed.connect(self.press_visualize_button)
-        #bottom_layer.addWidget(button_visualize)
-        #layout.addLayout(bottom_layer)
+        # bottom_layer = QHBoxLayout()
+        # button_visualize = QPushButton("Visualize Match")
+        # button_visualize.pressed.connect(self.press_visualize_button)
+        # bottom_layer.addWidget(button_visualize)
+        # layout.addLayout(bottom_layer)
         self.setLayout(layout)
 
         # remove focus from buttons to keep keyboard shortcuts working
@@ -274,6 +270,7 @@ class DisplayCompare(QWidget):
         # ======================================================================
 
     def set_no_focus(self):
+        """Remove focus from all QPushButton children to keep keyboard shortcuts working."""
         for child in self.findChildren(QWidget):
             if isinstance(child, (QPushButton)):
                 child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -283,7 +280,7 @@ class DisplayCompare(QWidget):
         self.cfg = cfg
         self.mpDB = mpDB
         self.filterbar.update_project(mpDB)
-        
+
     # ==========================================================================
     # GUI
     # ==========================================================================
@@ -452,6 +449,7 @@ class DisplayCompare(QWidget):
     # MATCHING PROCESS
     # ==========================================================================
     def press_match_button(self):
+        """Handle the press event for the Match button."""
         # already a match
         if self.QueryContainer.is_existing_match():
             self.unmatch()
@@ -610,6 +608,7 @@ class DisplayCompare(QWidget):
         self.load_match()
 
     def format_metadata(self, info_dict, spacing=1):
+        """Format metadata dictionary into an HTML string for display."""
         spacer = "&nbsp;" * 20
         html_text = f"""<div style="line-height: {spacing}; width: 100%; height: 100%;">
                             <table cellspacing="5">
@@ -697,9 +696,9 @@ class DisplayCompare(QWidget):
         """Open PairX Popup to visualize query and match images together"""
         query = self.QueryContainer.get_info(self.QueryContainer.current_query_rid)
         match = self.QueryContainer.get_info(self.QueryContainer.current_match_rid)
-       # dialog = PairXPopup(self, query, match)
-       # if dialog.exec():
-       #     del dialog
+        # dialog = PairXPopup(self, query, match)
+        # if dialog.exec():
+        #     del dialog
 
     # ==========================================================================
     # FAVORITE
@@ -740,6 +739,7 @@ class DisplayCompare(QWidget):
     # KEYBOARD HANDLER
     # ==========================================================================
     def keyPressEvent(self, event):
+        """Handle key press events for navigation and actions."""
         self.setFocus()  # ensure window has focus to receive key events
         key = event.key()
         key_text = event.text()

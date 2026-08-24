@@ -16,6 +16,8 @@ from matchypatchy.gui.widgets.gui_assets import ComboBoxDelegate
 
 
 class MediaTable(QWidget):
+    """Widget for displaying list of Media"""
+
     update_signal = pyqtSignal(list)
     checkbox_signal = pyqtSignal(list)
     loaded_data = pyqtSignal()
@@ -28,11 +30,18 @@ class MediaTable(QWidget):
         self.data = pd.DataFrame()
         self.data_filtered = pd.DataFrame()
         self.individual_list = pd.DataFrame()
-        self.thumbnails = dict()
+        self.thumbnails = {}
         self.data_type = 1
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         self.thumbnail_size = 150
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
+        self.columns = ["Select", "Thumbnail", "Filepath", "Timestamp",
+                        "Station", "Camera", "Sequence ID", "External ID",
+                        "Viewpoint", "Individual", "Sex", "Age",
+                        "Reviewed", "Favorite", "Comment"]
+
+        self.valid_stations = []
+        self.valid_cameras = []
 
         # NOTE: do we want to refresh edit stack on re-entry?
         self.edit_stack = []
@@ -41,16 +50,13 @@ class MediaTable(QWidget):
         layout = QVBoxLayout()
         # Create QTableWidget
         self.table = QTableWidget()
-        self.table.setColumnCount(17)  # Columns: Thumbnail, Name, and Description
-        self.table.setHorizontalHeaderLabels(["Select", "Thumbnail", "Filepath", "Timestamp",
-                                              "Station", "Camera", "Sequence ID", "External ID",
-                                              "Viewpoint", "Individual", "Sex", "Age",
-                                              "Reviewed", "Favorite", "Comment"])
+        self.table.setColumnCount(len(self.columns))  # Columns: Thumbnail, Name, and Description
+        self.table.setHorizontalHeaderLabels(self.columns)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         # Connect sorting
         self.sort_order = dict(zip(range(self.table.columnCount()),
-                                   [Qt.SortOrder.AscendingOrder]*self.table.columnCount()))
+                                   [Qt.SortOrder.AscendingOrder] * self.table.columnCount()))
         self.table.setSortingEnabled(False)
         self.table.horizontalHeader().setSortIndicatorShown(True)
         self.table.horizontalHeader().setSectionsClickable(True)
@@ -64,14 +70,13 @@ class MediaTable(QWidget):
         layout.addWidget(self.table)
         self.setLayout(layout)
 
-
     def update_project(self, cfg, mpDB):
         """Update database object"""
         self.cfg = cfg
         self.mpDB = mpDB
 
     # RUN ON ENTRY -------------------------------------------------------------
-    def clear_contents(self, data_type):
+    def clear_and_load_contents(self, data_type):
         """Clear all contents of the media table"""
         # clear old view
         self.data_type = data_type
@@ -81,11 +86,11 @@ class MediaTable(QWidget):
 
         # fetch data
         self.individual_list = fetch_individual(self.mpDB)
-        self.dataloader = FetchTableThread(self)
-        self.dataloader.done.connect(self.filter)
-        self.dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
-        self.dataloader.loaded_data.connect(self.loaded_data.emit)
-        self.dataloader.start()
+        dataloader = FetchTableThread(self)
+        dataloader.done.connect(self.filter)
+        dataloader.loaded_data.connect(lambda data: setattr(self, 'data', data))
+        dataloader.loaded_data.connect(self.loaded_data.emit)
+        dataloader.start()
 
     # STEP 2 - CALLED BY load_data()
     def format_table(self):
@@ -147,11 +152,11 @@ class MediaTable(QWidget):
                                                   "Station", "Camera", "Sequence ID",
                                                   "External ID", "Comment", "# of Rois"])
 
-             # clear item delegates (really only necessary for viewpoint)
+            # clear item delegates (really only necessary for viewpoint)
             self.table.setItemDelegateForColumn(VIEWPOINT_COLUMN, None)
             self.table.setItemDelegateForColumn(SEX_COLUMN, None)
             self.table.setItemDelegateForColumn(AGE_COLUMN, None)
-            
+
         # adjust widths
         self.table.resizeColumnsToContents()
         for col in range(self.table.columnCount()):
@@ -252,19 +257,19 @@ class MediaTable(QWidget):
             station_delegate = ComboBoxDelegate(list(self.valid_stations.values()), self)
             self.table.setItemDelegateForColumn(4, station_delegate)
 
-            self.table_loader_thread = LoadTableThread(self)
-            self.table_loader_thread.loaded_cell.connect(self.add_cell)
-            self.table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
-            self.table_loader_thread.done.connect(self.loaded_data.emit)
+            table_loader_thread = LoadTableThread(self)
+            table_loader_thread.loaded_cell.connect(self.add_cell)
+            table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
+            table_loader_thread.done.connect(self.loaded_data.emit)
 
             if popup:
                 loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
                 loading_bar.set_max(n_rows)
-                self.table_loader_thread.progress_update.connect(loading_bar.set_counter)
-                loading_bar.rejected.connect(self.table_loader_thread.requestInterruption)
+                table_loader_thread.progress_update.connect(loading_bar.set_counter)
+                loading_bar.rejected.connect(table_loader_thread.requestInterruption)
                 loading_bar.show()
 
-            self.table_loader_thread.start()
+            table_loader_thread.start()
 
     def sort(self, column):
         """
@@ -299,10 +304,7 @@ class MediaTable(QWidget):
 
     def get_checkstate_int(self, item):
         """Get integer value from checkstate of checkbox item"""
-        if (item == Qt.CheckState.Checked):
-            return 1
-        else:
-            return 0
+        return 1 if (item == Qt.CheckState.Checked) else 0
 
     def invert_checkstate(self, item):
         """Invert checkstate of checkbox item"""
@@ -365,8 +367,8 @@ class MediaTable(QWidget):
         # TODO - check if multiple rows found for the same edit, and handle accordingly
         if len(row) > 1:
             print(f"Warning: multiple rows found for edit {edit}. Using first match.")
+
         row = row[0]
-    
         column = edit.reference
 
         return row, column
@@ -380,18 +382,20 @@ class MediaTable(QWidget):
         """
         reference = self.columns[column]
         # print(f"DEBUG: row {row}, column {column}, reference {reference}")
-                
+
         if self.data_type == 1:
             rid = int(self.data_filtered.at[row, "id"])
-            media_id = int(self.data_filtered.at[row, "media_id"]) 
+            media_id = int(self.data_filtered.at[row, "media_id"])
         else:
             rid = None
-            media_id = id
+            media_id = int(self.data_filtered.at[row, "id"])
 
+        # skip if select column
         if reference == 'select':
             return
+
         # checked items
-        elif reference == 'reviewed' or reference == 'favorite':
+        if reference in ['reviewed', 'favorite']:
             previous_value = int(self.data_filtered.at[row, reference])
             new_value = self.get_checkstate_int(self.table.item(row, column).checkState())
         # station
@@ -409,7 +413,7 @@ class MediaTable(QWidget):
             else:
                 new_value = int(key)
         # individual
-        elif reference == 'individual_id' or reference == 'sex' or reference == 'age':
+        elif reference in ['individual_id', 'sex', 'age']:
             iid = self.data_filtered.at[row, "individual_id"]
             print(iid)
             if iid is None:
@@ -430,10 +434,10 @@ class MediaTable(QWidget):
         # add edit to stack
         edit = EditObject(rid=rid,
                           mid=media_id,
-                          reference=reference,  
+                          reference=reference,
                           previous_value=previous_value,
                           new_value=new_value)
-        
+
         self.edit_stack.append(edit)
         self.update_signal.emit([row, column])  # update undo button in DisplayMedia
         self.apply_edits()
@@ -450,8 +454,8 @@ class MediaTable(QWidget):
         self.refresh_table(popup=False)
 
     def handle_checkbox_change(self, row, column):
-        """ 
-        Detect when a checkbox is checked or unchecked 
+        """
+        Detect when a checkbox is checked or unchecked
         Connects to DisplayMedia.check_selected_rows to update the selected rows in the media table
         """
         if column == 0:
@@ -462,7 +466,7 @@ class MediaTable(QWidget):
                 self.checkbox_signal.emit([row, column, checked])
 
     def save_changes(self):
-        # commit all changes in self.edit_stack to database
+        """Save all changes in the edit stack to the database"""
         while len(self.edit_stack) > 0:
             edit = self.edit_stack.pop()
             replace_dict = {edit.reference: edit.new_value}
@@ -486,10 +490,10 @@ class MediaTable(QWidget):
 
         # reload data and refresh table
         self.edit_stack = []
-        self.clear_contents(self.data_type)
-        self.load_data(self.data_type)
+        self.clear_and_load_contents(self.data_type)
 
     def select_row(self, row, overwrite=None):
+        """Select a specific row in the media table, optionally overwriting its current state"""
         select = self.table.item(row, 0)
         if overwrite is not None:
             if overwrite is True:
@@ -500,11 +504,12 @@ class MediaTable(QWidget):
             self.invert_checkstate(select)
 
     def select_all(self, overwrite=False):
-        """Select all rows in the media table"""
+        """Select all rows in the media table, optionally overwriting their current state"""
         for row in range(self.table.rowCount()):
             self.select_row(row, overwrite=overwrite)
 
     def selectedRows(self):
+        """Return a list of currently selected rows in the media table"""
         selected_rows = []
         for row in range(self.table.rowCount()):
             item = self.table.item(row, 0)
@@ -513,4 +518,5 @@ class MediaTable(QWidget):
         return selected_rows
 
     def edit_row(self, row):
+        """Edit a specific row in the media table by delegating to the parent"""
         self.parent.edit_row(row)

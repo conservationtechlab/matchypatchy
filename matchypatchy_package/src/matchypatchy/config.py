@@ -128,6 +128,15 @@ class mpConfig():
         # rewrite config
         self.save()
 
+    def update_home_dir(self, home_dir):
+        """Update the home directory and related paths."""
+        self.HOME_DIR = Path(home_dir)
+        self.DB_DIR = self.HOME_DIR / 'Database'
+        self.ML_DIR = self.HOME_DIR / 'Models'
+        self.THUMBNAIL_DIR = self.HOME_DIR / 'Thumbnails'
+        self.FRAME_DIR = self.HOME_DIR / 'Frames'
+        self.save()
+
 
 # ==============================================================================
 def resource_path(relative_path):
