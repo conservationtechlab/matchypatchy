@@ -6,12 +6,12 @@ from matchypatchy import gui
 from matchypatchy import logging_config
 from matchypatchy import threads
 
-from matchypatchy.config import (HOME_DIR, add, asset_path, initiate, load_cfg,
+from matchypatchy.config import (HOME_DIR, add, asset_path, initiate, load_cfg, mpConfig,
                                  resource_path, update, update_project_folder,)
 from matchypatchy.database import (COLUMNS, EditObject, IMAGE_EXT,
                                    MatchyPatchyDB, THUMBNAIL_NOTFOUND,
                                    THUMBNAIL_SIZE, TZ_CONVERT_DICT, VIDEO_EXT,
-                                   check_missing_thumbnails,
+                                   check_missing_thumbnails, export_data,
                                    fetch_individual, fetch_media,
                                    fetch_media_thumbnails, fetch_regions,
                                    fetch_roi, fetch_roi_media,
@@ -63,7 +63,7 @@ from matchypatchy.threads import (AnimlThread, BuildManifestThread,
                                   update_model_yml,)
 
 __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
-           'COLUMNS', 'CSVImportThread', 'ClickableSlider', 'ComboBoxDelegate',
+           'CSVImportThread', 'ClickableSlider', 'ComboBoxDelegate',
            'ComboBoxSeparator', 'ConfigPopup', 'DisplayBase', 'DisplayCompare',
            'DisplayMedia', 'DownloadMLThread', 'EditObject',
            'FavoriteMatchObject', 'FetchTableThread', 'FilterBar', 'FilterBox',
@@ -92,13 +92,13 @@ __all__ = ['AboutPopup', 'AlertPopup', 'AnimlThread', 'BuildManifestThread',
            'individual_roi_dict', 'initiate', 'is_valid_reid_model',
            'load_cfg', 'load_model', 'location', 'logging_config', 'main_gui',
            'manual_query', 'match_object', 'match_thread', 'media',
-           'media_count', 'media_table', 'model_download_thread', 'mpdb',
-           'popup_alert', 'popup_config', 'popup_import_csv',
+           'media_count', 'media_table', 'model_download_thread', 'mpConfig',
+           'mpdb', 'popup_alert', 'popup_config', 'popup_import_csv',
            'popup_import_folder', 'popup_individual', 'popup_media_edit',
            'popup_ml', 'popup_pairx', 'popup_readme', 'popup_station',
            'popup_survey', 'qc_query', 'query', 'reid_thread', 'resource_path',
            'save_media_thumbnail', 'save_roi_thumbnail', 'sequence_roi_dict',
            'sequence_thread', 'setup', 'setup_chromadb', 'setup_database',
-           'setup_logger', 'table_thread', 'threads', 'thumbnails', 'update',
-           'update_model_yml', 'update_project_folder', 'widget_filterbar',
-           'widget_image_adjustment', 'widget_media', 'widgets']
+           'setup_logger', 'table_thread', 'threads', 'thumbnails',
+           'update_model_yml', 'widget_filterbar', 'widget_image_adjustment',
+           'widget_media', 'widgets']

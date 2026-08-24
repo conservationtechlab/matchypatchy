@@ -38,7 +38,6 @@ class FetchTableThread(QThread):
         if self.data_type == 1:
             self.data = fetch_roi_media(self.mpDB, reset_index=False)
             print("Fetched Roi Media, total rows:", len(self.data))
-
             # add missing thumbnails
             if missing_thumbnails:
                 for roi_id in missing_thumbnails:

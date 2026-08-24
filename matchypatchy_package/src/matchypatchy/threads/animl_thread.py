@@ -4,14 +4,12 @@ QThread Class for Processing BBox, Frames, BuildFileManifest with ANIML
 """
 import animl
 import pandas as pd
-from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
-from matchypatchy.database.media import fetch_roi_media
+from matchypatchy.database.media import fetch_roi_media, get_sha256
 from matchypatchy.threads.model_download_thread import get_path
-from matchypatchy import config
 
 
 MEGADETECTORv1000_SIZE = 960
@@ -33,11 +31,54 @@ class BuildManifestThread(QThread):
         self.manifest.emit(self.data)
 
 
+class VerifyNewBaseDirsThread(QThread):
+    """
+    Thread for launching buildfilemanifest
+    """
+    not_in_db = pyqtSignal(list)
+    not_in_new_directory = pyqtSignal(list)
+    finished = pyqtSignal()
+
+    def __init__(self, parent):
+        super().__init__()
+        self.mpDB = parent.mpDB
+        self.base_dirs = parent.base_dirs
+        self.updates = parent.updates
+        self.not_found_in_db = []
+        self.not_found_in_new_directory = []
+
+    def run(self):
+        for update in self.updates:
+            if not self.isInterruptionRequested():
+                base_dir_id = update[0]
+                directory = update[1]
+                # Flatten the list of media hashes for easier comparison
+                media = self.mpDB.select("media", columns="relative_path, sha256", row_cond=f"base_dir_id = {base_dir_id}")
+                media_hashes = set([h[1] for h in media])
+
+                # Build the file manifest for the new directory
+                new_data = animl.build_file_manifest(directory, exif=False)
+                new_hashes = [get_sha256(filepath) for filepath in new_data['filepath']]
+                new_data = list(zip(new_data['filepath'], new_hashes))
+
+                hash_not_found_in_db = [h[0] for h in new_data if h[1] not in set(media_hashes)]
+                self.not_found_in_db.append(hash_not_found_in_db)
+                
+                hash_not_found_in_new_directory = [h[0] for h in media if h[1] not in set(new_hashes)]
+                self.not_found_in_new_directory.append(hash_not_found_in_new_directory)
+
+        # Emit signals if the thread was not interrupted
+        if not self.isInterruptionRequested():
+            self.not_in_db.emit(self.not_found_in_db)
+            self.not_in_new_directory.emit(self.not_found_in_new_directory)
+            self.finished.emit()
+
+
 class AnimlThread(QThread):
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, mpDB, DETECTOR_KEY):
+    def __init__(self, mpDB, cfg, DETECTOR_KEY):
         super().__init__()
         self.mpDB = mpDB
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
@@ -51,10 +92,9 @@ class AnimlThread(QThread):
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
 
         # select media that do not have rois
-        media = self.mpDB._command("""SELECT * FROM media WHERE NOT EXISTS
-                                 (SELECT 1 FROM roi WHERE roi.media_id = media.id);""")
-        self.media = pd.DataFrame(media, columns=["id", "filepath", "sha256", "ext", "timestamp", "station_id", "camera_id",
-                                                  "sequence_id", "external_id", "comment"])
+        media, column_names = self.mpDB.get_media_with_filepath(row_cond="NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
+        self.media = pd.DataFrame(media, columns=column_names)
+        
         # select rois that do not have bbox
         rois = fetch_roi_media(mpDB, reset_index=False)
         self.rois = rois[rois['bbox_x'] == -1]  # imported without bbox

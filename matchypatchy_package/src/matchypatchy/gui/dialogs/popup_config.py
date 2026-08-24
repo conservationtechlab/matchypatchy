@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
 
@@ -25,7 +26,6 @@ class ConfigPopup(QDialog):
         self.parent = parent
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
-        self.mpDB = parent.mpDB
         self.logger = parent.logger
         self.cfg = config.load_cfg()
         self.ml_dir = Path(config.load_cfg('ML_DIR'))
@@ -41,7 +41,7 @@ class ConfigPopup(QDialog):
         directory_layout.addWidget(directory_label)
         # Editable line for project directory
         self.home_dir = QLineEdit()
-        self.home_dir.setText(str(self.cfg['HOME_DIR']))
+        self.home_dir.setText(str(self.cfg.HOME_DIR))
         directory_layout.addWidget(self.home_dir)
         # Edit button
         button_home_dir = QPushButton()
@@ -58,6 +58,14 @@ class ConfigPopup(QDialog):
         directory_layout.addWidget(button_add)
         layout.addLayout(directory_layout)
 
+        # UPDATE UPLOADS DIRECTORIES -------------------------------------------
+        uploads_layout = QHBoxLayout()
+        self.button_uploads = QPushButton("Edit Source Directories")
+        self.button_uploads.setFixedWidth(self.column1_width)
+        self.button_uploads.clicked.connect(self.edit_uploads)
+        uploads_layout.addWidget(self.button_uploads, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addLayout(uploads_layout)
+
         # Visualizer Model
         visualizer_layout = QHBoxLayout()
         visualizer_label = QLabel("Visualizer Model:")
@@ -65,7 +73,7 @@ class ConfigPopup(QDialog):
         visualizer_label.setFixedWidth(self.label_width)
         visualizer_layout.addWidget(visualizer_label)
         self.visualizer_model = QLineEdit()
-        reid_path = get_path(self.ml_dir, self.cfg['REID_KEY'])
+        reid_path = get_path(self.ml_dir, self.cfg.REID_KEY)
         self.visualizer_model.setText(str(reid_path))
         visualizer_layout.addWidget(self.visualizer_model)
         button_visualizer_model = QPushButton()
@@ -85,7 +93,7 @@ class ConfigPopup(QDialog):
         sequence_layout.addWidget(sequence_duration_label)
         self.sequence_duration = QLineEdit()
         self.sequence_duration.setFixedWidth(self.edit_width)
-        self.sequence_duration.setText(str(self.cfg['SEQUENCE_DURATION']))
+        self.sequence_duration.setText(str(self.cfg.SEQUENCE_DURATION))
         self.sequence_duration.textChanged.connect(self.update_sequence)
         sequence_layout.addWidget(self.sequence_duration, alignment=Qt.AlignmentFlag.AlignLeft)
         sequence_layout.addWidget(VerticalSeparator())
@@ -95,7 +103,7 @@ class ConfigPopup(QDialog):
         sequence_layout.addWidget(sequence_n_label)
         self.sequence_n = QLineEdit()
         self.sequence_n.setFixedWidth(self.edit_width)
-        self.sequence_n.setText(str(self.cfg['SEQUENCE_N']))
+        self.sequence_n.setText(str(self.cfg.SEQUENCE_N))
         self.sequence_n.textChanged.connect(self.update_sequence)
         sequence_layout.addWidget(self.sequence_n, alignment=Qt.AlignmentFlag.AlignLeft)
         sequence_layout.addStretch()
@@ -152,7 +160,7 @@ class ConfigPopup(QDialog):
         nummatches_layout.addWidget(nummatches_label)
         self.nummatches = QLineEdit()
         self.nummatches.setFixedWidth(self.edit_width)
-        self.nummatches.setText(str(self.cfg['KNN']))
+        self.nummatches.setText(str(self.cfg.KNN))
         nummatches_layout.addWidget(self.nummatches, alignment=Qt.AlignmentFlag.AlignLeft)
         self.nummatches.textChanged.connect(self.update_nummatches)
         layout.addLayout(nummatches_layout)
@@ -175,7 +183,7 @@ class ConfigPopup(QDialog):
         cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(cuda_layout)
 
-        # MPDB KEY -----------------------------------------------------------------
+        # MPDB KEY -------------------------------------------------------------
         mpdbkey_layout = QHBoxLayout()
         mpdbkey_label = QLabel("Database Key:")
         mpdbkey_label.setToolTip("Unique identifier for the current database.")
@@ -239,13 +247,12 @@ class ConfigPopup(QDialog):
 
     def refresh(self):
         """Refresh the config popup with updated values."""
-        self.cfg = config.load_cfg()
-        self.home_dir.setText(str(self.cfg['HOME_DIR']))
-        reid_path = get_path(self.ml_dir, self.cfg['REID_KEY'])
+        self.home_dir.setText(str(self.cfg.HOME_DIR))
+        reid_path = get_path(self.ml_dir, self.cfg.REID_KEY)
         self.visualizer_model.setText(str(reid_path))
-        self.nummatches.setText(str(self.cfg['KNN']))
-        self.sequence_duration.setText(str(self.cfg['SEQUENCE_DURATION']))
-        self.sequence_n.setText(str(self.cfg['SEQUENCE_N']))
+        self.nummatches.setText(str(self.cfg.KNN))
+        self.sequence_duration.setText(str(self.cfg.SEQUENCE_DURATION))
+        self.sequence_n.setText(str(self.cfg.SEQUENCE_N))
         self.mpdbkey_valid.setText(f"{self.mpDB.validate()}")
 
     def set_home_dir(self):
@@ -253,18 +260,13 @@ class ConfigPopup(QDialog):
         new_project = QFileDialog.getExistingDirectory(self, "Get Project Folder",
                                                        os.path.expanduser('~'),)
         if new_project:
-            new_db = Path(new_project) / "Database"
-            valid = self.mpDB.update_paths(new_db)
-
-            if valid:
-                config.update_project_folder(new_project, new_db)
-                self.refresh()
-
-            else:
-                dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
-                dialog.exec()
-                del dialog
-                self.logger.warning(f"Database at {new_db} is invalid. User prompted to select another path or delete.")
+            valid = self.parent.change_project(new_project)
+            if not valid:
+                return
+            # Update local references to the new project's database and config
+            self.mpDB = self.parent.mpDB
+            self.cfg = self.parent.cfg
+            self.refresh()
 
     def new_project(self):
         """Create new project directory"""
@@ -272,6 +274,9 @@ class ConfigPopup(QDialog):
                                                       os.path.expanduser('~'),)
         if parent_dir:
             self.parent.new_project(parent_dir)
+            # Update local references to the new project's database and config
+            self.mpDB = self.parent.mpDB
+            self.cfg = self.parent.cfg
             self.refresh()
 
     def set_visualizer_model(self):
@@ -350,8 +355,15 @@ class ConfigPopup(QDialog):
         """Change hardware device for running models"""
         selected_device = self.device.currentText()
         if selected_device == "CPU":
-            self.cfg['DEVICE'] = "CPUExecutionProvider"
+            self.cfg.update({'DEVICE': "CPUExecutionProvider"})
         elif selected_device == "CUDA-enabled GPU":
             self.cfg['DEVICE'] = "CUDAExecutionProvider"
         self.logger.info(f"Device changed to {self.cfg['DEVICE']}")
         config.update(self.cfg)
+            self.cfg.update({'DEVICE': "CUDAExecutionProvider"})
+
+    def edit_uploads(self):
+        """Open the upload directories manager popup."""
+        dialog = UploadManagerPopup(self)
+        dialog.exec()
+        del dialog

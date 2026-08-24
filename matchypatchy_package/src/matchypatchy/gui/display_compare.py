@@ -25,7 +25,6 @@ from matchypatchy.gui.qc_query import QC_QueryContainer
 from matchypatchy.gui.manual_query import ManualQueryContainer
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
-from matchypatchy.config import load_cfg
 
 
 class DisplayCompare(QWidget):
@@ -38,8 +37,9 @@ class DisplayCompare(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.parent = parent
         self.logger = parent.logger
+        self.cfg = parent.cfg
         self.mpDB = parent.mpDB
-        self.k = load_cfg('KNN')  # default knn
+        self.k = self.cfg.KNN  # default knn
         self.distance_metric = 'cosine'
         self.threshold = 50
         self.current_viewpoint = 1
@@ -278,10 +278,12 @@ class DisplayCompare(QWidget):
             if isinstance(child, (QPushButton)):
                 child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-    def update_db(self, mpDB):
+    def update_project(self, cfg, mpDB):
         """Update database object"""
+        self.cfg = cfg
         self.mpDB = mpDB
-
+        self.filterbar.update_project(mpDB)
+        
     # ==========================================================================
     # GUI
     # ==========================================================================
@@ -346,7 +348,7 @@ class DisplayCompare(QWidget):
         # hide individual filter
         self.filterbar.individual_visible(False)
         # run knn thread on entry
-        self.k = load_cfg('KNN')  # can be changed in configuration
+        self.k = self.cfg.KNN  # default knn
         self.QueryContainer = QueryContainer(self)  # re-establish object
         self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
         emb_exist = self.QueryContainer.load_data()

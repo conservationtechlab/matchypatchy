@@ -9,7 +9,6 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.database.media import fetch_individual, EditObject
 from matchypatchy.threads.model_download_thread import load_model
-from matchypatchy.config import load_cfg
 from matchypatchy.threads.table_thread import FetchTableThread, LoadTableThread
 
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
@@ -23,8 +22,9 @@ class MediaTable(QWidget):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.mpDB = parent.mpDB
         self.parent = parent
+        self.cfg = parent.cfg
+        self.mpDB = parent.mpDB
         self.data = pd.DataFrame()
         self.data_filtered = pd.DataFrame()
         self.individual_list = pd.DataFrame()
@@ -32,7 +32,7 @@ class MediaTable(QWidget):
         self.data_type = 1
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         self.thumbnail_size = 150
-        self.thumbnail_dir = load_cfg('THUMBNAIL_DIR')
+        self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
 
         # NOTE: do we want to refresh edit stack on re-entry?
         self.edit_stack = []
@@ -65,13 +65,14 @@ class MediaTable(QWidget):
         self.setLayout(layout)
 
 
+    def update_project(self, cfg, mpDB):
+        """Update database object"""
+        self.cfg = cfg
+        self.mpDB = mpDB
+
     # RUN ON ENTRY -------------------------------------------------------------
-    def load_data(self, data_type):
-        """
-        Fetch table, format, and filter data
-        data_type: 0 = media, 1 = rois
-        Returns True if data loaded, False if no media
-        """
+    def clear_contents(self, data_type):
+        """Clear all contents of the media table"""
         # clear old view
         self.data_type = data_type
         self.table.clearContents()
@@ -485,6 +486,7 @@ class MediaTable(QWidget):
 
         # reload data and refresh table
         self.edit_stack = []
+        self.clear_contents(self.data_type)
         self.load_data(self.data_type)
 
     def select_row(self, row, overwrite=None):
