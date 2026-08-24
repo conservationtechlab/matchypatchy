@@ -348,8 +348,8 @@ class MatchyPatchyDB():
                         (base_dir_id, relative_path, sha256, ext, timestamp, station_id,
                         camera_id, sequence_id, external_id, comment)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
-            data_tuple = (int(base_dir_id)
-                          str(filepath),
+            data_tuple = (int(base_dir_id),
+                          str(relative_path),
                           str(sha256),
                           str(ext),
                           str(timestamp),
