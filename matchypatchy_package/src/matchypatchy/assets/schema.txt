@@ -30,7 +30,12 @@ CREATE TABLE station (
                         long REAL,
                         survey_id INTEGER NOT NULL,
                         FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE)
-None
+TABLE: camera
+CREATE TABLE camera (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        station_id INTEGER NOT NULL,
+                        FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE)
 TABLE: uploads
 CREATE TABLE uploads (
                         id INTEGER PRIMARY KEY,
@@ -51,7 +56,7 @@ CREATE TABLE media (
                         sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
-                        FOREIGN KEY (base_dir_id) REFERENCES uploads (id),
+                        FOREIGN KEY (base_dir_id) REFERENCES uploads (id) ON DELETE CASCADE,
                         FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
                         FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
                         FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL)
@@ -84,12 +89,6 @@ CREATE TABLE individual (
 TABLE: sequence
 CREATE TABLE sequence (
                         id INTEGER PRIMARY KEY)
-TABLE: camera
-CREATE TABLE camera (
-                        id INTEGER PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        station_id INTEGER NOT NULL,
-                        FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE)
 TABLE: media_thumbnails
 CREATE TABLE media_thumbnails (
                         id INTEGER PRIMARY KEY,

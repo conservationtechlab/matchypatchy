@@ -84,9 +84,13 @@ class UploadManagerPopup(QDialog):
 
     def update(self):
         """Get upload directories list from mpDB"""
+        self.list.clearContents()
         self.base_dirs = self.mpDB._command("""SELECT u.id, u.base_dir, u.created_at, COUNT(media.id) AS count
                                                  FROM uploads u LEFT JOIN media ON media.base_dir_id = u.id
                                                  GROUP BY media.base_dir_id;""")
+        if self.base_dirs is None:
+            self.base_dirs = []
+
         self.list.setRowCount(len(self.base_dirs))
 
         for row in range(len(self.base_dirs)):
@@ -180,9 +184,8 @@ class UploadManagerPopup(QDialog):
     def log(self):
         """Log the verification results"""
         if self.contains_errors:
-            dialog = AlertPopup(self, 
-                                prompt=("Some files in the database could not be found in the new directory. ",
-                                        "Results have been saved to the log."))
+            dialog = AlertPopup(self, prompt=("Some files in the database could not be found in the new directory. "
+                                              "Results have been saved to the log."))
             dialog.exec()
             del dialog
 
@@ -194,9 +197,6 @@ class UploadManagerPopup(QDialog):
 
     def save(self):
         """Save changes to the selected upload directory"""
-        print(self.updates)
-        print(self.errors)
-
         # no updates, return early
         if self.updates == []:
             return
@@ -211,10 +211,11 @@ class UploadManagerPopup(QDialog):
             del dialog
 
         # if there are errors, warn the user
+        # TODO: Choose what will happen
         if self.contains_errors:
             dialog = AlertPopup(self, 
-                                prompt=("There are missing files in the new directories. Saving may cause "
-                                        "inconsistencies in the database. Would you like to proceed?"))
+                                prompt=("There are missing files in the new directories. This will only update "
+                                        "chosen paths with all available files. Would you like to proceed?"))
             if dialog.exec() == QDialog.rejected:
                 return
             del dialog
@@ -228,7 +229,7 @@ class UploadManagerPopup(QDialog):
                                     (update[1], update[0]))
             # WARN USER: Skipping update due to missing files
             else:
-                print(f"Skipping update for {update} due to missing files: {missing}")
+                self.logger.warning(f"Skipping update for {update} due to missing files: {missing}")
 
         self.update()
         self.button_save.setEnabled(False)

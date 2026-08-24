@@ -56,6 +56,13 @@ def setup_database(key, filepath, db=None):
                         survey_id INTEGER NOT NULL,
                         FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);''')
 
+    # CAMERA
+    cursor.execute('''CREATE TABLE IF NOT EXISTS camera (
+                        id INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        station_id INTEGER NOT NULL,
+                        FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE);''')
+
     # UPLOADS
     cursor.execute('''CREATE TABLE IF NOT EXISTS uploads (
                         id INTEGER PRIMARY KEY,
@@ -75,7 +82,7 @@ def setup_database(key, filepath, db=None):
                         sequence_id INTEGER,
                         external_id INTEGER,
                         comment TEXT,
-                        FOREIGN KEY (base_dir_id) REFERENCES uploads (id),
+                        FOREIGN KEY (base_dir_id) REFERENCES uploads (id) ON DELETE CASCADE,
                         FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
                         FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
                         FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);''')
@@ -107,13 +114,6 @@ def setup_database(key, filepath, db=None):
     # SEQUENCE
     cursor.execute('''CREATE TABLE IF NOT EXISTS sequence (
                         id INTEGER PRIMARY KEY);''')
-
-    # CAMERA
-    cursor.execute('''CREATE TABLE IF NOT EXISTS camera (
-                        id INTEGER PRIMARY KEY,
-                        name TEXT NOT NULL,
-                        station_id INTEGER NOT NULL,
-                        FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE);''')
 
     # THUMBNAILS
     cursor.execute('''CREATE TABLE IF NOT EXISTS media_thumbnails (
