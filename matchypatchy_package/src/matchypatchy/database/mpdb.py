@@ -574,7 +574,7 @@ class MatchyPatchyDB():
         """Update the base path for a given base_dir_id"""
         try:
             cursor = self.db.cursor()
-            command = f'UPDATE uploads SET base_dir = ? WHERE id = ?;'
+            command = f'UPDATE uploads SET base_dir=? WHERE id=?;'
             cursor.execute(command, (new_base_dir, base_dir_id))
             self.db.commit()
             self.logger.info(f"Updated base path for id {base_dir_id} to {new_base_dir}")
