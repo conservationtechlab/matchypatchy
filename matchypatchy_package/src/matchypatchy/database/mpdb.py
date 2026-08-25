@@ -334,7 +334,8 @@ class MatchyPatchyDB():
                   camera_id: Optional[int] = None,
                   sequence_id: Optional[int] = None,
                   external_id: Optional[int] = None,
-                  comment: Optional[str] = None):
+                  comment: Optional[str] = None,
+                  quiet: bool = True):
         """
         Media has 10 attributes not including id:
             id INTEGER PRIMARY KEY,
@@ -365,6 +366,8 @@ class MatchyPatchyDB():
                           sequence_id,
                           external_id,
                           comment)
+            if not quiet:
+                print(f"DEBUG: Executing SQL command: {command} with data: {data_tuple}")
             cursor.execute(command, data_tuple)
             media_id = cursor.lastrowid
             self.db.commit()
@@ -372,7 +375,8 @@ class MatchyPatchyDB():
 
         # filepath already exists
         except sqlite3.IntegrityError as error:
-            print(f"DEBUG: IntegrityError caught: {error}")
+            if not quiet:
+                print(f"DEBUG: IntegrityError caught: {error}")
             if 'UNIQUE constraint failed: media.relative_path' in error.args[0]:
                 self.logger.error(f"Failed to add {relative_path}, already exists in database.")
                 return "duplicate_error"
@@ -382,7 +386,8 @@ class MatchyPatchyDB():
             return None
 
         except sqlite3.Error as error:
-            print(f"Failed to add media: {error}")
+            if not quiet:
+                print(f"Failed to add media: {error}")
             self.logger.error(f"Failed to add media: {error}")
             return None
 
@@ -394,7 +399,8 @@ class MatchyPatchyDB():
                 reviewed: int = 0,
                 favorite: int = 0,
                 individual_id: Optional[int] = None,
-                emb: int = 0):
+                emb: int = 0,
+                quiet: bool = True):
         """
         Add a roi with:
             - media_id (int) NOT NULL
@@ -426,11 +432,15 @@ class MatchyPatchyDB():
                           int(favorite),
                           individual_id,
                           emb)
+            if not quiet:
+                print(f"Executing SQL command: {command} with data: {data_tuple}")
             cursor.execute(command, data_tuple)
             roi_id = cursor.lastrowid
             self.db.commit()
             return roi_id
         except sqlite3.Error as error:
+            if not quiet:
+                print(f"Failed to add roi for media: {media_id}. {error}")
             self.logger.error(f"Failed to add roi for media: {media_id}. {error}")
             return None
 
@@ -511,7 +521,7 @@ class MatchyPatchyDB():
             return None
 
     # EDIT ---------------------------------------------------------------------
-    def edit_row(self, table: str, row_id: int, replace: dict, quiet=True):
+    def edit_row(self, table: str, row_id: int, replace: dict, allow_none=False, quiet=True):
         """
         Edit a row in place
 
@@ -527,7 +537,12 @@ class MatchyPatchyDB():
             # convert empty values to SQL NULL
             for key, value in replace.items():
                 if value in (None, ''):
-                    replace[key] = 'NULL'
+                    if allow_none:
+                        replace[key] = 'NULL'
+                    else:
+                        self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
+                        return False
+                # if value is a string, wrap it in quotes for SQL
                 if isinstance(value, str):
                     replace[key] = f"'{value}'"
 
@@ -685,8 +700,10 @@ class MatchyPatchyDB():
                 command = f"""SELECT {columns} FROM station LEFT JOIN survey ON station.survey_id = survey.id
                                                 LEFT JOIN region ON survey.region_id = region.id;"""
             cursor.execute(command)
-            column_names = columns.split(", ")
             rows = cursor.fetchall()  # returns in tuple
+            # rename columns to avoid issues with '.' in column names when importing
+            column_names = columns.split(", ")
+            column_names = [col.replace(".", "_") for col in column_names]
             return rows, column_names
         except sqlite3.Error as error:
             self.logger.error(f"Failed all_media fetch: {error}")
@@ -707,20 +724,22 @@ class MatchyPatchyDB():
     def export_data(self):
         """
         Fetch Info for Media Table
-        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 'reviewed', 
-                   'media_id', 'individual_id', 'emb', 'base_dir_id', 'relative_path', 'ext', 
-                   'timestamp', 'station_id', 'sequence_id', 'camera_id', 'external_id', 'comment', 
-                   'favorite', 'name', 'sex', 'age', 'filepath']
+        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+                   'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
+                   'relative_path', 'ext', 'timestamp', 'station_id', 'sequence_id',
+                   'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex', 'age',
+                   'filepath', 'station_name', 'lat', 'long', 'station_survey_id',
+                   'survey_name', 'region_name', 'camera_name']
         """
         media, column_names = self.all_media()
         rois = pd.DataFrame(media, columns=column_names)
         if not rois.empty:
             # convert viewpoint to int
             rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
+            rois['timestamp'] = pd.to_datetime(rois['timestamp'])
             # merge with stations
-            stations, column_names = self.stations()
-            stations = pd.DataFrame(stations, columns=column_names)
-            stations.columns = stations.columns.str.replace('.', '_')
+            stations, columns = self.stations()
+            stations = pd.DataFrame(stations, columns=columns)
             export_data = pd.merge(rois, stations, on="station_id")
             # add camera name
             cameras = self.select("camera")
@@ -732,9 +751,6 @@ class MatchyPatchyDB():
                 export_data['camera_name'] = None
             # replace NaN with None
             export_data = export_data.replace({float('nan'): None})
-            # rename columns to avoid issues with '.' in column names when importing
-            export_data.columns = export_data.columns.str.replace('.', '_')
-            # print("DEBUG:", export_data.columns)
             return export_data
         else:
             return None
