@@ -123,15 +123,15 @@ class LoadTableThread(QThread):
         elif column in ['filepath', 'timestamp', 'sequence_id', 'roi_count']:
             # NOTE: language settings may cause filepath to be displayed differently, e.g. "C:\Users\..." vs "C:/Users/..."
             text = str(roi[column])
-           # if column == 'filepath':
-           #     text = text.replace("\\", "/")   # display-only, do not write back to DB
+            # if column == 'filepath':
+            #     text = text.replace("\\", "/")   # display-only, do not write back to DB
             qtw = QTableWidgetItem(text)
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
         # Station
         elif column == 'station':
             qtw = QTableWidgetItem(self.valid_stations[roi["station_id"]])
         # Camera
-        # TODO: itemdelegate 
+        # TODO: itemdelegate
         elif column == 'camera_id':
             if roi["camera_id"]:
                 qtw = QTableWidgetItem(self.valid_cameras[int(roi["camera_id"])])
@@ -155,17 +155,15 @@ class LoadTableThread(QThread):
                 qtw = QTableWidgetItem("Unknown")
             qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
         # Sex and Age
-        elif column == "sex" or column == 'age':
-            if roi['individual_id'] is not None:
-                qtw = QTableWidgetItem(str(roi[column]))
-            else:
-                qtw = QTableWidgetItem("Unknown")
+        elif column in ["sex", "age"]:
+            text = str(roi[column]) if roi['individual_id'] is not None else "Unknown"
+            qtw = QTableWidgetItem(text)
         # Reviewed and Favorite Checkbox
-        elif column == 'reviewed' or column == 'favorite':
+        elif column in ['reviewed', 'favorite']:
             qtw = QTableWidgetItem()
             qtw.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
             qtw.setCheckState(self.set_checkstate(roi[column]))
-        # everything else 
+        # everything else
         else:
             qtw = QTableWidgetItem(str(roi[column]))
         # return widget

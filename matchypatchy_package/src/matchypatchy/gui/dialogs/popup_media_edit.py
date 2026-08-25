@@ -18,6 +18,8 @@ from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy import config
 
+# TODO: remove load_config
+
 
 class MediaEditPopup(QDialog):
     """Popup for viewing and editing media/ROI metadata"""

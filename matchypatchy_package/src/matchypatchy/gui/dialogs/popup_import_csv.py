@@ -25,6 +25,8 @@ class ImportCSVPopup(QDialog):
 
     def __init__(self, parent, manifest):
         super().__init__(parent)
+        self.mpDB = parent.mpDB
+        self.cfg = parent.cfg
         self.logger = parent.logger
         self.active_survey = parent.active_survey[1]
         self.data = pd.read_csv(manifest)
@@ -275,7 +277,7 @@ class ImportCSVPopup(QDialog):
         # migrate from exported mpdb
         if self.migrate:
             self.logger.info(f"Migrating {len(self.data.groupby("filepath"))} files and {self.data.shape[0]} ROIs to Database")
-            self.import_thread = CSVMigrateThread(self.mpDB, self.data, self.logger)
+            self.import_thread = CSVMigrateThread(self, self.data)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.error_update.connect(self.show_errors)  # Connect error signal
             self.import_thread.start()
@@ -288,7 +290,7 @@ class ImportCSVPopup(QDialog):
             unique_images = self.data.groupby(selected_columns["filepath"])
             print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
             self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
-            self.import_thread = CSVImportThread(self.mpDB, unique_images, selected_columns, self.logger)
+            self.import_thread = CSVImportThread(self, unique_images, selected_columns)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.finished.connect(self.close)
             self.import_thread.start()
