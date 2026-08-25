@@ -16,6 +16,10 @@ from matchypatchy.threads.import_thread import FolderImportThread
 
 
 class ImportFolderPopup(QDialog):
+    """
+    Popup for importing data from a folder.
+    """
+
     def __init__(self, parent, directory):
         super().__init__(parent)
         self.logger = parent.logger
@@ -23,10 +27,11 @@ class ImportFolderPopup(QDialog):
         self.mpDB = parent.mpDB
         self.active_survey = parent.active_survey
         self.timezone = self.mpDB.select_join("survey", "region", "survey.region_id=region.id",
-                                        columns="region.timezone",
-                                        row_cond=f"survey.id={self.active_survey[0]}")[0][0][0]
+                                              columns="region.timezone",
+                                              row_cond=f"survey.id={self.active_survey[0]}")[0][0][0]
         self.directory = Path(directory)
         self.data = pd.DataFrame()
+        self.import_thread = None
 
         self.setWindowTitle(f'Importing into "{self.active_survey[1]}"')
         layout = QVBoxLayout()
@@ -99,7 +104,7 @@ class ImportFolderPopup(QDialog):
         """Offer options for station and cameralevel selection"""
         self.station_label.setText("Select directory level that corresponds to STATION, if available:")
         self.station.show()
-  
+
         self.camera_label.setText("Select directory level that corresponds to CAMERA, if available:")
         self.camera.show()
 

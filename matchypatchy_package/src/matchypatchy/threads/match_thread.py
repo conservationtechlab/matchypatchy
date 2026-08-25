@@ -9,7 +9,6 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.threads.match_object import MatchObject
 
 
-
 class MatchEmbeddingThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
@@ -137,7 +136,7 @@ class MatchEmbeddingThread(QThread):
         # prioritize sequences with IDed individuals
         if len(ided_rois) > 0:
             for match_object in self.pairs:
-                # prioritize matches by favorites 
+                # prioritize matches by favorites
                 if len(favorite_rois) > 0:
                     match_object.rank_neighbors_by_distance()
                     match_object.rank_neighbors_by_favorites(favorite_rois)

@@ -14,6 +14,7 @@ from matchypatchy.database.media import fetch_media
 
 
 class SequenceThread(QThread):
+    """Thread for processing media sequences based on station, camera, and timestamp."""
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     done = pyqtSignal()
 

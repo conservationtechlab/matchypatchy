@@ -23,7 +23,7 @@ class ManualQueryContainer(QObject):
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
         self.pair_table = pd.DataFrame()
-        self.filters = dict()
+        self.filters = {}
 
         self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
@@ -33,6 +33,7 @@ class ManualQueryContainer(QObject):
         self.current_match = 1
         self.current_query_sn = 0
         self.n_queries = 0
+        self.ranked_sequences = []
 
         # ROI REFERENCE
         self.current_query_rid = 0
@@ -56,12 +57,7 @@ class ManualQueryContainer(QObject):
             return False
 
         # must have embeddings to continue
-        if not (self.data_raw["emb"] == 0).all():
-            # need sequence and capture ids from media to restrict comparisons shown to
-            return True
-        # no embeddings
-        else:
-            return False
+        return not (self.data_raw["emb"] == 0).all()
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
@@ -92,23 +88,24 @@ class ManualQueryContainer(QObject):
             else:  # no valid stations, empty dataframe
                 self.parent.show_progress("No data to compare within filter.")
 
-        self.rois = self.data.index.tolist()
-        # set current query rois to all rois once 
-        self.ranked_sequences = [[r] for r in self.rois]
+        rois = self.data.index.tolist()
+        # set current query rois to all rois once
+        self.ranked_sequences = [[r] for r in rois]
         # set number of queries to validate
-        self.n_queries = len(self.rois)
+        self.n_queries = len(rois)
 
         # set match to first entry
-        self.current_match_rois = self.rois
-        self.set_match(self.current_match) #current_match default to 1
+        self.current_match_rois = rois
+        self.set_match(self.current_match)  # current_match default to 1
 
     def calculate_neighbors(self):
+        """Calculate pairwise distances between all media in the current dataset."""
         distances_list = []
         for i in range(len(self.data.index.tolist())):
             for j in range(i + 1, len(self.data.index.tolist())):  # Only j > i
                 id1, id2 = self.data.index.tolist()[i], self.data.index.tolist()[j]
                 distance = 1 - self.mpDB.calculate_similarity(id1, id2)
-                
+
                 distances_list.append({
                     'id1': id1,
                     'id2': id2,
@@ -133,7 +130,7 @@ class ManualQueryContainer(QObject):
         # set view to first in sequence
         self.set_within_query_sequence(0)
         # update matches
-        #self.update_matches()
+        # self.update_matches()  not necessary
 
     def set_within_query_sequence(self, n):
         """
@@ -165,33 +162,34 @@ class ManualQueryContainer(QObject):
         self.current_match_rid = self.current_match_rois[self.current_match]
 
     # VIEWPOINT ----------------------------------------------------------------
-        
+
     def toggle_viewpoint(self, selected_viewpoint):
         """Set the selected viewpoint filter and update rois"""
         data = self.data.loc[self.current_query_rois]
-        self.query_viewpoint_map = dict(zip(data.index, data['viewpoint']))
+        query_viewpoint_map = dict(zip(data.index, data['viewpoint']))
 
         self.selected_viewpoint = selected_viewpoint
+        # if selected_viewpoint is all, show all rois
         if self.selected_viewpoint == 1:
-            # if selected_viewpoint is all, show all rois
             return True
+  
+        # adjust numbering
+        self.selected_viewpoint = 1 if self.selected_viewpoint == 2 else selected_viewpoint
+        self.current_query_rois = [rid for rid in self.current_query_rois if query_viewpoint_map[rid] == self.selected_viewpoint]
+        self.current_match_rois = [rid for rid in self.current_match_rois if query_viewpoint_map[rid] == self.selected_viewpoint]
+        if not self.current_query_rois or not self.current_match_rois:
+            return False
         else:
-            # adjust numbering
-            self.selected_viewpoint = 1 if self.selected_viewpoint == 2 else selected_viewpoint
-            self.current_query_rois = [rid for rid in self.current_query_rois if self.query_viewpoint_map[rid] == self.selected_viewpoint]
-            self.current_match_rois = [rid for rid in self.current_match_rois if self.query_viewpoint_map[rid] == self.selected_viewpoint]
-            if not self.current_query_rois or not self.current_match_rois:
-                return False
-            else:
-                self.set_within_query_sequence(0)
-                self.set_match(1)
-                return True
+            self.set_within_query_sequence(0)
+            self.set_match(1)
+            return True
 
     # RETURN INFO --------------------------------------------------------------
     def is_existing_match(self):
+        """Return whether the current match is an existing match"""
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None
-    
+
     def both_unnamed(self):
         """Return whether both current query and match are unnamed"""
         return self.data.loc[self.current_match_rid, "individual_id"] is None and \
@@ -283,5 +281,6 @@ class ManualQueryContainer(QObject):
         self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': int(keep_id), "reviewed": 1}, quiet=False)
 
     def unmatch(self):
+        """Unmatch the current query and match"""
         # Set current match id to none
         self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None, "reviewed": 0}, quiet=False)

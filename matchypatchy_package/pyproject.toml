@@ -25,3 +25,9 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+
+[tool.pylint.master]
+extension-pkg-whitelist = ["PyQt6"]
+
+[tool.pylint.messages_control]
+disable = ["no-name-in-module"]

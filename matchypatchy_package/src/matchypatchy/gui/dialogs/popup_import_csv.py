@@ -12,24 +12,30 @@ from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
 
 
 class ImportCSVPopup(QDialog):
+    """
+    Popup for importing data from a CSV manifest.
+    """
 
     EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                         'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
                         'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                         'comment', 'name', 'sex', 'age',
-                        'station_id', 'station_name', 'lat', 'long', 'station_survey_id', 
+                        'station_id', 'station_name', 'lat', 'long', 'station_survey_id',
                         'survey_name', 'region_name', 'camera_name'}
 
     def __init__(self, parent, manifest):
         super().__init__(parent)
+        self.mpDB = parent.mpDB
+        self.cfg = parent.cfg
         self.logger = parent.logger
         self.active_survey = parent.active_survey[1]
         self.data = pd.read_csv(manifest)
+        self.import_thread = None
 
         # setup layout
         self.setWindowTitle("Import from CSV")
         layout = QVBoxLayout()
-         # Create a label
+        # Create a label
         self.label = QLabel("")
         layout.addWidget(self.label)
         layout.addSpacing(5)
@@ -45,18 +51,20 @@ class ImportCSVPopup(QDialog):
             self.migrate = False
             self.columns = ["None"] + list(self.data.columns)
             self.survey_columns = [str(self.active_survey)] + list(self.data.columns)
-            self.selected_filepath = self.columns[0]
-            self.selected_timestamp = self.columns[0]
-            self.selected_survey = self.survey_columns[0]
-            self.selected_station = self.columns[0]
-            self.selected_region = self.columns[0]
-            self.selected_sequence_id = self.columns[0]
-            self.selected_camera = self.columns[0]
-            self.selected_external_id = self.columns[0]
-            self.selected_viewpoint = self.columns[0]
-            self.selected_individual = self.columns[0]
-            self.selected_favorite = self.columns[0]
-            self.selected_comment = self.columns[0]
+            self.selections = {
+                "filepath": self.columns[0],
+                "timestamp": self.columns[0],
+                "survey": self.survey_columns[0],
+                "station": self.columns[0],
+                "region": self.columns[0],
+                "sequence_id": self.columns[0],
+                "camera": self.columns[0],
+                "external_id": self.columns[0],
+                "viewpoint": self.columns[0],
+                "individual": self.columns[0],
+                "favorite": self.columns[0],
+                "comment": self.columns[0],
+            }
 
             # Survey
             survey_layout = QHBoxLayout()
@@ -98,7 +106,7 @@ class ImportCSVPopup(QDialog):
                 ("External ID", "external_id", self.select_external),
                 ("Viewpoint", "viewpoint", self.select_viewpoint),
                 ("Individual", "individual", self.select_individual),
-                ("Favorite", "favorite", self.select_individual), 
+                ("Favorite", "favorite", self.select_individual),
                 ("Comment", "comment", self.select_comment)
             ]
 
@@ -133,36 +141,40 @@ class ImportCSVPopup(QDialog):
 
     # would this be better as a switch statement? probably
     def select_filepath(self):
+        """Select the filepath column from the CSV."""
         try:
-            self.selected_filepath = self.columns[self.filepath.currentIndex()]
+            self.selections['filepath'] = self.columns[self.filepath.currentIndex()]
             self.check_ok_button()
             return True
         except IndexError:
             return False
 
     def select_timestamp(self):
+        """Select the timestamp column from the CSV."""
         try:
-            self.selected_timestamp = self.columns[self.timestamp.currentIndex()]
+            self.selections['timestamp'] = self.columns[self.timestamp.currentIndex()]
             self.check_ok_button()
             return True
         except IndexError:
             return False
 
     def select_survey(self):
+        """Select the survey column from the CSV."""
         if self.survey.currentIndex() == 0:
-            self.selected_survey = ["active_survey", self.survey_columns[self.survey.currentIndex()]]
+            self.selections['survey'] = ["active_survey", self.survey_columns[self.survey.currentIndex()]]
             return True
         else:
             try:
-                self.selected_survey = self.survey_columns[self.survey.currentIndex()]
+                self.selections['survey'] = self.survey_columns[self.survey.currentIndex()]
                 self.check_ok_button()
                 return True
             except IndexError:
                 return False
 
     def select_station(self):
+        """Select the station column from the CSV."""
         try:
-            self.selected_station = self.columns[self.station.currentIndex()]
+            self.selections['station'] = self.columns[self.station.currentIndex()]
             self.check_ok_button()
             return True
         except IndexError:
@@ -170,57 +182,65 @@ class ImportCSVPopup(QDialog):
 
     # OPTIONAL
     def select_region(self):
+        """Select the region column from the CSV."""
         try:
-            self.selected_region = self.columns[self.region.currentIndex()]
+            self.selections['region'] = self.columns[self.region.currentIndex()]
             return True
         except IndexError:
             return False
 
     def select_camera(self):
+        """Select the camera column from the CSV."""
         try:
-            self.selected_camera = self.columns[self.camera.currentIndex()]
+            self.selections['camera'] = self.columns[self.camera.currentIndex()]
             return True
         except IndexError:
             return False
 
     def select_sequence(self):
+        """Select the sequence ID column from the CSV."""
         try:
-            self.selected_sequence_id = self.columns[self.sequence_id.currentIndex()]
+            self.selections['sequence_id'] = self.columns[self.sequence_id.currentIndex()]
             return True
         except IndexError:
             return False
 
     def select_external(self):
+        """Select the external ID column from the CSV."""
         try:
-            self.selected_external_id = self.columns[self.external_id.currentIndex()]
+            self.selections['external_id'] = self.columns[self.external_id.currentIndex()]
             return True
         except IndexError:
             return False
 
     def select_viewpoint(self):
+        """Select the viewpoint column from the CSV."""
         try:
-            self.selected_viewpoint = self.columns[self.viewpoint.currentIndex()]
+            self.selections['viewpoint'] = self.columns[self.viewpoint.currentIndex()]
             return True
         except IndexError:
             return False
 
     def select_individual(self):
+        """Select the individual column from the CSV."""
         try:
-            self.selected_individual = self.columns[self.individual.currentIndex()]
+            self.selections['individual'] = self.columns[self.individual.currentIndex()]
             return True
         except IndexError:
             return False
 
     def select_favorite(self):
+        """Select the favorite column from the CSV."""
         try:
-            self.selected_favorite = self.columns[self.favorite.currentIndex()]
+            self.selections['favorite'] = self.columns[self.favorite.currentIndex()]
             return True
         except IndexError:
             return False
 
     def select_comment(self):
+        """Select the comment column from the CSV."""
         try:
-            self.selected_comment = self.columns[self.comment.currentIndex()]
+            self.selections['comment'] = self.columns[self.comment.currentIndex()]
             return True
         except IndexError:
             return False
@@ -237,26 +257,15 @@ class ImportCSVPopup(QDialog):
         else:
             if self.survey.currentIndex() == 0:
                 self.select_survey()
-            if (self.selected_filepath != "None") and (self.selected_timestamp != "None") and \
-            (self.selected_station != "None") and (self.selected_survey != "None"):
+            if (self.selections.get('filepath', "None") != "None") and (self.selections.get('timestamp', "None") != "None") and \
+            (self.selections.get('station', "None") != "None") and (self.selections.get('survey', "None") != "None"):
                 self.okButton.setEnabled(True)
             else:
                 self.okButton.setEnabled(False)
 
     def collate_selections(self):
         """Collate selected columns into a dictionary"""
-        return {"filepath": self.selected_filepath,
-                "timestamp": self.selected_timestamp,
-                "survey": self.selected_survey,
-                "station": self.selected_station,
-                "camera": self.selected_camera,
-                "region": self.selected_region,
-                "sequence_id": self.selected_sequence_id,
-                "external_id": self.selected_external_id,
-                "viewpoint": self.selected_viewpoint,
-                "individual": self.selected_individual,
-                "favorite": self.selected_favorite,
-                "comment": self.selected_comment}
+        return self.selections
 
     def import_manifest(self):
         """
@@ -268,10 +277,9 @@ class ImportCSVPopup(QDialog):
         # migrate from exported mpdb
         if self.migrate:
             self.logger.info(f"Migrating {len(self.data.groupby("filepath"))} files and {self.data.shape[0]} ROIs to Database")
-            self.import_thread = CSVMigrateThread(self.mpDB, self.data, self.logger)
+            self.import_thread = CSVMigrateThread(self, self.data)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.error_update.connect(self.show_errors)  # Connect error signal
-            #self.import_thread.finished.connect(self.close)
             self.import_thread.start()
             return
 
@@ -282,7 +290,7 @@ class ImportCSVPopup(QDialog):
             unique_images = self.data.groupby(selected_columns["filepath"])
             print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
             self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
-            self.import_thread = CSVImportThread(self.mpDB, unique_images, selected_columns, self.logger)
+            self.import_thread = CSVImportThread(self, unique_images, selected_columns)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.finished.connect(self.close)
             self.import_thread.start()
