@@ -214,7 +214,7 @@ class MediaEditPopup(QDialog):
 
     def toggle_edit_roi_button(self):
         """Enable or disable the edit ROI button based on whether the current image has an ROI."""
-        if pd.isna(self.data.loc[self.current_image_index, "id"]):
+        if pd.isna(self.data.iloc[self.current_image_index]["id"]):
             print("video")
             self.edit_btn.setEnabled(False)
         else:
@@ -268,7 +268,7 @@ class MediaEditPopup(QDialog):
                     # add new thumbnail
                     self.mpDB.add_thumbnail("roi", new_rid, roi_thumbnail)
                     # update internal data
-                    self.data.loc[self.current_image_index,
+                    self.data.iloc[self.current_image_index,
                                   ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]] = [bbox_x, bbox_y, bbox_w, bbox_h]
                 del dialog
 
@@ -639,7 +639,7 @@ class MetadataPanel(QWidget):
                                   mid=row.media_id,
                                   reference='sex',
                                   previous_value=row.sex,
-                                  new_value=self.age.currentText())
+                                  new_value=self.sex.currentText())
                 self.send_edit(edit)
 
     def change_age(self):
