@@ -17,10 +17,10 @@ class ImportCSVPopup(QDialog):
     """
 
     EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                        'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-                        'filepath', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-                        'comment', 'name', 'sex', 'age',
-                        'station_id', 'station_name', 'lat', 'long', 'station_survey_id',
+                        'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
+                        'relative_path', 'ext', 'timestamp', 'station_id', 'sequence_id',
+                        'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex', 'age',
+                        'filepath', 'station_name', 'lat', 'long', 'station_survey_id',
                         'survey_name', 'region_name', 'camera_name'}
 
     def __init__(self, parent, manifest):

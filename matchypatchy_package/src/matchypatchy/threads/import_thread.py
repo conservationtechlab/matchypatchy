@@ -17,12 +17,11 @@ class CSVMigrateThread(QThread):
     error_update = pyqtSignal(list)  # Signal to update the error log
 
     EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                        'reviewed', 'favorite', 'media_id', 'emb',
-                        'filepath', 'ext', 'timestamp', 'sequence_id', 'external_id', 'comment',
-                        'individual_id', 'name', 'sex', 'age',
-                        'station_id', 'station_name', 'lat', 'long',
-                        'station_survey_id', 'survey_name', 'region_name',
-                        'camera_id', 'camera_name'}
+                        'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
+                        'relative_path', 'ext', 'timestamp', 'station_id', 'sequence_id',
+                        'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex', 'age',
+                        'filepath', 'station_name', 'lat', 'long', 'station_survey_id',
+                        'survey_name', 'region_name', 'camera_name'}
 
     def __init__(self, parent, data):
         super().__init__()
@@ -31,18 +30,24 @@ class CSVMigrateThread(QThread):
         self.cfg = parent.cfg
         self.data = data
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
+        self.base_dir_ref = {}  # dictionary to store base directory path to id mapping
         self.station_ref = {}  # dictionary to store survey name to id mapping
         self.camera_ref = {}  # dictionary to store camera name to id mapping
         self.individual_ref = {}  # dictionary to store individual name to id mapping
         self.sequence_ref = {}  # dictionary to store sequence id mapping
         self.errors = []  # list to store errors encountered during import
 
+        assert isinstance(self.data, pd.DataFrame), "Data must be a pandas DataFrame"
+        missing_columns = self.EXPECTED_COLUMNS - set(self.data.columns)
+        if missing_columns:
+            raise ValueError(f"Data cannot be imported as it is missing the following required columns: {missing_columns}")
+
+
     def run(self):
         roi_counter = 0  # progressbar counter
+
         for row in self.data.itertuples(index=False):
             if not self.isInterruptionRequested():
-
-                print(row)
 
                 # get survey id, create if not exists
                 survey_id = self.survey(row.survey_name, row.region_name)
@@ -53,10 +58,7 @@ class CSVMigrateThread(QThread):
                 # camera
                 new_camera_id = self.camera(new_station_id, row.camera_id, row.camera_name)
 
-                # base dir
-                # TODO: update for uploads table
-                base_dir = self.base_dir(row.filepath)
-                relative_path = row.filepath
+                new_base_dir_id = self._get_base_dir(row.base_dir_id, row.filepath, row.relative_path)
 
                 # hash
                 hash = get_sha256(row.filepath)
@@ -69,8 +71,8 @@ class CSVMigrateThread(QThread):
                 sequence_id = self.sequence(row.sequence_id)
 
                 # media
-                media_id = self.mpDB.add_media(base_dir,
-                                               relative_path,
+                media_id = self.mpDB.add_media(new_base_dir_id,
+                                               row.relative_path,
                                                hash,
                                                row.ext,
                                                row.timestamp,
@@ -120,6 +122,27 @@ class CSVMigrateThread(QThread):
             # finished adding media
             self.finished.emit()
             self.error_update.emit(self.errors)  # Emit the list of errors encountered during import
+
+    def _get_base_dir(self, old_base_dir_id, filepath, relative_path):
+        """Get the common base directory for a list of filepaths"""
+        if old_base_dir_id in self.base_dir_ref:
+            return self.base_dir_ref[old_base_dir_id]
+
+        if not filepath or not relative_path:
+            return None
+
+        full_path = Path(filepath)
+        rel_path = Path(relative_path)
+        num_parts = len(rel_path.parts)
+        base_dir = Path(*full_path.parts[:-num_parts])
+
+        # add to uploads table
+        new_base_dir_id = self.mpDB.add_upload(str(base_dir))
+        # add to ref
+        self.base_dir_ref[old_base_dir_id] = new_base_dir_id
+        print(new_base_dir_id)
+
+        return new_base_dir_id
 
     def survey(self, survey_name, region_name):
         """Get or create survey"""
@@ -178,9 +201,6 @@ class CSVMigrateThread(QThread):
         else:
             return None
 
-    def base_dir(self, filepath):
-        return os.path.dirname(filepath)
-
     def individual(self, old_individual_id, name, sex, age):
         """Get or create individual ID, not required for import"""
         if not pd.isna(old_individual_id):
@@ -229,6 +249,7 @@ class CSVImportThread(QThread):
         self.unique_images = unique_images
         self.selected_columns = selected_columns
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
+        self.sequence_ref = {}
 
     def run(self):
         roi_counter = 0  # progressbar counter
@@ -398,9 +419,18 @@ class CSVImportThread(QThread):
         return individual_id
 
     def sequence(self, exemplar):
-        # TODO create new sequence
-        """Get or create sequence ID"""
-        pass
+        """Get or create sequence ID, not required for import"""
+        old_sequence_id = getattr(exemplar, self.selected_columns["sequence"])
+        if not pd.isna(old_sequence_id):
+            try:
+                # get sequence id from reference dictionary first
+                sequence_id = self.sequence_ref[old_sequence_id]
+            except KeyError:
+                sequence_id = self.mpDB.add_sequence()
+                self.sequence_ref[old_sequence_id] = sequence_id
+            return sequence_id
+        else:
+            return None
 
     def external(self, exemplar):
         """Get external ID"""

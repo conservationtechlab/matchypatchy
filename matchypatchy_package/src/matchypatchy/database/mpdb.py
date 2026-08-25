@@ -296,7 +296,7 @@ class MatchyPatchyDB():
             command = """INSERT INTO individual
                         (name, sex, age)
                         VALUES (?, ?, ?);"""
-            data_tuple = (name, sex, age)
+            data_tuple = (str(name), sex, age)
             cursor.execute(command, data_tuple)
             individual_id = cursor.lastrowid
             self.db.commit()
@@ -314,7 +314,7 @@ class MatchyPatchyDB():
         try:
             cursor = self.db.cursor()
             command = """INSERT INTO uploads (base_dir) VALUES (?);"""
-            data_tuple = (base_dir,)
+            data_tuple = (str(base_dir),)
             cursor.execute(command, data_tuple)
             upload_id = cursor.lastrowid
             self.db.commit()
@@ -707,35 +707,34 @@ class MatchyPatchyDB():
     def export_data(self):
         """
         Fetch Info for Media Table
-        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
-                   'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
-                   'filepath', 'ext', 'timestamp', 'sequence_id', 'external_id', 'comment',
-                   'name', 'sex', 'age',
-                   'station_id', 'station_name', 'lat', 'long',
-                   'station_survey_id', 'survey_name', 'region_name',
-                   'camera_id', 'camera_name']
+        columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint', 'reviewed', 
+                   'media_id', 'individual_id', 'emb', 'base_dir_id', 'relative_path', 'ext', 
+                   'timestamp', 'station_id', 'sequence_id', 'camera_id', 'external_id', 'comment', 
+                   'favorite', 'name', 'sex', 'age', 'filepath']
         """
         media, column_names = self.all_media()
         rois = pd.DataFrame(media, columns=column_names)
-        rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
-        # merge with stations
-        stations, column_names = self.stations()
-        stations = pd.DataFrame(stations, columns=column_names)
-        stations.columns = stations.columns.str.replace('.', '_')
-        # get camera names
-        cameras = self.select("camera")
         if not rois.empty:
+            # convert viewpoint to int
+            rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
+            # merge with stations
+            stations, column_names = self.stations()
+            stations = pd.DataFrame(stations, columns=column_names)
+            stations.columns = stations.columns.str.replace('.', '_')
             export_data = pd.merge(rois, stations, on="station_id")
             # add camera name
+            cameras = self.select("camera")
             if cameras:
                 cameras = pd.DataFrame(cameras, columns=["camera_id", "camera_name", "station_id"])
                 export_data = pd.merge(export_data, cameras[["camera_id", "camera_name"]], on="camera_id")
             else:
                 # no camera, set column to blank
                 export_data['camera_name'] = None
+            # replace NaN with None
             export_data = export_data.replace({float('nan'): None})
             # rename columns to avoid issues with '.' in column names when importing
             export_data.columns = export_data.columns.str.replace('.', '_')
+            # print("DEBUG:", export_data.columns)
             return export_data
         else:
             return None
