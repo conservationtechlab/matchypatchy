@@ -254,6 +254,8 @@ class MediaTable(QWidget):
         """
         # clear old contents and prep for filtered data
         self.table.clearContents()
+        # reload individual data if necessary
+        self.individual_list = fetch_individual(self.mpDB)
         # if there are any left
         n_rows = self.data_filtered.shape[0]
         if n_rows:
