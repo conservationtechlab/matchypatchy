@@ -9,6 +9,14 @@ from dataclasses import dataclass
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
+# Column names returned by fetch_roi_media (roi joined with media and individual)
+COLUMNS = [
+    'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+    'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
+    'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id',
+    'sequence_id', 'external_id', 'comment', 'name', 'sex', 'age',
+]
+
 
 @dataclass
 class EditObject:

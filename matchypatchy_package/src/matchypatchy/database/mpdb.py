@@ -205,7 +205,7 @@ class MatchyPatchyDB():
         except sqlite3.Error as error:
             if not quiet:
                 print(f"DEBUG: Failed to execute command: {error}")
-            self.logger.error("Failed to execute command.", error)
+            self.logger.error(f"Failed to execute command: {error}")
             return None
 
     # INSERT -------------------------------------------------------------------
@@ -559,7 +559,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()
             return rows
         except sqlite3.Error as error:
-            self.logger.error("Failed fetch: ", error)
+            self.logger.error(f"Failed fetch: {error}")
             return None
 
     def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None, quiet=True):
@@ -640,7 +640,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error("Failed all_media fetch:", error)
+            self.logger.error(f"Failed all_media fetch: {error}")
             return None, None
         
     def get_full_path(self, media_id):
@@ -697,28 +697,6 @@ class MatchyPatchyDB():
             return None
 
     # EXPORT -------------------------------------------------------------------
-    def all_media(self, row_cond: Optional[str] = None):
-        """Return joined roi and media info for Media Table"""
-        try:
-            cursor = self.db.cursor()
-            columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                         roi.media_id, roi.individual_id, emb, filepath, ext, timestamp,
-                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age"""
-            if row_cond is not None:
-                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                            LEFT JOIN individual ON roi.individual_id = individual.id
-                                            WHERE {row_cond};"""
-            else:
-                command = f"""SELECT {columns} FROM roi INNER JOIN media ON roi.media_id = media.id
-                                            LEFT JOIN individual ON roi.individual_id = individual.id;"""
-            cursor.execute(command)
-            column_names = [description[0] for description in cursor.description]
-            rows = cursor.fetchall()  # returns in tuple
-            return rows, column_names
-        except sqlite3.Error as error:
-            self.logger.error("Failed all_media fetch:", error)
-            return None, None
-
     def export_data(self):
         """
         Fetch Info for Media Table
