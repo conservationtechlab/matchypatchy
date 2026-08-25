@@ -16,9 +16,6 @@ from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.media import fetch_individual, get_roi_bbox, EditObject
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.database.thumbnails import save_roi_thumbnail
-from matchypatchy import config
-
-# TODO: remove load_config
 
 
 class MediaEditPopup(QDialog):
@@ -28,6 +25,7 @@ class MediaEditPopup(QDialog):
     def __init__(self, parent, data, data_type, current_image_index=0, crop=False):
         super().__init__(parent)
         self.parent = parent
+
         # image roi == 1
         if data_type == 1:
             self.setWindowTitle("View ROI")
@@ -38,6 +36,7 @@ class MediaEditPopup(QDialog):
             self.adjust_mode = 'bbox'
         self.setFixedSize(1000, 500)
         self.mpDB = parent.mpDB
+        self.cfg = parent.cfg
         self.data = data
         self.data_type = data_type
         self.ids = data["id"].tolist()
@@ -261,7 +260,7 @@ class MediaEditPopup(QDialog):
                     # add new roi
                     new_rid = self.mpDB.add_roi(int(media_id), frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     # save thumbnail
-                    roi_thumbnail = save_roi_thumbnail(config.load_cfg('THUMBNAIL_DIR'),
+                    roi_thumbnail = save_roi_thumbnail(self.cfg.THUMBNAIL_DIR,
                                                        self.data.iloc[self.current_image_index]["filepath"],
                                                        self.data.iloc[self.current_image_index]["ext"],
                                                        frame, bbox_x, bbox_y, bbox_w, bbox_h)
@@ -282,7 +281,7 @@ class MediaEditPopup(QDialog):
                     # do not add emb_id, to be determined later
                     roi_id = self.mpDB.add_roi(int(media_id), int(frame), bbox_x, bbox_y, bbox_w, bbox_h)
                     # save thumbnail
-                    roi_thumbnail = save_roi_thumbnail(config.load_cfg('THUMBNAIL_DIR'),
+                    roi_thumbnail = save_roi_thumbnail(self.cfg.THUMBNAIL_DIR,
                                                        self.data.iloc[self.current_image_index]["filepath"],
                                                        self.data.iloc[self.current_image_index]["ext"],
                                                        frame, bbox_x, bbox_y, bbox_w, bbox_h)
