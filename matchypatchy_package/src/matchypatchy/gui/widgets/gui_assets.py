@@ -2,10 +2,12 @@
 Custom assets for the GUI, such as buttons and separators.
 
 """
-from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QWidget, QTextEdit,
+from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QVBoxLayout, QWidget, QTextEdit, QLineEdit,
                              QSlider, QLabel, QHBoxLayout, QSpacerItem, QStyledItemDelegate)
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+
+from installation.windows.python_env_base.Lib.email.mime import text
 
 
 class VerticalSeparator(QFrame):
@@ -234,3 +236,75 @@ class TextEditWithSignal(QTextEdit):
     def on_typing_finished(self):
         """Called when user stops typing for 500ms"""
         self.text_finished.emit(self.toPlainText())
+
+
+class SequenceSelector(QWidget):
+    """
+    Widget for selecting a query image within a sequence.
+    Provides previous/next buttons and displays the current query number.
+    Used in display_compare.py for selecting the current query image within a sequence.
+    """
+    def __init__(self, name):
+        super().__init__()
+
+        layout = QHBoxLayout(self)
+        layout.addWidget(QLabel(name))
+        self.button_previous = QPushButton("<<")
+        self.button_previous.setMaximumWidth(40)
+        
+        layout.addWidget(self.button_previous)
+        self.current_number = QLineEdit("1")
+        self.current_number.setFixedWidth(50)
+        layout.addWidget(self.current_number)
+        self.total = QLabel("/9")
+        layout.addWidget(self.total)
+        self.button_next = QPushButton(">>")
+        self.button_next.setMaximumWidth(40)
+        
+        layout.addWidget(self.button_next)
+        layout.addSpacing(20)
+
+    def set_current_number(self, number):
+        self.current_number.setText(str(number + 1))
+
+    def set_total(self, n):
+        self.total.setText("/ " + str(n))
+
+
+class SliderWithLabel(QWidget):
+    """
+    Widget that combines a QSlider with a QLabel to display its current value.
+    """
+    slider_value_changed = pyqtSignal(int)  # Signal emitted when the slider value changes
+
+    def __init__(self, label, min_val=0, max_val=100, initial=0):
+        super().__init__()
+
+        layout = QHBoxLayout(self)
+        # text label for the slider value
+        self.label = QLabel(label + ": ")
+        self.label.setStyleSheet("border: 1px solid black;")
+        layout.addWidget(self.label)
+
+        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider.setRange(min_val, max_val)
+        self.slider.setValue(initial)
+        self.slider.setFixedWidth(50)
+        self.slider.valueChanged.connect(self.update_text)
+        layout.addWidget(self.slider)
+        # manual input for the slider value
+        self.value_edit = QLineEdit(f"{initial / 100:.2f}")
+        self.value_edit.setFixedWidth(50)
+        self.value_edit.textChanged.connect(self.value_edit_changed)
+        layout.addWidget(self.value_edit)
+
+    def update_text(self, value):
+        self.value_edit.setText(f"{value / 100:.2f}")
+        self.slider_value_changed.emit(value)
+
+    def value_edit_changed(self, text):
+        val = float(text)
+        if 0.0 <= val <= 1.0:
+            self.slider.setValue(int(val * 100))
+            self.slider_value_changed.emit(int(val * 100))
+

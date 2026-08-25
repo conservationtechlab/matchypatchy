@@ -136,6 +136,10 @@ class QueryContainer(QObject):
             # interrupt occurred or dicts are empty
             self.thread_signal.emit(False)
 
+    def set_threshold(self, threshold):
+        """Set the similarity threshold for the query container"""
+        self.threshold = threshold
+
     def set_query(self, n):
         """Set the Query side to a particular (n) image in the list"""
         # wrap around
