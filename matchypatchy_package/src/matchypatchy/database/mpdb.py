@@ -212,7 +212,7 @@ class MatchyPatchyDB():
         except sqlite3.Error as error:
             if not quiet:
                 print(f"DEBUG: Failed to execute command: {error}")
-            self.logger.error("Failed to execute command.", error)
+            self.logger.error(f"Failed to execute command: {error}")
             return None
 
     # INSERT -------------------------------------------------------------------
@@ -566,7 +566,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()
             return rows
         except sqlite3.Error as error:
-            self.logger.error("Failed fetch: ", error)
+            self.logger.error(f"Failed fetch: {error}")
             return None
 
     def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None, quiet=True):
@@ -647,7 +647,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error("Failed all_media fetch:", error)
+            self.logger.error(f"Failed all_media fetch: {error}")
             return None, None
 
     def get_full_path(self, media_id):

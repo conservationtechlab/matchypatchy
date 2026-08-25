@@ -8,6 +8,9 @@ from pathlib import Path
 import yaml
 import animl
 
+# Module-level home directory, set by initiate() or update_project_folder()
+HOME_DIR = None
+
 
 class mpConfig():
     def __init__(self, home_dir):
