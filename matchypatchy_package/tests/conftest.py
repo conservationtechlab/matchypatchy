@@ -21,12 +21,43 @@ class _VersionMock(int):
         return super().__new__(cls, value)
 
 
+class _SignalStub:
+    """Minimal Qt signal stub with emit/connect APIs."""
+    def __init__(self, *args, **kwargs):
+        self._slots = []
+
+    def connect(self, slot):
+        self._slots.append(slot)
+
+    def emit(self, *args, **kwargs):
+        for slot in self._slots:
+            slot(*args, **kwargs)
+
+
+class _QThreadStub:
+    """Minimal QThread stub used by worker unit tests."""
+    finished = _SignalStub()
+
+    def __init__(self, *args, **kwargs):
+        self._interrupted = False
+
+    def isInterruptionRequested(self):
+        return self._interrupted
+
+    def requestInterruption(self):
+        self._interrupted = True
+
+
 class _MockModule(types.ModuleType):
     """A stub module whose attribute access always returns a fresh MagicMock."""
     def __getattr__(self, name: str):
         # Return version integers for known version attributes so they can be compared
         if name in ('PYQT_VERSION', 'QT_VERSION', 'PYQT_VERSION_STR', 'QT_VERSION_STR'):
             return _VersionMock(0x060900)  # PyQt6 6.9.0
+        if name == 'QThread':
+            return _QThreadStub
+        if name == 'pyqtSignal':
+            return lambda *args, **kwargs: _SignalStub()
         # For QtCore specifically, return a module-like object with PYQT_VERSION
         if name == 'QtCore':
             mock = MagicMock()
