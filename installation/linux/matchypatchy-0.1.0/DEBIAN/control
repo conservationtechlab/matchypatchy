@@ -4,6 +4,6 @@ Section: utils
 Priority: optional
 Architecture: all
 Maintainer: Your Name <you@example.com>
-Depends: bash, python3, xdg-utils
+Depends: bash
 Description: MatchyPatchy packaged app (example)
- MatchyPatchy installed to /opt/matchypatchy with launcher and desktop entry.
+ MatchyPatchy installs to ~/.MatchyPatchy with bundled python_env and launcher scripts.
