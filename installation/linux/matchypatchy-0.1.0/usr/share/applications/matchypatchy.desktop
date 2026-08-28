@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=MatchyPatchy
-Exec=/usr/local/bin/matchypatchy
+Exec=/opt/matchypatchy/install.sh
 Icon=matchypatchy
 Terminal=true
 Categories=Utility;
