@@ -521,7 +521,7 @@ class MatchyPatchyDB():
             return None
 
     # EDIT ---------------------------------------------------------------------
-    def edit_row(self, table: str, row_id: int, replace: dict, allow_none=False, quiet=True):
+    def edit_row(self, table: str, row_id: int, replace: dict, allow_none=True, quiet=True):
         """
         Edit a row in place
 
