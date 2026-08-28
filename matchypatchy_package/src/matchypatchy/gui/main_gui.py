@@ -8,10 +8,11 @@ Display Pages:
     1. DisplayMedia
     2. DisplayCompare
 """
+import os
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog,
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog, QDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction, QGuiApplication
 from PyQt6.QtCore import QSettings
@@ -24,6 +25,8 @@ from matchypatchy.gui.dialogs.popup_config import ConfigPopup
 from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
 from matchypatchy.gui.dialogs.popup_readme import READMEPopup
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
@@ -91,10 +94,10 @@ class MainWindow(QMainWindow):
         # view = menuBar.addMenu("View")
         help = menuBar.addMenu("Help")
 
-        file.addAction("New")
-
         # FILE IMPORT
         file_import = QMenu("Import", self)
+        file_import.addAction("Import CSV", self.import_csv)
+        file_import.addAction("Import Folder", self.import_folder)
         file.addMenu(file_import)
 
         file_export = QAction("Export", self)
@@ -163,16 +166,45 @@ class MainWindow(QMainWindow):
         self.Compare.compare_manual(selected_ids=selected_ids)
 
     # FILE =====================================================================
-    def new(self):
-        # TODO
-        pass
+    def import_csv(self):
+        """Add media from a CSV manifest"""
+        selected_survey = self.Base.select_survey()
+        if not selected_survey:
+            dialog = AlertPopup(self, "Please select a survey before importing.")
+            dialog.exec()
+            del dialog
+            return
+        else:
+            self.active_survey = self.Base.active_survey
+            manifest = QFileDialog.getOpenFileName(self, "Open File",
+                                                   os.path.expanduser('~'),
+                                                   ("CSV Files (*.csv)"))[0]
+            if manifest:
+                self.logger.info(f"Importing from manifest: {manifest}")
+                dialog = ImportCSVPopup(self, manifest)
+                dialog.exec()
+                del dialog
 
-    def import_popup(self, table):
-        """
-        Launch file browser
-        """
-        # TODO: Implement file import functionality
-        pass
+    # STEP 1: Import from FOLDER
+    def import_folder(self):
+        """Add media from a folder"""
+        selected_survey = self.Base.select_survey()
+        if not selected_survey:
+            dialog = AlertPopup(self, "Please select a survey before importing.")
+            dialog.exec()
+            del dialog
+            return
+        else:
+            self.active_survey = self.Base.active_survey
+            directory = QFileDialog.getExistingDirectory(self, "Open File",
+                                                         os.path.expanduser('~'),
+                                                         QFileDialog.Option.ShowDirsOnly)
+            if directory:
+                dialog = ImportFolderPopup(self, directory)
+                self.logger.info(f"Importing from directory: {directory}")
+                if dialog.exec() == QDialog.DialogCode.Rejected:
+                    self.import_folder()
+                del dialog
 
     def export(self):
         data = self.mpDB.export_data()
