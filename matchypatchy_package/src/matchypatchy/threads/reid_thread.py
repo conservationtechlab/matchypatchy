@@ -20,15 +20,14 @@ class ReIDThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     done = pyqtSignal()
 
-    def __init__(self, mpDB, cfg, ML_DIR, REID_KEY, VIEWPOINT_KEY):
+    def __init__(self, mpDB, cfg, mloptions):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = ML_DIR
-        self.reid_filepath = get_path(self.ml_dir, REID_KEY)
-        self.viewpoint_filepath = get_path(self.ml_dir, VIEWPOINT_KEY)
         self.cfg = cfg
-        self.device = self.cfg.get('DEVICE')
-
+        self.device = self.cfg.DEVICE
+        self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
+        self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
+        
     def run(self):
         """Process viewpoint and embeddings for ROIs"""
         # ROIS must be fetched after start() to chain with animl

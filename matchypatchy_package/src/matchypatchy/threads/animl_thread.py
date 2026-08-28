@@ -82,12 +82,12 @@ class AnimlThread(QThread):
     def __init__(self, mpDB, cfg, DETECTOR_KEY):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = Path(cfg.get('ML_DIR'))
-        self.smart_frames = cfg.get('SMART_FRAMES')
-        self.fps = cfg.get('VIDEO_FPS')
-        self.n_frames = cfg.get('N_FRAMES')
-        self.thumbnail_dir = cfg.get('THUMBNAIL_DIR')
-        self.device = cfg.get('DEVICE')
+        self.ml_dir = Path(cfg.ML_DIR)
+        self.smart_frames = cfg.SMART_FRAMES
+        self.fps = cfg.VIDEO_FPS
+        self.n_frames = cfg.N_FRAMES
+        self.thumbnail_dir = cfg.THUMBNAIL_DIR
+        self.device = cfg.DEVICE
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)

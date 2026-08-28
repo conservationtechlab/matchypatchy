@@ -76,6 +76,7 @@ class FetchTableThread(QThread):
         else:
             self.data = pd.DataFrame()
 
+        self.data['select'] = 0
         self.loaded_data.emit(self.data)
         self.done.emit()
 
@@ -110,9 +111,10 @@ class LoadTableThread(QThread):
         Adds Row to Table with Items from self.data_filtered
         """
         if column == 'select':
+            selected = roi['select']
             qtw = QTableWidgetItem()
             qtw.setFlags(qtw.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            qtw.setCheckState(Qt.CheckState.Unchecked)
+            qtw.setCheckState(Qt.CheckState.Checked if selected else Qt.CheckState.Unchecked)
         # Thumbnail
         elif column == 'thumbnail':
             thumbnail_path = roi['thumbnail_path']
