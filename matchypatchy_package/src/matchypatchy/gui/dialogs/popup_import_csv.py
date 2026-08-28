@@ -3,7 +3,7 @@ Popup for Importing a Manifest
 """
 import pandas as pd
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QProgressBar,
+from PyQt6.QtWidgets import (QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QProgressBar,
                              QComboBox, QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt
 
@@ -52,21 +52,51 @@ class ImportCSVPopup(QDialog):
             self.columns = ["None"] + list(self.data.columns)
             self.survey_columns = [str(self.active_survey)] + list(self.data.columns)
             self.selections = {
+                "survey": self.survey_columns[0],
                 "filepath": self.columns[0],
                 "timestamp": self.columns[0],
-                "survey": self.survey_columns[0],
                 "station": self.columns[0],
+                "lat": self.columns[0],
+                "long": self.columns[0],
                 "region": self.columns[0],
-                "sequence_id": self.columns[0],
                 "camera": self.columns[0],
+                "sequence_id": self.columns[0],
                 "external_id": self.columns[0],
+                "comment": self.columns[0],
+                "favorite": self.columns[0],
                 "viewpoint": self.columns[0],
                 "individual": self.columns[0],
-                "favorite": self.columns[0],
-                "comment": self.columns[0],
+                "sex": self.columns[0],
+                "age": self.columns[0],               
             }
 
-            # Survey
+            # Create a grid layout for 4 columns x 3 rows
+            grid_layout = QGridLayout()
+            grid_layout.setSpacing(10)
+
+            # All fields in order (12 total = 4 cols × 3 rows)
+            all_fields = [
+                ("Filepath", "filepath", True),
+                ("Timestamp", "timestamp", True),
+                ("Station", "station", True),
+                ("Latitude", "lat", False),
+                ("Longitude", "long", False),
+                ("Region", "region", False),
+                ("Camera", "camera", False),
+                ("Sequence ID", "sequence_id", False),
+                ("External ID", "external_id", False),
+                ("Comment", "comment", False),
+                ("Favorite", "favorite", False),
+                ("Viewpoint", "viewpoint", False),
+                ("Individual", "individual", False),
+                ("Sex", "sex", False),
+                ("Age", "age", False),
+            ]
+
+            row = 0
+            col = 0
+
+            # Survey goes first (special case)
             survey_layout = QHBoxLayout()
             survey_layout.addWidget(QLabel("Survey:"))
             asterisk = QLabel("*")
@@ -78,53 +108,39 @@ class ImportCSVPopup(QDialog):
             self.survey.addItems(self.columns)
             self.survey.currentTextChanged.connect(self.select_survey)
             survey_layout.addWidget(self.survey)
-            layout.addLayout(survey_layout)
-            layout.addSpacing(5)
+            survey_layout.addSpacing(10)
+            grid_layout.addLayout(survey_layout, row, col)
+            row += 1
 
-            required_fields = [("Filepath", "filepath"),
-                               ("Timestamp", "timestamp"),
-                               ("Station", "station"),]
-
-            for label_text, attr_name in required_fields:
-                field_layout = QHBoxLayout()
-                field_layout.addWidget(QLabel(f"{label_text}:"))
-                asterisk = QLabel("*")
-                asterisk.setStyleSheet("QLabel { color : red; }")
-                field_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-                combo = QComboBox()
-                combo.addItems(self.columns)
-                combo.currentTextChanged.connect(
-                    lambda field=attr_name, cb=combo: self._select_column(field, cb, check_ok=True)
-                )
-                field_layout.addWidget(combo)
-                layout.addLayout(field_layout)
-                layout.addSpacing(5)
-                setattr(self, attr_name, combo)
-
-            additional_fields = [
-                ("Region", "region"),
-                ("Camera", "camera"),
-                ("Sequence ID", "sequence_id"),
-                ("External ID", "external_id"),
-                ("Viewpoint", "viewpoint"),
-                ("Individual", "individual"),
-                ("Favorite", "favorite"),
-                ("Comment", "comment")
-            ]
-
-            for label_text, field_name in additional_fields:
-                field_layout = QHBoxLayout()
-                field_layout.addWidget(QLabel(f"{label_text}:"))
-                combo = QComboBox()
-                combo.addItems(self.columns)
-                combo.currentTextChanged.connect(
-                    lambda field=field_name, cb=combo: self._select_column(field, cb)
-                )
-                field_layout.addWidget(combo)
-                layout.addLayout(field_layout)
-                layout.addSpacing(5)
+            # Add remaining fields
+            for label_text, field_name, is_required in all_fields:
+                if row >= 4:  # Move to next row after 4 columns
+                    row = 0
+                    col += 1
                 
+                field_layout = QHBoxLayout()
+                field_layout.addWidget(QLabel(f"{label_text}:"))
+                
+                if is_required:
+                    asterisk = QLabel("*")
+                    asterisk.setStyleSheet("QLabel { color : red; }")
+                    field_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
+                
+                combo = QComboBox()
+                combo.addItems(self.columns)
+                combo.currentIndexChanged.connect(
+                    lambda index, field=field_name, req=is_required: self._select_column(index, field, required=req)
+                )
+                field_layout.addWidget(combo)
+                field_layout.addSpacing(10)
+                
+                grid_layout.addLayout(field_layout, row, col)
+
                 setattr(self, field_name, combo)
+                
+                row += 1
+
+            layout.addLayout(grid_layout)
 
                 
         # Ok/Cancel
@@ -159,17 +175,17 @@ class ImportCSVPopup(QDialog):
                 return False
 
 
-    def _select_column(self, field_name, combobox, required=False):
+    def _select_column(self, index, field_name, required):
         """
         Generic column selection handler.
         
         Args:
+            index: The index of the selected item in the combobox
             field_name: Key for self.selections (e.g., 'filepath')
-            combobox: The QComboBox widget
             required: Whether this field is required
         """
         try:
-            self.selections[field_name] = self.columns[combobox.currentIndex()]
+            self.selections[field_name] = self.columns[index]
             if required:
                 self.check_ok_button()
             return True

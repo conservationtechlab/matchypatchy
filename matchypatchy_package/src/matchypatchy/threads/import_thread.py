@@ -42,7 +42,6 @@ class CSVMigrateThread(QThread):
         if missing_columns:
             raise ValueError(f"Data cannot be imported as it is missing the following required columns: {missing_columns}")
 
-
     def run(self):
         roi_counter = 0  # progressbar counter
 
@@ -51,15 +50,13 @@ class CSVMigrateThread(QThread):
 
                 # get survey id, create if not exists
                 survey_id = self.survey(row.survey_name, row.region_name)
-
                 # station
                 new_station_id = self.station(row.station_id, row.station_name, survey_id, row.lat, row.long)
-
                 # camera
                 new_camera_id = self.camera(new_station_id, row.camera_id, row.camera_name)
 
+                # base directory
                 new_base_dir_id = self._get_base_dir(row.base_dir_id, row.filepath, row.relative_path)
-
                 # hash
                 hash = get_sha256(row.filepath)
                 if hash is None:
@@ -133,14 +130,12 @@ class CSVMigrateThread(QThread):
 
         full_path = Path(filepath)
         rel_path = Path(relative_path)
-        num_parts = len(rel_path.parts)
-        base_dir = Path(*full_path.parts[:-num_parts])
+        base_dir = Path(*full_path.parts[:-len(rel_path.parts)])
 
         # add to uploads table
         new_base_dir_id = self.mpDB.add_upload(str(base_dir))
         # add to ref
         self.base_dir_ref[old_base_dir_id] = new_base_dir_id
-        print(new_base_dir_id)
 
         return new_base_dir_id
 
@@ -254,8 +249,8 @@ class CSVImportThread(QThread):
     def run(self):
         roi_counter = 0  # progressbar counter
 
-        # get base directory for the files being imported
-        base_dir = self._get_base_dir([row[self.selected_columns['filepath']].item() for _, row in self.unique_images])
+        # get common base directory for all images
+        base_dir = self._get_base_dir(list(self.unique_images.groups.keys()))
         try:
             base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir="{base_dir}"')[0][0]
         except IndexError:
@@ -267,23 +262,23 @@ class CSVImportThread(QThread):
                 if not Path(filepath).exists():
                     self.logger.warning(f"File {filepath} does not exist, skipping import...")
                     continue
-
+            
                 # get the relative path of the file with respect to the base directory
                 relative_path = self._get_relative_path(filepath, base_dir)
-
                 # get file extension
                 ext = Path(filepath).suffix.lower()
-
+                 # Calculate the SHA256 hash of the file
+                hash = get_sha256(filepath) 
+                
                 # get remaining information
-                exemplar = group.head(1)
+                exemplar = group.head(1).to_dict(orient='records')[0]
                 # timestamp
-                timestamp = getattr(exemplar, self.selected_columns["timestamp"])
+                timestamp = exemplar.get(self.selected_columns["timestamp"])
 
+                # get survey, station, and camera IDs
                 survey_id = self.survey(exemplar)
                 station_id = self.station(exemplar, survey_id)
                 camera_id = self.camera(exemplar, station_id)
-
-                hash = get_sha256(filepath)  # Calculate the SHA256 hash of the file
 
                 # insert into table
                 media_id = self.mpDB.add_media(base_dir_id,
@@ -298,7 +293,7 @@ class CSVImportThread(QThread):
                                                comment=self.comment(exemplar))
                 # image already added, get correct media_id
                 if media_id == "duplicate_error":
-                    media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{filepath}"')[0][0]
+                    media_id = self.mpDB.select("media", columns="id", row_cond=f'sha256="{hash}"')[0][0]
                 # save thumbnail for new media
                 else:
                     media_thumbnail = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
@@ -327,12 +322,15 @@ class CSVImportThread(QThread):
                         bbox_h = -1
 
                     # viewpoint
-                    viewpoint = int(getattr(roi, self.selected_columns["viewpoint"])) if self.selected_columns["viewpoint"] != "None" else None
+                    viewpoint_col = self.selected_columns["viewpoint"]
+                    viewpoint = self._convert_to_int(roi[viewpoint_col]) if viewpoint_col != "None" else None
 
                     # individual
                     individual_id = self.individual(roi)
                     # set reviewed to 1 for named images
                     reviewed = 1 if individual_id is not None else 0
+
+                    favorite = self.favorite(roi)
 
                     # do not add emb_id, to be determined later
                     roi_id = self.mpDB.add_roi(media_id,
@@ -341,6 +339,7 @@ class CSVImportThread(QThread):
                                                viewpoint=viewpoint,
                                                reviewed=reviewed,
                                                individual_id=individual_id,
+                                               favorite=favorite,
                                                emb=0)
                     # save thumbnails
                     roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox_w, bbox_h)
@@ -358,10 +357,12 @@ class CSVImportThread(QThread):
         if not filepaths:
             return None
 
-        paths = [Path(p) for p in filepaths]
-        common = Path(os.path.commonpath([p.parent for p in paths]))
-
-        return str(common)
+        # Convert all to absolute paths T
+        paths = [Path(fp).resolve() for fp in filepaths]
+        # Then get parents and commonpath
+        parents = [p.parent for p in paths]
+        base_dir = Path(os.path.commonpath(parents))
+        return str(base_dir)
 
     def _get_relative_path(self, filepath, base_dir):
         """Get the relative path of a file given its base directory"""
@@ -369,85 +370,140 @@ class CSVImportThread(QThread):
 
     def survey(self, exemplar):
         """Get or create survey"""
-        # get active survey
-        if len(self.selected_columns['survey']) > 1:
-            survey_name = self.selected_columns['survey'][1]
-            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
-        # get or create new survey
+        survey_id = None
+
+        # default survey
+        if isinstance(self.selected_columns["survey"], str):
+            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{self.selected_columns["survey"]}"')[0][0]
+        # find existing survey by name
         else:
-            survey_name = getattr(exemplar, self.selected_columns["survey"])
-            region_name = getattr(exemplar, self.selected_columns["region"]) if self.selected_columns["region"] != "None" else None
+            survey_name = exemplar.get(self.selected_columns["survey"])
+            survey_name = self._convert_to_str(survey_name)
             try:
                 survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
             except IndexError:
+                region_name = exemplar.get(self.selected_columns["region"])
+                region_name = self._convert_to_str(region_name)
                 survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
         return survey_id
 
     def station(self, exemplar, survey_id):
         """Get or create station"""
-        station_name = getattr(exemplar, self.selected_columns["station"])
+        station_name = exemplar.get(self.selected_columns["station"])
+        station_name = self._convert_to_str(station_name)
         try:
             station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
         except IndexError:
-            station_id = self.mpDB.add_station(str(station_name), None, None, survey_id)
+            lat = exemplar.get(self.selected_columns["lat"])
+            lat = self._convert_to_float(lat)
+            long = exemplar.get(self.selected_columns["long"])
+            long = self._convert_to_float(long)
+            station_id = self.mpDB.add_station(str(station_name), lat, long, survey_id)
         return station_id
-
+    
+    # OPTIONAL -----------------------------------------------------------------
     def camera(self, exemplar, station_id):
         """Get or create camera"""
-        if self.selected_columns["camera"] != "None":
-            camera_name = getattr(exemplar, self.selected_columns["camera"])
+        camera_id = None
+        camera_name = exemplar.get(self.selected_columns["camera"])
+        if camera_name is not None:
+            camera_name = self._convert_to_str(camera_name)
             try:
-                camera_name = str(camera_name).strip()
-                camera_name = camera_name.replace("'", "''")
-                row_cond = f"name = '{camera_name}'"
-                rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
-                camera_id = rows[0][0]
+                camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name='{camera_name}'")[0][0]
             except IndexError:
                 camera_id = self.mpDB.add_camera(str(camera_name), station_id)
-            return camera_id
-
-    def individual(self, roi):
-        """Get or create individual ID"""
-        if self.selected_columns["individual"] != "None":
-            individual = getattr(roi, self.selected_columns["individual"])
-            try:
-                individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{individual}"')[0][0]
-            except IndexError:
-                individual_id = self.mpDB.add_individual(str(individual))
-        else:  # no individual id, need review
-            individual_id = None
-        return individual_id
+        return camera_id
 
     def sequence(self, exemplar):
         """Get or create sequence ID, not required for import"""
-        old_sequence_id = getattr(exemplar, self.selected_columns["sequence"])
-        if not pd.isna(old_sequence_id):
+        sequence_id = None
+        old_sequence_id = exemplar.get(self.selected_columns["sequence_id"])
+        if old_sequence_id is not None:
             try:
                 # get sequence id from reference dictionary first
                 sequence_id = self.sequence_ref[old_sequence_id]
             except KeyError:
                 sequence_id = self.mpDB.add_sequence()
                 self.sequence_ref[old_sequence_id] = sequence_id
-            return sequence_id
-        else:
-            return None
-
+        return sequence_id
+    
     def external(self, exemplar):
         """Get external ID"""
-        if self.selected_columns["external_id"] != "None":
-            external_id = int(getattr(exemplar, self.selected_columns["external_id"]))
-        else:
-            external_id = None
+        external_id = exemplar.get(self.selected_columns["external_id"])
+        external_id = self._convert_to_int(external_id)
         return external_id
-
+    
     def comment(self, exemplar):
         """Get comment"""
-        if self.selected_columns["comment"] != "None":
-            comment = getattr(exemplar, self.selected_columns["comment"])
-        else:
-            comment = None
+        comment = exemplar.get(self.selected_columns["comment"])
+        comment = self._convert_to_str(comment)
         return comment
 
+    # ROI-RELATED METHODS 
+    def individual(self, roi):
+        """Get or create individual ID"""
+        individual_id = None
+        if self.selected_columns["individual"] != "None":
+            individual_name = roi[self.selected_columns["individual"]]
+            individual_name = self._convert_to_str(individual_name)
+            try:
+                individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{individual_name}"')[0][0]
+            except IndexError:
+                sex = None
+                age = None
+                #TODO: limit sex and age to valid values
+                if self.selected_columns["sex"] != "None":
+                    sex = roi[self.selected_columns["sex"]]
+                    sex = self._convert_to_str(sex)
+                if self.selected_columns["age"] != "None":
+                    age = roi[self.selected_columns["age"]]
+                    age = self._convert_to_str(age)
+                individual_id = self.mpDB.add_individual(individual_name, sex, age)
+        return individual_id
+
+    def favorite(self, roi):
+        """Get favorite status"""
+        if self.selected_columns["favorite"] != "None":
+            favorite = roi[self.selected_columns["favorite"]]
+            favorite = self._convert_to_int(favorite)
+            return favorite
+        # If favorite column is not specified, default to 0
+        return 0
+
+    def _convert_to_str(self, value):
+        """Convert a value to a stripped string, handling None"""
+        if value is None:
+            return None
+        if pd.isna(value):
+            return None
+        try:
+            value = str(value).strip()
+            value = value.replace("'", "''")
+            return value
+        except (ValueError, TypeError):
+            return None
+
+    def _convert_to_int(self, value):
+        """Convert a value to an integer, handling None"""
+        if value is None:
+            return None
+        if pd.isna(value):
+            return None
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return None
+
+    def _convert_to_float(self, value):
+        """Convert a value to a float, handling None"""
+        if value is None:
+            return None
+        if pd.isna(value):
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
 
 # FOLDER IMPORT ================================================================
 class FolderImportThread(QThread):
@@ -541,8 +597,7 @@ class FolderImportThread(QThread):
     def station(self, filepath, survey_id):
         """Get or create station"""
         station_name = Path(filepath).parts[self.station_level]
-        station_name = str(station_name).strip()
-        station_name = station_name.replace("'", "''")
+        station_name = str(station_name)
         try:
             station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
         except IndexError:
@@ -551,12 +606,11 @@ class FolderImportThread(QThread):
 
     def camera(self, filepath, station_id):
         camera_name = Path(filepath).parts[self.camera_level]
-        camera_name = str(camera_name).strip()
-        camera_name = camera_name.replace("'", "''")
+        camera_name = str(camera_name)
         try:
             camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name='{camera_name}'")[0][0]
         except IndexError:
-            camera_id = self.mpDB.add_camera(str(camera_name), station_id)
+            camera_id = self.mpDB.add_camera(camera_name, station_id)
 
         return camera_id
 
