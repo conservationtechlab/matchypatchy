@@ -37,7 +37,7 @@ class TestMpConfigInit:
     def test_default_video_frames(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
-        assert cfg.VIDEO_FRAMES == 3
+        assert cfg.SMART_FRAMES == 3
 
     def test_default_knn(self, tmp_path):
         home = tmp_path / "project"
@@ -114,10 +114,10 @@ class TestMpConfigSaveLoad:
     def test_load_restores_video_frames(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
-        cfg.VIDEO_FRAMES = 10
+        cfg.SMART_FRAMES = 10
         cfg.save()
         cfg2 = mpConfig(home)
-        assert cfg2.VIDEO_FRAMES == 10
+        assert cfg.SMART_FRAMES == 10
 
 
 # ---------------------------------------------------------------------------
@@ -134,9 +134,9 @@ class TestMpConfigUpdate:
     def test_update_multiple_keys(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
-        cfg.update({"KNN": 75, "VIDEO_FRAMES": 5})
+        cfg.update({"KNN": 75, "SMART_FRAMES": 5})
         assert cfg.KNN == 75
-        assert cfg.VIDEO_FRAMES == 5
+        assert cfg.SMART_FRAMES == 5
 
     def test_update_persists_to_file(self, tmp_path):
         home = tmp_path / "project"
@@ -166,12 +166,33 @@ class TestMpConfigSetDefault:
         cfg.set_default()
         assert cfg.KNN == 100
 
-    def test_set_default_resets_video_frames(self, tmp_path):
+    def test_set_default_resets_smart_frames(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
-        cfg.VIDEO_FRAMES = 99
+        cfg.SMART_FRAMES = 99
         cfg.set_default()
-        assert cfg.VIDEO_FRAMES == 3
+        assert cfg.SMART_FRAMES == 3
+
+    def test_set_default_resets_sequence_n(self, tmp_path):
+        home = tmp_path / "project"
+        cfg = mpConfig(home)
+        cfg.SEQUENCE_N = 99
+        cfg.set_default()
+        assert cfg.SEQUENCE_N == 3
+
+    def test_set_default_resets_fps(self, tmp_path):
+        home = tmp_path / "project"
+        cfg = mpConfig(home)
+        cfg.VIDEO_FPS = 9999
+        cfg.set_default()
+        assert cfg.VIDEO_FPS == 30
+
+    def test_set_default_resets_n_frames(self, tmp_path):
+        home = tmp_path / "project"
+        cfg = mpConfig(home)
+        cfg.N_FRAMES = 9999
+        cfg.set_default()
+        assert cfg.N_FRAMES == 10
 
     def test_set_default_resets_sequence_duration(self, tmp_path):
         home = tmp_path / "project"
