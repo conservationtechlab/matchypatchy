@@ -7,8 +7,6 @@ from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QVBoxL
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
-from installation.windows.python_env_base.Lib.email.mime import text
-
 
 class VerticalSeparator(QFrame):
     """Simple vertical separator line."""
