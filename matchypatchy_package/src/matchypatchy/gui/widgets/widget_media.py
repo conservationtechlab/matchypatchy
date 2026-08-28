@@ -2,9 +2,8 @@
 Custom Widgets for Displaying Media (Image/Video)
 """
 
-import cv2
-import pandas as pd
 from pathlib import Path
+import cv2
 from PIL import Image, ImageEnhance
 
 from PyQt6.QtWidgets import (QDialog, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
@@ -143,8 +142,12 @@ class ImageWidget(QLabel):
         self.crop_to_bbox = False
         self.pil_image = None
         self.qimage = None
+        self.scaled_image = None
         # Image Adjustments
         self.zoom_factor = 1.0
+        self.brightness_factor = 1.0
+        self.contrast_factor = 1.0
+        self.sharpness_factor = 1.0
         self.image_offset = QPointF(0, 0)  # Image translation offset
 
         # Create a QLabel to hold the image
@@ -157,6 +160,8 @@ class ImageWidget(QLabel):
         # Mouse events for drawing bounding boxes
         self.start_pos = None
         self.end_pos = None
+        # zoom position
+        self.drag_start_position = None
 
     def load(self, image_path, bbox=None, frame=None, crop=False):
         """
@@ -307,7 +312,6 @@ class ImageWidget(QLabel):
     # IMAGE ADJUSTMENTS ========================================================
     def reset(self):
         """Reset image adjustments and reload"""
-        self.scale_factor = 1.0
         self.zoom_factor = 1.0
         self.image_offset = QPointF(0, 0)
         self.rel_bbox = self.loaded_bbox  # reset to original bbox
@@ -315,6 +319,7 @@ class ImageWidget(QLabel):
         self.load(image_path=self.image_path, bbox=self.rel_bbox, frame=self.frame, crop=self.crop_to_bbox)
 
     def enable_drawing_mode(self, enable):
+        """Enable or disable drawing mode for the image widget."""
         self.drawing = enable
         self.adjust_mode = 'bbox' if enable else 'zoom'
 
@@ -491,6 +496,8 @@ class VideoPlayerBar(QWidget):
         super().__init__()
         self.player = player
         self.audio_output = audio_output
+        self.seeking = False
+        self.was_playing = False
 
         self.playback_layout = QHBoxLayout()
 
@@ -507,7 +514,6 @@ class VideoPlayerBar(QWidget):
         self.seek_slider.sliderMoved.connect(self.seek_position)
         self.seek_slider.sliderPressed.connect(self.pause_for_seek)
         self.seek_slider.sliderReleased.connect(self.resume_after_seek)
-        self.seeking = False
 
         self.player.positionChanged.connect(self.update_position)
         self.player.durationChanged.connect(self.update_duration)

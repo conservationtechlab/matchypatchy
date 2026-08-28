@@ -186,34 +186,38 @@ class TestCRUD:
     def test_add_media(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("S", 0, 0, 1)
-        mid = db.add_media("/img/test.jpg", "sha" * 20, ".jpg",
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "test.jpg", "sha" * 20, ".jpg",
                            "2024-06-01 10:00:00", station_id)
         assert isinstance(mid, int)
         rows = db.select("media", row_cond=f"id={mid}")
         assert len(rows) == 1
-        assert rows[0][1] == "/img/test.jpg"
+        assert rows[0][2] == "test.jpg"
 
     def test_add_media_duplicate_filepath_returns_error(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("S2", 0, 0, 1)
+        upload_id = db.add_upload("/img")
         sha1 = "aaa" * 22
         sha2 = "bbb" * 22
-        db.add_media("/img/dup.jpg", sha1, ".jpg", "2024-01-01", station_id)
-        result = db.add_media("/img/dup.jpg", sha2, ".jpg", "2024-01-02", station_id)
+        db.add_media(upload_id, "dup.jpg", sha1, ".jpg", "2024-01-01", station_id)
+        result = db.add_media(upload_id, "dup.jpg", sha2, ".jpg", "2024-01-02", station_id)
         assert result == "duplicate_error"
 
     def test_add_media_duplicate_sha256_returns_error(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("S3", 0, 0, 1)
+        upload_id = db.add_upload("/img")
         sha = "ccc" * 22
-        db.add_media("/img/original.jpg", sha, ".jpg", "2024-01-01", station_id)
-        result = db.add_media("/img/copy.jpg", sha, ".jpg", "2024-01-01", station_id)
+        db.add_media(upload_id, "original.jpg", sha, ".jpg", "2024-01-01", station_id)
+        result = db.add_media(upload_id, "copy.jpg", sha, ".jpg", "2024-01-01", station_id)
         assert result == "duplicate_error"
 
     def test_add_roi(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("S4", 0, 0, 1)
-        mid = db.add_media("/img/roi.jpg", "ddd" * 22, ".jpg", "2024-01-01", station_id)
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "roi.jpg", "ddd" * 22, ".jpg", "2024-01-01", station_id)
         rid = db.add_roi(mid, 0, 0.1, 0.2, 0.3, 0.4)
         assert isinstance(rid, int)
         rows = db.select("roi", row_cond=f"id={rid}")
@@ -223,7 +227,8 @@ class TestCRUD:
     def test_add_roi_rounds_bbox(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("S5", 0, 0, 1)
-        mid = db.add_media("/img/round.jpg", "eee" * 22, ".jpg", "2024-01-01", station_id)
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "round.jpg", "eee" * 22, ".jpg", "2024-01-01", station_id)
         rid = db.add_roi(mid, 0, 0.123456789, 0.987654321, 0.5, 0.5)
         rows = db.select("roi", row_cond=f"id={rid}")
         assert rows[0][3] == pytest.approx(0.1235, abs=1e-4)
@@ -244,14 +249,16 @@ class TestCRUD:
     def test_add_thumbnail(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("TmbStation", 0, 0, 1)
-        mid = db.add_media("/img/thumb.jpg", "fff" * 22, ".jpg", "2024-01-01", station_id)
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "thumb.jpg", "fff" * 22, ".jpg", "2024-01-01", station_id)
         tid = db.add_thumbnail("media", mid, "/thumbs/thumb_1.jpg")
         assert isinstance(tid, int)
 
     def test_add_thumbnail_duplicate_returns_error(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("TmbStation2", 0, 0, 1)
-        mid = db.add_media("/img/thumb2.jpg", "ggg" * 22, ".jpg", "2024-01-01", station_id)
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "thumb2.jpg", "ggg" * 22, ".jpg", "2024-01-01", station_id)
         db.add_thumbnail("media", mid, "/thumbs/t.jpg")
         result = db.add_thumbnail("media", mid, "/thumbs/t.jpg")
         assert result == "duplicate_error"
@@ -319,7 +326,7 @@ class TestSelectEditDeleteCount:
         db, _, ids = populated_db
         rows, columns = db.select_join(
             "roi", "media", "roi.media_id = media.id",
-            columns="roi.id, media.filepath",
+            columns="roi.id, media.relative_path",
         )
         assert rows is not None
         assert len(rows) >= 1
@@ -363,11 +370,12 @@ class TestEmbeddings:
     def test_knn_returns_neighbors(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("KnnStation", 0, 0, 1)
+        upload_id = db.add_upload("/img")
 
         roi_ids = []
         for i in range(5):
             mid = db.add_media(
-                f"/img/knn_{i}.jpg", f"knn_sha_{i}" * 5, ".jpg",
+                upload_id, f"knn_{i}.jpg", f"knn_sha_{i}" * 5, ".jpg",
                 "2024-01-01", station_id,
             )
             rid = db.add_roi(mid, 0, 0.1, 0.2, 0.3, 0.4)
@@ -384,8 +392,9 @@ class TestEmbeddings:
     def test_calculate_similarity(self, tmp_db):
         db, _ = tmp_db
         station_id = db.add_station("SimStation", 0, 0, 1)
-        mid1 = db.add_media("/img/s1.jpg", "sim_sha_1" * 7, ".jpg", "2024-01-01", station_id)
-        mid2 = db.add_media("/img/s2.jpg", "sim_sha_2" * 7, ".jpg", "2024-01-01", station_id)
+        upload_id = db.add_upload("/img")
+        mid1 = db.add_media(upload_id, "s1.jpg", "sim_sha_1" * 7, ".jpg", "2024-01-01", station_id)
+        mid2 = db.add_media(upload_id, "s2.jpg", "sim_sha_2" * 7, ".jpg", "2024-01-01", station_id)
         rid1 = db.add_roi(mid1, 0, 0.1, 0.2, 0.3, 0.4)
         rid2 = db.add_roi(mid2, 0, 0.1, 0.2, 0.3, 0.4)
 

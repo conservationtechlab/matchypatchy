@@ -18,10 +18,10 @@ class MLDownloadPopup(QDialog):
         super().__init__(parent)
         self.logger = parent.logger
         self.ml_dir = parent.cfg.ML_DIR
-        # update model yml
+        # Update model yml
         update_confirmed = model_download_thread.update_model_yml()
         self.logger.info(f"Model yaml update attempt: {update_confirmed}")
-        
+        # Load the model configuration after updating the YAML
         self.ml_cfg = model_download_thread.load_model()
         self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
@@ -67,7 +67,7 @@ class MLDownloadPopup(QDialog):
 
     def discover_models(self):
         """Check which models are already downloaded"""
-        models_dict = dict()
+        models_dict = {}
         for m in self.models.keys():
             names = self.models[m][0]
             if len(names) > 0:
@@ -87,15 +87,14 @@ class MLDownloadPopup(QDialog):
 
     def toggle_checkbox(self):
         """Check which models are checked, see if any new ones are checked"""
-        all = set()
+        all_available = set()
         for i, m in enumerate(self.models):
             checkbox = self.checkbox_layout.itemAtPosition(i, 0).widget()
             if checkbox.isChecked():
-                all.add(m)
-        
+                all_available.add(m)
+
         # See if any are newly checked
-        newly_checked = all - set(self.available_models.keys())
-        
+        newly_checked = all_available - set(self.available_models.keys())
         if newly_checked:
             self.download_ml(newly_checked)
 
@@ -114,7 +113,7 @@ class MLDownloadPopup(QDialog):
         self.disable_close()
         self.progress_bar.setRange(0, 0)  # indefinite
         self.progress_bar.show()
-        
+
         # Queue each model (thread-safe)
         for model_key in checked_models:
             self.build_thread.queue_download(model_key)
@@ -128,6 +127,7 @@ class MLDownloadPopup(QDialog):
             self.warning_label.show()
 
     def reject(self):
+        """Handle the rejection of the dialog, interrupting any ongoing downloads."""
         # interrupt download if in progress, otherwise just close
         if getattr(self, "build_thread", None) is not None and self.build_thread.isRunning():
             self.build_thread.requestInterruption()
@@ -195,7 +195,7 @@ class MLOptionsPopup(QDialog):
 
     def discover_models(self):
         """Check which models are already downloaded"""
-        models_dict = dict()
+        models_dict = {}
         for m in self.ml_cfg['MODELS'].keys():
             for name in self.ml_cfg['MODELS'][m][0]:
                 path = self.ml_dir / name
@@ -206,7 +206,7 @@ class MLOptionsPopup(QDialog):
 
     def get_subset(self, subset):
         """Get the available models of subset type"""
-        models_dict = dict()
+        models_dict = {}
         for m in self.ml_cfg[subset]:
             if m in self.available_models.keys():
                 path = self.ml_dir / self.available_models[m]
@@ -224,26 +224,27 @@ class MLOptionsPopup(QDialog):
         if len(self.available_detectors) == 0:
             return None
         else:
-            self.selected_DETECTOR_KEY = self.available_detectors[self.detector.currentIndex()]
-            return self.selected_DETECTOR_KEY
+            selected_DETECTOR_KEY = self.available_detectors[self.detector.currentIndex()]
+            return selected_DETECTOR_KEY
 
     def select_reid(self):
         """Return the selected re-identification model"""
         if len(self.available_reids) == 0:
             return None
         else:
-            self.selected_REID_KEY = self.available_reids[self.reid.currentIndex()]
-            return self.selected_REID_KEY
+            selected_REID_KEY = self.available_reids[self.reid.currentIndex()]
+            return selected_REID_KEY
 
     def select_viewpoint(self):
         """Return the selected viewpoint model"""
         if self.viewpoint.currentIndex() == 0:
             return None
         else:
-            self.selected_VIEWPOINT_KEY = self.available_viewpoints[self.viewpoint.currentIndex()]
-            return self.selected_VIEWPOINT_KEY
+            selected_VIEWPOINT_KEY = self.available_viewpoints[self.viewpoint.currentIndex()]
+            return selected_VIEWPOINT_KEY
 
     def return_selections(self):
+        """Return the current selections for sequence, detector, re-identification, and viewpoint."""
         sequence_checked = self.select_sequence()
         DETECTOR_KEY = self.select_detector()
         REID_KEY = self.select_reid()

@@ -22,28 +22,29 @@ from matchypatchy.gui.display_compare import DisplayCompare
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_config import ConfigPopup
 from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
-from matchypatchy.gui.dialogs.popup_readme import AboutPopup, READMEPopup, LicensePopup
+from matchypatchy.gui.dialogs.popup_readme import READMEPopup
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
 from matchypatchy.config import mpConfig
-from matchypatchy.database.media import export_data
 from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
 class MainWindow(QMainWindow):
+    """Main GUI class for the MatchyPatchy application."""
     def __init__(self, logger):
         super().__init__()
+        # Initialize main window settings and components
         self.settings = QSettings("SDZWA", "MatchyPatchy")
-        home_dir = self.load_home_dir() # load previous home dir or start fresh
-
+        # load previous home dir or start fresh
+        home_dir = self.load_home_dir()
+        # set logger
         self.logger = logger
-
         # set up config and create dirs if necessary
         self.cfg = mpConfig(home_dir)
         logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
-        
+
         # set up database
         self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
         logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
@@ -54,10 +55,9 @@ class MainWindow(QMainWindow):
         minimum_height = 768
         minimum_width = 1366
         self.setMinimumSize(minimum_width, minimum_height)
-        
+
         preferred_width = min(int(screen_resolution.width() * 0.9), 1400) if screen_resolution.width() > minimum_width else minimum_width
         preferred_height = min(int(screen_resolution.height() * 0.9), 900) if screen_resolution.height() > minimum_height else minimum_height
-            
         self.resize(preferred_width, preferred_height)
 
         # TODO: find best default size based on screen resolution and available space
@@ -82,12 +82,13 @@ class MainWindow(QMainWindow):
 
     # MENU BAR -----------------------------------------------------------------
     def _createMenuBar(self):
+        """Create the menu bar for the main window."""
         menuBar = QMenuBar(self)
         self.setMenuBar(menuBar)
         # FILE
         file = menuBar.addMenu("File")
         edit = menuBar.addMenu("Edit")
-        #view = menuBar.addMenu("View")
+        # view = menuBar.addMenu("View")
         help = menuBar.addMenu("Help")
 
         file.addAction("New")
@@ -95,14 +96,6 @@ class MainWindow(QMainWindow):
         # FILE IMPORT
         file_import = QMenu("Import", self)
         file.addMenu(file_import)
-
-        #file_import_station = QAction("Stations", self)
-        #file_import_station.triggered.connect(lambda: self.import_popup('station'))
-        #file_import.addAction(file_import_station)
-
-        #file_import_media = QAction("Media", self)
-        #file_import_media.triggered.connect(lambda: self.import_popup('media'))
-        #file_import.addAction(file_import_media)
 
         file_export = QAction("Export", self)
         file_export.triggered.connect(self.export)
@@ -144,22 +137,26 @@ class MainWindow(QMainWindow):
 
     # PAGE VIEWS ---------------------------------------------------------------
     def _set_base_view(self):
+        """Switch to the base view page.""" 
         self.pages.setCurrentIndex(0)
         self.Base.setFocus()
 
     def _set_media_view(self, filters: Optional[dict] = None):
+        """Switch to the media view page and apply optional filters.""" 
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
         self.Media.refresh_filters(filters)
         self.Media.load_table()
 
     def _set_compare_view(self):
+        """Switch to the compare view page.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
         self.Compare.refresh_filters()
         self.Compare.calculate_neighbors()
 
     def _set_manual_view(self, selected_ids=None):
+        """Switch to the manual comparison view page with selected IDs.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
         self.Compare.refresh_filters()
@@ -167,12 +164,14 @@ class MainWindow(QMainWindow):
 
     # FILE =====================================================================
     def new(self):
+        # TODO
         pass
 
     def import_popup(self, table):
         """
         Launch file browser
         """
+        # TODO: Implement file import functionality
         pass
 
     def export(self):
@@ -208,13 +207,14 @@ class MainWindow(QMainWindow):
             path = str(Path.cwd()) + "/MatchyPatchy-Share"  # Fallback to current working directory
             self.settings.setValue("home_dir", str(path))
             return path
-    
+
     def save_home_dir(self, path):
         """Save selected path"""
         self.settings.setValue("home_dir", str(path))
-        self.HOME_DIR = path
+        self.cfg.update_home_dir(path)
 
     def new_project(self, home_dir):
+        """Create a new project in the specified home directory."""
         # close existing database connection before creating a new project
         self.mpDB.close()
 
@@ -224,14 +224,15 @@ class MainWindow(QMainWindow):
 
         self.cfg = mpConfig(home_dir)
         self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
+        # update pages with the new configuration and database connection
         self.Base.update_project(self.cfg, self.mpDB)
         self.Media.update_project(self.cfg, self.mpDB)
         self.Compare.update_project(self.cfg, self.mpDB)
 
     def change_project(self, project_folder):
+        """Change the current project to the specified project folder."""
         # close existing database connection before creating a new project
         self.mpDB.close()
-
         cfg = mpConfig(project_folder)
         mpDB = MatchyPatchyDB(cfg.DB_DIR, self.logger)
         valid = mpDB.key
@@ -246,32 +247,37 @@ class MainWindow(QMainWindow):
             self.Media.update_project(self.cfg, self.mpDB)
             self.Compare.update_project(self.cfg, self.mpDB)
             return True
-        
+        # not valid
         else:
             self.logger.warning(f"Database at {str(project_folder)} is invalid. User prompted to select another path or delete.")
             dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
             dialog.exec()
+            del dialog
             return False
 
     def edit_config(self):
+        """Open the configuration editing popup."""
         dialog = ConfigPopup(self)
-        if dialog.exec():
-            del dialog
+        dialog.exec()
+        del dialog
         self.Base.update_survey()
 
     def manage_survey(self):
+        """Open the survey management popup."""
         dialog = SurveyPopup(self)
         dialog.exec()
         self.Base.update_survey()
         del dialog
 
     def manage_station(self):
+        """Open the station management popup."""
         self.Base.select_survey()
         dialog = StationPopup(self, active_survey=self.Base.active_survey)
         dialog.exec()
         del dialog
 
     def manage_media(self):
+        """Switch to the media management view."""
         self._set_media_view()
 
     # VIEW =====================================================================
@@ -279,22 +285,21 @@ class MainWindow(QMainWindow):
     # HELP =====================================================================
     def about(self):
         """Open About Popup"""
-        dialog = AboutPopup(self)
+        dialog = READMEPopup(self, doc_type="ABOUT")
         dialog.exec()
         del dialog
 
     def help(self):
         """Open README Popup"""
-        dialog = READMEPopup(self)
+        dialog = READMEPopup(self, doc_type="README")
         dialog.exec()
         del dialog
 
     def license(self):
         """Open License Popup"""
-        dialog = LicensePopup(self)
+        dialog = READMEPopup(self, doc_type="LICENSE")
         dialog.exec()
         del dialog
-
 
     # CLOSE EVENT ================================================================
     def closeEvent(self, event):

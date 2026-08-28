@@ -1,9 +1,9 @@
 '''
 Popup to add or edit config settings
 '''
-import animl
 import os
 from pathlib import Path
+import animl
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QComboBox,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
@@ -18,6 +18,10 @@ from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_m
 
 
 class ConfigPopup(QDialog):
+    """
+    Popup for adding or editing configuration settings.
+    """
+
     ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
     DEVICE_OPTIONS = {"CPUExecutionProvider": "CPU", "CUDAExecutionProvider": "CUDA-enabled GPU"}
 
@@ -27,8 +31,9 @@ class ConfigPopup(QDialog):
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
         self.logger = parent.logger
-        self.cfg = config.load_cfg()
-        self.ml_dir = Path(config.load_cfg('ML_DIR'))
+        self.mpDB = parent.mpDB
+        self.cfg = parent.cfg
+        self.ml_dir = Path(self.cfg.ML_DIR)
         self.label_width = 130
         self.edit_width = 150
 
@@ -61,7 +66,7 @@ class ConfigPopup(QDialog):
         # UPDATE UPLOADS DIRECTORIES -------------------------------------------
         uploads_layout = QHBoxLayout()
         self.button_uploads = QPushButton("Edit Source Directories")
-        self.button_uploads.setFixedWidth(self.column1_width)
+        self.button_uploads.setFixedWidth(self.label_width)
         self.button_uploads.clicked.connect(self.edit_uploads)
         uploads_layout.addWidget(self.button_uploads, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(uploads_layout)
@@ -119,7 +124,7 @@ class ConfigPopup(QDialog):
         self.smart_frames.setFixedWidth(self.edit_width)
         self.smart_frames.addItem("Enabled")
         self.smart_frames.addItem("Disabled")
-        self.smart_frames.setCurrentIndex(0 if self.cfg['SMART_FRAMES'] else 1)
+        self.smart_frames.setCurrentIndex(0 if self.cfg.SMART_FRAMES else 1)
         self.smart_frames.setToolTip("Enable or disable smart frame processing for video files.")
         self.smart_frames.currentTextChanged.connect(self.update_smart_frames)
         video_layout.addWidget(self.smart_frames, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -130,14 +135,14 @@ class ConfigPopup(QDialog):
         video_layout.addWidget(self.video_fps_label)
         self.video_fps = QLineEdit()
         self.video_fps.setFixedWidth(self.edit_width)
-        self.video_fps.setText(str(self.cfg['VIDEO_FPS']))
+        self.video_fps.setText(str(self.cfg.VIDEO_FPS))
         self.video_fps.textChanged.connect(self.update_video_fps)
         video_layout.addWidget(self.video_fps, alignment=Qt.AlignmentFlag.AlignLeft)
         video_layout.addStretch()
         layout.addLayout(video_layout)
 
-        self.video_fps_label.setVisible(self.cfg['SMART_FRAMES'])
-        self.video_fps.setVisible(self.cfg['SMART_FRAMES'])
+        self.video_fps_label.setVisible(self.cfg.SMART_FRAMES)
+        self.video_fps.setVisible(self.cfg.SMART_FRAMES)
 
         video_frames_layout = QHBoxLayout()
         video_n_frames_label = QLabel("Video Frames:")
@@ -146,7 +151,7 @@ class ConfigPopup(QDialog):
         video_frames_layout.addWidget(video_n_frames_label)
         self.n_frames = QLineEdit()
         self.n_frames.setFixedWidth(self.edit_width)
-        self.n_frames.setText(str(self.cfg['N_FRAMES']))
+        self.n_frames.setText(str(self.cfg.N_FRAMES))
         self.n_frames.textChanged.connect(self.update_n_frames)
         video_frames_layout.addWidget(self.n_frames, alignment=Qt.AlignmentFlag.AlignLeft)
         video_frames_layout.addStretch()
@@ -176,7 +181,7 @@ class ConfigPopup(QDialog):
         self.device.addItem("CPU")
         if "CUDAExecutionProvider" in providers:
             self.device.addItem("CUDA-enabled GPU")
-        current_device = self.cfg.get('DEVICE', 'CPUExecutionProvider')
+        current_device = self.cfg.DEVICE
         self.device.setCurrentText(self.DEVICE_OPTIONS.get(current_device, "CPU"))
         self.device.setToolTip("Select the hardware device for running models.")
         self.device.currentTextChanged.connect(self.change_device)
@@ -290,10 +295,10 @@ class ConfigPopup(QDialog):
             if is_valid_reid_model(Path(new_model[0]).stem):
                 # Update config
                 self.visualizer_model.setText(new_model[0])
-                self.cfg['REID_KEY'] = str(Path(new_model[0]).stem)
+                self.cfg.REID_KEY = str(Path(new_model[0]).stem)
                 # save changes to yml
-                self.logger.info(f"Re-ID model updated to {self.cfg['REID_KEY']}")
-                config.update(self.cfg)
+                self.logger.info(f"Re-ID model updated to {self.cfg.REID_KEY}")
+                self.cfg.save()
             else:
                 dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
                 dialog.exec()
@@ -304,9 +309,9 @@ class ConfigPopup(QDialog):
         try:
             nummatches = int(self.nummatches.text())
             if nummatches > 0:
-                self.cfg['KNN'] = nummatches
+                self.cfg.KNN = nummatches
                 self.logger.info(f"Max number of matches updated to {nummatches}")
-                config.update(self.cfg)
+                self.cfg.save()
         except ValueError:
             pass
 
@@ -316,27 +321,27 @@ class ConfigPopup(QDialog):
             duration = int(self.sequence_duration.text())
             n = int(self.sequence_n.text())
             if duration > 0:
-                self.cfg['SEQUENCE_DURATION'] = duration
-                self.cfg['SEQUENCE_N'] = n
+                self.cfg.SEQUENCE_DURATION = duration
+                self.cfg.SEQUENCE_N = n
                 self.logger.info(f"Sequence settings updated: duration={duration}, n={n}")
-                config.update(self.cfg)
+                self.cfg.save()
         except ValueError:
             pass
 
     def update_smart_frames(self):
         """Update smart frames setting"""
-        self.cfg['SMART_FRAMES'] = True if self.smart_frames.currentText() == "Enabled" else False
-        self.video_fps_label.setVisible(self.cfg['SMART_FRAMES'])
-        self.video_fps.setVisible(self.cfg['SMART_FRAMES'])
-        config.update(self.cfg)
+        self.cfg.SMART_FRAMES = True if self.smart_frames.currentText() == "Enabled" else False
+        self.video_fps_label.setVisible(self.cfg.SMART_FRAMES)
+        self.video_fps.setVisible(self.cfg.SMART_FRAMES)
+        self.cfg.save()
 
     def update_video_fps(self):
         """Update video fps setting"""
         try:
             fps = int(self.video_fps.text())
             if fps > 0:
-                self.cfg['VIDEO_FPS'] = fps
-                config.update(self.cfg)
+                self.cfg.VIDEO_FPS = fps
+                self.cfg.save()
         except ValueError:
             pass
 
@@ -345,22 +350,22 @@ class ConfigPopup(QDialog):
         try:
             n_frames = int(self.n_frames.text())
             if n_frames > 0:
-                self.cfg['N_FRAMES'] = n_frames
-                config.update(self.cfg)
+                self.cfg.N_FRAMES = n_frames
+                self.cfg.save()
         except ValueError:
             pass
 
     def change_device(self):
+        """Change hardware device for running models between CPU and CUDA-enabled GPU"""
         self.logger.info(f"Device changed to {self.device.currentText()}")
         """Change hardware device for running models"""
         selected_device = self.device.currentText()
         if selected_device == "CPU":
-            self.cfg.update({'DEVICE': "CPUExecutionProvider"})
+            self.cfg.DEVICE = "CPUExecutionProvider"
         elif selected_device == "CUDA-enabled GPU":
-            self.cfg['DEVICE'] = "CUDAExecutionProvider"
-        self.logger.info(f"Device changed to {self.cfg['DEVICE']}")
-        config.update(self.cfg)
-            self.cfg.update({'DEVICE': "CUDAExecutionProvider"})
+            self.cfg.DEVICE = "CUDAExecutionProvider"
+        self.logger.info(f"Device changed to {self.cfg.DEVICE}")
+        self.cfg.save()
 
     def edit_uploads(self):
         """Open the upload directories manager popup."""

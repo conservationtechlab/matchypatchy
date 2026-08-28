@@ -20,14 +20,14 @@ class ReIDThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     done = pyqtSignal()
 
-    def __init__(self, mpDB, ML_DIR, REID_KEY, VIEWPOINT_KEY):
+    def __init__(self, mpDB, cfg, mloptions):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = ML_DIR
-        self.reid_filepath = get_path(self.ml_dir, REID_KEY)
-        self.viewpoint_filepath = get_path(self.ml_dir, VIEWPOINT_KEY)
-        self.device = config.load_cfg('DEVICE')
-
+        self.cfg = cfg
+        self.device = self.cfg.DEVICE
+        self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
+        self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
+        
     def run(self):
         """Process viewpoint and embeddings for ROIs"""
         # ROIS must be fetched after start() to chain with animl
@@ -40,7 +40,7 @@ class ReIDThread(QThread):
 
         # need only media that has corresponding ROIs
         media = self.mpDB._command("""
-            SELECT roi.id, roi.media_id, 
+            SELECT roi.id, roi.media_id,
                 uploads.base_dir || '/' || media.relative_path AS filepath,
                 media.external_id, media.camera_id, media.sequence_id
             FROM roi
@@ -145,7 +145,7 @@ class PairXThread(QThread):
                                  self.model, ["backbone.blocks.3"],
                                  k_lines=20, k_colors=10)
         return explained_imgs
-    
+
     def get_bbox(self, roi):
         '''
         Return the bbox coordinates for a given roi row

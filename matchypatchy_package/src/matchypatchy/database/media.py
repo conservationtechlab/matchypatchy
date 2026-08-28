@@ -2,12 +2,21 @@
 Functions for Manipulating and Processing ROIs
 """
 import hashlib
-import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass
+import pandas as pd
+
 
 IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
+
+# Column names returned by fetch_roi_media (roi joined with media and individual)
+COLUMNS = [
+    'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
+    'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
+    'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id',
+    'sequence_id', 'external_id', 'comment', 'name', 'sex', 'age',
+]
 
 
 @dataclass
@@ -38,17 +47,17 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     Fetches all media info with full paths, converts to dataframe
     """
-     # select ids
+    # select ids
     if ids:
         ids_str = ', '.join(map(str, ids))
-        row_cond=f"WHERE m.id IN ({ids_str})"
+        row_cond = f"WHERE m.id IN ({ids_str})"
     else:
-        row_cond=None
-    
+        row_cond = None
+
     # fetch counts for media table data_type=0
     if counts:
         query = f"""
-            SELECT 
+            SELECT
                 m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
                 m.external_id, m.comment,
@@ -61,16 +70,16 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
             GROUP BY m.id
         """
 
-        columns=["id","base_dir_id", "relative_path", "sha256", "ext", 
-                 "timestamp", 'station_id', "camera_id", 'sequence_id',
-                 "external_id", 'comment', 'roi_count', 'filepath']
+        columns = ["id", "base_dir_id", "relative_path", "sha256", "ext",
+                   "timestamp", 'station_id', "camera_id", 'sequence_id',
+                   "external_id", 'comment', 'roi_count', 'filepath']
 
         media = mpDB._command(query, quiet=quiet)
 
     # Query media with joined full paths no counts
     else:
         query = f"""
-            SELECT 
+            SELECT
                 m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
                 m.external_id, m.comment,
@@ -80,9 +89,9 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
             {row_cond if row_cond else ''}
         """
 
-        columns=["id", "base_dir_id", "relative_path", "sha256", "ext",
-                 "timestamp", 'station_id', "camera_id", 'sequence_id',
-                 "external_id", 'comment', 'filepath']
+        columns = ["id", "base_dir_id", "relative_path", "sha256", "ext",
+                   "timestamp", 'station_id', "camera_id", 'sequence_id',
+                   "external_id", 'comment', 'filepath']
 
         media = mpDB._command(query, quiet=quiet)
 
@@ -91,8 +100,8 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
         media = pd.DataFrame(media, columns=columns)
         media = media.replace({float('nan'): None})
         return media
-    else:
-        return pd.DataFrame()
+    # return empty dataframe if no media found
+    return pd.DataFrame()
 
 
 def fetch_roi(mpDB, media_id=None):
@@ -100,7 +109,7 @@ def fetch_roi(mpDB, media_id=None):
     Fetches roi table with media filepaths, converts to dataframe
     """
     query = """
-        SELECT 
+        SELECT
             r.id, r.media_id, r.frame, r.bbox_x, r.bbox_y, r.bbox_w, r.bbox_h,
             r.viewpoint, r.reviewed, r.favorite, r.individual_id, r.emb,
             u.base_dir || '/' || m.relative_path AS filepath
@@ -108,20 +117,21 @@ def fetch_roi(mpDB, media_id=None):
         JOIN media m ON r.media_id = m.id
         LEFT JOIN uploads u ON m.base_dir_id = u.id
     """
-    
+
     if media_id:
         query += f" WHERE r.media_id = {media_id}"
-    
+
     manifest = mpDB._command(query)
-    
+
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
                                                "viewpoint", "reviewed", "favorite", "individual_id", "emb", "filepath"])
         rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
         rois = rois.replace({float('nan'): None})
         return rois
-    else:
-        return pd.DataFrame()
+
+    # return empty dataframe if no roi found
+    return pd.DataFrame()
 
 
 def fetch_roi_media(mpDB, rids=None, reset_index=True):
@@ -151,25 +161,27 @@ def fetch_individual(mpDB):
     individual = mpDB.select("individual")
     if individual:
         return pd.DataFrame(individual, columns=["id", "name", "sex", "age"]).set_index("id")
-    else:  # return empty
-        return pd.DataFrame(columns=["id", "name", "sex", "age"]).set_index("id")
+    # return empty dataframe if no individual found
+    return pd.DataFrame(columns=["id", "name", "sex", "age"]).set_index("id")
 
 
 def get_roi_bbox(roi):
     """Return the bbox coordinates for a given roi row"""
-    if {'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'}.issubset(roi.columns) and \
-        roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']].notnull().all(axis=None):
-        return roi[['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h']]
+    columns = ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]
+
+    if set(columns).issubset(roi.columns) and roi[columns].notnull().all(axis=None):
+        return roi[columns]
+    # return None if bbox coordinates are not available
     return None
 
 
-def get_sequence(id, roi_media):
+def get_sequence(rid, roi_media):
     """
     Return two lists of roi.ids
 
     Group by capture, order by frame number
     """
-    sequence_id = roi_media.loc[id, "sequence_id"]
+    sequence_id = roi_media.loc[rid, "sequence_id"]
     sequence = roi_media[roi_media['sequence_id'] == sequence_id]
     sequence = sequence.sort_values(by=['timestamp'])
     return sequence.index.to_list()
@@ -181,7 +193,7 @@ def sequence_roi_dict(roi_media):
 
     Group by capture, order by frame number
     """
-    sequence_dict = dict()
+    sequence_dict = {}
     sequence_ids = roi_media["sequence_id"].to_list()
     for s in sequence_ids:
         sequence = roi_media[roi_media['sequence_id'] == s]
@@ -195,7 +207,7 @@ def individual_roi_dict(roi_media):
 
     Group by capture, order by frame number
     """
-    individual_dict = dict()
+    individual_dict = {}
     individual_ids = roi_media["individual_id"].to_list()
     for iid in individual_ids:
         individual = roi_media[roi_media['individual_id'] == iid]

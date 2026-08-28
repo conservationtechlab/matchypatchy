@@ -29,6 +29,8 @@ from matchypatchy import config
 
 
 class DisplayBase(QWidget):
+    """Base class for the main dashboard view in the MatchyPatchy GUI."""
+
     LOGO = str(config.asset_path("graphics/logo.png"))
 
     def __init__(self, parent):
@@ -38,26 +40,31 @@ class DisplayBase(QWidget):
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         padding = 120
+        # Initialize threads for sequence, animl, and reid processing
+        self.active_survey = None
+        self.sequence_thread = None
+        self.animl_thread = None
+        self.reid_thread = None
 
         container = QWidget()
         container.setObjectName("mainBorderWidget")
         layout = QVBoxLayout()
 
-        self.label = QLabel("Welcome To MatchyPatchy")
-        self.label.setObjectName("Title")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setFixedHeight(25)
-        self.label.setStyleSheet("""#Title {font-size: 22px;}""")
-        layout.addWidget(self.label)
+        label = QLabel("Welcome To MatchyPatchy")
+        label.setObjectName("Title")
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setFixedHeight(25)
+        label.setStyleSheet("""#Title {font-size: 22px;}""")
+        layout.addWidget(label)
         layout.addSpacing(10)
         layout.addStretch()
 
-        self.logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
-        self.logo.setFixedSize(600, 400)
-        self.logo.setObjectName("borderWidget")
+        logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
+        logo.setFixedSize(600, 400)
+        logo.setObjectName("borderWidget")
         logo_img = QImage(self.LOGO)
-        self.logo.setPixmap(QPixmap.fromImage(logo_img))
-        layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
+        logo.setPixmap(QPixmap.fromImage(logo_img))
+        layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addSpacing(10)
         layout.addStretch()
 
@@ -152,7 +159,7 @@ class DisplayBase(QWidget):
         main_layout = QVBoxLayout()
         main_layout.addWidget(container)
         self.setLayout(main_layout)
-
+        
         self.update_survey()
 
     def update_project(self, cfg, mpDB):
@@ -284,10 +291,7 @@ class DisplayBase(QWidget):
             # 3. REID AND VIEWPOINT
             dialog.set_max(100)
             dialog.set_counter(0)
-            self.miew_thread = ReIDThread(self.mpDB, 
-                                          self.cfg.ML_DIR,
-                                          mloptions['REID_KEY'],
-                                          mloptions['VIEWPOINT_KEY'])
+            self.miew_thread = ReIDThread(self.mpDB, self.cfg, mloptions)
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)
             # chain threads

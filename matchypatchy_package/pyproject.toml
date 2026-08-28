@@ -1,6 +1,6 @@
 [project]
 name = "matchypatchy"
-version = "0.1.6_dev"
+version = "0.1.7_dev"
 authors = [
   { name="Kyra Swanson", email="tswanson@sdzwa.org" },
 ]
@@ -25,3 +25,9 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+
+[tool.pylint.master]
+extension-pkg-whitelist = ["PyQt6"]
+
+[tool.pylint.messages_control]
+disable = ["no-name-in-module"]

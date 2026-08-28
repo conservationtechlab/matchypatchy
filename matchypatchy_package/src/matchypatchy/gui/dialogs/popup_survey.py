@@ -15,6 +15,7 @@ from matchypatchy.database.media import media_count
 
 
 class SurveyPopup(QDialog):
+    """Popup dialog for managing surveys (add/edit/delete)"""
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Manage surveys")
@@ -87,13 +88,14 @@ class SurveyPopup(QDialog):
                                  dialog.get_year_start(),
                                  dialog.get_year_end())
         del dialog
-        self.surveys = self.update()
+        # refresh the survey list after adding a new survey
+        self.update()
 
     def edit(self):
         """Edit selected survey"""
         selected_survey = self.list.currentRow()
-        id = self.survey_list_ordered[selected_survey][0]
-        cond = f'survey.id={id}'
+        survey_id = self.survey_list_ordered[selected_survey][0]
+        cond = f'survey.id={survey_id}'
         row = self.mpDB.select_join('survey', 'region', 'survey.region_id=region.id',
                                     columns='survey.id, survey.name, region.name, year_start, year_end',
                                     row_cond=cond, quiet=False)[0]
@@ -115,28 +117,35 @@ class SurveyPopup(QDialog):
                             "region_id": region_id,
                             "year_start": dialog.get_year_start(),
                             "year_end": dialog.get_year_end()}
-            self.mpDB.edit_row("survey", id, replace_dict)
+            self.mpDB.edit_row("survey", survey_id, replace_dict)
         del dialog
-        self.surveys = self.update()
+        # refresh the survey list after editing a survey
+        self.update()
 
     def delete(self):
         """Delete selected survey"""
         selected_survey = self.list.currentRow()
-        id, selected = self.survey_list_ordered[selected_survey]
-        _, n = media_count(self.mpDB, id)
+        survey_id, selected = self.survey_list_ordered[selected_survey]
+        _, n = media_count(self.mpDB, survey_id)
         dialog = AlertPopup(self, f'Are you sure you want to delete {selected}? This will remove {n} images.')
         if dialog.exec() == QDialog.DialogCode.Accepted:
             # delete survey, should cascade to stations and media
-            self.mpDB.delete("survey", f'id={id}')
+            self.mpDB.delete("survey", f'id={survey_id}')
 
         del dialog
+        # refresh the survey list after deleting a survey
         self.update()
 
 
 class SurveyFillPopup(QDialog):
     """Popup to fill in new survey details"""
 
-    def __init__(self, parent, name="", region_name="", timezone = datetime.now().astimezone().tzinfo, year_start="", year_end=""):
+    def __init__(self, parent,
+                 name: str = "",
+                 region_name: str = "",
+                 timezone: zoneinfo.ZoneInfo = datetime.now().astimezone().tzinfo,
+                 year_start: str = "",
+                 year_end: str = ""):
         super().__init__(parent)
         self.setWindowTitle("Survey")
         layout = QVBoxLayout()
@@ -159,9 +168,9 @@ class SurveyFillPopup(QDialog):
         layout.addWidget(QLabel('Timezone'))
         self.timezone = QComboBox()
         self.timezone.setFixedHeight(20)
-        self.timezone.addItems(sorted(zoneinfo.available_timezones()))  
+        self.timezone.addItems(sorted(zoneinfo.available_timezones()))
         self.timezone.setEditable(True)
-        
+
         # convert common abbreviations to IANA names if needed
         iana_name = TZ_CONVERT_DICT.get(str(timezone), str(timezone))
         if iana_name in zoneinfo.available_timezones():
@@ -190,9 +199,9 @@ class SurveyFillPopup(QDialog):
 
         self.name.textChanged.connect(self.check_input)
         self.region.textChanged.connect(self.check_input)
-        self.name.returnPressed.connect(lambda: self.region.setFocus())
-        self.region.returnPressed.connect(lambda: self.year_start.setFocus())
-        self.year_start.returnPressed.connect(lambda: self.year_end.setFocus())
+        self.name.returnPressed.connect(self.region.setFocus)
+        self.region.returnPressed.connect(self.year_start.setFocus)
+        self.year_start.returnPressed.connect(self.year_end.setFocus)
         self.year_end.returnPressed.connect(self.accept_verify)
         self.name.setFocus()
         self.check_input()
@@ -204,20 +213,26 @@ class SurveyFillPopup(QDialog):
         self.okButton.setEnabled(bool(self.get_name() and self.get_region()))
 
     def get_name(self):
+        """Get the name value"""
         return self.name.text()
 
     def get_region(self):
+        """Get the region value"""
         return self.region.text()
-    
+
     def get_timezone(self):
+        """Get the timezone value"""
         return self.timezone.currentText()
 
     def get_year_start(self):
+        """Get the start year value"""
         return self.year_start.text()
 
     def get_year_end(self):
+        """Get the end year value"""
         return self.year_end.text()
 
     def accept_verify(self):
+        """Verify the input fields and accept the dialog if all required fields have values"""
         if self.get_name() and self.get_region():
             self.accept()

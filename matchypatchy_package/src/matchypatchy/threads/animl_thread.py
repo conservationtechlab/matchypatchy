@@ -2,6 +2,7 @@
 QThread Class for Processing BBox, Frames, BuildFileManifest with ANIML
 
 """
+from pathlib import Path
 import animl
 import pandas as pd
 
@@ -63,7 +64,7 @@ class VerifyNewBaseDirsThread(QThread):
 
                 hash_not_found_in_db = [h[0] for h in new_data if h[1] not in set(media_hashes)]
                 self.not_found_in_db.append(hash_not_found_in_db)
-                
+
                 hash_not_found_in_new_directory = [h[0] for h in media if h[1] not in set(new_hashes)]
                 self.not_found_in_new_directory.append(hash_not_found_in_new_directory)
 
@@ -81,12 +82,12 @@ class AnimlThread(QThread):
     def __init__(self, mpDB, cfg, DETECTOR_KEY):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = Path(config.load_cfg('ML_DIR'))
-        self.smart_frames = config.load_cfg('SMART_FRAMES')
-        self.fps = config.load_cfg('VIDEO_FPS')
-        self.n_frames = config.load_cfg('N_FRAMES')
-        self.thumbnail_dir = config.load_cfg('THUMBNAIL_DIR')
-        self.device = config.load_cfg('DEVICE')
+        self.ml_dir = Path(cfg.ML_DIR)
+        self.smart_frames = cfg.SMART_FRAMES
+        self.fps = cfg.VIDEO_FPS
+        self.n_frames = cfg.N_FRAMES
+        self.thumbnail_dir = cfg.THUMBNAIL_DIR
+        self.device = cfg.DEVICE
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
@@ -94,7 +95,7 @@ class AnimlThread(QThread):
         # select media that do not have rois
         media, column_names = self.mpDB.get_media_with_filepath(row_cond="NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
         self.media = pd.DataFrame(media, columns=column_names)
-        
+
         # select rois that do not have bbox
         rois = fetch_roi_media(mpDB, reset_index=False)
         self.rois = rois[rois['bbox_x'] == -1]  # imported without bbox
@@ -108,7 +109,7 @@ class AnimlThread(QThread):
         if self.DETECTOR_KEY is None:
             self.detector = None
         else:
-           self.detector = animl.load_detector(self.md_filepath, device=self.device)
+            self.detector = animl.load_detector(self.md_filepath, device=self.device)
 
     def run(self):
         # pull out images and videos from media

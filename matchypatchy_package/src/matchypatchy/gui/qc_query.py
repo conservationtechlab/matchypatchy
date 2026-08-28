@@ -21,9 +21,9 @@ class QC_QueryContainer(QObject):
         self.parent = parent
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
-        self.individuals_raw = dict()
-        self.individuals = dict()
-        self.filters = dict()
+        self.individuals_raw = {}
+        self.individuals = {}
+        self.filters = {}
         self.ranked_sequences = []
         self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
@@ -110,6 +110,11 @@ class QC_QueryContainer(QObject):
             return False
 
     def rank(self):
+        """
+        Rank the individuals by the number of ROIs they have.
+        The ranked list is stored in self.ranked_sequences.
+        Also sets the number of queries to validate.
+        """
         # Rank by number of rois for each iid
         self.ranked_sequences = sorted(self.individuals.items(), key=lambda x: len(x[1]), reverse=True)
         # set number of queries to validate
@@ -128,8 +133,8 @@ class QC_QueryContainer(QObject):
         # set current query
         self.current_query = n
         # get corresponding sequence_id and rois
-        self.current_sequence_id = self.ranked_sequences[self.current_query][0]
-        self.current_query_rois = self.individuals[self.current_sequence_id]
+        current_sequence_id = self.ranked_sequences[self.current_query][0]
+        self.current_query_rois = self.individuals[current_sequence_id]
         # set view to first in sequence
         self.set_within_query_sequence(0)
         # update matches
@@ -175,11 +180,11 @@ class QC_QueryContainer(QObject):
         self.current_match_rid = self.current_match_rois[self.current_match]
 
     # VIEWPOINT ----------------------------------------------------------------
-        
+
     def toggle_viewpoint(self, selected_viewpoint):
         """Set the selected viewpoint filter and update rois"""
         data = self.data.loc[self.current_query_rois]
-        self.query_viewpoint_map = dict(zip(data.index, data['viewpoint']))
+        query_viewpoint_map = dict(zip(data.index, data['viewpoint']))
 
         self.selected_viewpoint = selected_viewpoint
         if self.selected_viewpoint == 1:
@@ -188,8 +193,8 @@ class QC_QueryContainer(QObject):
         else:
             # adjust numbering
             self.selected_viewpoint = 1 if self.selected_viewpoint == 2 else selected_viewpoint
-            self.current_query_rois = [rid for rid in self.current_query_rois if self.query_viewpoint_map[rid] == self.selected_viewpoint]
-            self.current_match_rois = [rid for rid in self.current_match_rois if self.query_viewpoint_map[rid] == self.selected_viewpoint]
+            self.current_query_rois = [rid for rid in self.current_query_rois if query_viewpoint_map[rid] == self.selected_viewpoint]
+            self.current_match_rois = [rid for rid in self.current_match_rois if query_viewpoint_map[rid] == self.selected_viewpoint]
             if not self.current_query_rois or not self.current_match_rois:
                 return False
             else:
@@ -199,6 +204,7 @@ class QC_QueryContainer(QObject):
 
     # RETURN INFO --------------------------------------------------------------
     def is_existing_match(self):
+        """Check if the current query and match are for the same individual."""
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None
 
@@ -261,5 +267,8 @@ class QC_QueryContainer(QObject):
         self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
 
     def unmatch(self):
+        """
+        Unmatch the current query from its match by setting the individual_id to None and reviewed to 0.
+        """
         # Set current match id to none
         self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None, "reviewed": 0}, quiet=False)

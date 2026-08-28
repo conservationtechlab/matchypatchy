@@ -13,6 +13,7 @@ from matchypatchy.threads.match_object import FavoriteMatchObject
 
 
 class QueryContainer(QObject):
+    """Container class for managing query and match data within the MatchyPatchy GUI."""
     thread_signal = pyqtSignal(bool)
     loaded_data = pyqtSignal(pd.DataFrame)
 
@@ -23,11 +24,17 @@ class QueryContainer(QObject):
         self.metric = parent.distance_metric
         self.k = parent.k
         self.threshold = parent.threshold
-        self.filter_dict = dict()
+        self.filter_dict = {}
         self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
-        self.neighbor_dict = dict()
+        self.match_thread = None
+
+        self.data_raw = pd.DataFrame()
+        self.data = pd.DataFrame()
+
+        self.neighbor_dict = {}
         self.ranked_sequences = []
+        self.sequences = {}
 
         self.current_match_object = None
         self.current_query_rois = []
@@ -65,12 +72,7 @@ class QueryContainer(QObject):
             return False
 
         # must have embeddings to continue
-        if not (self.data_raw["emb"] == 0).all():
-            # need sequence and capture ids from media to restrict comparisons shown to
-            return True
-        # no embeddings
-        else:
-            return False
+        return not (self.data_raw["emb"] == 0).all()
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
@@ -133,6 +135,10 @@ class QueryContainer(QObject):
         else:
             # interrupt occurred or dicts are empty
             self.thread_signal.emit(False)
+
+    def set_threshold(self, threshold):
+        """Set the similarity threshold for the query container"""
+        self.threshold = threshold
 
     def set_query(self, n):
         """Set the Query side to a particular (n) image in the list"""
@@ -199,18 +205,17 @@ class QueryContainer(QObject):
 
         # filter query and matches by selected viewpoint
         viewpoint_available = self.current_match_object.show_viewpoint(self.selected_viewpoint)
-        
+
         # update matches and query rois based on new viewpoint selection
         self.current_query_rois = self.current_match_object.get_ranked_query_rids()
         self.set_within_query_sequence(0)
         self.update_matches()
 
         return viewpoint_available
-    
+
     # FAVORITES ----------------------------------------------------------------
     def set_match_favorites(self, active):
         """Set the match favorites active state"""
-        
         if active:
             # store the current match object before switching to favorites
             self.knn_match_object = self.current_match_object
@@ -226,12 +231,12 @@ class QueryContainer(QObject):
             for index, _ in favorites.iterrows():
                 distance = 1 - self.mpDB.calculate_similarity(self.knn_match_object.query_data.iloc[0]['id'], index)
                 filtered_neighbors.append((index, distance))
-            
+
             # create the favorite match object with the filtered neighbors
             self.favorite_match_object = FavoriteMatchObject(self.knn_match_object.sequence_id,
                                                              filtered_neighbors,
-                                                             query_data = self.knn_match_object.query_data,
-                                                             match_data = favorites)
+                                                             query_data=self.knn_match_object.query_data,
+                                                             match_data=favorites)
             # switch the current match object to the favorite match object
             self.current_match_object = self.favorite_match_object
         else:
