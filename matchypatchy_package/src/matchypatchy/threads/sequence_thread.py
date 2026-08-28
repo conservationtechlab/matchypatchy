@@ -11,19 +11,19 @@ from datetime import timedelta
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.media import fetch_media
-from matchypatchy.config import load_cfg
 
 
 class SequenceThread(QThread):
+    """Thread for processing media sequences based on station, camera, and timestamp."""
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     done = pyqtSignal()
 
-    def __init__(self, mpDB, flag):
+    def __init__(self, mpDB, cfg, flag):
         super().__init__()
         self.mpDB = mpDB
         self.flag = flag
-        self.max_time = timedelta(seconds=int(load_cfg('SEQUENCE_DURATION')))
-        self.max_n = int(load_cfg('SEQUENCE_N'))
+        self.max_time = timedelta(seconds=int(cfg.SEQUENCE_DURATION))
+        self.max_n = int(cfg.SEQUENCE_N)
 
         self.media = fetch_media(self.mpDB)
         self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')

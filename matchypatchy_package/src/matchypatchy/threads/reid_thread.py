@@ -4,13 +4,11 @@ Thread Class for Processing Viewpoint and Miew Embedding
 """
 import animl
 from numpy import argmax
-from pathlib import Path
 import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.threads.model_download_thread import get_path
-from matchypatchy import config
 from matchypatchy.database.media import fetch_roi
 
 # from matchypatchy.pairx.core import explain
@@ -22,14 +20,14 @@ class ReIDThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     done = pyqtSignal()
 
-    def __init__(self, mpDB, REID_KEY, VIEWPOINT_KEY):
+    def __init__(self, mpDB, cfg, mloptions):
         super().__init__()
         self.mpDB = mpDB
-        self.ml_dir = Path(config.load_cfg('ML_DIR'))
-        self.reid_filepath = get_path(self.ml_dir, REID_KEY)
-        self.viewpoint_filepath = get_path(self.ml_dir, VIEWPOINT_KEY)
-        self.device = config.load_cfg('DEVICE')
-
+        self.cfg = cfg
+        self.device = self.cfg.DEVICE
+        self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
+        self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
+        
     def run(self):
         """Process viewpoint and embeddings for ROIs"""
         # ROIS must be fetched after start() to chain with animl
@@ -40,9 +38,17 @@ class ReIDThread(QThread):
             self.done.emit()
             return
 
-        media, _ = self.mpDB.select_join("roi", "media", "roi.media_id = media.id",
-                                         columns="roi.id, media_id, filepath, external_id, camera_id, sequence_id")
+        # need only media that has corresponding ROIs
+        media = self.mpDB._command("""
+            SELECT roi.id, roi.media_id,
+                uploads.base_dir || '/' || media.relative_path AS filepath,
+                media.external_id, media.camera_id, media.sequence_id
+            FROM roi
+            JOIN media ON roi.media_id = media.id
+            LEFT JOIN uploads ON media.base_dir_id = uploads.id
+        """)
         self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
+
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
         self.rois['filepath'] = self.rois['roi_id'].map(self.image_paths)
 
@@ -139,7 +145,7 @@ class PairXThread(QThread):
                                  self.model, ["backbone.blocks.3"],
                                  k_lines=20, k_colors=10)
         return explained_imgs
-    
+
     def get_bbox(self, roi):
         '''
         Return the bbox coordinates for a given roi row

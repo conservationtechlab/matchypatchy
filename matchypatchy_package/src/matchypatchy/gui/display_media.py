@@ -15,6 +15,8 @@ from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
 
 class DisplayMedia(QWidget):
+    """GUI class for displaying and managing media content."""
+
     SAVE_STYLE = """ QPushButton { background-color: #2a3e5e; color: white; }"""
     edit_stack_signal = pyqtSignal(list)  # Signal to send edit stack to main GUI
 
@@ -22,9 +24,13 @@ class DisplayMedia(QWidget):
         super().__init__()
         self.parent = parent
         self.logger = parent.logger
+        self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         # 0 for Media, 1 for ROI
         self.data_type = data_type
+        self.valid_stations = []
+        self.selected_rows = []
+        
         layout = QVBoxLayout()
 
         # First Layer ----------------------------------------------------------
@@ -151,9 +157,12 @@ class DisplayMedia(QWidget):
             else:
                 self.parent._set_compare_view()
 
-    def update_db(self, mpDB):
+    def update_project(self, cfg, mpDB):
         """Update database object"""
+        self.cfg = cfg
         self.mpDB = mpDB
+        self.media_table.update_project(cfg, mpDB)
+        self.filterbar.update_project(mpDB)
 
     # =========================================================================
     # FILTERS
@@ -198,6 +207,7 @@ class DisplayMedia(QWidget):
     # =========================================================================
     # MEDIA TABLE HANDLERS
     # =========================================================================
+
     # 1. RUN ON ENTRY
     def load_table(self):
         """Load media/roi data into table based on current data_type"""
@@ -207,6 +217,7 @@ class DisplayMedia(QWidget):
 
         if media_n == 0:
             # no media at all
+            self.media_table.clear_and_load_contents(self.data_type)
             dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
             if dialog.exec():
                 self.home()
@@ -224,7 +235,7 @@ class DisplayMedia(QWidget):
                 self.show_type.blockSignals(False)
 
             # load table with current data type
-            self.media_table.load_data(self.data_type)
+            self.media_table.clear_and_load_contents(self.data_type)
             return True
 
     def update_count_label(self):
@@ -256,7 +267,7 @@ class DisplayMedia(QWidget):
         self.update_count_label()
 
     def handle_table_change(self, edit):
-        """Slot to receive updates from QTableWidget"""
+        """Slot to receive updates from QTableWidget to enable/disable buttons and update selected rows"""
         row = edit[0]
         column = edit[1]
         item = self.media_table.table.item(row, column)
@@ -298,7 +309,6 @@ class DisplayMedia(QWidget):
 
     def edit_row(self, row):
         """Edit a single row"""
-        
         data = self.media_table.data_filtered.iloc[[row]].reset_index(drop=True)
         current_image_index = 0
 
@@ -313,10 +323,10 @@ class DisplayMedia(QWidget):
                 video_row = video.iloc[[0]].copy().reset_index(drop=True)
                 video_row['media_id'] = mid
                 # clear out roi columns for video row so mediawidget behaves correctly
-                video_row[['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 
+                video_row[['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h',
                            'viewpoint', 'individual_id', 'age', 'sex']] = pd.NA
                 data = pd.concat([data, video_row], ignore_index=True)  # add video row
-                
+
         # Launch Media Edit Popup
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
@@ -375,11 +385,11 @@ class DisplayMedia(QWidget):
             if dialog.exec():
                 for row in self.selected_rows:
                     if self.data_type == 1:
-                        id = int(self.media_table.data_filtered.at[row, "media_id"])
-                        self.mpDB.copy("media", id)
+                        mid = int(self.media_table.data_filtered.at[row, "media_id"])
+                        self.mpDB.copy("media", mid)
                     else:
-                        id = int(self.media_table.data_filtered.at[row, "id"])
-                        self.mpDB.copy("media", id)
+                        mid = int(self.media_table.data_filtered.at[row, "id"])
+                        self.mpDB.copy("media", mid)
                 del dialog
 
     def delete(self):

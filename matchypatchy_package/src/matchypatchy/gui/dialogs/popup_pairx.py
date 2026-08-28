@@ -22,6 +22,7 @@ class PairXPopup(QDialog):
         self.setWindowTitle("Match Visualizer")
         self.setMinimumSize(880, 900)
         self.parent = parent
+        self.cfg = parent.cfg
         self.query = query
         self.match = match
         self.model = None
@@ -64,7 +65,7 @@ class PairXPopup(QDialog):
         #self.pairx_thread.start()
 
     def load_model(self):
-        self.reid_filepath = get_path(Path(config.load_cfg('ML_DIR')), config.load_cfg('REID_KEY'))
+        self.reid_filepath = get_path(Path(self.cfg.ML_DIR), self.cfg.REID_KEY)
         if self.reid_filepath:
             self.model = animl.load_miew(self.reid_filepath)
             return True

@@ -53,7 +53,7 @@ def get_path(ML_DIR, key):
     MODELS = load_model('MODELS')
     if key is None:
         return None
-    names =  MODELS[key][0]
+    names = MODELS[key][0]
     if len(names) > 0:
         path = Path(ML_DIR) / names[0]
     else:
@@ -72,14 +72,15 @@ def delete(ML_DIR, key):
 
 
 class DownloadMLThread(QThread):
+    """Thread for downloading ML models"""
     finished_ok = pyqtSignal(bool, str)
 
     def __init__(self, ml_dir, parent=None):
         super().__init__(parent)
         self.ml_dir = Path(ml_dir)
         self.download_queue = Queue()  # thread-safe queue
-        self._shutdown = False  # flag to signal thread to exit gracefully  
-        
+        self._shutdown = False  # flag to signal thread to exit gracefully
+
         model_yml_path = asset_path("models.yml")
         with open(model_yml_path, 'r') as cfg_file:
             ml_cfg = yaml.safe_load(cfg_file)
@@ -99,19 +100,20 @@ class DownloadMLThread(QThread):
                 try:
                     # Non-blocking: raises Empty if queue is empty
                     key = self.download_queue.get(timeout=0.5)
-                    
+
                     names = self.models[key][0]
                     urls = self.models[key][1]
-                    
+
                     for i, url in enumerate(urls):
                         name = names[i]
                         final_path = self.ml_dir / name
-                        
+
                         if final_path.exists():
                             continue
-                        
-                        self.download_one(url=url, final_path=final_path,
-                                        should_cancel=self.isInterruptionRequested)
+
+                        self.download_one(url=url,
+                                          final_path=final_path,
+                                          should_cancel=self.isInterruptionRequested)
                 except Empty:
                     self.finished_ok.emit(True, "Download Complete")
 

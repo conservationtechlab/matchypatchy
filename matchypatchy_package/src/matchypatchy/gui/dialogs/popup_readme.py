@@ -1,43 +1,22 @@
 """
-View README, ABOUT, and LICENSE popups
+View README popups
 
 """
-from matchypatchy import config
+from matchypatchy.config import resource_path
 
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit
 
 
-class AboutPopup(QDialog):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.parent = parent
-        self.setMinimumSize(800, 400)
-        self.setWindowTitle('View README')
-
-        layout = QVBoxLayout()
-        self.text_edit = QTextEdit()
-        layout.addWidget(self.text_edit)
-        self.setLayout(layout)
-        self.display_readme()
-
-    def display_readme(self):
-        about_path = config.resource_path("ABOUT.md")
-        print(about_path)
-        try:
-            with open(about_path, "r") as file:
-                readme_text = file.read()
-                self.text_edit.setMarkdown(readme_text)
-        except FileNotFoundError:
-            self.text_edit.setText("ABOUT.md not found.")
-        self.text_edit.setReadOnly(True)
-
-
 class READMEPopup(QDialog):
-    def __init__(self, parent):
+    """
+    Popup to view the README information
+    """
+    def __init__(self, parent, doc_type):
         super().__init__(parent)
         self.parent = parent
+        self.doc_type = doc_type
         self.setMinimumSize(800, 400)
-        self.setWindowTitle('View README')
+        self.setWindowTitle(f'View {self.doc_type}')
 
         layout = QVBoxLayout()
         self.text_edit = QTextEdit()
@@ -46,35 +25,12 @@ class READMEPopup(QDialog):
         self.display_readme()
 
     def display_readme(self):
-        readme_path = config.resource_path("README.md")
+        """Display the README information"""
+        readme_path = resource_path(f"{self.doc_type}.md")
         try:
-            with open(readme_path, "r") as file:
+            with open(readme_path, "r", encoding="utf-8") as file:
                 readme_text = file.read()
                 self.text_edit.setMarkdown(readme_text)
         except FileNotFoundError:
-            self.text_edit.setText("README.md not found.")
-        self.text_edit.setReadOnly(True)
-
-
-class LicensePopup(QDialog):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.parent = parent
-        self.setMinimumSize(800, 400)
-        self.setWindowTitle('View License')
-
-        layout = QVBoxLayout()
-        self.text_edit = QTextEdit()
-        layout.addWidget(self.text_edit)
-        self.setLayout(layout)
-        self.display_readme()
-
-    def display_readme(self):
-        license_path = config.resource_path("LICENSE")
-        try:
-            with open(license_path, "r") as file:
-                readme_text = file.read()
-                self.text_edit.setMarkdown(readme_text)
-        except FileNotFoundError:
-            self.text_edit.setText("LICENSE not found.")
+            self.text_edit.setText(f"{self.doc_type}.md not found.")
         self.text_edit.setReadOnly(True)

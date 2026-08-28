@@ -18,6 +18,7 @@ class FilterBar(QWidget):
         self.size = size
         self.filters = {}
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
+        self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name"))
 
         layout = QHBoxLayout()
         # Filter label
@@ -68,11 +69,17 @@ class FilterBar(QWidget):
 
         self.setLayout(layout)
 
+    def update_project(self, mpDB):
+        """Update database object"""
+        self.mpDB = mpDB
+
     def refresh_filters(self, prefilter=None):
         """
-        Clear and Refresh Filters on Re-entry
+        Clear and Refresh Filters on Re-entry.
+
+        Args:
+            prefilter (dict, optional): Dictionary containing prefilter values to apply after refresh.
         """
-        #print("Refreshing filters with prefilter:", prefilter)
         # block signals to prevent triggers
         self.region_select.blockSignals(True)
         self.survey_select.blockSignals(True)
@@ -95,7 +102,7 @@ class FilterBar(QWidget):
         # filter stations based on all surveys
         self.filter_stations()
 
-         # individual list hidden until feature is implemented on QC
+        # individual list hidden until feature is implemented on QC
         self.individual_select.clear()
         self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
@@ -110,7 +117,6 @@ class FilterBar(QWidget):
         self.unidentified.setChecked(False)
         self.favorites.setChecked(False)
         self.no_roi.setChecked(False)
-
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
@@ -150,31 +156,38 @@ class FilterBar(QWidget):
         self.no_roi.blockSignals(False)
 
     def select_region(self):
+        """Handle selection of a region from the region combobox."""
         self.filters['active_region'] = self.region_list_ordered[self.region_select.currentIndex()]
         self.filter_surveys()
         self.filter_stations(survey_ids=list(self.valid_surveys.items()))
 
     def select_survey(self):
+        """Handle selection of a survey from the survey combobox."""
         self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
         self.filter_stations(survey_ids=[self.filters['active_survey']])
 
     def select_station(self):
+        """Handle selection of a station from the station combobox."""
         self.filters['active_station'] = self.station_list_ordered[self.station_select.currentIndex()]
 
     def select_viewpoint(self):
+        """Handle selection of a viewpoint from the viewpoint combobox."""
         self.filters['active_viewpoint'] = self.viewpoint_list_ordered[self.viewpoint_select.currentIndex()]
 
     def select_individual(self):
+        """Handle selection of an individual from the individual combobox."""
         self.filters['active_individual'] = self.individual_list_ordered[self.individual_select.currentIndex()]
 
     def select_unidentified(self):
+        """Toggle the unidentified only filter."""
         self.unidentified_only = not self.unidentified_only
 
     def select_favorites(self):
+        """Toggle the favorites only filter."""
         self.favorites_only = not self.favorites_only
 
     def select_no_roi(self):
-        """Toggle No ROI filter"""
+        """Toggle the No ROI filter."""
         if self.no_roi.isChecked():
             mids = self.mpDB._command("""SELECT m.id
                                       FROM media m
@@ -197,7 +210,7 @@ class FilterBar(QWidget):
             # get all surveys
             self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name"))
         # Update survey list to reflect active region
-        self.survey_list_ordered = [(0, 'Survey')] + [(k, v) for k, v in self.valid_surveys.items()]
+        self.survey_list_ordered = [(0, 'Survey')] + list(self.valid_surveys.items())
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
         self.survey_select.blockSignals(False)
 
@@ -214,7 +227,7 @@ class FilterBar(QWidget):
             self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
 
         # Update station list to reflect active survey
-        self.station_list_ordered = [(0, 'Station')] + [(k, v) for k, v in self.valid_stations.items()]
+        self.station_list_ordered = [(0, 'Station')] + list(self.valid_stations.items())
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
         self.station_select.blockSignals(False)
 
@@ -231,6 +244,7 @@ class FilterBar(QWidget):
         return self.filters
 
     def get_valid_stations(self):
+        """Return the currently valid stations based on the active survey(s)"""
         return self.valid_stations
 
     def viewpoint_visible(self, visible: bool):
@@ -255,6 +269,8 @@ class FilterBar(QWidget):
 
 
 class FilterBox(QComboBox):
+    """Custom QComboBox for filter selections with fixed width."""
+
     def __init__(self, initial_list, width):
         super().__init__()
         self.setModel(QStandardItemModel())
