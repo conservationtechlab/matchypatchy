@@ -267,7 +267,7 @@ class DisplayMedia(QWidget):
         self.update_count_label()
 
     def handle_table_change(self, edit):
-        """Slot to receive updates from QTableWidget"""
+        """Slot to receive updates from QTableWidget to enable/disable buttons and update selected rows"""
         row = edit[0]
         column = edit[1]
         item = self.media_table.table.item(row, column)
