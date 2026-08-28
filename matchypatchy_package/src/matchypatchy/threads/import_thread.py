@@ -323,7 +323,8 @@ class CSVImportThread(QThread):
 
                     # viewpoint
                     viewpoint_col = self.selected_columns["viewpoint"]
-                    viewpoint = self._convert_to_int(roi[viewpoint_col]) if viewpoint_col != "None" else None
+                    viewpoint_value = self._roi_value(roi, viewpoint_col)
+                    viewpoint = self._convert_to_int(viewpoint_value) if viewpoint_col != "None" else None
 
                     # individual
                     individual_id = self.individual(roi)
@@ -440,12 +441,22 @@ class CSVImportThread(QThread):
         return comment
 
     # ROI-RELATED METHODS 
+    def _roi_value(self, roi, column):
+        """Get ROI value by selected column supporting string or integer references."""
+        if column == "None" or column is None:
+            return None
+        if isinstance(column, int):
+            return roi[column]
+        return getattr(roi, column, None)
+
     def individual(self, roi):
         """Get or create individual ID"""
         individual_id = None
         if self.selected_columns["individual"] != "None":
-            individual_name = roi[self.selected_columns["individual"]]
+            individual_name = self._roi_value(roi, self.selected_columns["individual"])
             individual_name = self._convert_to_str(individual_name)
+            if individual_name is None:
+                return None
             try:
                 individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{individual_name}"')[0][0]
             except IndexError:
@@ -453,10 +464,10 @@ class CSVImportThread(QThread):
                 age = None
                 #TODO: limit sex and age to valid values
                 if self.selected_columns["sex"] != "None":
-                    sex = roi[self.selected_columns["sex"]]
+                    sex = self._roi_value(roi, self.selected_columns["sex"])
                     sex = self._convert_to_str(sex)
                 if self.selected_columns["age"] != "None":
-                    age = roi[self.selected_columns["age"]]
+                    age = self._roi_value(roi, self.selected_columns["age"])
                     age = self._convert_to_str(age)
                 individual_id = self.mpDB.add_individual(individual_name, sex, age)
         return individual_id
@@ -464,9 +475,9 @@ class CSVImportThread(QThread):
     def favorite(self, roi):
         """Get favorite status"""
         if self.selected_columns["favorite"] != "None":
-            favorite = roi[self.selected_columns["favorite"]]
+            favorite = self._roi_value(roi, self.selected_columns["favorite"])
             favorite = self._convert_to_int(favorite)
-            return favorite
+            return favorite if favorite is not None else 0
         # If favorite column is not specified, default to 0
         return 0
 
