@@ -283,4 +283,7 @@ class ManualQueryContainer(QObject):
     def unmatch(self):
         """Unmatch the current query and match"""
         # Set current match id to none
-        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None, "reviewed": 0}, quiet=False)
+        self.mpDB.edit_row('roi', 
+                           self.current_query_rid, {'individual_id': None, "reviewed": 0}, 
+                           allow_none=True, 
+                           quiet=False)

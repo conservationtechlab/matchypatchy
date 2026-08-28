@@ -299,8 +299,13 @@ class TestSelectEditDeleteCount:
 
     def test_edit_row_sets_null(self, populated_db):
         db, _, ids = populated_db
-        result = db.edit_row("individual", ids["individual_id"], {"sex": None})
+        result = db.edit_row("individual", ids["individual_id"], {"sex": None}, allow_none=True)
         assert result is True
+
+    def test_edit_row_sets_null_not_allowed(self, populated_db):
+        db, _, ids = populated_db
+        result = db.edit_row("individual", ids["individual_id"], {"sex": None})
+        assert result is False
 
     def test_delete(self, populated_db):
         db, _, ids = populated_db
