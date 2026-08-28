@@ -48,6 +48,43 @@ class _QThreadStub:
         self._interrupted = True
 
 
+class _QObjectStub:
+    """Minimal QObject stub — real Python class so subclasses can be instantiated."""
+    def __init__(self, *args, **kwargs):
+        pass
+
+
+class _QWidgetStub(_QObjectStub):
+    """Minimal QWidget stub — real Python class so subclasses can be instantiated."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._layout = None
+
+    def setLayout(self, layout):
+        self._layout = layout
+
+    def setFocusPolicy(self, policy):
+        pass
+
+    def setWindowTitle(self, title):
+        pass
+
+    def setStyleSheet(self, style):
+        pass
+
+
+class _QDialogStub(_QWidgetStub):
+    """Minimal QDialog stub — real Python class so subclasses can be instantiated."""
+    def exec(self):
+        return False
+
+    def accept(self):
+        pass
+
+    def reject(self):
+        pass
+
+
 class _MockModule(types.ModuleType):
     """A stub module whose attribute access always returns a fresh MagicMock."""
     def __getattr__(self, name: str):
@@ -56,6 +93,12 @@ class _MockModule(types.ModuleType):
             return _VersionMock(0x060900)  # PyQt6 6.9.0
         if name == 'QThread':
             return _QThreadStub
+        if name == 'QObject':
+            return _QObjectStub
+        if name in ('QWidget', 'QAbstractScrollArea', 'QFrame'):
+            return _QWidgetStub
+        if name in ('QDialog', 'QAbstractDialog'):
+            return _QDialogStub
         if name == 'pyqtSignal':
             return lambda *args, **kwargs: _SignalStub()
         # For QtCore specifically, return a module-like object with PYQT_VERSION
