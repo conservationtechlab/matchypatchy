@@ -133,12 +133,13 @@ class LoadTableThread(QThread):
         elif column == 'station':
             qtw = QTableWidgetItem(self.valid_stations[roi["station_id"]])
         # Camera
-        # TODO: itemdelegate
+        # TODO: itemdelegate/make editable
         elif column == 'camera_id':
             if roi["camera_id"]:
                 qtw = QTableWidgetItem(self.valid_cameras[int(roi["camera_id"])])
             else:  # can be null
                 qtw = QTableWidgetItem()
+            qtw.setFlags(qtw.flags() & ~Qt.ItemFlag.ItemIsEditable)
         # Viewpoint
         elif column == 'viewpoint':
             vp_raw = roi["viewpoint"]

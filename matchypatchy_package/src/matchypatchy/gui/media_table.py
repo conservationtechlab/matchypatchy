@@ -64,6 +64,7 @@ class MediaTable(QWidget):
         self.table.setSortingEnabled(False)
         self.table.horizontalHeader().setSortIndicatorShown(True)
         self.table.horizontalHeader().setSectionsClickable(True)
+        # Connect header click to sorting function
         self.table.horizontalHeader().sectionClicked.connect(self.sort)
         # Connect double click to edit row
         self.table.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
