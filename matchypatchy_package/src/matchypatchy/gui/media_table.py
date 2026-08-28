@@ -275,6 +275,7 @@ class MediaTable(QWidget):
             self.table_loader_thread.done.connect(lambda: self.table.blockSignals(False))
             self.table_loader_thread.done.connect(self.reconnect_signals)
             self.table_loader_thread.done.connect(self.loaded_data.emit)
+            self.table_loader_thread.done.connect(self.checkbox_signal.emit)
 
             if popup:
                 loading_bar = AlertPopup(self, "Loading data...", progressbar=True, cancel_only=True)
