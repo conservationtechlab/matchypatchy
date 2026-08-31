@@ -19,9 +19,10 @@ class FetchTableThread(QThread):
 
     def __init__(self, parent):
         super().__init__()
+        self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         self.data_type = parent.data_type
-        self.thumbnail_dir = parent.thumbnail_dir
+        self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.individual_list = fetch_individual(self.mpDB)
         self.data = pd.DataFrame()
 
@@ -80,7 +81,7 @@ class FetchTableThread(QThread):
         self.loaded_data.emit(self.data)
         self.done.emit()
 
-
+# REMOVE
 class LoadTableThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     loaded_cell = pyqtSignal(int, int, object)
