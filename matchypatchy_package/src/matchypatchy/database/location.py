@@ -22,7 +22,7 @@ def fetch_regions(mpDB):
     return pd.DataFrame(columns=["id", "name", "timezone"])
 
 
-def fetch_stations(mpDB, survey_id=None):
+def fetch_stations(mpDB, survey_id=None, reset_index=False):
     """
     Fetches stations associated with given survey, Converts to DataFrame
     """
@@ -32,10 +32,12 @@ def fetch_stations(mpDB, survey_id=None):
         stations = mpDB.select("station")
 
     if stations:
-        return pd.DataFrame(stations, columns=["id", "name", "lat", "long", "survey_id"])
-
+        df = pd.DataFrame(stations, columns=["id", "name", "lat", "long", "survey_id"])
+        if reset_index:
+            df = df.set_index("id")
+        return df
+    
     return pd.DataFrame(columns=["id", "name", "lat", "long", "survey_id"])
-
 
 def fetch_station_names_from_id(mpDB, station_id):
     """Given a station id, return names and ids of survey and region"""
