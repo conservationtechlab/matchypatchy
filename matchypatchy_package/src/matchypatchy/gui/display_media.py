@@ -181,6 +181,12 @@ class DisplayMedia(QWidget):
         self.mpDB = mpDB
         self.filterbar.update_project(mpDB)
 
+    def show_alert(self, message):
+        """Display an alert message to the user"""
+        dialog = AlertPopup(self, prompt=message)
+        dialog.exec()
+        del dialog
+
     # =========================================================================
     # FILTERS
     # =========================================================================
@@ -271,6 +277,7 @@ class DisplayMedia(QWidget):
             self.individual_list = fetch_individual(self.mpDB)
             self.dataloader = FetchTableThread(self)
             self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
+            self.dataloader.prompt_update.connect(lambda message: self.show_alert(message))
             self.dataloader.start()
             return True
 
