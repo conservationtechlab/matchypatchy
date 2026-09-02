@@ -581,7 +581,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()
             return rows
         except sqlite3.Error as error:
-            self.logger.error(f"Failed fetch: {error}")
+            self.logger.error(f"Failed fetch on {table}: {error}")
             return None
 
     def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None, quiet=True):
@@ -610,7 +610,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error(f"Failed fetch: {error}")
+            self.logger.error(f"Failed fetch on {table} with join on {join_table}: {error}")
             return None, None
 
     def get_media_with_filepath(self, row_cond: Optional[str] = None):
