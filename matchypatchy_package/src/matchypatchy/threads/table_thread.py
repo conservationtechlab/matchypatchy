@@ -3,9 +3,7 @@ QThread for saving thumbnails to temp dir for media table
 """
 import pandas as pd
 
-from PyQt6.QtGui import QImage
-from PyQt6.QtWidgets import QTableWidgetItem
-from PyQt6.QtCore import QThread, pyqtSignal, Qt
+from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
 from matchypatchy.database import thumbnails
@@ -14,6 +12,7 @@ from matchypatchy.config import asset_path
 
 class FetchTableThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
+    prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     loaded_data = pyqtSignal(pd.DataFrame)
     done = pyqtSignal()
 
@@ -34,6 +33,8 @@ class FetchTableThread(QThread):
         """
         # check for missing thumbnails and add
         missing_thumbnails = thumbnails.check_missing_thumbnails(self.mpDB, data_type=self.data_type)
+        if missing_thumbnails:
+            self.prompt_update.emit(f"Found {len(missing_thumbnails)} missing thumbnails. Refreshing...")
 
         # ROIS
         if self.data_type == 1:
@@ -50,10 +51,14 @@ class FetchTableThread(QThread):
                     bbox_y = row['bbox_y'].values[0]
                     bbox_w = row['bbox_w'].values[0]
                     bbox_h = row['bbox_h'].values[0]
-                    thumbnail_path = thumbnails.save_roi_thumbnail(self.thumbnail_dir, filepath, ext,
-                                                                   frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    self.mpDB.delete("roi_thumbnails", f"fid={roi_id}")  # remove old entry if exists
-                    self.mpDB.add_thumbnail("roi", roi_id, thumbnail_path)
+                    # skip if bounding box is invalid
+                    if bbox_w == -1:
+                        thumbnail_path = asset_path(thumbnails.THUMBNAIL_NOTFOUND)
+                    else:
+                        thumbnail_path = thumbnails.save_roi_thumbnail(self.thumbnail_dir, filepath, ext,
+                                                                       frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                        self.mpDB.delete("roi_thumbnails", f"fid={roi_id}")  # remove old entry if exists
+                        self.mpDB.add_thumbnail("roi", roi_id, thumbnail_path)
             # load thumbnails
             self.thumbnails = thumbnails.fetch_roi_thumbnails(self.mpDB)
             self.data = pd.merge(self.data, self.thumbnails, on="id")

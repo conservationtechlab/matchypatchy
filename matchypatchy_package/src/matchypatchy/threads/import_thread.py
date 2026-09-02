@@ -7,8 +7,10 @@ import pandas as pd
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail
+from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail, THUMBNAIL_NOTFOUND
 from matchypatchy.database.media import get_sha256
+from matchypatchy.config import asset_path
+
 
 
 # CSV MIGRATE ==================================================================
@@ -236,13 +238,14 @@ class CSVImportThread(QThread):
 
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
-    def __init__(self, parent, unique_images, selected_columns):
+    def __init__(self, parent, unique_images, selected_columns, active_survey):
         super().__init__()
         self.logger = parent.logger
         self.mpDB = parent.mpDB
         self.cfg = parent.cfg
         self.unique_images = unique_images
         self.selected_columns = selected_columns
+        self.active_survey = active_survey
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.sequence_ref = {}
 
@@ -343,8 +346,13 @@ class CSVImportThread(QThread):
                                                favorite=favorite,
                                                emb=0)
                     # save thumbnails
-                    roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
+                    if bbox_w == -1:
+                        roi_thumbnail = asset_path(THUMBNAIL_NOTFOUND)
+                        self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail))
+                    else:
+                        roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext, 
+                                                           frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                        self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail))
 
                     roi_counter += 1
                     self.progress_update.emit(roi_counter)
@@ -374,8 +382,8 @@ class CSVImportThread(QThread):
         survey_id = None
 
         # default survey
-        if isinstance(self.selected_columns["survey"], str):
-            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{self.selected_columns["survey"]}"')[0][0]
+        if self.selected_columns["survey"] is None:
+            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{self.active_survey}"')
         # find existing survey by name
         else:
             survey_name = exemplar.get(self.selected_columns["survey"])
