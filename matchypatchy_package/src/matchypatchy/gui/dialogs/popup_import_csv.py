@@ -50,7 +50,7 @@ class ImportCSVPopup(QDialog):
             self.label.setText("Select Columns to Import Data")
             self.migrate = False
             self.columns = ["None"] + list(self.data.columns)
-            self.survey_columns = [str(self.active_survey)] + list(self.data.columns)
+            self.survey_columns = [str(self.active_survey)] + self.columns
             self.selections = {
                 "survey": self.survey_columns[0],
                 "filepath": self.columns[0],
@@ -164,11 +164,12 @@ class ImportCSVPopup(QDialog):
     def select_survey(self):
         """Select the survey column from the CSV."""
         if self.survey.currentIndex() == 0:
-            self.selections['survey'] = [self.survey_columns[self.survey.currentIndex()]]
+            self.selections['survey'] = None
             return True
         else:
             try:
-                self.selections['survey'] = self.survey_columns[self.survey.currentIndex()]
+                # remove spacer
+                self.selections['survey'] = self.survey_columns[self.survey.currentIndex() - 1 ]
                 self.check_ok_button()
                 return True
             except IndexError:
@@ -214,6 +215,8 @@ class ImportCSVPopup(QDialog):
         """
         # assert bbox in manifest.columns
         self.progress_bar.show()
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFormat("%v/%m")
 
         # migrate from exported mpdb
         if self.migrate:
@@ -230,7 +233,7 @@ class ImportCSVPopup(QDialog):
             unique_images = self.data.groupby(self.selections["filepath"])
             print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
             self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
-            self.import_thread = CSVImportThread(self, unique_images, self.selections)
+            self.import_thread = CSVImportThread(self, unique_images, self.selections, self.active_survey)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.finished.connect(self.close)
             self.import_thread.start()
@@ -250,3 +253,12 @@ class ImportCSVPopup(QDialog):
         # Disconnect the import_manifest slot and connect the close slot to the accepted signal
         self.buttonBox.accepted.disconnect(self.import_manifest)
         self.buttonBox.accepted.connect(self.close)
+
+    def reject(self):
+        """Handle the rejection of the dialog, interrupting any ongoing downloads."""
+        # interrupt download if in progress, otherwise just close
+        if getattr(self, "import_thread", None) is not None and self.import_thread.isRunning():
+            self.import_thread.requestInterruption()
+            # optional: don't close immediately; wait for thread to finish
+            return
+        super().reject()

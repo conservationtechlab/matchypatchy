@@ -5,6 +5,7 @@ __pycache__/
 
 # test databases
 *.db
+*.csv
 
 Jaguar/
 Giraffe/
