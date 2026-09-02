@@ -238,6 +238,10 @@ class CSVImportThread(QThread):
 
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
 
+    # How many ROIs to process between progress signal emissions.
+    # Raising this reduces cross-thread signal overhead on large imports.
+    PROGRESS_BATCH_SIZE = 10
+
     def __init__(self, parent, unique_images, selected_columns, active_survey):
         super().__init__()
         self.logger = parent.logger
@@ -247,10 +251,16 @@ class CSVImportThread(QThread):
         self.selected_columns = selected_columns
         self.active_survey = active_survey
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
+        self.station_ref = {}
+        self.camera_ref = {}
+        self.individual_ref = {}
         self.sequence_ref = {}
+        # NEW: cache survey lookups too -- previously every group re-queried the DB
+        self.survey_ref = {}
 
     def run(self):
         roi_counter = 0  # progressbar counter
+        emitted_counter = 0  # last value emitted, to batch signal emission
 
         # get common base directory for all images
         base_dir = self._get_base_dir(list(self.unique_images.groups.keys()))
@@ -259,20 +269,37 @@ class CSVImportThread(QThread):
         except IndexError:
             base_dir_id = self.mpDB.add_upload(base_dir)
 
-        for filepath, group in self.unique_images:
-            if not self.isInterruptionRequested():
+        # ------------------------------------------------------------------
+        # NEW: run the whole import inside a single transaction.
+        # SQLite's default is to fsync on every commit; doing thousands of
+        # individual inserts (media, roi, thumbnails) each as their own
+        # implicit transaction is the dominant cost in this workload.
+        # Wrapping the entire loop in one BEGIN/COMMIT turns N fsyncs into 1.
+        #
+        # This assumes self.mpDB exposes the underlying sqlite3 connection
+        # (adjust attribute name to match your actual mpDB implementation),
+        # and that mpDB.add_*/select do NOT call conn.commit() internally.
+        # If they do, you'll need to add a `commit=True` default param to
+        # suppress inner commits during bulk import, or add a context-manager
+        # style `with self.mpDB.transaction():` helper to mpDB itself.
+        # ------------------------------------------------------------------
+        try:
+            for filepath, group in self.unique_images:
+                if self.isInterruptionRequested():
+                    break
+
                 # check to see if file exists
                 if not Path(filepath).exists():
                     self.logger.warning(f"File {filepath} does not exist, skipping import...")
                     continue
-            
+
                 # get the relative path of the file with respect to the base directory
                 relative_path = self._get_relative_path(filepath, base_dir)
                 # get file extension
                 ext = Path(filepath).suffix.lower()
-                 # Calculate the SHA256 hash of the file
-                hash = get_sha256(filepath) 
-                
+                # Calculate the SHA256 hash of the file
+                hash = get_sha256(filepath)
+
                 # get remaining information
                 exemplar = group.head(1).to_dict(orient='records')[0]
                 # timestamp
@@ -293,7 +320,8 @@ class CSVImportThread(QThread):
                                                camera_id=camera_id,
                                                sequence_id=self.sequence(exemplar),
                                                external_id=self.external(exemplar),
-                                               comment=self.comment(exemplar))
+                                               comment=self.comment(exemplar),
+                                               commit=False)
                 # image already added, get correct media_id
                 if media_id == "duplicate_error":
                     media_id = self.mpDB.select("media", columns="id", row_cond=f'sha256="{hash}"')[0][0]
@@ -344,18 +372,32 @@ class CSVImportThread(QThread):
                                                reviewed=reviewed,
                                                individual_id=individual_id,
                                                favorite=favorite,
-                                               emb=0)
+                                               emb=0,
+                                               commit=False)
                     # save thumbnails
                     if bbox_w == -1:
                         roi_thumbnail = asset_path(THUMBNAIL_NOTFOUND)
-                        self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail))
+                        self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail), commit=False)
                     else:
-                        roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext, 
+                        roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext,
                                                            frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                        self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail))
+                        self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail), commit=False)
 
                     roi_counter += 1
-                    self.progress_update.emit(roi_counter)
+
+                    # bank progress updates and commit in batches
+                    if roi_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
+                        self.progress_update.emit(roi_counter)
+                        emitted_counter = roi_counter
+                        self.mpDB.db.commit()
+
+        except Exception:
+            self.mpDB.db.rollback()
+            raise
+
+        # make sure the progress bar reaches its true final value
+        if emitted_counter != roi_counter:
+            self.progress_update.emit(roi_counter)
 
         if not self.isInterruptionRequested():
             # finished adding media
@@ -379,27 +421,38 @@ class CSVImportThread(QThread):
 
     def survey(self, exemplar):
         """Get or create survey"""
-        survey_id = None
-
-        # default survey
+        # NEW: cache by resolved survey name/default so we don't hit the DB
+        # for every image group -- surveys rarely vary within a single import.
         if self.selected_columns["survey"] is None:
-            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{self.active_survey}"')
-        # find existing survey by name
+            cache_key = self.active_survey
         else:
-            survey_name = exemplar.get(self.selected_columns["survey"])
-            survey_name = self._convert_to_str(survey_name)
+            cache_key = self._convert_to_str(exemplar.get(self.selected_columns["survey"]))
+
+        if cache_key in self.survey_ref:
+            return self.survey_ref[cache_key]
+
+        survey_id = None
+        if self.selected_columns["survey"] is None:
+            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{self.active_survey}"')[0][0]
+        else:
+            survey_name = cache_key
             try:
                 survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
             except IndexError:
                 region_name = exemplar.get(self.selected_columns["region"])
                 region_name = self._convert_to_str(region_name)
                 survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
+
+        self.survey_ref[cache_key] = survey_id
         return survey_id
 
     def station(self, exemplar, survey_id):
         """Get or create station"""
         station_name = exemplar.get(self.selected_columns["station"])
         station_name = self._convert_to_str(station_name)
+        # check reference dictionary first
+        if station_name in self.station_ref:
+            return self.station_ref[station_name]
         try:
             station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
         except IndexError:
@@ -408,19 +461,24 @@ class CSVImportThread(QThread):
             long = exemplar.get(self.selected_columns["long"])
             long = self._convert_to_float(long)
             station_id = self.mpDB.add_station(str(station_name), lat, long, survey_id)
+        self.station_ref[station_name] = station_id
         return station_id
-    
+
     # OPTIONAL -----------------------------------------------------------------
     def camera(self, exemplar, station_id):
         """Get or create camera"""
         camera_id = None
         camera_name = exemplar.get(self.selected_columns["camera"])
         if camera_name is not None:
+            # check reference dictionary first
+            if camera_name in self.camera_ref:
+                return self.camera_ref[camera_name]
             camera_name = self._convert_to_str(camera_name)
             try:
                 camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name='{camera_name}'")[0][0]
             except IndexError:
                 camera_id = self.mpDB.add_camera(str(camera_name), station_id)
+            self.camera_ref[camera_name] = camera_id
         return camera_id
 
     def sequence(self, exemplar):
@@ -435,20 +493,20 @@ class CSVImportThread(QThread):
                 sequence_id = self.mpDB.add_sequence()
                 self.sequence_ref[old_sequence_id] = sequence_id
         return sequence_id
-    
+
     def external(self, exemplar):
         """Get external ID"""
         external_id = exemplar.get(self.selected_columns["external_id"])
         external_id = self._convert_to_int(external_id)
         return external_id
-    
+
     def comment(self, exemplar):
         """Get comment"""
         comment = exemplar.get(self.selected_columns["comment"])
         comment = self._convert_to_str(comment)
         return comment
 
-    # ROI-RELATED METHODS 
+    # ROI-RELATED METHODS
     def _roi_value(self, roi, column):
         """Get ROI value by selected column supporting string or integer references."""
         if column == "None" or column is None:
@@ -465,6 +523,9 @@ class CSVImportThread(QThread):
             individual_name = self._convert_to_str(individual_name)
             if individual_name is None:
                 return None
+            # check reference dictionary first
+            if individual_name in self.individual_ref:
+                return self.individual_ref[individual_name]
             try:
                 individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{individual_name}"')[0][0]
             except IndexError:
@@ -478,6 +539,7 @@ class CSVImportThread(QThread):
                     age = self._roi_value(roi, self.selected_columns["age"])
                     age = self._convert_to_str(age)
                 individual_id = self.mpDB.add_individual(individual_name, sex, age)
+            self.individual_ref[individual_name] = individual_id
         return individual_id
 
     def favorite(self, roi):
@@ -523,6 +585,7 @@ class CSVImportThread(QThread):
             return float(value)
         except (ValueError, TypeError):
             return None
+
 
 # FOLDER IMPORT ================================================================
 class FolderImportThread(QThread):
