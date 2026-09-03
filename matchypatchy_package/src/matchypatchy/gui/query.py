@@ -1,6 +1,10 @@
 """
 Class Definition for Query Object
 """
+import json
+from pathlib import Path
+import time
+
 import pandas as pd
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -14,12 +18,15 @@ from matchypatchy.threads.match_object import FavoriteMatchObject
 class QueryContainer(QObject):
     """Container class for managing query and match data within the MatchyPatchy GUI."""
     thread_signal = pyqtSignal(bool)
+    progress_update = pyqtSignal(int)
     loaded_data = pyqtSignal(pd.DataFrame)
 
     def __init__(self, parent):
         super().__init__()
-        self.mpDB = parent.mpDB
         self.parent = parent
+        self.mpDB = parent.mpDB
+        self.cfg = parent.cfg
+        self.logger = parent.logger
         self.metric = parent.distance_metric
         self.k = parent.k
         self.threshold = parent.threshold
@@ -35,7 +42,6 @@ class QueryContainer(QObject):
         self._roi_index = {}  # {roi_id: row_data_dict}
         self._seq_index = {}  # {sequence_id: [roi_ids]}
 
-        self.neighbor_dict = {}
         self.ranked_sequences = []
         self.sequences = {}
 
@@ -65,6 +71,10 @@ class QueryContainer(QObject):
         self._favorites_cache = None
         self._similarities_cache = {}
 
+        # KNN Cache
+        self._knn_cache = {}
+        self.cache_timeout = 3600  # Cache valid for 1 hour (seconds)
+
     # STEP 0: Load data and build indices for fast lookups
     def load_data(self):
         """
@@ -75,17 +85,9 @@ class QueryContainer(QObject):
         # no data
         if self.data_raw.empty:
             return False
-
-        # Build lookup dicts
-        self._build_indices()
         
         # Must have embeddings to continue
         return not (self.data_raw["emb"] == 0).all()
-
-    def _build_indices(self):
-        """Build ROI and sequence indices for fast lookups"""
-        self._roi_index = self.data_raw.to_dict('index')
-        self._seq_index = self.data_raw.reset_index().groupby('sequence_id')['id'].apply(list).to_dict()
 
     # STEP 2: Filter data
     def filter(self, filter_dict=None, valid_stations=None):
@@ -94,6 +96,7 @@ class QueryContainer(QObject):
         Avoid full DataFrame copy and multiple redundant filters.
         """
         if filter_dict is None or valid_stations is None:
+            # return full data
             self.data = self.data_raw.copy()
         else:
             # Single filter pass instead of multiple identical checks
@@ -109,6 +112,11 @@ class QueryContainer(QObject):
         # Rebuild index with filtered data
         self._build_indices()
         self.sequences = db_roi.sequence_roi_dict(self.data)
+
+    def _build_indices(self):
+        """Build ROI and sequence indices for fast lookups"""
+        self._roi_index = self.data_raw.to_dict('index')
+        self._seq_index = self.data_raw.reset_index().groupby('sequence_id')['id'].apply(list).to_dict()
 
     def _get_valid_stations_from_current(self):
         """
@@ -143,16 +151,20 @@ class QueryContainer(QObject):
     # RUN ON ENTRY IF LOAD_DATA
     def calculate_neighbors(self):
         """Start MatchEmbeddingThread to calculate neighbors"""
-        if self.match_thread and self.match_thread.isRunning():
-            self.match_thread.requestInterruption()
-            self.match_thread.wait()
+        #self.logger.info("Using cached KNN results")
+        cache_available = self.load_knn_cache()
+        if cache_available:
+            self.logger.info("Using cached KNN results")
+            self.thread_signal.emit(bool(self.ranked_sequences))
+            return
         
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.data, self.sequences,
                                                  k=self.k, metric=self.metric, threshold=self.threshold)
-        self.match_thread.progress_update.connect(self.parent.progress.set_counter)
-        self.match_thread.prompt_update.connect(self.parent.progress.update_prompt)
+        self.match_thread.progress_update.connect(lambda value: self.update_progress(value))
         self.match_thread.ranked_queries_return.connect(self.capture_ranked_sequences)
         self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished
+        # connect parent rejected signal to request interruption of match thread
+        self.parent.progress.rejected.connect(self.match_thread.requestInterruption)
         self.match_thread.start()
 
     def capture_ranked_sequences(self, ranked_sequences):
@@ -163,11 +175,123 @@ class QueryContainer(QObject):
 
     def finish_calculating(self):
         """Finish calculating neighbors, signal to DisplayCompare to update with gui"""
+        self.save_knn_cache()
         self.thread_signal.emit(bool(self.ranked_sequences))
+
+    def update_progress(self, value):
+        """Update the progress in the parent progress popup"""
+        if hasattr(self.parent, 'update_progress'):
+            self.progress_update.emit(value)
 
     def set_threshold(self, threshold):
         """Set the similarity threshold for the query container"""
         self.threshold = threshold
+
+    # KNN CACHE MANAGEMENT -----------------------------------------------------
+
+    def clear_knn_cache(self):
+        """Clear the KNN cache"""
+        self._knn_cache = {}
+        self.logger.info("KNN cache cleared")
+
+    def save_knn_cache(self):
+        """
+        Save cache as JSON for portability and debuggability.
+        JSON is human-readable and more portable than pickle.
+        """
+        cache_data = {
+            'ranked_sequences': self._serialize_ranked_sequences(self.ranked_sequences),
+            'timestamp': time.time()
+        }
+        
+        dbdir = self.cfg.DB_DIR
+        filepath = Path(dbdir) / "knn_cache.json"
+        
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            self.logger.info(f"KNN cache saved to {filepath}")
+        except Exception as e:
+            self.logger.error(f"Failed to save JSON cache: {e}")
+
+    def _serialize_ranked_sequences(self, ranked_sequences):
+        """
+        Convert MatchObject list to serializable dictionaries.
+        Stores only the essential data needed to rebuild.
+        """
+        serialized = []
+        
+        for match_obj in ranked_sequences:
+            serialized.append({
+                'sequence_id': match_obj.sequence_id,
+                'neighbors': match_obj.neighbors,  # [(roi_id, distance), ...]
+                'query_data': match_obj.query_data.to_dict('records'),  # Convert DataFrame to list of dicts
+                'match_data': match_obj.match_data.to_dict('records'),
+                'og_ranked_query_rids': match_obj.og_ranked_query_rids,
+                'og_ranked_matches': match_obj.og_ranked_matches
+            })
+        
+        return serialized
+
+    def load_knn_cache(self):
+        """Load KNN cache from JSON"""
+        dbdir = self.cfg.DB_DIR
+        filepath = Path(dbdir) / "knn_cache.json"
+        
+        if not filepath.exists():
+            return False
+        
+        try:
+            print(f"Loading KNN cache from {filepath}")
+            with open(filepath, 'r') as f:
+                cache_data = json.load(f)
+            
+            cache_age = time.time() - cache_data['timestamp']
+            if cache_age > self.cache_timeout:
+                return False
+            
+            self.ranked_sequences = self._deserialize_ranked_sequences(
+                cache_data['ranked_sequences']
+            )
+            self.n_queries = len(self.ranked_sequences)
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load JSON cache: {e}")
+            return False
+
+    def _deserialize_ranked_sequences(self, serialized_sequences):
+        """
+        Rebuild MatchObject instances from serialized data.
+        """
+        from matchypatchy.threads.match_object import MatchObject
+        
+        rebuilt = []
+        
+        for i, seq_data in enumerate(serialized_sequences):
+            # Convert dicts back to DataFrames
+            query_data = pd.DataFrame(seq_data['query_data'])
+            match_data = pd.DataFrame(seq_data['match_data'])
+            
+            # Rebuild MatchObject
+            match_obj = MatchObject(
+                sequence_id=seq_data['sequence_id'],
+                filtered_neighbors=seq_data['neighbors'],
+                query_data=query_data,
+                match_data=match_data
+            )
+            
+            # Restore cached ranking if available
+            if seq_data.get('og_ranked_query_rids'):
+                match_obj.og_ranked_query_rids = seq_data['og_ranked_query_rids']
+                match_obj.og_ranked_matches = seq_data['og_ranked_matches']
+                match_obj.ranked_query_rids = seq_data['og_ranked_query_rids']
+                match_obj.ranked_matches = seq_data['og_ranked_matches']
+            
+            rebuilt.append(match_obj)
+            self.progress_update.emit(100 * (i + 1)/len(serialized_sequences))
+
+        return rebuilt
 
     # QUERY NAVIGATION ---------------------------------------------------------
     def set_query(self, n):
@@ -241,8 +365,8 @@ class QueryContainer(QObject):
             return
 
         # Reload only the two sequences that changed
-        query_df = db_roi.fetch_roi_media(self.mpDB, sequence_id=query_seq_id)
-        match_df = db_roi.fetch_roi_media(self.mpDB, sequence_id=match_seq_id)
+        query_df = db_roi.fetch_roi_media(self.mpDB, sequence_ids=[query_seq_id])
+        match_df = db_roi.fetch_roi_media(self.mpDB, sequence_ids=[match_seq_id])
 
         if query_df.empty or match_df.empty:
             # Fallback if fetch fails
@@ -274,10 +398,9 @@ class QueryContainer(QObject):
         
         # Fetch fresh data for each sequence
         updated_dfs = []
-        for seq_id in sequence_ids:
-            seq_df = db_roi.fetch_roi_media(self.mpDB, sequence_id=seq_id)
-            if not seq_df.empty:
-                updated_dfs.append(seq_df)
+        seq_df = db_roi.fetch_roi_media(self.mpDB, sequence_ids=sequence_ids)
+        if not seq_df.empty:
+            updated_dfs.append(seq_df)
         
         if updated_dfs:
             self.data = pd.concat([self.data] + updated_dfs)
