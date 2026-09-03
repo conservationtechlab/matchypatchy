@@ -867,6 +867,33 @@ class MatchyPatchyDB():
         similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
         return float(similarity)
 
+    def batch_calculate_similarity(self, query_id, match_ids):
+        """
+        Calculate similarities between a query embedding and multiple match embeddings.
+        Returns a dict: {match_id: similarity}
+        """
+        query_results = self.collection.get(ids=[str(query_id)], include=["embeddings"])
+        query_emb = query_results['embeddings'][0]
+
+        if query_emb is None:
+            return {mid: None for mid in match_ids}
+
+        match_ids_str = [str(mid) for mid in match_ids]
+        match_results = self.collection.get(ids=match_ids_str, include=["embeddings"])
+
+        similarities = {}
+        for mid, emb in zip(match_ids, match_results['embeddings']):
+            if emb is None:
+                similarities[mid] = None
+                continue
+            dot_product = np.dot(query_emb, emb)
+            norm1 = np.linalg.norm(query_emb)
+            norm2 = np.linalg.norm(emb)
+            similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
+            similarities[mid] = float(similarity)
+
+        return similarities
+
     def clear_emb(self):
         """Clear vector database and rebuild (no way to delete)"""
         self.chroma.delete_collection(name="embedding_collection")
