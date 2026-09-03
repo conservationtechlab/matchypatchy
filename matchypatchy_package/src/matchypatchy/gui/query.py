@@ -6,7 +6,6 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
-
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
 from matchypatchy.threads.match_object import FavoriteMatchObject
@@ -31,6 +30,10 @@ class QueryContainer(QObject):
 
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
+
+        # Inde data by ROI for quck lookup
+        self._roi_index = {}  # {roi_id: row_data_dict}
+        self._seq_index = {}  # {sequence_id: [roi_ids]}
 
         self.neighbor_dict = {}
         self.ranked_sequences = []
@@ -58,59 +61,92 @@ class QueryContainer(QObject):
         # FAVORITE Toggle
         self.favorite_match_object = None
         self.knn_match_object = None
+        # Cache for favorite and similarity computations
+        self._favorites_cache = None
+        self._similarities_cache = {}
 
-    # STEP 0
+    # STEP 0: Load data and build indices for fast lookups
     def load_data(self):
         """
-        Calculates knn for all unvalidated images, ranks by smallest distance to NN
+        Load ROI media and build fast lookup indices.
         """
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
-        # create favorite match object of user's favorited ROIs
         self.loaded_data.emit(self.data_raw)
         # no data
         if self.data_raw.empty:
             return False
 
-        # must have embeddings to continue
+        # Build lookup dicts
+        self._build_indices()
+        
+        # Must have embeddings to continue
         return not (self.data_raw["emb"] == 0).all()
 
-    # STEP 2
+    def _build_indices(self):
+        """Build ROI and sequence indices for fast lookups"""
+        self._roi_index = self.data_raw.to_dict('index')
+        self._seq_index = self.data_raw.reset_index().groupby('sequence_id')['id'].apply(list).to_dict()
+
+    # STEP 2: Filter data
     def filter(self, filter_dict=None, valid_stations=None):
         """
-        Filter media based on active survey selected in dropdown of DisplayMedia
-        Triggered by calculate neighbors and change in filters
-
-        if filter > 0 : use id
-        if filter == 0: do not filter
+        Filter media efficiently using vectorized operations.
+        Avoid full DataFrame copy and multiple redundant filters.
         """
-        # create backups for filtering
-        self.data = self.data_raw.copy()
-
-        if filter_dict is not None and valid_stations is not None:
-            # Region Filter (depends on prefilterd stations from MediaDisplay)
-            if filter_dict['active_region'][0] > 0 and valid_stations:
-                self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
-
-            # Survey Filter (depends on prefilterd stations from MediaDisplay)
-            if filter_dict['active_survey'][0] > 0 and valid_stations:
-                self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
-
-            # Single station Filter
-            if filter_dict['active_station'][0] > 0 and valid_stations:
-                self.data = self.data[self.data['station_id'] == filter_dict['active_station'][0]]
-            elif filter_dict['active_station'][0] == 0 and valid_stations:
-                self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
-                # no valid stations, empty dataframe
-            else:
+        if filter_dict is None or valid_stations is None:
+            self.data = self.data_raw.copy()
+        else:
+            # Single filter pass instead of multiple identical checks
+            station_ids = self._get_valid_stations(filter_dict, valid_stations)
+            
+            if station_ids is None:
                 self.parent.show_progress("No data to compare within filter.")
-
+                self.data = pd.DataFrame()
+            else:
+                # Single vectorized filter
+                self.data = self.data_raw[self.data_raw['station_id'].isin(station_ids)]
+        
+        # Rebuild index with filtered data
+        self._build_indices()
         self.sequences = db_roi.sequence_roi_dict(self.data)
+
+    def _get_valid_stations_from_current(self):
+        """
+        Extract valid stations from current filter state.
+        Used for partial updates to maintain filter consistency.
+        """
+        if not hasattr(self, '_current_valid_stations'):
+            return None
+        return self._current_valid_stations
+
+    def _get_valid_stations(self, filter_dict, valid_stations):
+        """
+        Determine which stations to include based on filters.
+        Returns set of station IDs or None if no valid data.
+        """
+        self._current_valid_stations = valid_stations
+        valid_set = set(valid_stations.keys()) if valid_stations else set()
+        
+        if not valid_set:
+            return None
+        
+        # Priority: single station > survey > region
+        if filter_dict['active_station'][0] > 0:
+            return {filter_dict['active_station'][0]}
+        
+        # Survey and region filters use the same pre-filtered valid_stations
+        if filter_dict['active_survey'][0] > 0 or filter_dict['active_region'][0] > 0:
+            return valid_set
+        
+        return valid_set
 
     # RUN ON ENTRY IF LOAD_DATA
     def calculate_neighbors(self):
-        """
-        Start MatchEmbeddingThread to calculate neighbors
-        """
+        """Start MatchEmbeddingThread to calculate neighbors"""
+        if self.match_thread and self.match_thread.isRunning():
+            self.match_thread.requestInterruption()
+            self.match_thread.wait()
+        
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.data, self.sequences,
                                                  k=self.k, metric=self.metric, threshold=self.threshold)
         self.match_thread.progress_update.connect(self.parent.progress.set_counter)
@@ -126,27 +162,18 @@ class QueryContainer(QObject):
         self.n_queries = len(self.ranked_sequences)
 
     def finish_calculating(self):
-        """
-        Finish calculating neighbors, signal to DisplayCompare to update with gui
-        """
-        if self.ranked_sequences:
-            # compute viewpoints
-            self.thread_signal.emit(True)
-        else:
-            # interrupt occurred or dicts are empty
-            self.thread_signal.emit(False)
+        """Finish calculating neighbors, signal to DisplayCompare to update with gui"""
+        self.thread_signal.emit(bool(self.ranked_sequences))
 
     def set_threshold(self, threshold):
         """Set the similarity threshold for the query container"""
         self.threshold = threshold
 
+    # QUERY NAVIGATION ---------------------------------------------------------
     def set_query(self, n):
         """Set the Query side to a particular (n) image in the list"""
-        # wrap around
-        if n < 0:
-            n = self.n_queries - 1
-        if n > self.n_queries - 1:
-            n = 0
+        # Wrap around
+        n = n % self.n_queries if self.n_queries > 0 else 0
 
         # set current query
         self.current_query = n
@@ -159,16 +186,11 @@ class QueryContainer(QObject):
         self.update_matches()
 
     def set_within_query_sequence(self, n):
-        """
-        If the query sequence contains more than one image,
-        set the display to the nth element in the sequence
-        """
-        # wrap around
-        if n < 0:
-            n = len(self.current_query_rois) - 1
-        if n > len(self.current_query_rois) - 1:
-            n = 0
-
+        """Set the display to the nth element in the sequence"""
+        if not self.current_query_rois:
+            return
+        
+        n = n % len(self.current_query_rois)
         self.current_query_sn = n  # number within sequence
         self.current_query_rid = self.current_query_rois[self.current_query_sn]
 
@@ -185,20 +207,83 @@ class QueryContainer(QObject):
         self.set_match(0)
 
     def set_match(self, n):
-        """
-        Set the current match index and id
-        """
-        # wrap around
-        if n < 0:
-            n = len(self.current_match_rois) - 1
-        if n > len(self.current_match_rois) - 1:
-            n = 0
-
+        """Set the current match index and id"""
+        if not self.current_match_rois:
+            return
+        
+        n = n % len(self.current_match_rois)
         self.current_match = n
         self.current_match_rid = self.current_match_rois[self.current_match]
 
-    # VIEWPOINT ----------------------------------------------------------------
+    def get_query_sequence_id(self):
+        """Get current query sequence ID"""
+        if self.current_match_object:
+            return self.current_match_object.sequence_id
+        return None
 
+    def get_match_sequence_id(self):
+        """Get current match sequence ID"""
+        if self.current_match_object and self.current_match_rois:
+            # Get sequence ID of current match ROI
+            return self._get_roi_field(self.current_match_rid, 'sequence_id')
+        return None
+
+    def update_sequences_in_place(self, query_seq_id, match_seq_id):
+        """
+        Update only the two affected sequences in local cache 
+        instead of reloading everything from DB.
+        Much faster than full load_data() + filter().
+        """
+        if query_seq_id is None or match_seq_id is None:
+            # Fallback to full reload if sequence IDs not available
+            self.load_data()
+            self.filter(self.filter_dict, self._get_valid_stations_from_current())
+            return
+
+        # Reload only the two sequences that changed
+        query_df = db_roi.fetch_roi_media(self.mpDB, sequence_id=query_seq_id)
+        match_df = db_roi.fetch_roi_media(self.mpDB, sequence_id=match_seq_id)
+
+        if query_df.empty or match_df.empty:
+            # Fallback if fetch fails
+            self.load_data()
+            self.filter(self.filter_dict, self._get_valid_stations_from_current())
+            return
+
+        # Remove old sequence data and insert updated data
+        # Using index-based filtering since 'id' is the index
+        self.data = self.data[~self.data['sequence_id'].isin([query_seq_id, match_seq_id])]
+        
+        # Concatenate new data and preserve index
+        self.data = pd.concat([self.data, query_df, match_df])
+        
+        # Rebuild indices with updated data
+        self._build_indices()
+
+
+    def update_partial_sequences(self, sequence_ids):
+        """
+        Update specific sequences by reloading from DB.
+        Useful for targeted updates without full reload.
+        """
+        if not sequence_ids:
+            return
+        
+        # Remove old data for these sequences
+        self.data = self.data[~self.data['sequence_id'].isin(sequence_ids)]
+        
+        # Fetch fresh data for each sequence
+        updated_dfs = []
+        for seq_id in sequence_ids:
+            seq_df = db_roi.fetch_roi_media(self.mpDB, sequence_id=seq_id)
+            if not seq_df.empty:
+                updated_dfs.append(seq_df)
+        
+        if updated_dfs:
+            self.data = pd.concat([self.data] + updated_dfs)
+            self._build_indices()
+
+    # VIEWPOINT ----------------------------------------------------------------
     def toggle_viewpoint(self, selected_viewpoint):
         """Flip between viewpoints in paired images within a sequence"""
         self.selected_viewpoint = selected_viewpoint
@@ -219,137 +304,194 @@ class QueryContainer(QObject):
         if active:
             # store the current match object before switching to favorites
             self.knn_match_object = self.current_match_object
-            # reload data for updated favorites, no need to filter
-            self.load_data()
-            favorites = self.data_raw[self.data_raw['favorite'] == 1]
-            if favorites.empty:
-                # no favorite matches available, exit early
+            
+            # Use cached favorites if available, otherwise fetch once
+            if self._favorites_cache is None:
+                self._favorites_cache = self.data_raw[self.data_raw['favorite'] == 1].copy()
+            
+            if self._favorites_cache.empty:
                 return
 
-            # get "filtered neighbors", [(match_id, distance)]
-            filtered_neighbors = []
-            for index, _ in favorites.iterrows():
-                distance = 1 - self.mpDB.calculate_similarity(self.knn_match_object.query_data.iloc[0]['id'], index)
-                filtered_neighbors.append((index, distance))
+            query_roi_id = self.knn_match_object.query_data.iloc[0]['id']
+            filtered_neighbors = self._calculate_favorites_similarities(query_roi_id)
 
-            # create the favorite match object with the filtered neighbors
-            self.favorite_match_object = FavoriteMatchObject(self.knn_match_object.sequence_id,
-                                                             filtered_neighbors,
-                                                             query_data=self.knn_match_object.query_data,
-                                                             match_data=favorites)
-            # switch the current match object to the favorite match object
+            # Create favorite match object
+            self.favorite_match_object = FavoriteMatchObject(
+                self.knn_match_object.sequence_id,
+                filtered_neighbors,
+                query_data=self.knn_match_object.query_data,
+                match_data=self._favorites_cache
+            )
             self.current_match_object = self.favorite_match_object
         else:
             # restore the original match object when deactivating favorites
             self.current_match_object = self.knn_match_object
             self.knn_match_object = None
             self.favorite_match_object = None
+            self._similarities_cache.clear()
 
         self.update_matches()
 
-    # RETURN INFO --------------------------------------------------------------------
+    # RETURN INFO --------------------------------------------------------------
+    def _calculate_favorites_similarities(self, query_roi_id):
+        """
+        Vectorized similarity calculation for favorites.
+        Batch query all similarities at once instead of loop.
+        """
+        favorite_ids = self._favorites_cache['id'].tolist()
+        # Check cache first
+        uncached = [fid for fid in favorite_ids if fid not in self._similarities_cache]
+
+        if uncached:
+            # Batch calculate similarities for uncached favorites
+            batch_similarities = self.mpDB.batch_calculate_similarity(query_roi_id, uncached)
+            self._similarities_cache.update(batch_similarities)
+        
+        # Return cached similarities
+        filtered_neighbors = [(fid, 1 - self._similarities_cache[fid]) for fid in favorite_ids]
+        return filtered_neighbors
+
     def is_existing_match(self):
         """Return whether current query and match have same individual_id"""
-        return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
-            self.data.loc[self.current_query_rid, "individual_id"] is not None
+        query_iid = self._get_roi_field(self.current_query_rid, 'individual_id')
+        match_iid = self._get_roi_field(self.current_match_rid, 'individual_id')
+        return query_iid == match_iid and query_iid is not None
 
     def both_unnamed(self):
         """Return whether both current query and match are unnamed"""
-        return self.data.loc[self.current_match_rid, "individual_id"] is None and \
-            self.data.loc[self.current_query_rid, "individual_id"] is None
+        return (self._get_roi_field(self.current_query_rid, 'individual_id') is None and
+                self._get_roi_field(self.current_match_rid, 'individual_id') is None)
 
     def current_distance(self):
-        """Return distance between current sequence and matchs"""
+        """Return distance between current sequence and match"""
         matches = self.current_match_object.get_ranked_matches()
-        return matches[self.current_match][1]
+        return matches[self.current_match][1] if self.current_match < len(matches) else float('inf')
+
+    def _get_roi_field(self, roi_id, field):
+        """
+        Get ROI field efficiently using index.
+        Falls back to DataFrame if index out of sync.
+        """
+        if roi_id in self._roi_index:
+            return self._roi_index[roi_id].get(field)
+        # Fallback to DataFrame lookup
+        if roi_id in self.data.index:
+            return self.data.loc[roi_id, field]
+        return None
+
+    def _get_roi_full_record(self, roi_id):
+        """Get full ROI record from index"""
+        if roi_id in self._roi_index:
+            return self._roi_index[roi_id]
+        if roi_id in self.data.index:
+            return self.data.loc[roi_id].to_dict()
+        return None
+
+    def _update_roi_index(self, updates_dict):
+        """Update local index with batch changes"""
+        for roi_id, changes in updates_dict.items():
+            if roi_id in self._roi_index:
+                self._roi_index[roi_id].update(changes)
 
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
-        if column is None:  # return whole row
+        if column is None:
+            # Return whole row from index or DataFrame
+            if rid in self._roi_index:
+                return pd.Series(self._roi_index[rid])
             return self.data.loc[rid]
         elif column == 'bbox':
-            # Return the bbox coordinates for current query
             return db_roi.get_roi_bbox(self.data.loc[[rid]])
         elif column == 'metadata':
             return self.roi_metadata(self.data.loc[rid])
         else:
-            return self.data.loc[rid, column]
+            return self._get_roi_field(rid, column)
 
     def roi_metadata(self, roi):
-        """
-        Display relevant metadata in comparison label box
-        """
+        """Display relevant metadata in comparison label box"""
         location = fetch_station_names_from_id(self.mpDB, roi['station_id'])
 
-        roi = roi.rename(index={"name": "Name",
-                                "sex": "Sex",
-                                "age": "Age",
-                                "filepath": "Filepath",
-                                "comment": "Comment",
-                                "timestamp": "Timestamp",
-                                "station_id": "Station",
-                                "sequence_id": "Sequence ID",
-                                "viewpoint": "Viewpoint"})
+        roi_renamed = roi.rename(index={"name": "Name",
+                                        "sex": "Sex",
+                                        "age": "Age",
+                                        "filepath": "Filepath",
+            "comment": "Comment",
+            "timestamp": "Timestamp",
+            "station_id": "Station",
+            "sequence_id": "Sequence ID",
+            "viewpoint": "Viewpoint"
+        })
 
-        info_dict = roi[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
-                        'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+        info_dict = roi_renamed[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
+                                 'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
         info_dict['id'] = roi.name
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
 
-        # convert viewpoint to human-readable (0=Left, 1=Right)
-        VIEWPOINT = load_model('VIEWPOINTS')
-        if info_dict['Viewpoint'] is None:
+        # Convert viewpoint to human-readable
+        viewpoint_val = info_dict['Viewpoint']
+        if viewpoint_val is None or pd.isna(viewpoint_val):
             info_dict['Viewpoint'] = 'None'
-        else:  # BUG: Typecasting issue, why is viewpoint returning a float?
-            info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
+        else:
+            try:
+                info_dict['Viewpoint'] = self.VIEWPOINT_DICT[str(int(viewpoint_val))]
+            except (KeyError, ValueError, TypeError):
+                info_dict['Viewpoint'] = 'Unknown'
 
         return info_dict
 
     # MATCH FUNCTIONS ----------------------------------------------------------
+    # Batch database updates
     def new_iid(self, individual_id):
-        """Update records for roi after confirming a match"""
-        for roi in self.current_query_rois:
-            self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
-
-        self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
+        """Update records for roi after confirming a match (batched)"""
+        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1} 
+                      for roi in self.current_query_rois}
+        roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
+        
+        # Batch update instead of N individual queries
+        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
+        
+        # Update local index
+        self._update_roi_index(roi_updates)
 
     def merge(self):
-        """Merge two individuals after match"""
-        query = self.data.loc[self.current_query_rid]
-        match = self.data.loc[self.current_match_rid]
+        """Merge two individuals after match (optimized)"""
+        query_data = self._get_roi_full_record(self.current_query_rid)
+        match_data = self._get_roi_full_record(self.current_match_rid)
 
-        query_iid = query['individual_id']
-        match_iid = match['individual_id']
+        if query_data is None or match_data is None:
+            return
 
-        # both are named
+        query_iid = query_data.get('individual_id')
+        match_iid = match_data.get('individual_id')
+
+        # Determine which ID to keep
         if query_iid is not None:
-            # query is older, keep query name
-            if match_iid is None or match_iid < query_iid:
-                sequence = [match['sequence_id']]
-                keep_id = query_iid
-
-            # match is older, keep match name
-            else:
-                sequence = [self.current_match_object.sequence_id]
-                keep_id = match_iid
-
-        # query is None, give match name
+            keep_id = query_iid if (match_iid is None or match_iid < query_iid) else match_iid
         else:
-            sequence = [self.current_match_object.sequence_id]
             keep_id = match_iid
 
-        # find all rois with newer name
-        to_merge = self.data[self.data["sequence_id"].isin(sequence)]
+        # Find all ROIs in affected sequence
+        to_merge_seq = self.current_match_object.sequence_id
+        merge_rois = self._seq_index.get(to_merge_seq, [])
 
-        for i in to_merge.index:
-            self.mpDB.edit_row('roi', i, {'individual_id': int(keep_id), "reviewed": 1}, quiet=False)
+        # Batch update all ROIs
+        roi_updates = {roi: {"individual_id": int(keep_id), "reviewed": 1} 
+                      for roi in merge_rois}
+        self.mpDB.batch_edit('roi', roi_updates, quiet=False)
+        
+        # Update local index
+        self._update_roi_index(roi_updates)
 
     def unmatch(self):
         """Unmatch the current query ROI from the matched ROI"""
-        self.mpDB.edit_row('roi', 
-                           self.current_query_rid, {'individual_id': None, "reviewed": 0}, 
-                           allow_none=True,
-                           quiet=False)
+        self.mpDB.edit('roi', self.current_query_rid,
+            {'individual_id': None, "reviewed": 0},
+            allow_none=True,
+            quiet=False
+        )
+        
+        # Update local index
+        self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
