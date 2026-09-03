@@ -43,8 +43,11 @@ def fetch_station_names_from_id(mpDB, station_id):
     """Given a station id, return names and ids of survey and region"""
     station_name, suvery_id = mpDB.select("station", "name, survey_id", row_cond=f"id={station_id}")[0]
     survey_name, region_id = mpDB.select("survey", "name, region_id", row_cond=f"id={suvery_id}")[0]
-    region_name = mpDB.select("region", "name", row_cond=f"id={region_id}")
-    region_name = region_name[0][0] if region_name else None
+    if region_id is None:
+        region_name = None
+    else:
+        region_name = mpDB.select("region", "name", row_cond=f"id={region_id}")
+        region_name = region_name[0][0] if region_name else None
     return_dict = {'station_name': station_name,
                    'suvery_id': suvery_id,
                    'survey_name': survey_name,
