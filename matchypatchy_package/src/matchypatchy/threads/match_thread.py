@@ -9,7 +9,6 @@ from matchypatchy.threads.match_object import MatchObject
 
 class MatchEmbeddingThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
-    prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     ranked_queries_return = pyqtSignal(list)
     done = pyqtSignal()
 
@@ -48,6 +47,7 @@ class MatchEmbeddingThread(QThread):
         # 3. Rank ROIs by match scores, prioritize previously IDd individuals
         # 4. Pad sequences to include all ROIs from matched sequences
         """
+        print("Starting match thread")
         for i, s in enumerate(self.sequences):
             if not self.isInterruptionRequested():
                 sequence_rois = self.sequences[s]
@@ -154,24 +154,15 @@ class MatchEmbeddingThread(QThread):
             # Apply ranking to all matches at once
             for match_object in self.pairs:
                 # Combine all ranking criteria into single sort
-                match_object.neighbors = sorted(
-                    match_object.neighbors,
-                    key=lambda x: (
-                        x[1],  # distance (ascending)
-                        x[0] not in favorite_rois_set,  # favorites first
-                        x[0] not in ided_rois_set  # ided second
-                    )
-                )
+                if len(favorite_rois_set) > 0:
+                    match_object.rank_neighbors_by_distance()
+                    match_object.rank_neighbors_by_favorites(favorite_rois_set)
+                # then prioritize matches by IDed status
+                match_object.rank_neighbors_by_ided(ided_rois_set)
 
-            # Single sort pass with combined keys
-            self.pairs = sorted(
-                self.pairs,
-                key=lambda x: (
-                    # Sort by: has ided match (desc), then by match count (desc)
-                    -any(item[0] in ided_rois_set for item in x.neighbors),
-                    -len(x.neighbors)
-                )
-            )
+           # prioritize by number of matches and ided status
+            self.pairs = sorted(self.pairs, key=lambda x: len(x.neighbors), reverse=True)
+            self.pairs = sorted(self.pairs, key=lambda x: any(item[0] in ided_rois_set for item in x.neighbors), reverse=True)
         else:
             # No IDs - just sort by distance and count
             for match_object in self.pairs:
