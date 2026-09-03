@@ -7,8 +7,7 @@ from pathlib import Path
 import pandas as pd
 from PIL import Image
 
-from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QLineEdit, QSlider)
+from PyQt6.QtWidgets import QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt6.QtCore import Qt
 
 from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
@@ -273,6 +272,33 @@ class DisplayCompare(QWidget):
         self.threshold = value
         self.QueryContainer.set_threshold(self.threshold)
 
+    # ALERT POPUP MANAGER ------------------------------------------------------
+    def show_progress(self, prompt):
+        """Progress Popup for Match Thread"""
+        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=False)
+        self.progress.show()
+
+    def update_prompt(self, prompt):
+        """Update the prompt in the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.update_prompt(prompt)
+
+    def update_progress(self, progress):
+        """Update the progress bar in the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.set_counter(progress)
+
+    def set_progress_max(self, max_value):
+        """Set the maximum value for the progress bar"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.set_max(max_value)
+
+    def close_progress(self):
+        """Close the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.close()
+            self.progress = None
+
     # ==========================================================================
     # ON ENTRY
     # ==========================================================================
@@ -290,12 +316,12 @@ class DisplayCompare(QWidget):
         self.k = self.cfg.KNN  # default knn
         self.QueryContainer = QueryContainer(self)  # re-establish object
         self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
+        self.QueryContainer.progress_update.connect(self.update_progress)
+        self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
             self.QueryContainer.calculate_neighbors()
-            self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
-            self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
         else:
             self.home(warn=True)
 
@@ -303,13 +329,9 @@ class DisplayCompare(QWidget):
         """Handle data loaded signal from QueryContainer, update self.data for filters"""
         self.data = data
 
-    def show_progress(self, prompt):
-        """Progress Popup for Match Thread"""
-        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
-        self.progress.show()
-
     def check_matchthread_success(self, thread_success):
         """Check if match thread was successful, load first query if so"""
+        self.close_progress()
         if thread_success:
             self.change_query(0)
         else:

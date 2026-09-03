@@ -149,10 +149,8 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
         self.Media.refresh_filters(filters)
-
-        if hasattr(self.Media, 'progress') and self.Media.progress:
-            self.Media.show_progress("Loading media...")
-
+        self.Media.show_progress("Loading media...")
+        # wait to load
         QTimer.singleShot(50, self.Media.load_table)
 
     def _set_compare_view(self):
@@ -160,11 +158,8 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
         self.Compare.refresh_filters()
-
-        # Show loading indicator before heavy computation
-        if hasattr(self.Compare, 'progress') and self.Compare.progress:
-            self.Compare.show_progress("Matching embeddings... This may take a while.")
-
+        self.Compare.show_progress("Matching embeddings... This may take a while.")
+        # wait to load
         QTimer.singleShot(50, self.Compare.calculate_neighbors)
 
     def _set_manual_view(self, selected_ids=None):
