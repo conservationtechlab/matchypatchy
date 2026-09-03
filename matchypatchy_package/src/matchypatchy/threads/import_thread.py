@@ -261,7 +261,7 @@ class CSVImportThread(QThread):
 
     def run(self):
         roi_counter = 0  # progressbar counter
-
+        emitted_counter = 0  # last value emitted, to batch signal emission
         self.progress_message.emit("Starting import...")
 
         # get common base directory for all images
