@@ -28,6 +28,7 @@ class DisplayMedia(QWidget):
         self.logger = parent.logger
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
+        self.progress = None
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         # 0 for Media, 1 for ROI
         self.data_type = data_type
@@ -181,6 +182,16 @@ class DisplayMedia(QWidget):
         self.mpDB = mpDB
         self.filterbar.update_project(mpDB)
 
+    def show_progress(self, prompt):
+        """Progress Popup for Match Thread"""
+        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
+        self.progress.show()
+
+    def update_progress(self, progress):
+        """Update the progress bar in the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.set_counter(progress)
+
     # =========================================================================
     # FILTERS
     # =========================================================================
@@ -251,26 +262,28 @@ class DisplayMedia(QWidget):
         if media_n == 0:
             # no media at all
            # self.media_table.clear_and_load_contents(self.data_type)
-            dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
-            if dialog.exec():
+            self.show_progress("No images found! Please import media.")
+            if self.progress.exec():
                 self.home()
-            del dialog
             return False
         else:
             if self.data_type == 1 and roi_n == 0:
                 # no rois, default to full images
                 self.data_type = 0
-                dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
-                dialog.exec()
-                del dialog
+                self.show_progress("No rois found, defaulting to full images.")
+
                 self.show_type.blockSignals(True)
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
 
+            
+            self.show_progress("Loading data...")
             # load table with current data type
             self.individual_list = fetch_individual(self.mpDB)
             self.dataloader = FetchTableThread(self)
             self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
+            self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
+            self.dataloader.progress_max.connect(lambda max_value: self.progress.set_max(max_value))
             self.dataloader.start()
             return True
 

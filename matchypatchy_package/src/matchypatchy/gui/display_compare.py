@@ -293,7 +293,6 @@ class DisplayCompare(QWidget):
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
-            self.show_progress("Matching embeddings... This may take a while.")
             self.QueryContainer.calculate_neighbors()
             self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
             self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
@@ -607,6 +606,7 @@ class DisplayCompare(QWidget):
             self.edit_stack = dialog.get_edit_stack()
             self.save_changes()
             # reload data
+            # TODO: only reload the affected sequences instead of full reload
             self.QueryContainer.load_data()
             self.QueryContainer.filter()
             self.load_query()
@@ -667,6 +667,7 @@ class DisplayCompare(QWidget):
         """Set favorite status for given rid"""
         self.mpDB.edit_row('roi', rid, {"favorite": value})
         # reload database
+        # TODO: update only the affected sequences in the QueryContainer instead of full reload
         self.QueryContainer.load_data()
         self.QueryContainer.filter()
         self.load_query()
