@@ -569,6 +569,8 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
+            cursor.execute("BEGIN TRANSACTION")
+
             for row_id, replace in updates.items():
                 for key, value in replace.items():
                     if value in (None, ''):
@@ -589,6 +591,37 @@ class MatchyPatchyDB():
             return True
         except sqlite3.Error as error:
             self.logger.error(f"Failed batch update on table {table}: {error}")
+            return False
+
+    def batch_update_thumbnails(self, table, id_column, batch_updates):
+        """
+        Batch update multiple thumbnail entries.
+        batch_updates: {id: {column: value, ...}, ...}
+        """
+        if not batch_updates:
+            return
+
+        try:
+            # Build UPDATE statements for multiple IDs
+            # Using CASE for efficient multi-row update
+            ids = list(batch_updates.keys())
+            
+            # Simple approach: execute individual UPDATEs in a transaction
+            cursor = self.db.cursor()
+            cursor.execute("BEGIN TRANSACTION")
+            
+            for row_id, changes in batch_updates.items():
+                set_clause = ', '.join(f"{col} = ?" for col in changes.keys())
+                values = list(changes.values()) + [row_id]
+                query = f"UPDATE {table} SET {set_clause} WHERE {id_column} = ?"
+                cursor.execute(query, values)
+            
+            self.db.commit()
+            self.logger.info(f"Updated {len(batch_updates)} thumbnail entries in {table}")
+            return True
+        except Exception as e:
+            self.db.rollback()
+            self.logger.error(f"Error batch updating {table}: {e}")
             return False
 
     def select(self, table: str, columns: str = "*", row_cond: Optional[str] = None, quiet=True):
