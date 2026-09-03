@@ -28,6 +28,7 @@ class DisplayMedia(QWidget):
         self.logger = parent.logger
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
+        self.progress = None
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         # 0 for Media, 1 for ROI
         self.data_type = data_type
@@ -136,6 +137,16 @@ class DisplayMedia(QWidget):
 
         self.setLayout(layout)
 
+    def update_project(self, cfg, mpDB):
+        """Update database object"""
+        self.cfg = cfg
+        self.mpDB = mpDB
+        self.filterbar.update_project(mpDB)
+
+    # ==========================================================================
+    # NAVIGATION
+    # ==========================================================================
+
     def home(self):
         """Return to Base View"""
         if len(self.edit_stack) > 0:
@@ -175,11 +186,32 @@ class DisplayMedia(QWidget):
                 self.parent._set_compare_view()
         return
 
-    def update_project(self, cfg, mpDB):
-        """Update database object"""
-        self.cfg = cfg
-        self.mpDB = mpDB
-        self.filterbar.update_project(mpDB)
+    # ALERT POPUP MANAGER ------------------------------------------------------
+    def show_progress(self, prompt):
+        """Progress Popup for Match Thread"""
+        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
+        self.progress.show()
+
+    def update_prompt(self, prompt):
+        """Update the prompt in the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.update_prompt(prompt)
+
+    def update_progress(self, progress):
+        """Update the progress bar in the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.set_counter(progress)
+
+    def set_progress_max(self, max_value):
+        """Set the maximum value for the progress bar"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.set_max(max_value)
+
+    def close_progress(self):
+        """Close the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.close()
+            self.progress = None
 
     # =========================================================================
     # FILTERS
@@ -251,18 +283,16 @@ class DisplayMedia(QWidget):
         if media_n == 0:
             # no media at all
            # self.media_table.clear_and_load_contents(self.data_type)
-            dialog = AlertPopup(self, "No images found! Please import media.", title="Alert")
-            if dialog.exec():
+            self.update_prompt("No images found! Please import media.")
+            if self.progress.exec():
                 self.home()
-            del dialog
             return False
         else:
             if self.data_type == 1 and roi_n == 0:
                 # no rois, default to full images
                 self.data_type = 0
-                dialog = AlertPopup(self, "No rois found, defaulting to full images.", title="Alert")
-                dialog.exec()
-                del dialog
+                self.update_prompt("No rois found, defaulting to full images.")
+
                 self.show_type.blockSignals(True)
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
@@ -271,6 +301,8 @@ class DisplayMedia(QWidget):
             self.individual_list = fetch_individual(self.mpDB)
             self.dataloader = FetchTableThread(self)
             self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
+            self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
+            self.dataloader.done.connect(self.close_progress)  # Close the progress dialog when done
             self.dataloader.start()
             return True
 

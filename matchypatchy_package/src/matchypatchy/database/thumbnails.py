@@ -35,10 +35,9 @@ def save_media_thumbnail(thumbnail_dir, filepath, ext):
 
         # create a temporary file to hold thumbnail
         rand = random.randint(1000, 9999)
-        newpath = Path(thumbnail_dir) / Path(filepath).stem
-        thumbnail_filepath = f"{str(newpath)}_{rand}.jpg"
+        thumbnail_filepath = f"{str(Path(filepath).stem)}_{rand}.jpg"
         # save the image
-        scaled_image.save(thumbnail_filepath, format="JPG")
+        scaled_image.save(str(thumbnail_dir) + "/" + thumbnail_filepath, format="JPG")
     else:
         thumbnail_filepath = str(asset_path(THUMBNAIL_NOTFOUND))
 
@@ -69,11 +68,9 @@ def save_roi_thumbnail(thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox
 
         # create a temporary file to hold thumbnail
         rand = random.randint(1000, 9999)
-        newpath = Path(thumbnail_dir) / Path(filepath).stem
-        thumbnail_filepath = f"{str(newpath)}_{frame}_{rand}.jpg"
-
+        thumbnail_filepath = f"{str(Path(filepath).stem)}_{rand}.jpg"
         # save the image
-        scaled_image.save(thumbnail_filepath, format="JPG")
+        scaled_image.save(str(thumbnail_dir) + "/" + thumbnail_filepath, format="JPG")
     else:
         thumbnail_filepath = str(asset_path(THUMBNAIL_NOTFOUND))
 
@@ -96,7 +93,7 @@ def get_frame(video_path, frame=0):
     return None
 
 
-def check_missing_thumbnails(mpDB, data_type):
+def check_missing_thumbnails(mpDB, thumbnail_dir, data_type):
     """
     Check for missing thumbnails in roi or media table
     """
@@ -119,7 +116,7 @@ def check_missing_thumbnails(mpDB, data_type):
 
     # Also check for files that are listed but the file is missing
     for _, row in thumbnails.iterrows():
-        if not Path(row['thumbnail_path']).is_file():
+        if not (Path(thumbnail_dir) / Path(row['thumbnail_path'])).is_file():
             missing_ids.append(row['id'])
 
     return missing_ids
