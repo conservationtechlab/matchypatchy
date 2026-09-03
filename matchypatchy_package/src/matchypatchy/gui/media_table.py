@@ -100,7 +100,7 @@ class MediaTable(QAbstractTableModel):
         if self._columns[col] == "station_id":
             if role == Qt.ItemDataRole.DisplayRole:
                 id = int(self._data_filtered.at[row, self._columns[col]])
-                return self.STATIONS.at[id, "name"]
+                return self.STATIONS.loc[id, "name"]
 
         # viewpoint 
         if self._columns[col] == "viewpoint":
