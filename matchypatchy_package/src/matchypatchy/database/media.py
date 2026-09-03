@@ -147,7 +147,7 @@ def fetch_roi_media(mpDB, rids=None, sequence_ids=None,reset_index=True):
         media, column_names = mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
     elif sequence_ids:
         sequence_ids_str = ', '.join(map(str, sequence_ids))
-        media, column_names = mpDB.all_media(row_cond=f"roi.sequence_id IN ({sequence_ids_str})")
+        media, column_names = mpDB.all_media(row_cond=f"media.sequence_id IN ({sequence_ids_str})")
     else:
         media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
