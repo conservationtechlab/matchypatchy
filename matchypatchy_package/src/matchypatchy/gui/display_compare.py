@@ -416,8 +416,12 @@ class DisplayCompare(QWidget):
 
     def confirm_match(self):
         """
-        Match button was clicked, merge query sequence and current match
+        Match button was clicked, merge query sequence and current match.
+        Optimized to only update affected data.
         """
+        query_sequence_id = self.QueryContainer.get_query_sequence_id()
+        match_sequence_id = self.QueryContainer.get_match_sequence_id()
+        
         # Both individual_ids are None
         if self.QueryContainer.both_unnamed():
             # make new individual
@@ -429,13 +433,16 @@ class DisplayCompare(QWidget):
                 # update query and match
                 self.QueryContainer.new_iid(individual_id)
                 del dialog
-
-        # Match has a name
+            else:
+                return  # User cancelled - don't proceed
         else:
+            # Match has a name - merge sequences
             self.QueryContainer.merge()
-            # update data
-        self.QueryContainer.load_data()
-        self.QueryContainer.filter()
+        
+        # update affected sequences
+        self.QueryContainer.update_sequences_in_place(query_sequence_id, match_sequence_id)
+        
+        # Refresh only the current views (not all data)
         self.load_query()
         self.load_match()
 
@@ -448,9 +455,11 @@ class DisplayCompare(QWidget):
         if dialog.exec():
             self.QueryContainer.unmatch()
         del dialog
+        
+        # update affected sequences
+        query_sequence_id = [self.QueryContainer.get_query_sequence_id()]
+        self.QueryContainer.update_partial_sequences(query_sequence_id)
         # reload data
-        self.QueryContainer.load_data()
-        self.QueryContainer.filter()
         self.load_query()
         self.load_match()
 
@@ -476,6 +485,7 @@ class DisplayCompare(QWidget):
 
         self.match_selector.set_total(len(self.QueryContainer.current_match_rois))
         self.match_selector.set_current_number(self.QueryContainer.current_match)
+        self.match_counter.setText(f"1/{len(self.QueryContainer.current_match_rois)}")
 
         self.query_image_bar.reset()
         self.match_image_bar.reset()
@@ -495,6 +505,7 @@ class DisplayCompare(QWidget):
         self.match_image_bar.reset()
         self.match_selector.set_total(len(self.QueryContainer.current_match_rois))
         self.match_selector.set_current_number(self.QueryContainer.current_match)
+        self.match_counter.setText(f"{self.QueryContainer.current_match+1}/{len(self.QueryContainer.current_match_rois)}")
         self.load_match()
 
     def load_query(self):
