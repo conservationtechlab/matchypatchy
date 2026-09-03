@@ -237,6 +237,7 @@ class CSVImportThread(QThread):
     """Thread for importing CSV data into the database."""
 
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
+    progress_message = pyqtSignal(str)  # Signal to reset the progress bar
 
     # How many ROIs to process between progress signal emissions.
     # Raising this reduces cross-thread signal overhead on large imports.
@@ -260,7 +261,8 @@ class CSVImportThread(QThread):
 
     def run(self):
         roi_counter = 0  # progressbar counter
-        emitted_counter = 0  # last value emitted, to batch signal emission
+
+        self.progress_message.emit("Starting import...")
 
         # get common base directory for all images
         base_dir = self._get_base_dir(list(self.unique_images.groups.keys()))
@@ -401,6 +403,7 @@ class CSVImportThread(QThread):
 
         if not self.isInterruptionRequested():
             # finished adding media
+            self.mpDB.db.commit()  # commit anything remaining
             self.finished.emit()
 
     def _get_base_dir(self, filepaths):
