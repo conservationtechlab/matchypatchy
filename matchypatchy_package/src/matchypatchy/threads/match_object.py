@@ -1,7 +1,7 @@
 """
 Class definition for MatchObject and FavoriteMatchObject
 """
-
+import pandas as pd
 
 class MatchObject():
     """
@@ -26,10 +26,17 @@ class MatchObject():
         self.og_ranked_matches = []  # original ranked match tuples (roi_id, distance)
 
     def _invalidate_cache(self):
-        """Invalidate cache and rebuild viewpoint maps"""
-        self.query_viewpoint_map = dict(zip(self.query_data['id'], self.query_data['viewpoint']))
-        self.match_viewpoint_map = dict(zip(self.match_data['id'], self.match_data['viewpoint']))
+        """Invalidate cache and rebuild viewpoint maps with None handling"""
+        self.query_viewpoint_map = self._build_safe_viewpoint_map(self.query_data['id'], self.query_data['viewpoint'])
+        self.match_viewpoint_map = self._build_safe_viewpoint_map(self.match_data.index, self.match_data['viewpoint'])
         self._viewpoint_cache_valid = True
+
+    def _build_safe_viewpoint_map(self, ids, viewpoints):
+        """
+        Build viewpoint map with None values converted to a sort-safe high value.
+        This centralizes None handling instead of spreading it through sort keys.
+        """
+        return {roi_id: (vp if vp is not None else float('inf')) for roi_id, vp in zip(ids, viewpoints)} 
 
     def get_ranked_query_rids(self):
         """Get the ranked query ROI IDs"""
@@ -90,18 +97,27 @@ class MatchObject():
             self._invalidate_cache()
 
         # determine viewpoint matches between query sequence and matched sequence
-        query_viewpoints = set(self.query_data['viewpoint'].dropna().values)
-        match_viewpoints = set([self.match_viewpoint_map[x[0]] for x in self.neighbors if x[0] in self.match_viewpoint_map])
+        # Filter out the float('inf') sentinel values that represent None
+        query_viewpoints = set(vp for vp in self.query_viewpoint_map.values() if vp != float('inf'))
+        match_viewpoints = set(self.match_viewpoint_map[x[0]] for x in self.neighbors 
+                               if x[0] in self.match_viewpoint_map and self.match_viewpoint_map[x[0]] != float('inf'))
         viewpoint_matches = query_viewpoints & match_viewpoints
 
         # reorder query sequence by viewpoint
         self.og_ranked_query_rids = sorted(self.query_data['id'].values.astype(int).tolist(),
-                                           key=lambda x: (self.query_viewpoint_map[x] not in viewpoint_matches,
-                                                          self.query_viewpoint_map.get(x, float('inf'))))
+                                           key=lambda x: (
+                                               self.query_viewpoint_map[x] not in viewpoint_matches,
+                                               self.query_viewpoint_map[x]  # Now safe - no None values
+                                            ))
+
         # reorder matches by viewpoint
         self.og_ranked_matches = sorted(self.neighbors,
-                                        key=lambda x: (self.match_viewpoint_map.get(x[0], float('inf')) not in viewpoint_matches,
-                                                       self.match_viewpoint_map.get(x[0], float('inf'))))
+                                        key=lambda x: (
+                                            self.match_viewpoint_map.get(x[0], float('inf')) not in viewpoint_matches,
+                                            self.match_viewpoint_map.get(x[0], float('inf')),  # Now safe - no None values
+                                            x[1]  # distance tiebreaker
+                                        ))
+
         self.ranked_matches = self.og_ranked_matches
         self.ranked_query_rids = self.og_ranked_query_rids
 
@@ -109,23 +125,24 @@ class MatchObject():
         """
         Toggle between viewpoints in match stack
         """
-        # rezip in case data has changed
         if not self._viewpoint_cache_valid:
             self._invalidate_cache()
-        # reset to og order
+
         if selected_viewpoint == 1:
             self.ranked_matches = self.og_ranked_matches
             self.ranked_query_rids = self.og_ranked_query_rids
             return True
         
         selected_viewpoint = 1 if selected_viewpoint == 2 else selected_viewpoint
-        available_queries = [rid for rid in self.og_ranked_query_rids 
-                            if self.query_viewpoint_map[rid] == selected_viewpoint]
-        available_matches = [match for match in self.og_ranked_matches 
-                            if self.match_viewpoint_map.get(match[0]) == selected_viewpoint]
 
-        # if no matches or query rois for selected viewpoint, show all matches and query rois
-        if len(available_matches) == 0 or len(available_queries) == 0:
+        # Filter: only include if viewpoint matches and isn't the None sentinel
+        available_queries = [rid for rid in self.og_ranked_query_rids
+                             if self.query_viewpoint_map[rid] == selected_viewpoint]
+        
+        available_matches = [match for match in self.og_ranked_matches 
+                             if self.match_viewpoint_map.get(match[0], float('inf')) == selected_viewpoint]
+
+        if not available_matches or not available_queries:
             self.ranked_matches = self.og_ranked_matches
             self.ranked_query_rids = self.og_ranked_query_rids
             return False
@@ -160,18 +177,18 @@ class FavoriteMatchObject():
         self._viewpoint_matches_cache = None
 
     def _build_viewpoint_maps(self):
-        """Build viewpoint maps efficiently"""
-        # Use dict comprehension instead of zip for clarity and performance
-        self.query_viewpoint_map = {
-            roi_id: vp 
-            for roi_id, vp in zip(self.query_data['id'], self.query_data['viewpoint'])
-        }
-        
-        # Handle match_data as Series with index as ID
+        """Build viewpoint maps with None-safe conversion"""
+        self.query_viewpoint_map = self._build_safe_viewpoint_map(self.query_data['id'],
+                                                                  self.query_data['viewpoint'])
         if isinstance(self.match_data, pd.DataFrame):
-            self.match_viewpoint_map = dict(zip(self.match_data.index, self.match_data['viewpoint']))
+            self.match_viewpoint_map = self._build_safe_viewpoint_map(self.match_data.index,
+                                                                      self.match_data['viewpoint'])
         else:
             self.match_viewpoint_map = {}
+
+    def _build_safe_viewpoint_map(self, ids, viewpoints):
+        """Build viewpoint map with None values converted to float('inf')"""
+        return {roi_id: (vp if vp is not None else float('inf')) for roi_id, vp in zip(ids, viewpoints)}
 
     def update(self, new_data):
         """Update with new data and invalidate cache"""
@@ -195,7 +212,7 @@ class FavoriteMatchObject():
         
         # Set intersection for matching viewpoints
         query_viewpoints = set(self.query_data['viewpoint'].dropna().values)
-        match_viewpoints = set(self.match_viewpoint_map.values)
+        match_viewpoints = set(self.match_viewpoint_map.values())
         self._viewpoint_matches_cache = query_viewpoints & match_viewpoints
         
         return self._viewpoint_matches_cache

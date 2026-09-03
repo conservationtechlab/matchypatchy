@@ -338,7 +338,7 @@ class QueryContainer(QObject):
         Vectorized similarity calculation for favorites.
         Batch query all similarities at once instead of loop.
         """
-        favorite_ids = self._favorites_cache['id'].tolist()
+        favorite_ids = self._favorites_cache.index.tolist()
         # Check cache first
         uncached = [fid for fid in favorite_ids if fid not in self._similarities_cache]
 
