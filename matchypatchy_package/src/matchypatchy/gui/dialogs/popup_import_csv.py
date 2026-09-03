@@ -151,6 +151,10 @@ class ImportCSVPopup(QDialog):
         self.okButton = self.buttonBox.button(self.buttonBox.StandardButton.Ok)
         self.okButton.setEnabled(False)
 
+        # Progress message label
+        self.progress_label = QLabel()
+        self.progress_label.hide()
+        layout.addWidget(self.progress_label)
         # Progress Bar (hidden at start)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, self.data.shape[0])
@@ -235,6 +239,7 @@ class ImportCSVPopup(QDialog):
             self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
             self.import_thread = CSVImportThread(self, unique_images, self.selections, self.active_survey)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
+            self.import_thread.progress_message.connect(self.show_message)  # Connect progress message signal
             self.import_thread.finished.connect(self.close)
             self.import_thread.start()
 
@@ -253,6 +258,11 @@ class ImportCSVPopup(QDialog):
         # Disconnect the import_manifest slot and connect the close slot to the accepted signal
         self.buttonBox.accepted.disconnect(self.import_manifest)
         self.buttonBox.accepted.connect(self.close)
+
+    def show_message(self, message):
+        """Show progress messages from the import thread."""
+        self.progress_label.show()
+        self.progress_label.setText(message)
 
     def reject(self):
         """Handle the rejection of the dialog, interrupting any ongoing downloads."""
