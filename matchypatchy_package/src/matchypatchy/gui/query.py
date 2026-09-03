@@ -187,112 +187,6 @@ class QueryContainer(QObject):
         """Set the similarity threshold for the query container"""
         self.threshold = threshold
 
-    # KNN CACHE MANAGEMENT -----------------------------------------------------
-
-    def clear_knn_cache(self):
-        """Clear the KNN cache"""
-        self._knn_cache = {}
-        self.logger.info("KNN cache cleared")
-
-    def save_knn_cache(self):
-        """
-        Save cache as JSON for portability and debuggability.
-        JSON is human-readable and more portable than pickle.
-        """
-        cache_data = {
-            'ranked_sequences': self._serialize_ranked_sequences(self.ranked_sequences),
-            'timestamp': time.time()
-        }
-        
-        dbdir = self.cfg.DB_DIR
-        filepath = Path(dbdir) / "knn_cache.json"
-        
-        try:
-            with open(filepath, 'w') as f:
-                json.dump(cache_data, f, indent=2)
-            self.logger.info(f"KNN cache saved to {filepath}")
-        except Exception as e:
-            self.logger.error(f"Failed to save JSON cache: {e}")
-
-    def _serialize_ranked_sequences(self, ranked_sequences):
-        """
-        Convert MatchObject list to serializable dictionaries.
-        Stores only the essential data needed to rebuild.
-        """
-        serialized = []
-        
-        for match_obj in ranked_sequences:
-            serialized.append({
-                'sequence_id': match_obj.sequence_id,
-                'neighbors': match_obj.neighbors,  # [(roi_id, distance), ...]
-                'query_data': match_obj.query_data.to_dict('records'),  # Convert DataFrame to list of dicts
-                'match_data': match_obj.match_data.to_dict('records'),
-                'og_ranked_query_rids': match_obj.og_ranked_query_rids,
-                'og_ranked_matches': match_obj.og_ranked_matches
-            })
-        
-        return serialized
-
-    def load_knn_cache(self):
-        """Load KNN cache from JSON"""
-        dbdir = self.cfg.DB_DIR
-        filepath = Path(dbdir) / "knn_cache.json"
-        
-        if not filepath.exists():
-            return False
-        
-        try:
-            print(f"Loading KNN cache from {filepath}")
-            with open(filepath, 'r') as f:
-                cache_data = json.load(f)
-            
-            cache_age = time.time() - cache_data['timestamp']
-            if cache_age > self.cache_timeout:
-                return False
-            
-            self.ranked_sequences = self._deserialize_ranked_sequences(
-                cache_data['ranked_sequences']
-            )
-            self.n_queries = len(self.ranked_sequences)
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to load JSON cache: {e}")
-            return False
-
-    def _deserialize_ranked_sequences(self, serialized_sequences):
-        """
-        Rebuild MatchObject instances from serialized data.
-        """
-        from matchypatchy.threads.match_object import MatchObject
-        
-        rebuilt = []
-        
-        for i, seq_data in enumerate(serialized_sequences):
-            # Convert dicts back to DataFrames
-            query_data = pd.DataFrame(seq_data['query_data'])
-            match_data = pd.DataFrame(seq_data['match_data'])
-            
-            # Rebuild MatchObject
-            match_obj = MatchObject(
-                sequence_id=seq_data['sequence_id'],
-                filtered_neighbors=seq_data['neighbors'],
-                query_data=query_data,
-                match_data=match_data
-            )
-            
-            # Restore cached ranking if available
-            if seq_data.get('og_ranked_query_rids'):
-                match_obj.og_ranked_query_rids = seq_data['og_ranked_query_rids']
-                match_obj.og_ranked_matches = seq_data['og_ranked_matches']
-                match_obj.ranked_query_rids = seq_data['og_ranked_query_rids']
-                match_obj.ranked_matches = seq_data['og_ranked_matches']
-            
-            rebuilt.append(match_obj)
-            self.progress_update.emit(100 * (i + 1)/len(serialized_sequences))
-
-        return rebuilt
-
     # QUERY NAVIGATION ---------------------------------------------------------
     def set_query(self, n):
         """Set the Query side to a particular (n) image in the list"""
@@ -611,10 +505,116 @@ class QueryContainer(QObject):
     def unmatch(self):
         """Unmatch the current query ROI from the matched ROI"""
         self.mpDB.edit('roi', self.current_query_rid,
-            {'individual_id': None, "reviewed": 0},
-            allow_none=True,
-            quiet=False
-        )
+                       {'individual_id': None, "reviewed": 0},
+                       allow_none=True,
+                       quiet=False)
         
         # Update local index
         self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
+
+    # ==========================================================================
+    # KNN CACHE MANAGEMENT 
+    # ==========================================================================
+    def clear_knn_cache(self):
+        """Clear the KNN cache"""
+        self._knn_cache = {}
+        self.logger.info("KNN cache cleared")
+
+    def save_knn_cache(self):
+        """
+        Save cache as JSON for portability and debuggability.
+        JSON is human-readable and more portable than pickle.
+        """
+        cache_data = {
+            'ranked_sequences': self._serialize_ranked_sequences(self.ranked_sequences),
+            'timestamp': time.time()
+        }
+        
+        dbdir = self.cfg.DB_DIR
+        filepath = Path(dbdir) / "knn_cache.json"
+        
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            self.logger.info(f"KNN cache saved to {filepath}")
+        except Exception as e:
+            self.logger.error(f"Failed to save JSON cache: {e}")
+
+    def _serialize_ranked_sequences(self, ranked_sequences):
+        """
+        Convert MatchObject list to serializable dictionaries.
+        Stores only the essential data needed to rebuild.
+        """
+        serialized = []
+        
+        for match_obj in ranked_sequences:
+            serialized.append({
+                'sequence_id': match_obj.sequence_id,
+                'neighbors': match_obj.neighbors,  # [(roi_id, distance), ...]
+                'query_data': match_obj.query_data.to_dict('records'),  # Convert DataFrame to list of dicts
+                'match_data': match_obj.match_data.to_dict('records'),
+                'og_ranked_query_rids': match_obj.og_ranked_query_rids,
+                'og_ranked_matches': match_obj.og_ranked_matches
+            })
+        
+        return serialized
+
+    def load_knn_cache(self):
+        """Load KNN cache from JSON"""
+        dbdir = self.cfg.DB_DIR
+        filepath = Path(dbdir) / "knn_cache.json"
+        
+        if not filepath.exists():
+            return False
+        
+        try:
+            print(f"Loading KNN cache from {filepath}")
+            with open(filepath, 'r') as f:
+                cache_data = json.load(f)
+            
+            cache_age = time.time() - cache_data['timestamp']
+            if cache_age > self.cache_timeout:
+                return False
+            
+            self.ranked_sequences = self._deserialize_ranked_sequences(
+                cache_data['ranked_sequences']
+            )
+            self.n_queries = len(self.ranked_sequences)
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to load JSON cache: {e}")
+            return False
+
+    def _deserialize_ranked_sequences(self, serialized_sequences):
+        """
+        Rebuild MatchObject instances from serialized data.
+        """
+        from matchypatchy.threads.match_object import MatchObject
+        
+        rebuilt = []
+        
+        for i, seq_data in enumerate(serialized_sequences):
+            # Convert dicts back to DataFrames
+            query_data = pd.DataFrame(seq_data['query_data'])
+            match_data = pd.DataFrame(seq_data['match_data'])
+            
+            # Rebuild MatchObject
+            match_obj = MatchObject(
+                sequence_id=seq_data['sequence_id'],
+                filtered_neighbors=seq_data['neighbors'],
+                query_data=query_data,
+                match_data=match_data
+            )
+            
+            # Restore cached ranking if available
+            if seq_data.get('og_ranked_query_rids'):
+                match_obj.og_ranked_query_rids = seq_data['og_ranked_query_rids']
+                match_obj.og_ranked_matches = seq_data['og_ranked_matches']
+                match_obj.ranked_query_rids = seq_data['og_ranked_query_rids']
+                match_obj.ranked_matches = seq_data['og_ranked_matches']
+            
+            rebuilt.append(match_obj)
+            self.progress_update.emit(100 * (i + 1)/len(serialized_sequences))
+
+        return rebuilt
