@@ -7,9 +7,8 @@ from pathlib import Path
 import pandas as pd
 from PIL import Image
 
-from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QLineEdit, QSlider)
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtCore import Qt, QTimer
 
 from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
 from matchypatchy.gui.widgets.widget_image_adjustment import ImageAdjustBar
@@ -47,12 +46,9 @@ class DisplayCompare(QWidget):
         self.current_viewpoint = 1
         self.compare_type = 'default'  # whether 'default', 'qc' or 'manual'
         self.QueryContainer = QueryContainer(self)
-        self.progress = None   # placeholder for progress popup
         self.edit_stack = []  # placeholder for media edit stack
         self.query_load_thread = None  # placeholder for image load thread
         self.match_load_thread = None  # placeholder for image load thread
-
-        self.data = pd.DataFrame()  # placeholder for query data to be used in filters
 
         # Options Bar ==============================================================
         layout = QVBoxLayout()
@@ -71,7 +67,7 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         button_recalc = QPushButton("Recalculate Matches")
-        button_recalc.clicked.connect(self.calculate_neighbors)
+        button_recalc.clicked.connect(lambda: self.calculate_neighbors(clear_cache=True))
         first_layer.addWidget(button_recalc)
 
         button_recalc = QPushButton("Quality Control by Individual")
@@ -254,8 +250,8 @@ class DisplayCompare(QWidget):
             self.progress.close()
         if warn:
             dialog = AlertPopup(self, prompt="No data to match, process images first.")
-            if dialog.exec():
-                del dialog
+            dialog.exec()
+            del dialog
         self.parent._set_base_view()
 
     def validate(self):
@@ -265,20 +261,50 @@ class DisplayCompare(QWidget):
     def warn(self, prompt):
         """Create an Alert Popup with given prompt"""
         dialog = AlertPopup(self, prompt=prompt)
-        if dialog.exec():
-            del dialog
+        dialog.exec()
+        del dialog
 
     def change_threshold(self, value):
         """Handle changes to the similarity threshold slider"""
         self.threshold = value
         self.QueryContainer.set_threshold(self.threshold)
 
+    # ALERT POPUP MANAGER ------------------------------------------------------
+    def show_progress(self, prompt):
+        """Progress Popup for Match Thread"""
+        if not hasattr(self, 'progress') or self.progress is None:
+            self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=False)
+        self.progress.update_prompt(prompt)
+        self.progress.show()
+
+    def update_prompt(self, prompt):
+        """Update the prompt in the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.update_prompt(prompt)
+
+    def update_progress(self, progress):
+        """Update the progress bar in the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.set_counter(progress)
+
+    def set_progress_max(self, max_value):
+        """Set the maximum value for the progress bar"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.set_max(max_value)
+
+    def close_progress(self):
+        """Close the progress popup"""
+        if hasattr(self, 'progress') and self.progress is not None:
+            self.progress.close()
+            self.progress = None
+
     # ==========================================================================
     # ON ENTRY
     # ==========================================================================
-    def calculate_neighbors(self):
+    def calculate_neighbors(self, clear_cache=False):
         """Calculate neighbors for all query ROIs, load first query and match"""
         # Disable individual select until feature is implemented on QC
+        self.k = self.cfg.KNN  # default knn
         self.compare_type = 'default'
         # show favorite toggle and reset its state
         self.button_match_favorites.setVisible(True)
@@ -286,35 +312,56 @@ class DisplayCompare(QWidget):
         self.button_match_favorites.setStyleSheet("")
         # hide individual filter
         self.filterbar.individual_visible(False)
-        # run knn thread on entry
-        self.k = self.cfg.KNN  # default knn
+        self.show_progress("Initializing...")
+        self.set_progress_max(0)
+        # Delay the heavy work so popup can render
+        QTimer.singleShot(100, lambda: self._initialize_query_container(clear_cache))
+
+    def _initialize_query_container(self, clear_cache=False):
         self.QueryContainer = QueryContainer(self)  # re-establish object
-        self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
-        emb_exist = self.QueryContainer.load_data()
-        if emb_exist:
-            self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
-            self.show_progress("Matching embeddings... This may take a while.")
-            self.QueryContainer.calculate_neighbors()
-            self.progress.rejected.connect(self.QueryContainer.match_thread.requestInterruption)
-            self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
+        self.QueryContainer.progress_update.connect(self.update_progress)
+        self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
+        # Connect the progress popup's rejected signal to stop the query container's calculation
+        if hasattr(self, 'progress') and self.progress:
+            self.progress.rejected.connect(self.QueryContainer.stop_calculation)
+        # try cache first
+        if clear_cache:
+            self.logger.info("Clearing KNN cache")
+            self.QueryContainer.clear_knn_cache()
         else:
-            self.home(warn=True)
+            # Load embeddings and filter data before calculating neighbors
+            emb_exist = self.QueryContainer.load_data()
+            if emb_exist:
+                matches_exist = self.QueryContainer.filter(filter_dict=self.filters, 
+                                                           valid_stations=self.valid_stations)
+                if matches_exist:
+                   self._cache_or_calculate_neighbors()
+                else:
+                    self.update_prompt("No matches found within filter.")
+            else:
+                self.home(warn=True)
 
-    def handle_query_data_loaded(self, data):
-        """Handle data loaded signal from QueryContainer, update self.data for filters"""
-        self.data = data
-
-    def show_progress(self, prompt):
-        """Progress Popup for Match Thread"""
-        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
-        self.progress.show()
+    def _cache_or_calculate_neighbors(self):
+        """Attempt to use cached KNN results, calculate if not available."""
+        # try cache first
+        self.progress.update_prompt("Checking cache...")
+        cache_available = self.QueryContainer.load_knn_cache()
+        if cache_available:
+            self.logger.info("Using cached KNN results")
+            QTimer.singleShot(100, lambda: self.check_matchthread_success(True))
+        else:
+            # if cache not available, calculate neighbors
+            self.update_prompt("Matching embeddings...")
+            self.set_progress_max(100)
+            QTimer.singleShot(100, self.QueryContainer.calculate_neighbors)
 
     def check_matchthread_success(self, thread_success):
         """Check if match thread was successful, load first query if so"""
+        self.close_progress()
         if thread_success:
             self.change_query(0)
         else:
-            self.warn(prompt="No data to compare, all available data from same sequence/capture.")
+            self.update_prompt("No data to compare, all available data from same sequence/capture.")
 
     def calculate_by_individual(self):
         """Enter QC mode, recalculate matches by individual IDs"""
@@ -331,9 +378,9 @@ class DisplayCompare(QWidget):
             if filtered:
                 self.change_query(0)
             else:
-                self.warn(prompt="No data to compare within filter.")
+                self.update_prompt("No data to compare within filter.")
         else:
-            self.warn(prompt="No data to compare, no named individuals to analyze.")
+            self.update_prompt("No data to compare, no named individuals to analyze.")
 
     def compare_manual(self, selected_ids=None):
         """Enter manual comparison mode, recalculate matches manually"""
@@ -348,7 +395,7 @@ class DisplayCompare(QWidget):
             self.QueryContainer.calculate_neighbors()
             self.change_query(0)
         else:
-            self.warn(prompt="No data to compare within filter.")
+            self.update_prompt("No data to compare within filter.")
 
     def toggle_match_favorites_button(self):
         """
@@ -416,8 +463,12 @@ class DisplayCompare(QWidget):
 
     def confirm_match(self):
         """
-        Match button was clicked, merge query sequence and current match
+        Match button was clicked, merge query sequence and current match.
+        Optimized to only update affected data.
         """
+        query_sequence_id = self.QueryContainer.get_query_sequence_id()
+        match_sequence_id = self.QueryContainer.get_match_sequence_id()
+        
         # Both individual_ids are None
         if self.QueryContainer.both_unnamed():
             # make new individual
@@ -429,13 +480,16 @@ class DisplayCompare(QWidget):
                 # update query and match
                 self.QueryContainer.new_iid(individual_id)
                 del dialog
-
-        # Match has a name
+            else:
+                return  # User cancelled - don't proceed
         else:
+            # Match has a name - merge sequences
             self.QueryContainer.merge()
-            # update data
-        self.QueryContainer.load_data()
-        self.QueryContainer.filter()
+        
+        # update affected sequences
+        self.QueryContainer.update_sequences_in_place(query_sequence_id, match_sequence_id)
+        
+        # Refresh only the current views (not all data)
         self.load_query()
         self.load_match()
 
@@ -447,12 +501,15 @@ class DisplayCompare(QWidget):
                             cancel_only=False)
         if dialog.exec():
             self.QueryContainer.unmatch()
+            
+            # update affected sequences
+            query_sequence_id = [self.QueryContainer.get_query_sequence_id()]
+            self.QueryContainer.update_partial_sequences(query_sequence_id)
+            
+            # reload data
+            self.load_query()
+            self.load_match()
         del dialog
-        # reload data
-        self.QueryContainer.load_data()
-        self.QueryContainer.filter()
-        self.load_query()
-        self.load_match()
 
     # ==========================================================================
     # LOAD FUNCTIONS
@@ -476,6 +533,7 @@ class DisplayCompare(QWidget):
 
         self.match_selector.set_total(len(self.QueryContainer.current_match_rois))
         self.match_selector.set_current_number(self.QueryContainer.current_match)
+        self.match_counter.setText(f"1/{len(self.QueryContainer.current_match_rois)}")
 
         self.query_image_bar.reset()
         self.match_image_bar.reset()
@@ -495,6 +553,7 @@ class DisplayCompare(QWidget):
         self.match_image_bar.reset()
         self.match_selector.set_total(len(self.QueryContainer.current_match_rois))
         self.match_selector.set_current_number(self.QueryContainer.current_match)
+        self.match_counter.setText(f"{self.QueryContainer.current_match+1}/{len(self.QueryContainer.current_match_rois)}")
         self.load_match()
 
     def load_query(self):
@@ -596,6 +655,7 @@ class DisplayCompare(QWidget):
             self.edit_stack = dialog.get_edit_stack()
             self.save_changes()
             # reload data
+            # TODO: only reload the affected sequences instead of full reload
             self.QueryContainer.load_data()
             self.QueryContainer.filter()
             self.load_query()
@@ -606,11 +666,11 @@ class DisplayCompare(QWidget):
         # commit all changes in self.edit_stack to database
         while len(self.edit_stack) > 0:
             edit = self.edit_stack.pop()
-            id = edit['id']
+            id = edit['rid']
             replace_dict = {edit['reference']: edit['new_value']}
             # determine table to edit based on reference column
             if edit['reference'] in {'age', 'sex'}:
-                iid = self.data.loc[self.data['id'] == id, 'individual_id'].values[0]
+                iid = self.QueryContainer.get_info(id, "individual_id")
                 self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
             elif edit['reference'] in {'comment'}:
                 self.mpDB.edit_row("media", id, replace_dict, allow_none=True, quiet=False)
@@ -656,6 +716,7 @@ class DisplayCompare(QWidget):
         """Set favorite status for given rid"""
         self.mpDB.edit_row('roi', rid, {"favorite": value})
         # reload database
+        # TODO: update only the affected sequences in the QueryContainer instead of full reload
         self.QueryContainer.load_data()
         self.QueryContainer.filter()
         self.load_query()

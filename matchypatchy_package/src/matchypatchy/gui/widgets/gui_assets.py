@@ -72,11 +72,8 @@ class ComboBoxDelegate(QStyledItemDelegate):
     def setModelData(self, editor, model, index):
         """Save the selected value to the model"""
         selected_text = editor.currentText()
-        selected_index = editor.currentIndex()  # 🔥 Get the current index
-        self.itemSelected.emit(index.row(), index.column(), selected_index)
-
-        # Save selected text in table model
-        model.setData(index, selected_text)
+        #selected_index = editor.currentIndex()  # 🔥 Get the current index
+        model.setData(index, selected_text, Qt.ItemDataRole.EditRole)
 
 
 class ThreePointSlider(QWidget):

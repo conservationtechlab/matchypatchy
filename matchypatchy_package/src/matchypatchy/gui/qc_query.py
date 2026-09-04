@@ -87,7 +87,7 @@ class QC_QueryContainer(QObject):
             elif filter_dict['active_station'][0] == 0 and valid_stations:
                 self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
             else:  # no valid stations, empty dataframe
-                self.parent.show_progress("No data to compare within filter.")
+                return False
 
             # Individual Filter
             if filter_dict['active_individual'][0] > 0:
@@ -106,7 +106,6 @@ class QC_QueryContainer(QObject):
             return True
         # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
-            self.parent.show_progress(prompt="No data to compare, all available data from same sequence/capture.")
             return False
 
     def rank(self):
@@ -205,8 +204,32 @@ class QC_QueryContainer(QObject):
     # RETURN INFO --------------------------------------------------------------
     def is_existing_match(self):
         """Check if the current query and match are for the same individual."""
-        return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
-            self.data.loc[self.current_query_rid, "individual_id"] is not None
+        query_iid = self._get_roi_field(self.current_query_rid, 'individual_id')
+        match_iid = self._get_roi_field(self.current_match_rid, 'individual_id')
+        return query_iid == match_iid and query_iid is not None
+
+    def current_distance(self):
+        """Return distance between current sequence and matchs"""
+        return 0
+
+    def _get_roi_field(self, roi_id, field):
+        """Get ROI field from DataFrame (always fresh)"""
+        if roi_id in self.data.index:
+            return self.data.loc[roi_id, field]
+        return None
+
+    def _get_roi_full_record(self, roi_id):
+        """Get full ROI record from index"""
+        if roi_id in self.data.index:
+            return self.data.loc[roi_id].to_dict()
+        return None
+
+    def _update_roi_index(self, updates_dict):
+        """Update local index with batch changes"""
+        for roi_id, changes in updates_dict.items():
+            # Update DataFrame
+            for key, value in changes.items():
+                self.data.loc[roi_id, key] = value
 
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
@@ -219,10 +242,6 @@ class QC_QueryContainer(QObject):
             return self.roi_metadata(self.data.loc[rid])
         else:
             return self.data.loc[rid, column]
-
-    def current_distance(self):
-        """Return distance between current sequence and matchs"""
-        return 0
 
     def roi_metadata(self, roi):
         """
@@ -247,12 +266,15 @@ class QC_QueryContainer(QObject):
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
 
-        # convert viewpoint to human-readable (0=Left, 1=Right)
-        VIEWPOINT = load_model('VIEWPOINTS')
-        if info_dict['Viewpoint'] is None:
+        # Convert viewpoint to human-readable
+        viewpoint_val = info_dict['Viewpoint']
+        if viewpoint_val is None or pd.isna(viewpoint_val):
             info_dict['Viewpoint'] = 'None'
-        else:  # BUG: Typecasting issue, why is viewpoint returning a float?
-            info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
+        else:
+            try:
+                info_dict['Viewpoint'] = self.VIEWPOINT_DICT[str(int(viewpoint_val))]
+            except (KeyError, ValueError, TypeError):
+                info_dict['Viewpoint'] = 'Unknown'
 
         return info_dict
 
@@ -261,14 +283,23 @@ class QC_QueryContainer(QObject):
         """
         Update records for roi after confirming a match
         """
-        for roi in self.current_query_rois:
-            self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
+        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1} 
+                       for roi in self.current_query_rois}
+        roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
 
-        self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
+        # Update local index
+        self._update_roi_index(roi_updates)
+
+        # Then batch update the database
+        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
 
     def unmatch(self):
-        """
-        Unmatch the current query from its match by setting the individual_id to None and reviewed to 0.
-        """
-        # Set current match id to none
-        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None, "reviewed": 0}, quiet=False)
+        """Unmatch the current query ROI from the matched ROI"""
+        # Update local index
+        self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
+
+        # Update the database
+        self.mpDB.edit_row('roi', self.current_query_rid,
+                           {'individual_id': None, "reviewed": 0},
+                           allow_none=True,
+                           quiet=False)

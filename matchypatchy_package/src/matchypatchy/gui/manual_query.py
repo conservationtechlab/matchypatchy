@@ -86,7 +86,7 @@ class ManualQueryContainer(QObject):
             elif filter_dict['active_station'][0] == 0 and valid_stations:
                 self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
             else:  # no valid stations, empty dataframe
-                self.parent.show_progress("No data to compare within filter.")
+                return False
 
         rois = self.data.index.tolist()
         # set current query rois to all rois once
@@ -94,9 +94,13 @@ class ManualQueryContainer(QObject):
         # set number of queries to validate
         self.n_queries = len(rois)
 
-        # set match to first entry
-        self.current_match_rois = rois
-        self.set_match(self.current_match)  # current_match default to 1
+        if rois:
+            # set match to first entry
+            self.current_match_rois = rois
+            self.set_match(self.current_match)  # current_match default to 1
+            return True
+        else:
+            return False
 
     def calculate_neighbors(self):
         """Calculate pairwise distances between all media in the current dataset."""
@@ -186,14 +190,41 @@ class ManualQueryContainer(QObject):
 
     # RETURN INFO --------------------------------------------------------------
     def is_existing_match(self):
-        """Return whether the current match is an existing match"""
-        return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
-            self.data.loc[self.current_query_rid, "individual_id"] is not None
+        """Return whether current query and match have same individual_id"""
+        query_iid = self._get_roi_field(self.current_query_rid, 'individual_id')
+        match_iid = self._get_roi_field(self.current_match_rid, 'individual_id')
+        return query_iid == match_iid and query_iid is not None
 
     def both_unnamed(self):
         """Return whether both current query and match are unnamed"""
-        return self.data.loc[self.current_match_rid, "individual_id"] is None and \
-            self.data.loc[self.current_query_rid, "individual_id"] is None
+        return (self._get_roi_field(self.current_query_rid, 'individual_id') is None and
+                self._get_roi_field(self.current_match_rid, 'individual_id') is None)
+
+    def current_distance(self):
+        """Return distance between current sequence and matchs"""
+        lower = min(self.current_query_rid, self.current_match_rid)
+        upper = max(self.current_query_rid, self.current_match_rid)
+        distance = self.pair_table.loc[(self.pair_table['id1'] == lower) & (self.pair_table['id2'] == upper), 'distance']
+        return distance.values[0] if not distance.empty else 0
+
+    def _get_roi_field(self, roi_id, field):
+        """Get ROI field from DataFrame (always fresh)"""
+        if roi_id in self.data.index:
+            return self.data.loc[roi_id, field]
+        return None
+
+    def _get_roi_full_record(self, roi_id):
+        """Get full ROI record from index"""
+        if roi_id in self.data.index:
+            return self.data.loc[roi_id].to_dict()
+        return None
+
+    def _update_roi_index(self, updates_dict):
+        """Update local index with batch changes"""
+        for roi_id, changes in updates_dict.items():
+            # Update DataFrame
+            for key, value in changes.items():
+                self.data.loc[roi_id, key] = value
 
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
@@ -206,13 +237,6 @@ class ManualQueryContainer(QObject):
             return self.roi_metadata(self.data.loc[rid])
         else:
             return self.data.loc[rid, column]
-
-    def current_distance(self):
-        """Return distance between current sequence and matchs"""
-        lower = min(self.current_query_rid, self.current_match_rid)
-        upper = max(self.current_query_rid, self.current_match_rid)
-        distance = self.pair_table.loc[(self.pair_table['id1'] == lower) & (self.pair_table['id2'] == upper), 'distance']
-        return distance.values[0] if not distance.empty else 0
 
     def roi_metadata(self, roi):
         """
@@ -237,12 +261,15 @@ class ManualQueryContainer(QObject):
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
 
-        # convert viewpoint to human-readable (0=Left, 1=Right)
-        VIEWPOINT = load_model('VIEWPOINTS')
-        if info_dict['Viewpoint'] is None:
+        # Convert viewpoint to human-readable
+        viewpoint_val = info_dict['Viewpoint']
+        if viewpoint_val is None or pd.isna(viewpoint_val):
             info_dict['Viewpoint'] = 'None'
-        else:  # BUG: Typecasting issue, why is viewpoint returning a float?
-            info_dict['Viewpoint'] = VIEWPOINT[str(int(info_dict['Viewpoint']))]
+        else:
+            try:
+                info_dict['Viewpoint'] = self.VIEWPOINT_DICT[str(int(viewpoint_val))]
+            except (KeyError, ValueError, TypeError):
+                info_dict['Viewpoint'] = 'Unknown'
 
         return info_dict
 
@@ -251,36 +278,52 @@ class ManualQueryContainer(QObject):
         """
         Update records for roi after confirming a match
         """
-        for roi in self.current_query_rois:
-            self.mpDB.edit_row('roi', roi, {"individual_id": individual_id, "reviewed": 1})
+        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1} 
+                       for roi in self.current_query_rois}
+        roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
 
-        self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
+        # Update local index
+        self._update_roi_index(roi_updates)
+
+        # Then batch update the database
+        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
 
     def merge(self):
         """Merge two individuals after match"""
-        query = self.data.loc[self.current_query_rid]
-        match = self.data.loc[self.current_match_rid]
+        query_data = self._get_roi_full_record(self.current_query_rid)
+        match_data = self._get_roi_full_record(self.current_match_rid)
 
-        query_iid = query['individual_id']
-        match_iid = match['individual_id']
-        # both are named
+        if query_data is None or match_data is None:
+            return
+
+        query_iid = query_data.get('individual_id')
+        match_iid = match_data.get('individual_id')
+
+        # Determine which ID to keep
         if query_iid is not None:
-            # query is older, keep query name
-            if match_iid is None or match_iid < query_iid:
-                keep_id = query_iid
-
-            # match is older, keep match name
-            else:
-                keep_id = match_iid
-
-        # query is None, give match name
+            # keep the older one (inputted into the db first)
+            keep_id = query_iid if (match_iid is None or match_iid < query_iid) else match_iid
         else:
             keep_id = match_iid
 
         self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': int(keep_id), "reviewed": 1}, quiet=False)
         self.mpDB.edit_row('roi', self.current_match_rid, {'individual_id': int(keep_id), "reviewed": 1}, quiet=False)
 
+        # Update local index
+        roi_updates = {
+            self.current_query_rid: {'individual_id': int(keep_id), "reviewed": 1},
+            self.current_match_rid: {'individual_id': int(keep_id), "reviewed": 1}
+        }
+        self._update_roi_index(roi_updates)
+
+        
     def unmatch(self):
         """Unmatch the current query and match"""
+        # Update local index
+        self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
+
         # Set current match id to none
-        self.mpDB.edit_row('roi', self.current_query_rid, {'individual_id': None, "reviewed": 0}, quiet=False)
+        self.mpDB.edit_row('roi', self.current_query_rid,
+                           {'individual_id': None, "reviewed": 0}, 
+                           allow_none=True, 
+                           quiet=False)
