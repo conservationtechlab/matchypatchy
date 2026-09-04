@@ -38,8 +38,7 @@ class QueryContainer(QObject):
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
 
-        # Inde data by ROI for quck lookup
-        self._roi_index = {}  # {roi_id: row_data_dict}
+        # Index data by seq for quick lookup
         self._seq_index = {}  # {sequence_id: [roi_ids]}
 
         self.ranked_sequences = []
@@ -110,12 +109,11 @@ class QueryContainer(QObject):
                 self.data = self.data_raw[self.data_raw['station_id'].isin(station_ids)]
         
         # Rebuild index with filtered data
-        self._build_indices()
+        self._build_seq_indices()
         self.sequences = db_roi.sequence_roi_dict(self.data)
 
-    def _build_indices(self):
-        """Build ROI and sequence indices for fast lookups"""
-        self._roi_index = self.data_raw.to_dict('index')
+    def _build_seq_indices(self):
+        """Build sequence indices for fast lookups"""
         self._seq_index = self.data_raw.reset_index().groupby('sequence_id')['id'].apply(list).to_dict()
 
     def _get_valid_stations_from_current(self):
@@ -281,7 +279,7 @@ class QueryContainer(QObject):
         self.data = pd.concat([self.data, query_df, match_df])
         
         # Rebuild indices with updated data
-        self._build_indices()
+        self._build_seq_indices()
 
 
     def update_partial_sequences(self, sequence_ids):
@@ -303,7 +301,7 @@ class QueryContainer(QObject):
         
         if updated_dfs:
             self.data = pd.concat([self.data] + updated_dfs)
-            self._build_indices()
+            self._build_seq_indices()
 
     # VIEWPOINT ----------------------------------------------------------------
     def toggle_viewpoint(self, selected_viewpoint):
@@ -390,21 +388,13 @@ class QueryContainer(QObject):
         return matches[self.current_match][1] if self.current_match < len(matches) else float('inf')
 
     def _get_roi_field(self, roi_id, field):
-        """
-        Get ROI field efficiently using index.
-        Falls back to DataFrame if index out of sync.
-        """
-        if roi_id in self._roi_index:
-            return self._roi_index[roi_id].get(field)
-        # Fallback to DataFrame lookup
+        """Get ROI field from DataFrame (always fresh)"""
         if roi_id in self.data.index:
             return self.data.loc[roi_id, field]
         return None
 
     def _get_roi_full_record(self, roi_id):
         """Get full ROI record from index"""
-        if roi_id in self._roi_index:
-            return self._roi_index[roi_id]
         if roi_id in self.data.index:
             return self.data.loc[roi_id].to_dict()
         return None
@@ -412,15 +402,14 @@ class QueryContainer(QObject):
     def _update_roi_index(self, updates_dict):
         """Update local index with batch changes"""
         for roi_id, changes in updates_dict.items():
-            if roi_id in self._roi_index:
-                self._roi_index[roi_id].update(changes)
+            # Update DataFrame
+            for key, value in changes.items():
+                self.data.loc[roi_id, key] = value
 
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
         if column is None:
             # Return whole row from index or DataFrame
-            if rid in self._roi_index:
-                return pd.Series(self._roi_index[rid])
             return self.data.loc[rid]
         elif column == 'bbox':
             return db_roi.get_roi_bbox(self.data.loc[[rid]])
@@ -471,12 +460,12 @@ class QueryContainer(QObject):
         roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1} 
                       for roi in self.current_query_rois}
         roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
-        
-        # Batch update instead of N individual queries
-        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
-        
+
         # Update local index
         self._update_roi_index(roi_updates)
+
+        # Then batch update the database
+        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
 
     def merge(self):
         """Merge two individuals after match (optimized)"""
@@ -509,7 +498,7 @@ class QueryContainer(QObject):
 
     def unmatch(self):
         """Unmatch the current query ROI from the matched ROI"""
-        self.mpDB.edit('roi', self.current_query_rid,
+        self.mpDB.edit_row('roi', self.current_query_rid,
                        {'individual_id': None, "reviewed": 0},
                        allow_none=True,
                        quiet=False)

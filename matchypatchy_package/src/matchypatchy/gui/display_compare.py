@@ -481,14 +481,15 @@ class DisplayCompare(QWidget):
                             cancel_only=False)
         if dialog.exec():
             self.QueryContainer.unmatch()
+            
+            # update affected sequences
+            query_sequence_id = [self.QueryContainer.get_query_sequence_id()]
+            self.QueryContainer.update_partial_sequences(query_sequence_id)
+            
+            # reload data
+            self.load_query()
+            self.load_match()
         del dialog
-        
-        # update affected sequences
-        query_sequence_id = [self.QueryContainer.get_query_sequence_id()]
-        self.QueryContainer.update_partial_sequences(query_sequence_id)
-        # reload data
-        self.load_query()
-        self.load_match()
 
     # ==========================================================================
     # LOAD FUNCTIONS
