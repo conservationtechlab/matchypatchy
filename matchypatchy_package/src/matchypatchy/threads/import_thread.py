@@ -379,6 +379,8 @@ class CSVImportThread(QThread):
                         emitted_counter = roi_counter
                         self.mpDB.db.commit()
 
+            self.mpDB.db.commit()  # commit anything remaining
+
         except Exception:
             self.mpDB.db.rollback()
             raise
@@ -389,7 +391,6 @@ class CSVImportThread(QThread):
 
         if not self.isInterruptionRequested():
             # finished adding media
-            self.mpDB.db.commit()  # commit anything remaining
             self.finished.emit()
 
     def _get_base_dir(self, filepaths):
