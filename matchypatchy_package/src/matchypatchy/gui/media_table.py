@@ -92,7 +92,7 @@ class MediaTable(QAbstractTableModel):
         if self._columns[col] == "thumbnail_path":
             if role == Qt.ItemDataRole.DecorationRole:
                 thumbnail_path = self._data_filtered.at[row, self._columns[col]]
-                if thumbnail_path:
+                if isinstance(thumbnail_path, str) and thumbnail_path:
                     pixmap = QPixmap(str(self.thumbnail_dir / thumbnail_path))
                     return pixmap
             # Suppress text display

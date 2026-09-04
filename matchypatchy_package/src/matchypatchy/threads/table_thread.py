@@ -6,6 +6,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
 from matchypatchy.database import thumbnails
+from matchypatchy.config import asset_path
 
 
 class FetchTableThread(QThread):
@@ -25,6 +26,7 @@ class FetchTableThread(QThread):
         self.individual_list = fetch_individual(self.mpDB)
         self.data = pd.DataFrame()
         self.thumbnails = pd.DataFrame()
+        self.BATCH_SIZE = 50
 
     def run(self):
         """
@@ -51,7 +53,7 @@ class FetchTableThread(QThread):
                 self.thumbnails = thumbnails.fetch_roi_thumbnails(self.mpDB)
                 self.data = pd.merge(self.data, self.thumbnails, on="id", how="left")
                 
-                 self.data[self.data['bbox_w'] == -1]["thumbnail_path"] = asset_path(thumbnails.THUMBNAIL_NOTFOUND)
+                self.data.loc[self.data['bbox_w'] == -1, "thumbnail_path"] = asset_path(thumbnails.THUMBNAIL_NOTFOUND)
 
             # media
             elif self.data_type == 0:
@@ -72,7 +74,6 @@ class FetchTableThread(QThread):
             self.logger.error(f"Error loading thumbnails: {str(e)}")
         finally:
             self.done.emit()
-            
 
     def _generate_roi_thumbnails_batch(self, missing_ids, total_missing):
         """
@@ -102,8 +103,7 @@ class FetchTableThread(QThread):
                                                                row['bbox_y'],
                                                                row['bbox_w'],
                                                                row['bbox_h'])
-
-                batch_updates[roi_id] = {'thumbnail_path': thumbnail_path}
+                batch_updates[roi_id] = {'filepath': str(thumbnail_path)}
 
             except Exception as e:
                 print(f"Error generating thumbnail for ROI {roi_id}: {e}")
@@ -113,7 +113,12 @@ class FetchTableThread(QThread):
             progress = int((idx + 1) / total_missing * 100)
             self.progress_update.emit(progress)
 
-        # Single batch update operation
+            # Single batch update operation
+            if len(batch_updates) >= self.BATCH_SIZE:
+                self.mpDB.batch_update_thumbnails("roi_thumbnails", "fid", batch_updates)
+                batch_updates = {}
+        
+        # Final batch update for any remaining thumbnails
         if batch_updates:
             self.mpDB.batch_update_thumbnails("roi_thumbnails", "fid", batch_updates)
         
@@ -139,7 +144,7 @@ class FetchTableThread(QThread):
                 thumbnail_path = thumbnails.save_media_thumbnail(self.thumbnail_dir, 
                                                                  row['filepath'],
                                                                  row['ext'])
-                batch_updates[media_id] = {'thumbnail_path': thumbnail_path}
+                batch_updates[media_id] = {'filepath': str(thumbnail_path)}
 
             except Exception as e:
                 print(f"Error generating thumbnail for media {media_id}: {e}")
@@ -149,6 +154,11 @@ class FetchTableThread(QThread):
             progress = int((idx + 1) / total_missing * 100)
             self.progress_update.emit(progress)
 
-        # Single batch update operation
+            # Single batch update operation
+            if len(batch_updates) >= self.BATCH_SIZE:
+                self.mpDB.batch_update_thumbnails("media_thumbnails", "fid", batch_updates)
+                batch_updates = {}
+
+        # Final batch update for any remaining thumbnails
         if batch_updates:
             self.mpDB.batch_update_thumbnails("media_thumbnails", "fid", batch_updates)
