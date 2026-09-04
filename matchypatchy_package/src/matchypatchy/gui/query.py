@@ -6,9 +6,10 @@ from pathlib import Path
 import time
 
 import pandas as pd
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 import matchypatchy.database.media as db_roi
+from matchypatchy.threads.match_object import MatchObject
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
@@ -102,8 +103,9 @@ class QueryContainer(QObject):
             station_ids = self._get_valid_stations(filter_dict, valid_stations)
             
             if station_ids is None:
-                self.parent.show_progress("No data to compare within filter.")
                 self.data = pd.DataFrame()
+                self.logger.info("No valid stations found, resulting in empty data.")
+                return False
             else:
                 # Single vectorized filter
                 self.data = self.data_raw[self.data_raw['station_id'].isin(station_ids)]
@@ -111,6 +113,8 @@ class QueryContainer(QObject):
         # Rebuild index with filtered data
         self._build_seq_indices()
         self.sequences = db_roi.sequence_roi_dict(self.data)
+        self.logger.info(f"Filtered data contains {len(self.data)} entries.")
+        return True
 
     def _build_seq_indices(self):
         """Build sequence indices for fast lookups"""
@@ -147,28 +151,27 @@ class QueryContainer(QObject):
         return valid_set
 
     # RUN ON ENTRY IF LOAD_DATA
-    def calculate_neighbors(self, clear_cache=False):
+    def calculate_neighbors(self):
         """Start MatchEmbeddingThread to calculate neighbors"""
         #self.logger.info("Using cached KNN results")
-        if clear_cache:
-            self.logger.info("Clearing KNN cache")
-            self.clear_knn_cache()
-        else:
-            cache_available = self.load_knn_cache()
-            if cache_available:
-                self.logger.info("Using cached KNN results")
-                self.thread_signal.emit(bool(self.ranked_sequences))
-                return
         # cache cleared or not found
-        self.parent.show_progress("Calculating neighbors...")
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.data, self.sequences,
                                                  k=self.k, metric=self.metric, threshold=self.threshold)
         self.match_thread.progress_update.connect(lambda value: self.update_progress(value))
         self.match_thread.ranked_queries_return.connect(self.capture_ranked_sequences)
         self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished
-        # connect parent rejected signal to request interruption of match thread
-        self.parent.progress.rejected.connect(self.match_thread.requestInterruption)
-        self.match_thread.start()
+        # start the match thread after a short delay to allow the GUI to update
+        QTimer.singleShot(100, self.start_thread)
+
+    def start_thread(self):
+        """Start the match thread after a short delay"""
+        if hasattr(self, 'match_thread') and self.match_thread is not None:
+            self.match_thread.start()
+
+    def stop_calculation(self):
+        """Request the match thread to stop calculation"""
+        if hasattr(self, 'match_thread') and self.match_thread is not None:
+            self.match_thread.requestInterruption()
 
     def capture_ranked_sequences(self, ranked_sequences):
         """Capture ranked_sequences from MatchEmbeddingThread"""
@@ -478,6 +481,7 @@ class QueryContainer(QObject):
 
         # Determine which ID to keep
         if query_iid is not None:
+            # keep the older one (inputted into the db first)
             keep_id = query_iid if (match_iid is None or match_iid < query_iid) else match_iid
         else:
             keep_id = match_iid
@@ -496,13 +500,14 @@ class QueryContainer(QObject):
 
     def unmatch(self):
         """Unmatch the current query ROI from the matched ROI"""
-        self.mpDB.edit_row('roi', self.current_query_rid,
-                       {'individual_id': None, "reviewed": 0},
-                       allow_none=True,
-                       quiet=False)
-        
         # Update local index
         self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
+
+        # update database
+        self.mpDB.edit_row('roi', self.current_query_rid,
+                           {'individual_id': None, "reviewed": 0},
+                           allow_none=True,
+                           quiet=False)
 
     # ==========================================================================
     # KNN CACHE MANAGEMENT 
@@ -568,9 +573,7 @@ class QueryContainer(QObject):
             if cache_age > self.cache_timeout:
                 return False
             
-            self.ranked_sequences = self._deserialize_ranked_sequences(
-                cache_data['ranked_sequences']
-            )
+            self.ranked_sequences = self._deserialize_ranked_sequences(cache_data['ranked_sequences'])
             self.n_queries = len(self.ranked_sequences)
             return True
             
@@ -582,8 +585,6 @@ class QueryContainer(QObject):
         """
         Rebuild MatchObject instances from serialized data.
         """
-        from matchypatchy.threads.match_object import MatchObject
-        
         rebuilt = []
         
         for i, seq_data in enumerate(serialized_sequences):
@@ -607,6 +608,5 @@ class QueryContainer(QObject):
                 match_obj.ranked_matches = seq_data['og_ranked_matches']
             
             rebuilt.append(match_obj)
-            self.progress_update.emit(100 * (i + 1)/len(serialized_sequences))
 
         return rebuilt

@@ -87,7 +87,7 @@ class QC_QueryContainer(QObject):
             elif filter_dict['active_station'][0] == 0 and valid_stations:
                 self.data = self.data[self.data['station_id'].isin(list(valid_stations.keys()))]
             else:  # no valid stations, empty dataframe
-                self.parent.show_progress("No data to compare within filter.")
+                return False
 
             # Individual Filter
             if filter_dict['active_individual'][0] > 0:
@@ -106,7 +106,6 @@ class QC_QueryContainer(QObject):
             return True
         # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
-            self.parent.show_progress(prompt="No data to compare, all available data from same sequence/capture.")
             return False
 
     def rank(self):
@@ -296,10 +295,11 @@ class QC_QueryContainer(QObject):
 
     def unmatch(self):
         """Unmatch the current query ROI from the matched ROI"""
-        self.mpDB.edit_row('roi', self.current_query_rid,
-                       {'individual_id': None, "reviewed": 0},
-                       allow_none=True,
-                       quiet=False)
-        
         # Update local index
         self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
+
+        # Update the database
+        self.mpDB.edit_row('roi', self.current_query_rid,
+                           {'individual_id': None, "reviewed": 0},
+                           allow_none=True,
+                           quiet=False)
