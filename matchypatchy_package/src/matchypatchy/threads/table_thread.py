@@ -40,12 +40,10 @@ class FetchTableThread(QThread):
                                                               data_type=self.data_type)
             total_missing = len(missing_ids)
             self.progress_max.emit(total_missing)
-            print("Total missing thumbnails:", total_missing)
 
             # roi
             if self.data_type == 1:
                 self.data = fetch_roi_media(self.mpDB, reset_index=False)
-                print("Fetched Roi Media, total rows:", len(self.data))
                 if missing_ids:
                     self._generate_roi_thumbnails_batch(missing_ids, total_missing)
 
@@ -58,7 +56,6 @@ class FetchTableThread(QThread):
             # media
             elif self.data_type == 0:
                 self.data = fetch_media(self.mpDB, counts=True)
-                print("Fetched Media, total rows:", len(self.data))
                 if missing_ids:
                     self._generate_media_thumbnails_batch(missing_ids, total_missing)
 
@@ -106,12 +103,11 @@ class FetchTableThread(QThread):
                 batch_updates[roi_id] = {'filepath': str(thumbnail_path)}
 
             except Exception as e:
-                print(f"Error generating thumbnail for ROI {roi_id}: {e}")
+                self.logger.error(f"Error generating thumbnail for ROI {roi_id}: {e}")
                 continue
 
             # Update progress
-            progress = int((idx + 1) / total_missing * 100)
-            self.progress_update.emit(progress)
+            self.progress_update.emit(idx + 1)
 
             # Single batch update operation
             if len(batch_updates) >= self.BATCH_SIZE:
@@ -147,12 +143,11 @@ class FetchTableThread(QThread):
                 batch_updates[media_id] = {'filepath': str(thumbnail_path)}
 
             except Exception as e:
-                print(f"Error generating thumbnail for media {media_id}: {e}")
+                self.logger.error(f"Error generating thumbnail for media {media_id}: {e}")
                 continue
 
             # Update progress
-            progress = int((idx + 1) / total_missing * 100)
-            self.progress_update.emit(progress)
+            self.progress_update.emit(idx + 1)
 
             # Single batch update operation
             if len(batch_updates) >= self.BATCH_SIZE:

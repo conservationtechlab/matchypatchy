@@ -76,7 +76,6 @@ class MediaTable(QAbstractTableModel):
         row = index.row()
         col = index.column()
 
-        #print(f"Accessing row {row}, column {col}")
         if self._columns[col] in ["select", "reviewed", "favorite"]:
             if role == Qt.ItemDataRole.CheckStateRole:
                 return (

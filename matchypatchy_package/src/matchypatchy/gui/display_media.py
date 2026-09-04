@@ -192,7 +192,7 @@ class DisplayMedia(QWidget):
     def show_progress(self, prompt):
         """Progress Popup for Match Thread"""
         if not hasattr(self, 'progress') or self.progress is None:
-            self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=False)
+            self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
         self.progress.update_prompt(prompt)
         self.progress.show()
 
@@ -212,6 +212,7 @@ class DisplayMedia(QWidget):
         if hasattr(self, 'progress') and self.progress is not None:
             self.update_prompt("Collecting missing thumbnails...")
             self.progress.set_max(max_value)
+            self.progress.progress_bar.setFormat("%v/%m")   # shows percentage, e.g. 42%
 
     def close_progress(self):
         """Close the progress popup"""

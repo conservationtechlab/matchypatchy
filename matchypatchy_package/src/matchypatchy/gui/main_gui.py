@@ -273,7 +273,6 @@ class MainWindow(QMainWindow):
         valid = mpDB.key
         # Check if the database key is valid
         if valid:
-            print(f"Changing project to {str(project_folder)}")
             self.settings.setValue("home_dir", str(project_folder))
             self.logger.info(f"Updating project folder to {str(project_folder)}.")
             self.cfg = cfg

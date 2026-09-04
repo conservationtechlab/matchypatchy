@@ -47,7 +47,6 @@ class MatchEmbeddingThread(QThread):
         # 3. Rank ROIs by match scores, prioritize previously IDd individuals
         # 4. Pad sequences to include all ROIs from matched sequences
         """
-        print("Starting match thread")
         for i, s in enumerate(self.sequences):
             if not self.isInterruptionRequested():
                 sequence_rois = self.sequences[s]

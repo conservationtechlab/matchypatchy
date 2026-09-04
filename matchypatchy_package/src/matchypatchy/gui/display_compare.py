@@ -313,6 +313,7 @@ class DisplayCompare(QWidget):
         # hide individual filter
         self.filterbar.individual_visible(False)
         self.show_progress("Initializing...")
+        self.set_progress_max(0)
         # Delay the heavy work so popup can render
         QTimer.singleShot(100, lambda: self._initialize_query_container(clear_cache))
 
@@ -351,6 +352,7 @@ class DisplayCompare(QWidget):
         else:
             # if cache not available, calculate neighbors
             self.update_prompt("Matching embeddings...")
+            self.set_progress_max(100)
             QTimer.singleShot(100, self.QueryContainer.calculate_neighbors)
 
     def check_matchthread_success(self, thread_success):
