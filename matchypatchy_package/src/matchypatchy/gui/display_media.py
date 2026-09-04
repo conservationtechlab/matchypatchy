@@ -28,7 +28,6 @@ class DisplayMedia(QWidget):
         self.logger = parent.logger
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
-        self.progress = None
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         # 0 for Media, 1 for ROI
         self.data_type = data_type
@@ -121,11 +120,14 @@ class DisplayMedia(QWidget):
         self.view.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.view.horizontalHeader().setSortIndicatorShown(True)
         self.view.horizontalHeader().setSectionsClickable(True)
-        self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self.view.verticalHeader().setDefaultSectionSize(150)
+        self.view.verticalHeader().setDefaultSectionSize(150)  # row size = thumbnail with
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
+        for col in range(self.media_table.columnCount()):
+            self.view.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         self.view.setColumnWidth(0, 40)  # Set the width of the select column
         self.view.setColumnWidth(1, 150)  # Set the width of the thumbnail column
+        self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
+        self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
         # Connect the selection changed signal from the media table to a handler
         self.media_table.user_edit.connect(self.add_edit_to_stack)
@@ -189,7 +191,9 @@ class DisplayMedia(QWidget):
     # ALERT POPUP MANAGER ------------------------------------------------------
     def show_progress(self, prompt):
         """Progress Popup for Match Thread"""
-        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
+        if not hasattr(self, 'progress') or self.progress is None:
+            self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=False)
+        self.progress.update_prompt(prompt)
         self.progress.show()
 
     def update_prompt(self, prompt):
@@ -307,7 +311,7 @@ class DisplayMedia(QWidget):
             self.individual_list = fetch_individual(self.mpDB)
             self.dataloader = FetchTableThread(self)
             self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
-            self.dataloader.prompt_update.connect(lambda message: self.show_alert(message))
+            self.dataloader.progress_max.connect(lambda n_missing: self.set_progress_max(n_missing))
             self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
             self.dataloader.done.connect(self.close_progress)  # Close the progress dialog when done
             self.dataloader.start()

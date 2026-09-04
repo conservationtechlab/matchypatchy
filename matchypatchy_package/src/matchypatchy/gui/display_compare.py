@@ -8,7 +8,7 @@ import pandas as pd
 from PIL import Image
 
 from PyQt6.QtWidgets import QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 
 from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
 from matchypatchy.gui.widgets.widget_image_adjustment import ImageAdjustBar
@@ -49,8 +49,6 @@ class DisplayCompare(QWidget):
         self.current_viewpoint = 1
         self.compare_type = 'default'  # whether 'default', 'qc' or 'manual'
         self.QueryContainer = QueryContainer(self)
-        self.progress = AlertPopup(self, "Calculating neighbors...", progressbar=True, cancel_only=False)
-        self.progress.hide()
         self.edit_stack = []  # placeholder for media edit stack
         self.query_load_thread = None  # placeholder for image load thread
         self.match_load_thread = None  # placeholder for image load thread
@@ -310,7 +308,7 @@ class DisplayCompare(QWidget):
     def calculate_neighbors(self, clear_cache=False):
         """Calculate neighbors for all query ROIs, load first query and match"""
         # Disable individual select until feature is implemented on QC
-
+        self.k = self.cfg.KNN  # default knn
         self.compare_type = 'default'
         # show favorite toggle and reset its state
         self.button_match_favorites.setVisible(True)
@@ -319,15 +317,17 @@ class DisplayCompare(QWidget):
         # hide individual filter
         self.filterbar.individual_visible(False)
         # run knn thread on entry
-        self.k = self.cfg.KNN  # default knn
         self.QueryContainer = QueryContainer(self)  # re-establish object
         self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
         self.QueryContainer.progress_update.connect(self.update_progress)
         self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
-            self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
-            self.QueryContainer.calculate_neighbors(clear_cache=clear_cache)
+            matches_exist = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
+            if matches_exist:
+                self.QueryContainer.calculate_neighbors(clear_cache=clear_cache)
+            else:
+                self.warn(prompt="No matches found within filter.")
         else:
             self.home(warn=True)
 

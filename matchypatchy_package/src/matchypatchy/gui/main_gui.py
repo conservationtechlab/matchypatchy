@@ -148,19 +148,19 @@ class MainWindow(QMainWindow):
         """Switch to the media view page and apply optional filters.""" 
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
-        self.Media.refresh_filters(filters)
+        QTimer.singleShot(200, lambda: self.Media.refresh_filters(filters))
         self.Media.show_progress("Loading media...")
         # wait to load
-        QTimer.singleShot(50, self.Media.load_table)
+        QTimer.singleShot(200, self.Media.load_table)
 
     def _set_compare_view(self):
         """Switch to the compare view page.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
-        self.Compare.refresh_filters()
-        self.Compare.show_progress("Matching embeddings... This may take a while.")
+        QTimer.singleShot(200, self.Compare.refresh_filters)
+        self.Compare.show_progress("Matching embeddings...")
         # wait to load
-        QTimer.singleShot(50, self.Compare.calculate_neighbors)
+        QTimer.singleShot(200, self.Compare.calculate_neighbors)
 
     def _set_manual_view(self, selected_ids=None):
         """Switch to the manual comparison view page with selected IDs.""" 
