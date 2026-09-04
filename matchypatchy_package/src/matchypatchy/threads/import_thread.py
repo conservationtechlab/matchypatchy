@@ -271,20 +271,6 @@ class CSVImportThread(QThread):
         except IndexError:
             base_dir_id = self.mpDB.add_upload(base_dir)
 
-        # ------------------------------------------------------------------
-        # NEW: run the whole import inside a single transaction.
-        # SQLite's default is to fsync on every commit; doing thousands of
-        # individual inserts (media, roi, thumbnails) each as their own
-        # implicit transaction is the dominant cost in this workload.
-        # Wrapping the entire loop in one BEGIN/COMMIT turns N fsyncs into 1.
-        #
-        # This assumes self.mpDB exposes the underlying sqlite3 connection
-        # (adjust attribute name to match your actual mpDB implementation),
-        # and that mpDB.add_*/select do NOT call conn.commit() internally.
-        # If they do, you'll need to add a `commit=True` default param to
-        # suppress inner commits during bulk import, or add a context-manager
-        # style `with self.mpDB.transaction():` helper to mpDB itself.
-        # ------------------------------------------------------------------
         try:
             for filepath, group in self.unique_images:
                 if self.isInterruptionRequested():
