@@ -149,15 +149,20 @@ class QueryContainer(QObject):
         return valid_set
 
     # RUN ON ENTRY IF LOAD_DATA
-    def calculate_neighbors(self):
+    def calculate_neighbors(self, clear_cache=False):
         """Start MatchEmbeddingThread to calculate neighbors"""
         #self.logger.info("Using cached KNN results")
-        cache_available = self.load_knn_cache()
-        if cache_available:
-            self.logger.info("Using cached KNN results")
-            self.thread_signal.emit(bool(self.ranked_sequences))
-            return
-        
+        if clear_cache:
+            self.logger.info("Clearing KNN cache")
+            self.clear_knn_cache()
+        else:
+            cache_available = self.load_knn_cache()
+            if cache_available:
+                self.logger.info("Using cached KNN results")
+                self.thread_signal.emit(bool(self.ranked_sequences))
+                return
+        # cache cleared or not found
+        self.parent.show_progress("Calculating neighbors...")
         self.match_thread = MatchEmbeddingThread(self.mpDB, self.data, self.sequences,
                                                  k=self.k, metric=self.metric, threshold=self.threshold)
         self.match_thread.progress_update.connect(lambda value: self.update_progress(value))

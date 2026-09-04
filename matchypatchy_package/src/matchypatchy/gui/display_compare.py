@@ -49,7 +49,8 @@ class DisplayCompare(QWidget):
         self.current_viewpoint = 1
         self.compare_type = 'default'  # whether 'default', 'qc' or 'manual'
         self.QueryContainer = QueryContainer(self)
-        self.progress = None   # placeholder for progress popup
+        self.progress = AlertPopup(self, "Calculating neighbors...", progressbar=True, cancel_only=False)
+        self.progress.hide()
         self.edit_stack = []  # placeholder for media edit stack
         self.query_load_thread = None  # placeholder for image load thread
         self.match_load_thread = None  # placeholder for image load thread
@@ -73,7 +74,7 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         button_recalc = QPushButton("Recalculate Matches")
-        button_recalc.clicked.connect(self.calculate_neighbors)
+        button_recalc.clicked.connect(lambda: self.calculate_neighbors(clear_cache=True))
         first_layer.addWidget(button_recalc)
 
         button_recalc = QPushButton("Quality Control by Individual")
@@ -278,7 +279,9 @@ class DisplayCompare(QWidget):
     # ALERT POPUP MANAGER ------------------------------------------------------
     def show_progress(self, prompt):
         """Progress Popup for Match Thread"""
-        self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=False)
+        if not hasattr(self, 'progress') or self.progress is None:
+            self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=False)
+        self.progress.update_prompt(prompt)
         self.progress.show()
 
     def update_prompt(self, prompt):
@@ -299,15 +302,15 @@ class DisplayCompare(QWidget):
     def close_progress(self):
         """Close the progress popup"""
         if hasattr(self, 'progress') and self.progress is not None:
-            self.progress.close()
-            self.progress = None
+            self.progress.hide()
 
     # ==========================================================================
     # ON ENTRY
     # ==========================================================================
-    def calculate_neighbors(self):
+    def calculate_neighbors(self, clear_cache=False):
         """Calculate neighbors for all query ROIs, load first query and match"""
         # Disable individual select until feature is implemented on QC
+
         self.compare_type = 'default'
         # show favorite toggle and reset its state
         self.button_match_favorites.setVisible(True)
@@ -324,7 +327,7 @@ class DisplayCompare(QWidget):
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
-            self.QueryContainer.calculate_neighbors()
+            self.QueryContainer.calculate_neighbors(clear_cache=clear_cache)
         else:
             self.home(warn=True)
 
