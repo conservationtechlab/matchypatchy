@@ -607,20 +607,21 @@ class MatchyPatchyDB():
             return
 
         try:
-            # Build UPDATE statements for multiple IDs
-            # Using CASE for efficient multi-row update
-            ids = list(batch_updates.keys())
-            
             # Simple approach: execute individual UPDATEs in a transaction
             cursor = self.db.cursor()
             cursor.execute("BEGIN TRANSACTION")
             
             for row_id, changes in batch_updates.items():
-                set_clause = ', '.join(f"{col} = ?" for col in changes.keys())
-                values = list(changes.values()) + [row_id]
-                query = f"UPDATE {table} SET {set_clause} WHERE {id_column} = ?"
+                # Add the ID to the changes
+                all_columns = {id_column: row_id, **changes}
+                
+                columns = ', '.join(all_columns.keys())
+                placeholders = ', '.join('?' * len(all_columns))
+                values = list(all_columns.values())
+                
+                query = f"INSERT OR REPLACE INTO {table} ({columns}) VALUES ({placeholders})"
                 cursor.execute(query, values)
-            
+                
             self.db.commit()
             self.logger.info(f"Updated {len(batch_updates)} thumbnail entries in {table}")
             return True
