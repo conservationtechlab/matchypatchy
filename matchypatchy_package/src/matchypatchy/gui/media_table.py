@@ -24,7 +24,7 @@ class MediaTable(QAbstractTableModel):
         self.mpDB = parent.mpDB
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.VIEWPOINTS = load_model('VIEWPOINTS')
-        self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
+        self.updateStations()
         self.updateIndividuals()
 
         self._data_filtered = pd.DataFrame()
@@ -189,6 +189,7 @@ class MediaTable(QAbstractTableModel):
 
         # Fetch and reset index for stations and individuals
         self.updateIndividuals()
+        self.updateStations()
         self.layoutChanged.emit()
 
     def updateHeaderDict(self, headers):
@@ -199,6 +200,9 @@ class MediaTable(QAbstractTableModel):
 
     def updateIndividuals(self):
         self.INDIVIDUALS = fetch_individual(self.mpDB)
+
+    def updateStations(self):
+        self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         """Provide header data for the table view."""

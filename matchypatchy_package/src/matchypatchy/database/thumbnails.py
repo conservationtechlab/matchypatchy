@@ -118,6 +118,8 @@ def check_missing_thumbnails(mpDB, thumbnail_dir, data_type):
     for _, row in thumbnails.iterrows():
         if not (Path(thumbnail_dir) / Path(row['thumbnail_path'])).is_file():
             missing_ids.append(row['id'])
+        if row['thumbnail_path'] == str(asset_path(THUMBNAIL_NOTFOUND)):
+            missing_ids.append(row['id'])
 
     return missing_ids
 

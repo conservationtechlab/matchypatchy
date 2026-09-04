@@ -25,6 +25,9 @@ from matchypatchy.gui.manual_query import ManualQueryContainer
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
 
+# TODO: recalculate matches button clears cache
+# determine how long to keep cache
+
 
 class DisplayCompare(QWidget):
     """GUI class for displaying and managing match comparisons."""

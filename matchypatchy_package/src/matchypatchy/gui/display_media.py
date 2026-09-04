@@ -213,6 +213,12 @@ class DisplayMedia(QWidget):
             self.progress.close()
             self.progress = None
 
+    def show_alert(self, message):
+        """Display an alert message to the user"""
+        dialog = AlertPopup(self, prompt=message)
+        dialog.exec()
+        del dialog
+
     # =========================================================================
     # FILTERS
     # =========================================================================
@@ -301,6 +307,7 @@ class DisplayMedia(QWidget):
             self.individual_list = fetch_individual(self.mpDB)
             self.dataloader = FetchTableThread(self)
             self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
+            self.dataloader.prompt_update.connect(lambda message: self.show_alert(message))
             self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
             self.dataloader.done.connect(self.close_progress)  # Close the progress dialog when done
             self.dataloader.start()

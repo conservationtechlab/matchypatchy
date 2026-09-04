@@ -335,6 +335,7 @@ class MatchyPatchyDB():
                   sequence_id: Optional[int] = None,
                   external_id: Optional[int] = None,
                   comment: Optional[str] = None,
+                  commit: bool = True,
                   quiet: bool = True):
         """
         Media has 10 attributes not including id:
@@ -370,7 +371,8 @@ class MatchyPatchyDB():
                 print(f"DEBUG: Executing SQL command: {command} with data: {data_tuple}")
             cursor.execute(command, data_tuple)
             media_id = cursor.lastrowid
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return media_id
 
         # filepath already exists
@@ -400,6 +402,7 @@ class MatchyPatchyDB():
                 favorite: int = 0,
                 individual_id: Optional[int] = None,
                 emb: int = 0,
+                commit: bool = True,
                 quiet: bool = True):
         """
         Add a roi with:
@@ -436,7 +439,8 @@ class MatchyPatchyDB():
                 print(f"Executing SQL command: {command} with data: {data_tuple}")
             cursor.execute(command, data_tuple)
             roi_id = cursor.lastrowid
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return roi_id
         except sqlite3.Error as error:
             if not quiet:
@@ -475,7 +479,7 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to add camera: {error}")
             return None
 
-    def add_thumbnail(self, table, fid, filepath):
+    def add_thumbnail(self, table, fid, filepath, commit=True):
         """Add a thumbnail entry to media_thumbnails or roi_thumbnails table
 
         Args:
@@ -489,7 +493,8 @@ class MatchyPatchyDB():
             data_tuple = (fid, filepath)
             cursor.execute(command, data_tuple)
             thumbnail_id = cursor.lastrowid
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return thumbnail_id
 
         # filepath already exists
@@ -647,7 +652,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()
             return rows
         except sqlite3.Error as error:
-            self.logger.error(f"Failed fetch: {error}")
+            self.logger.error(f"Failed fetch on {table}: {error}")
             return None
 
     def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None, quiet=True):
@@ -676,7 +681,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error(f"Failed fetch: {error}")
+            self.logger.error(f"Failed fetch on {table} with join on {join_table}: {error}")
             return None, None
 
     def get_media_with_filepath(self, row_cond: Optional[str] = None):

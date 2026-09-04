@@ -50,6 +50,8 @@ class FetchTableThread(QThread):
                 # Load all thumbnails
                 self.thumbnails = thumbnails.fetch_roi_thumbnails(self.mpDB)
                 self.data = pd.merge(self.data, self.thumbnails, on="id", how="left")
+                
+                 self.data[self.data['bbox_w'] == -1]["thumbnail_path"] = asset_path(thumbnails.THUMBNAIL_NOTFOUND)
 
             # media
             elif self.data_type == 0:
@@ -70,6 +72,7 @@ class FetchTableThread(QThread):
             self.logger.error(f"Error loading thumbnails: {str(e)}")
         finally:
             self.done.emit()
+            
 
     def _generate_roi_thumbnails_batch(self, missing_ids, total_missing):
         """

@@ -56,6 +56,10 @@ class AlertPopup(QDialog):
         self.progress_max = max
         self.progress_bar.setRange(self.progress_min, self.progress_max)
 
+    def show_progress_text(self):
+        self.progress_bar.setTextVisible(True)
+        self.progress_bar.setFormat("%p%")   # shows percentage, e.g. 42%
+
     def set_counter(self, counter):
         """Update the progress bar to specific"""
         if counter < self.progress_max:
