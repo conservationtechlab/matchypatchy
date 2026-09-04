@@ -426,17 +426,15 @@ class QueryContainer(QObject):
                                         "sex": "Sex",
                                         "age": "Age",
                                         "filepath": "Filepath",
-            "comment": "Comment",
-            "timestamp": "Timestamp",
-            "station_id": "Station",
-            "sequence_id": "Sequence ID",
-            "viewpoint": "Viewpoint"
-        })
+                                        "comment": "Comment",
+                                        "timestamp": "Timestamp",
+                                        "station_id": "Station",
+                                        "sequence_id": "Sequence ID",
+                                        "viewpoint": "Viewpoint"})
 
         info_dict = roi_renamed[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
                                  'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
-        info_dict['id'] = roi.name
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
@@ -458,7 +456,7 @@ class QueryContainer(QObject):
     def new_iid(self, individual_id):
         """Update records for roi after confirming a match (batched)"""
         roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1} 
-                      for roi in self.current_query_rois}
+                       for roi in self.current_query_rois}
         roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
 
         # Update local index
