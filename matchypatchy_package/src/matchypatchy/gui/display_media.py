@@ -208,7 +208,9 @@ class DisplayMedia(QWidget):
 
     def set_progress_max(self, max_value):
         """Set the maximum value for the progress bar"""
+        # connects to FetchTableThread's progress_max signal
         if hasattr(self, 'progress') and self.progress is not None:
+            self.update_prompt("Collecting missing thumbnails...")
             self.progress.set_max(max_value)
 
     def close_progress(self):
@@ -216,12 +218,6 @@ class DisplayMedia(QWidget):
         if hasattr(self, 'progress') and self.progress is not None:
             self.progress.close()
             self.progress = None
-
-    def show_alert(self, message):
-        """Display an alert message to the user"""
-        dialog = AlertPopup(self, prompt=message)
-        dialog.exec()
-        del dialog
 
     # =========================================================================
     # FILTERS
@@ -287,6 +283,7 @@ class DisplayMedia(QWidget):
     def load_table(self):
         """Load media/roi data into table based on current data_type"""
         # check if there are rois first
+        self.show_progress("Loading media...")
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
 
@@ -313,6 +310,9 @@ class DisplayMedia(QWidget):
             self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
             self.dataloader.progress_max.connect(lambda n_missing: self.set_progress_max(n_missing))
             self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
+            # Connect the progress popup's rejected signal to stop the query container's calculation
+            if hasattr(self, 'progress') and self.progress:
+                self.progress.rejected.connect(self.dataloader.requestInterruption)
             self.dataloader.done.connect(self.close_progress)  # Close the progress dialog when done
             self.dataloader.start()
             return True
