@@ -563,6 +563,72 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to update table: {error}")
             return False
 
+    def batch_edit(self, table: str, updates: dict, allow_none=False, quiet=True):
+        """
+        Batch edit multiple rows in a table
+
+        Args
+            - table (str): table name
+            - updates (dict): dictionary of row_id: {column: value} updates
+            - quiet (bool): if False, prints the executed commands
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute("BEGIN TRANSACTION")
+
+            for row_id, replace in updates.items():
+                for key, value in replace.items():
+                    if value in (None, ''):
+                        if allow_none:
+                            replace[key] = 'NULL'
+                        else:
+                            self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
+                            return False
+                    if isinstance(value, str):
+                        replace[key] = f"'{value}'"
+
+                replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
+                command = f"UPDATE {table} SET {replace_values} WHERE id={row_id}"
+                if not quiet:
+                    print(command)
+                cursor.execute(command)
+            self.db.commit()
+            return True
+        except sqlite3.Error as error:
+            self.logger.error(f"Failed batch update on table {table}: {error}")
+            return False
+
+    def batch_update_thumbnails(self, table, id_column, batch_updates):
+        """
+        Batch update multiple thumbnail entries.
+        batch_updates: {id: {column: value, ...}, ...}
+        """
+        if not batch_updates:
+            return
+
+        try:
+            # Build UPDATE statements for multiple IDs
+            # Using CASE for efficient multi-row update
+            ids = list(batch_updates.keys())
+            
+            # Simple approach: execute individual UPDATEs in a transaction
+            cursor = self.db.cursor()
+            cursor.execute("BEGIN TRANSACTION")
+            
+            for row_id, changes in batch_updates.items():
+                set_clause = ', '.join(f"{col} = ?" for col in changes.keys())
+                values = list(changes.values()) + [row_id]
+                query = f"UPDATE {table} SET {set_clause} WHERE {id_column} = ?"
+                cursor.execute(query, values)
+            
+            self.db.commit()
+            self.logger.info(f"Updated {len(batch_updates)} thumbnail entries in {table}")
+            return True
+        except Exception as e:
+            self.db.rollback()
+            self.logger.error(f"Error batch updating {table}: {e}")
+            return False
+
     def select(self, table: str, columns: str = "*", row_cond: Optional[str] = None, quiet=True):
         """
         Select columns based on optional row_cond
@@ -806,6 +872,23 @@ class MatchyPatchyDB():
         knn = self.collection.query(query_embeddings=query, n_results=k + 1)
         return knn
 
+    def batch_knn(self, query_ids, k=3):
+        """
+        Query KNN for multiple ROI IDs at once (much faster than individual queries).
+        Returns dict: {roi_id: (neighbor_ids, distances)}
+        """
+        query_ids_str = [str(qid) for qid in query_ids]
+        queries = self.collection.get(ids=query_ids_str, include=['embeddings'])['embeddings']
+        
+        results = {}
+        for roi_id, embedding in zip(query_ids, queries):
+            knn = self.collection.query(query_embeddings=[embedding], n_results=k + 1)
+            results[roi_id] = (
+                [int(x) for x in knn['ids'][0]],
+                knn['distances'][0]
+            )
+        return results
+
     def calculate_similarity(self, query_id, match_id):
         results1 = self.collection.get(ids=[str(query_id)], include=["embeddings"])
         results2 = self.collection.get(ids=[str(match_id)], include=["embeddings"])
@@ -821,6 +904,33 @@ class MatchyPatchyDB():
         norm2 = np.linalg.norm(emb2)
         similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
         return float(similarity)
+
+    def batch_calculate_similarity(self, query_id, match_ids):
+        """
+        Calculate similarities between a query embedding and multiple match embeddings.
+        Returns a dict: {match_id: similarity}
+        """
+        query_results = self.collection.get(ids=[str(query_id)], include=["embeddings"])
+        query_emb = query_results['embeddings'][0]
+
+        if query_emb is None:
+            return {mid: None for mid in match_ids}
+
+        match_ids_str = [str(mid) for mid in match_ids]
+        match_results = self.collection.get(ids=match_ids_str, include=["embeddings"])
+
+        similarities = {}
+        for mid, emb in zip(match_ids, match_results['embeddings']):
+            if emb is None:
+                similarities[mid] = None
+                continue
+            dot_product = np.dot(query_emb, emb)
+            norm1 = np.linalg.norm(query_emb)
+            norm2 = np.linalg.norm(emb)
+            similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
+            similarities[mid] = float(similarity)
+
+        return similarities
 
     def clear_emb(self):
         """Clear vector database and rebuild (no way to delete)"""

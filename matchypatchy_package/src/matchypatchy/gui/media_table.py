@@ -22,6 +22,7 @@ class MediaTable(QAbstractTableModel):
         self.parent = parent
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
+        self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         self.updateStations()
         self.updateIndividuals()
@@ -90,8 +91,10 @@ class MediaTable(QAbstractTableModel):
         # thumbnail
         if self._columns[col] == "thumbnail_path":
             if role == Qt.ItemDataRole.DecorationRole:
-                pixmap = QPixmap(self._data_filtered.at[row, self._columns[col]])
-                return pixmap
+                thumbnail_path = self._data_filtered.at[row, self._columns[col]]
+                if thumbnail_path:
+                    pixmap = QPixmap(str(self.thumbnail_dir / thumbnail_path))
+                    return pixmap
             # Suppress text display
             if role == Qt.ItemDataRole.DisplayRole:
                 return None

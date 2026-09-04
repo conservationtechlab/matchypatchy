@@ -6,7 +6,11 @@ __pycache__/
 # test databases
 *.db
 *.csv
+*.zip
+*.ipynb
 
+
+Jaguar_Full/
 Jaguar/
 Giraffe/
 examples/

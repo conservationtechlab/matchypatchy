@@ -208,6 +208,10 @@ class QC_QueryContainer(QObject):
         return self.data.loc[self.current_query_rid, "individual_id"] == self.data.loc[self.current_match_rid, "individual_id"] and \
             self.data.loc[self.current_query_rid, "individual_id"] is not None
 
+    def current_distance(self):
+        """Return distance between current sequence and matchs"""
+        return 0
+
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
         if column is None:  # return whole row
@@ -267,11 +271,12 @@ class QC_QueryContainer(QObject):
         self.mpDB.edit_row('roi', self.current_match_rid, {"individual_id": individual_id, "reviewed": 1})
 
     def unmatch(self):
-        """
-        Unmatch the current query from its match by setting the individual_id to None and reviewed to 0.
-        """
-        # Set current match id to none
-        self.mpDB.edit_row('roi',
-                           self.current_query_rid, {'individual_id': None, "reviewed": 0},
-                           allow_none=True,
-                           quiet=False)
+        """Unmatch the current query ROI from the matched ROI"""
+        self.mpDB.edit('roi', self.current_query_rid,
+                       {'individual_id': None, "reviewed": 0},
+                       allow_none=True,
+                       quiet=False)
+        
+        # Update local index
+        self.data.loc[self.current_query_rid, 'individual_id'] = None
+        self.data.loc[self.current_query_rid, 'reviewed'] = 0
