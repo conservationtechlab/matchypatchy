@@ -71,7 +71,7 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(button_recalc)
 
         button_recalc = QPushButton("Quality Control by Individual")
-        button_recalc.clicked.connect(self.calculate_by_individual)
+        button_recalc.clicked.connect(self.compare_by_individual)
         first_layer.addWidget(button_recalc)
 
         # FILTERBAR --------------------------------------------------------------
@@ -327,19 +327,20 @@ class DisplayCompare(QWidget):
         # try cache first
         if clear_cache:
             self.logger.info("Clearing KNN cache")
+            print("Clearing KNN cache")
             self.QueryContainer.clear_knn_cache()
-        else:
-            # Load embeddings and filter data before calculating neighbors
-            emb_exist = self.QueryContainer.load_data()
-            if emb_exist:
-                matches_exist = self.QueryContainer.filter(filter_dict=self.filters, 
-                                                           valid_stations=self.valid_stations)
-                if matches_exist:
-                   self._cache_or_calculate_neighbors()
-                else:
-                    self.update_prompt("No matches found within filter.")
+
+        # Load embeddings and filter data before calculating neighbors
+        emb_exist = self.QueryContainer.load_data()
+        if emb_exist:
+            matches_exist = self.QueryContainer.filter(filter_dict=self.filters, 
+                                                        valid_stations=self.valid_stations)
+            if matches_exist:
+                self._cache_or_calculate_neighbors()
             else:
-                self.home(warn=True)
+                self.update_prompt("No matches found within filter.")
+        else:
+            self.home(warn=True)
 
     def _cache_or_calculate_neighbors(self):
         """Attempt to use cached KNN results, calculate if not available."""
@@ -363,9 +364,15 @@ class DisplayCompare(QWidget):
         else:
             self.update_prompt("No data to compare, all available data from same sequence/capture.")
 
-    def calculate_by_individual(self):
-        """Enter QC mode, recalculate matches by individual IDs"""
+    # --------------------------------------------------------------------------
+    def compare_by_individual(self):
+        """
+        Enter QC mode, recalculate matches by individual IDs
+        
+        Does not require a cache
+        """
         # must have inviduals to enter QC mode
+
         if not fetch_individual(self.mpDB).empty:
             self.compare_type = 'qc'
             self.button_match_favorites.setVisible(False)  # hide favorite toggle
@@ -383,7 +390,11 @@ class DisplayCompare(QWidget):
             self.update_prompt("No data to compare, no named individuals to analyze.")
 
     def compare_manual(self, selected_ids=None):
-        """Enter manual comparison mode, recalculate matches manually"""
+        """
+        Enter manual comparison mode, recalculate matches manually
+        
+        Does not require a cache
+        """
         self.compare_type = 'manual'
         self.button_match_favorites.setVisible(False)  # hide favorite toggle
         self.filterbar.individual_visible(False)
@@ -428,7 +439,7 @@ class DisplayCompare(QWidget):
         self.valid_stations = self.filterbar.get_valid_stations()
 
         if self.compare_type == 'qc':
-            self.calculate_by_individual()
+            self.compare_by_individual()
         elif self.compare_type == 'manual':
             self.compare_manual()
         else:
@@ -633,6 +644,8 @@ class DisplayCompare(QWidget):
                                 <td>Station:</td><td>{info_dict['Station']}</td>
                             </tr><tr>
                                 <td>Comment:</td><td>{info_dict['Comment']}</td>
+                                <td>{spacer}</td>
+                                <td>Camera:</td><td>{info_dict['Camera']}</td>
                             </tr>
                             </table>
                         </div>
@@ -647,7 +660,7 @@ class DisplayCompare(QWidget):
         Open Image in MatchyPatchy Single Image Popup to Edit Metadata
         Note: Redraws query and match
         """
-        data = self.QueryContainer.get_info(rid)
+        data = self.QueryContainer.get_info(rid).copy()
         data["id"] = rid
         data = data.to_frame().T
         dialog = MediaEditPopup(self, data, data_type=1)

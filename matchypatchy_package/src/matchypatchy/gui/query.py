@@ -27,6 +27,7 @@ class QueryContainer(QObject):
         self.parent = parent
         self.mpDB = parent.mpDB
         self.cfg = parent.cfg
+        self.CACHE_PATH = Path(self.cfg.DB_DIR) / "knn_cache.json"
         self.logger = parent.logger
         self.metric = parent.distance_metric
         self.k = parent.k
@@ -72,7 +73,6 @@ class QueryContainer(QObject):
         self._similarities_cache = {}
 
         # KNN Cache
-        self._knn_cache = {}
         self.cache_timeout = 3600  # Cache valid for 1 hour (seconds)
 
     # STEP 0: Load data and build indices for fast lookups
@@ -423,7 +423,7 @@ class QueryContainer(QObject):
 
     def roi_metadata(self, roi):
         """Display relevant metadata in comparison label box"""
-        location = fetch_station_names_from_id(self.mpDB, roi['station_id'])
+        location = fetch_station_names_from_id(self.mpDB, roi['station_id'], roi['camera_id'])
 
         roi_renamed = roi.rename(index={"name": "Name",
                                         "sex": "Sex",
@@ -432,15 +432,17 @@ class QueryContainer(QObject):
                                         "comment": "Comment",
                                         "timestamp": "Timestamp",
                                         "station_id": "Station",
+                                        "camera_id": "Camera",
                                         "sequence_id": "Sequence ID",
                                         "viewpoint": "Viewpoint"})
 
-        info_dict = roi_renamed[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
+        info_dict = roi_renamed[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station', 'Camera',
                                  'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
+        info_dict['Camera'] = location['camera_name']
 
         # Convert viewpoint to human-readable
         viewpoint_val = info_dict['Viewpoint']
@@ -514,7 +516,8 @@ class QueryContainer(QObject):
     # ==========================================================================
     def clear_knn_cache(self):
         """Clear the KNN cache"""
-        self._knn_cache = {}
+        # delete the file
+        self.CACHE_PATH.unlink(missing_ok=True)
         self.logger.info("KNN cache cleared")
 
     def save_knn_cache(self):
@@ -527,13 +530,10 @@ class QueryContainer(QObject):
             'timestamp': time.time()
         }
         
-        dbdir = self.cfg.DB_DIR
-        filepath = Path(dbdir) / "knn_cache.json"
-        
         try:
-            with open(filepath, 'w') as f:
+            with open(self.CACHE_PATH, 'w') as f:
                 json.dump(cache_data, f, indent=2)
-            self.logger.info(f"KNN cache saved to {filepath}")
+            self.logger.info(f"KNN cache saved to {self.CACHE_PATH}")
         except Exception as e:
             self.logger.error(f"Failed to save JSON cache: {e}")
 
@@ -558,15 +558,13 @@ class QueryContainer(QObject):
 
     def load_knn_cache(self):
         """Load KNN cache from JSON"""
-        dbdir = self.cfg.DB_DIR
-        filepath = Path(dbdir) / "knn_cache.json"
-        
-        if not filepath.exists():
+        # Check if the cache file exists before attempting to load it
+        if not self.CACHE_PATH.exists():
             return False
         
         try:
-            print(f"Loading KNN cache from {filepath}")
-            with open(filepath, 'r') as f:
+            print(f"Loading KNN cache from {self.CACHE_PATH}")
+            with open(self.CACHE_PATH, 'r') as f:
                 cache_data = json.load(f)
             
             cache_age = time.time() - cache_data['timestamp']

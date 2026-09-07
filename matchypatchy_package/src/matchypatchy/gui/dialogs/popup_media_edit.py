@@ -482,10 +482,13 @@ class MetadataPanel(QWidget):
         self.name_list = ["Unknown"] + list(self.individuals["name"])
         self.name.addItems(self.name_list)
         self.timestamp_data.setText(str(self.data.iloc[current_image_index]["timestamp"]))
-        survey_info = fetch_station_names_from_id(self.mpDB, self.data.iloc[current_image_index]["station_id"])
+        survey_info = fetch_station_names_from_id(self.mpDB, 
+                                                  self.data.iloc[current_image_index]["station_id"],
+                                                  self.data.iloc[current_image_index]["camera_id"])
         self.station_data.setText(str(survey_info['station_name']))
         self.survey_data.setText(str(survey_info["survey_name"]))
         self.region_data.setText(str(survey_info["region_name"]))
+        #self.camera_data.setText(str(survey_info["camera_name"]))
         self.sequence_data.setText(str(self.data.iloc[current_image_index]["sequence_id"]))
         self.external_data.setText(str(self.data.iloc[current_image_index]["external_id"]))
 

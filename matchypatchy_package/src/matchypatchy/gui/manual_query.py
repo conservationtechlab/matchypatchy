@@ -242,7 +242,7 @@ class ManualQueryContainer(QObject):
         """
         Display relevant metadata in comparison label box
         """
-        location = fetch_station_names_from_id(self.mpDB, roi['station_id'])
+        location = fetch_station_names_from_id(self.mpDB, roi['station_id'], roi['camera_id'])
 
         roi = roi.rename(index={"name": "Name",
                                 "sex": "Sex",
@@ -251,15 +251,17 @@ class ManualQueryContainer(QObject):
                                 "comment": "Comment",
                                 "timestamp": "Timestamp",
                                 "station_id": "Station",
+                                "camera_id": "Camera",
                                 "sequence_id": "Sequence ID",
                                 "viewpoint": "Viewpoint"})
 
-        info_dict = roi[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station',
+        info_dict = roi[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station', 'Camera',
                          'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
         info_dict['Region'] = location['region_name']
+        info_dict['Camera'] = location['camera_name']
 
         # Convert viewpoint to human-readable
         viewpoint_val = info_dict['Viewpoint']
