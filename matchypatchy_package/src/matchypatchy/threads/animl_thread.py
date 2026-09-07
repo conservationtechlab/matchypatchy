@@ -88,6 +88,7 @@ class AnimlThread(QThread):
         self.n_frames = cfg.N_FRAMES
         self.thumbnail_dir = cfg.THUMBNAIL_DIR
         self.device = cfg.DEVICE
+        self.batch_size = cfg.BATCH_SIZE  # Set a default batch size for processing images
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
@@ -143,78 +144,84 @@ class AnimlThread(QThread):
             return
 
         # detect new images
-        for i, image in self.images.iterrows():
-            if not self.isInterruptionRequested():
-                media_id = image['id']
-                row = image.to_frame().T
+        for batch_start in range(0, len(self.images), self.batch_size):
+            if self.isInterruptionRequested():
+                break
 
-                detections = animl.detect(self.detector,
-                                          row,
-                                          MEGADETECTORv1000_SIZE,
-                                          MEGADETECTORv1000_SIZE,
-                                          confidence_threshold=self.confidence_threshold)
+            batch_end = min(batch_start + self.batch_size, len(self.images))
+            image_batch = self.images.iloc[batch_start:batch_end]
 
-                detections = animl.parse_detections(detections, manifest=row)
-                detections = animl.get_animals(detections)
+            detections = animl.detect(self.detector,
+                                      image_batch,
+                                      MEGADETECTORv1000_SIZE,
+                                      MEGADETECTORv1000_SIZE,
+                                      confidence_threshold=self.confidence_threshold,
+                                      batch_size=self.batch_size,
+                                      use_progress_bar=False)
 
-                for _, roi in detections.iterrows():
-                    frame = roi['frame'] if 'frame' in roi.index else 0
+            detections = animl.parse_detections(detections, manifest=image_batch)
+            detections = animl.get_animals(detections)
 
-                    bbox_x = roi['bbox_x']
-                    bbox_y = roi['bbox_y']
-                    bbox_w = roi['bbox_w']
-                    bbox_h = roi['bbox_h']
+            for _, roi in detections.iterrows():
+                frame = roi['frame'] if 'frame' in roi.index else 0
 
-                    # do not add emb_id, to be determined later
-                    roi_id = self.mpDB.add_roi(media_id,
-                                               frame,
-                                               bbox_x, bbox_y, bbox_w, bbox_h,
-                                               viewpoint=None,
-                                               individual_id=None,
-                                               emb=0)
-                    # save thumbnails
-                    roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
-                                                       image['filepath'],
-                                                       image['ext'],
-                                                       frame,
-                                                       bbox_x, bbox_y, bbox_w, bbox_h)
-                    self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
+                bbox_x = roi['bbox_x']
+                bbox_y = roi['bbox_y']
+                bbox_w = roi['bbox_w']
+                bbox_h = roi['bbox_h']
 
-            self.progress_count += 1
+                # do not add emb_id, to be determined later
+                roi_id = self.mpDB.add_roi(roi['id'],  #media id
+                                           frame,
+                                           bbox_x, bbox_y, bbox_w, bbox_h,
+                                           viewpoint=None,
+                                           individual_id=None,
+                                           emb=0)
+                # save thumbnails
+                roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
+                                                   roi['filepath'],
+                                                   roi['ext'],
+                                                   frame,
+                                                    bbox_x, bbox_y, bbox_w, bbox_h)
+                self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
+
+            self.progress_count += len(image_batch)
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
 
         # Process existing rois without bbox
-        for i, image in self.rois.iterrows():
-            if not self.isInterruptionRequested():
-                media_id = image['media_id']
-                row = image.to_frame().T
+        for batch_start in range(0, len(self.rois), self.batch_size):
+            if self.isInterruptionRequested():
+                break
+                
+            batch_end = min(batch_start + self.batch_size, len(self.rois))
+            roi_batch = self.rois.iloc[batch_start:batch_end]
 
-                detections = animl.detect(self.detector,
-                                          row,
-                                          MEGADETECTORv1000_SIZE,
-                                          MEGADETECTORv1000_SIZE,
-                                          confidence_threshold=self.confidence_threshold)
+            detections = animl.detect(self.detector,
+                                      roi_batch,
+                                      MEGADETECTORv1000_SIZE,
+                                      MEGADETECTORv1000_SIZE,
+                                      confidence_threshold=self.confidence_threshold,
+                                      batch_size=self.batch_size,
+                                      use_progress_bar=False)
 
-                detections = animl.parse_detections(detections, manifest=row)
-                detections = animl.get_animals(detections)
+            detections = animl.parse_detections(detections, manifest=roi_batch)
+            detections = animl.get_animals(detections)
 
-                for _, roi in detections.iterrows():
-                    frame = roi['frame'] if 'frame' in roi.index else 0
+            for _, roi in detections.iterrows():
+                frame = roi['frame'] if 'frame' in roi.index else 0
 
-                    bbox_x = roi['bbox_x']
-                    bbox_y = roi['bbox_y']
-                    bbox_w = roi['bbox_w']
-                    bbox_h = roi['bbox_h']
+                bbox_x = roi['bbox_x']
+                bbox_y = roi['bbox_y']
+                bbox_w = roi['bbox_w']
+                bbox_h = roi['bbox_h']
 
-                    # do not add emb_id, to be determined later
-                    self.mpDB.edit_row('roi',
-                                       image['id'],
-                                       {"bbox_x": bbox_x,
-                                        "bbox_y": bbox_y,
-                                        "bbox_w": bbox_w,
-                                        "bbox_h": bbox_h
-                                        })
-            self.progress_count += 1
+                # do not add emb_id, to be determined later
+                self.mpDB.edit_row('roi',
+                                    roi['id'],
+                                    {"bbox_x": bbox_x, "bbox_y": bbox_y,
+                                     "bbox_w": bbox_w, "bbox_h": bbox_h})
+
+            self.progress_count += len(roi_batch)
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
 
     def detect_videos(self):

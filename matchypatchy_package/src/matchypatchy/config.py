@@ -22,6 +22,7 @@ class mpConfig():
         self.ML_DIR = home_dir /  'Models'
         self.THUMBNAIL_DIR = home_dir / 'Thumbnails'
         self.FRAME_DIR = home_dir / 'Frames'
+        self.BATCH_SIZE = 4
         self.N_FRAMES = 3
         self.SMART_FRAMES = 3
         self.VIDEO_FPS = 1
@@ -58,6 +59,7 @@ class mpConfig():
                 self.ML_DIR = Path(cfg.get('ML_DIR', self.HOME_DIR / 'Models'))
                 self.THUMBNAIL_DIR = Path(cfg.get('THUMBNAIL_DIR', self.HOME_DIR / 'Thumbnails'))
                 self.FRAME_DIR = Path(cfg.get('FRAME_DIR', self.HOME_DIR / 'Frames'))
+                self.BATCH_SIZE = cfg.get('BATCH_SIZE', 4)
                 self.VIDEO_FPS = cfg.get('VIDEO_FPS', 1)
                 self.N_FRAMES = cfg.get('N_FRAMES', 3)
                 self.SMART_FRAMES = cfg.get('SMART_FRAMES', 3)
@@ -88,6 +90,7 @@ class mpConfig():
             'DB_DIR': str(self.DB_DIR),
             'ML_DIR': str(self.ML_DIR),
             'THUMBNAIL_DIR': str(self.THUMBNAIL_DIR),
+            'BATCH_SIZE': self.BATCH_SIZE,
             'VIDEO_FPS': self.VIDEO_FPS,
             'N_FRAMES': self.N_FRAMES,
             'SMART_FRAMES': self.SMART_FRAMES,
@@ -108,6 +111,7 @@ class mpConfig():
         self.ML_DIR = self.HOME_DIR /  'Models'
         self.THUMBNAIL_DIR = self.HOME_DIR / 'Thumbnails'
         self.FRAME_DIR = self.HOME_DIR / 'Frames'
+        self.BATCH_SIZE = 4
         self.VIDEO_FPS = 1
         self.N_FRAMES = 3
         self.SMART_FRAMES = 3
