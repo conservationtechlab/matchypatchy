@@ -25,6 +25,7 @@ class ReIDThread(QThread):
         self.mpDB = mpDB
         self.cfg = cfg
         self.device = self.cfg.DEVICE
+        self.batch_size = cfg.BATCH_SIZE
         self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
         self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
         
@@ -74,7 +75,11 @@ class ReIDThread(QThread):
             filtered_rois.reset_index(drop=True, inplace=True)
 
             model, classes = animl.load_classifier(self.viewpoint_filepath, device=self.device)
-            dataloader = animl.manifest_dataloader(filtered_rois, resize_width=480, resize_height=480, crop=True)
+            dataloader = animl.ManifestDataloader(filtered_rois, 
+                                                  resize_width=480,
+                                                  resize_height=480,
+                                                  crop=True,
+                                                  batch_size=self.batch_size)
 
             for i, batch in enumerate(dataloader):
                 if not self.isInterruptionRequested():
