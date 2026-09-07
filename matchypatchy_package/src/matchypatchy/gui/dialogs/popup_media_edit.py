@@ -34,7 +34,7 @@ class MediaEditPopup(QDialog):
         else:
             self.setWindowTitle("View Media")
             self.adjust_mode = 'bbox'
-        self.setFixedSize(1000, 500)
+        self.setFixedSize(1000, 520)
         self.mpDB = parent.mpDB
         self.cfg = parent.cfg
         self.data = data
@@ -339,8 +339,8 @@ class MetadataPanel(QWidget):
         self.individuals = None
         self.name_list = ["Unknown"]  # List of individual names for the combobox
 
-        horizontal_gap = 80
-        vertical_gap = 8
+        self.horizontal_gap = 80
+        self.vertical_gap = 8
         # handle comment change only after editing is done
         self.comment_changed = False
         self.edit_stack = []
@@ -348,124 +348,72 @@ class MetadataPanel(QWidget):
         # Layout ---------------------------------------------------------------
         metadata_layout = QVBoxLayout()
 
-        # Timestamp
-        timestamp = QHBoxLayout()
-        timestamp_label = QLabel("Timestamp: ")
-        timestamp_label.setFixedWidth(horizontal_gap)
-        timestamp.addWidget(timestamp_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.timestamp_data = QLabel()
-        timestamp.addWidget(self.timestamp_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
-        metadata_layout.addLayout(timestamp)
-        metadata_layout.addSpacing(vertical_gap)
-        # Station
-        station = QHBoxLayout()
-        station_label = QLabel("Station: ")
-        station_label.setFixedWidth(horizontal_gap)
-        station.addWidget(station_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.station_data = QLabel()
-        station.addWidget(self.station_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
-        metadata_layout.addLayout(station)
-        metadata_layout.addSpacing(vertical_gap)
-        # Survey
-        survey = QHBoxLayout()
-        survey_label = QLabel("Survey: ")
-        survey_label.setFixedWidth(horizontal_gap)
-        survey.addWidget(survey_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.survey_data = QLabel()
-        survey.addWidget(self.survey_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
-        metadata_layout.addLayout(survey)
-        metadata_layout.addSpacing(vertical_gap)
-        # Region
-        region = QHBoxLayout()
-        region_label = QLabel("Region: ")
-        region_label.setFixedWidth(horizontal_gap)
-        region.addWidget(region_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.region_data = QLabel()
-        region.addWidget(self.region_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
-        metadata_layout.addLayout(region)
-        metadata_layout.addSpacing(vertical_gap)
-        # Sequence ID
-        sequence = QHBoxLayout()
-        sequence_label = QLabel("Sequence ID: ")
-        sequence_label.setFixedWidth(horizontal_gap)
-        sequence.addWidget(sequence_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.sequence_data = QLabel()
-        sequence.addWidget(self.sequence_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
-        metadata_layout.addLayout(sequence)
-        metadata_layout.addSpacing(vertical_gap)
-        # External ID
-        external = QHBoxLayout()
-        external_label = QLabel("External ID: ")
-        external_label.setFixedWidth(horizontal_gap)
-        external.addWidget(external_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.external_data = QLabel()
-        external.addWidget(self.external_data, 1, alignment=Qt.AlignmentFlag.AlignLeft)
-        metadata_layout.addLayout(external)
-        metadata_layout.addSpacing(int(vertical_gap / 2))
+        # Read-only fields
+        self.timestamp_data = self._add_metadata_field(metadata_layout, "Timestamp: ", QLabel())
+        self.station_data = self._add_metadata_field(metadata_layout, "Station: ", QLabel())
+        self.camera_data = self._add_metadata_field(metadata_layout, "Camera: ", QLabel())
+        self.survey_data = self._add_metadata_field(metadata_layout, "Survey: ", QLabel())
+        self.region_data = self._add_metadata_field(metadata_layout, "Region: ", QLabel())
+        self.sequence_data = self._add_metadata_field(metadata_layout, "Sequence ID: ", QLabel())
+        self.external_data = self._add_metadata_field(metadata_layout, "External ID: ", QLabel())
 
-        # Divider
+        metadata_layout.addSpacing(int(self.vertical_gap / 2))
         metadata_layout.addWidget(HorizontalSeparator(linewidth=2))
-        metadata_layout.addSpacing(int(vertical_gap / 2))
+        metadata_layout.addSpacing(int(self.vertical_gap / 2))
 
-        # EDITABLE -------------------------------------------------------------
-        # Name - EDITABLE
+        # Editable fields
+        self.name = QComboBox()
         name_layout = QHBoxLayout()
         name_label = QLabel("Name: ")
-        name_label.setFixedWidth(horizontal_gap)
+        name_label.setFixedWidth(self.horizontal_gap)
         name_layout.addWidget(name_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.name = QComboBox()
-        self.name.currentIndexChanged.connect(self.change_name)
         name_layout.addWidget(self.name, stretch=1)
         self.add_individual = QPushButton("+")
         self.add_individual.pressed.connect(self.new_individual)
         name_layout.addWidget(self.add_individual)
+        self.name.currentIndexChanged.connect(self.change_name)
         metadata_layout.addLayout(name_layout)
-        metadata_layout.addSpacing(vertical_gap)
-        # Sex - EDITABLE
-        sex_layout = QHBoxLayout()
-        sex_label = QLabel("Sex: ")
-        sex_label.setFixedWidth(horizontal_gap)
-        sex_layout.addWidget(sex_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.sex = QComboBox()
-        self.sex.currentIndexChanged.connect(self.change_sex)
-        sex_layout.addWidget(self.sex, stretch=1)
-        metadata_layout.addLayout(sex_layout)
-        metadata_layout.addSpacing(vertical_gap)
-        # Age - EDITABLE
-        age_layout = QHBoxLayout()
-        age_label = QLabel("Age: ")
-        age_label.setFixedWidth(horizontal_gap)
-        age_layout.addWidget(age_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.age = QComboBox()
-        self.age.currentIndexChanged.connect(self.change_age)
-        age_layout.addWidget(self.age, stretch=1)
-        metadata_layout.addLayout(age_layout)
-        metadata_layout.addSpacing(vertical_gap)
-        # Viewpoint - EDITABLE
-        viewpoint_layout = QHBoxLayout()
-        viewpoint_label = QLabel("Viewpoint: ")
-        viewpoint_label.setFixedWidth(horizontal_gap)
-        viewpoint_layout.addWidget(viewpoint_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        metadata_layout.addSpacing(self.vertical_gap)
+
+        self.sex = self._add_metadata_field(metadata_layout, "Sex: ", QComboBox(), 
+                                           is_editable=True, on_change=self.change_sex, stretch=True)
+        self.age = self._add_metadata_field(metadata_layout, "Age: ", QComboBox(), 
+                                           is_editable=True, on_change=self.change_age, stretch=True)
+
         self.VIEWPOINTS = load_model('VIEWPOINTS')
-        self.viewpoint = QComboBox()
-        self.viewpoint.currentIndexChanged.connect(self.change_viewpoint)
-        viewpoint_layout.addWidget(self.viewpoint, 1)
-        metadata_layout.addLayout(viewpoint_layout)
-        metadata_layout.addSpacing(vertical_gap)
-        # Comment - EDITABLE
-        comment = QHBoxLayout()
-        comment_label = QLabel("Comment: ")
-        comment_label.setFixedWidth(horizontal_gap)
-        comment.addWidget(comment_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.viewpoint = self._add_metadata_field(metadata_layout, "Viewpoint: ", QComboBox(), 
+                                                 is_editable=True, on_change=self.change_viewpoint, stretch=True)
+        # comment
         self.comment = TextEditWithSignal()
         self.comment.setFixedHeight(60)
         self.comment.text_finished.connect(self.change_comment)
-        comment.addWidget(self.comment, 1)
-        comment.addStretch()
-        metadata_layout.addLayout(comment)
-        metadata_layout.addStretch()
+        comment_layout = QHBoxLayout()
+        comment_label = QLabel("Comment: ")
+        comment_label.setFixedWidth(self.horizontal_gap)
+        comment_layout.addWidget(comment_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        comment_layout.addWidget(self.comment, 1)
+        comment_layout.addStretch()
+        metadata_layout.addLayout(comment_layout)
+        metadata_layout.addSpacing(self.vertical_gap)
 
+        metadata_layout.addStretch()
         self.setLayout(metadata_layout)
+
+    def _add_metadata_field(self, layout, label_text, data_widget, 
+                            is_editable=False, on_change=None, stretch=False):
+        """Helper to add a metadata field with label and data widget"""
+        row_layout = QHBoxLayout()
+        label = QLabel(label_text)
+        label.setFixedWidth(self.horizontal_gap)
+        row_layout.addWidget(label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        
+        if is_editable and on_change:
+            data_widget.currentIndexChanged.connect(on_change)
+        
+        row_layout.addWidget(data_widget, 1 if stretch else 0)
+        layout.addLayout(row_layout)
+        layout.addSpacing(self.vertical_gap)
+        return data_widget
 
     def refresh_values(self, current_image_index):
         """Refresh metadata values based on current image index"""
@@ -488,7 +436,7 @@ class MetadataPanel(QWidget):
         self.station_data.setText(str(survey_info['station_name']))
         self.survey_data.setText(str(survey_info["survey_name"]))
         self.region_data.setText(str(survey_info["region_name"]))
-        #self.camera_data.setText(str(survey_info["camera_name"]))
+        self.camera_data.setText(str(survey_info["camera_name"]))
         self.sequence_data.setText(str(self.data.iloc[current_image_index]["sequence_id"]))
         self.external_data.setText(str(self.data.iloc[current_image_index]["external_id"]))
 
