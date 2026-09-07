@@ -4,11 +4,12 @@ GUI Window for Match Comparisons
 """
 import os
 from pathlib import Path
-import pandas as pd
 from PIL import Image
 
-from PyQt6.QtWidgets import QApplication, QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+                             QHeaderView, QTableWidget, QTableWidgetItem)
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPalette
 
 from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
 from matchypatchy.gui.widgets.widget_image_adjustment import ImageAdjustBar
@@ -133,11 +134,9 @@ class DisplayCompare(QWidget):
         query_layout.addWidget(self.query_image_bar)
 
         # MetaData
-        self.query_info = QLabel("Image Metadata")
-        self.query_info.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.query_info.setContentsMargins(5, 10, 5, 10)
-        self.query_info.setMaximumHeight(200)
-        self.query_info.setStyleSheet("border: 1px solid black; font-size: 16px;")
+        self.query_info = QTableWidget()
+        self._set_table(self.query_info)
+
         query_layout.addWidget(self.query_info, 1)
         image_layout.addLayout(query_layout)
 
@@ -204,12 +203,8 @@ class DisplayCompare(QWidget):
         match_layout.addWidget(self.match_image_bar)
 
         # MetaData
-        self.match_info = QLabel("Image Metadata")
-        self.match_info.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.match_info.setContentsMargins(5, 10, 5, 10)
-        self.match_info.setMaximumHeight(200)
-        self.match_info.setStyleSheet("border: 1px solid black; font-size: 16px;")
-
+        self.match_info = QTableWidget()
+        self._set_table(self.match_info)
         match_layout.addWidget(self.match_info, 1)
         image_layout.addLayout(match_layout)
         # Add image block to layout
@@ -575,8 +570,7 @@ class DisplayCompare(QWidget):
                               frame=self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "frame"),
                               bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid, 'bbox'), crop=True)
         metadata = self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata")
-        self.query_info.setText(self.format_metadata(metadata))
-        self.query_info.adjustSize()
+        self.format_metadata(self.query_info, metadata)
         self.toggle_match_button()
         self.toggle_query_favorite()
 
@@ -590,10 +584,8 @@ class DisplayCompare(QWidget):
         self.match_image.load(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "filepath"),
                               frame=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "frame"),
                               bbox=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "bbox"), crop=True)
-
         metadata = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "metadata")
-        self.match_info.setText(self.format_metadata(metadata))
-        self.match_info.adjustSize()
+        self.format_metadata(self.match_info, metadata)
         self.toggle_match_button()
         self.toggle_match_favorite()
 
@@ -617,40 +609,88 @@ class DisplayCompare(QWidget):
         self.load_query()
         self.load_match()
 
-    def format_metadata(self, info_dict, spacing=1):
-        """Format metadata dictionary into an HTML string for display."""
-        spacer = "&nbsp;" * 20
-        html_text = f"""<div style="line-height: {spacing}; width: 100%; height: 100%;">
-                            <table cellspacing="5">
-                            <tr>
-                                <td>Name:</td><td>{info_dict['Name']}</td>
-                                <td>{spacer}</td>
-                                <td>File Name:</td><td>{os.path.basename(info_dict['Filepath'])}</td>
-                            </tr><tr>
-                                <td>Viewpoint:</td><td>{info_dict['Viewpoint']}</td>
-                                <td>{spacer}</td>
-                                <td>Timestamp:</td><td>{info_dict['Timestamp']}</td>
-                            </tr><tr>
-                                <td>Sex:</td><td>{info_dict['Sex']}</td>
-                                <td>{spacer}</td>
-                                <td>Region:</td><td>{info_dict['Region']}</td>
-                            </tr><tr>
-                                <td>Age:</td><td>{info_dict['Age']}</td>
-                                <td>{spacer}</td>
-                                <td>Survey:</td><td>{info_dict['Survey']}</td>
-                            </tr><tr>
-                                <td>Sequence ID:</td><td>{info_dict['Sequence ID']}</td>
-                                <td>{spacer}</td>
-                                <td>Station:</td><td>{info_dict['Station']}</td>
-                            </tr><tr>
-                                <td>Comment:</td><td>{info_dict['Comment']}</td>
-                                <td>{spacer}</td>
-                                <td>Camera:</td><td>{info_dict['Camera']}</td>
-                            </tr>
-                            </table>
-                        </div>
-                    """
-        return html_text
+    # METADATA TABLE
+    def _set_table(self, table):
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setVisible(False)
+        table.setShowGrid(False)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        table.setMaximumHeight(250)
+        table.setRowCount(7)
+        table.setColumnCount(4) 
+        table.setStyleSheet("""
+            QTableWidget {
+                border: 1px solid;
+                border-radius: 4px;
+                font-size: 15px;
+                font-family: 'Segoe UI', Arial, sans-serif;
+            }
+            QTableWidget::item {
+                padding: 6px;
+            }
+        """)
+
+    def format_metadata(self, table, info_dict):
+        """Populate the query_info QTableWidget with metadata."""
+        palette = self.palette()
+        bg_secondary = palette.color(QPalette.ColorRole.AlternateBase)
+        text_label = palette.color(QPalette.ColorRole.Text)
+        text_value = palette.color(QPalette.ColorRole.WindowText)
+
+        rows = [
+            ("Name:",        info_dict['Name'],          "File Name",  os.path.basename(info_dict['Filepath'])),
+            ("Viewpoint:",   info_dict['Viewpoint'],      "Timestamp:",  info_dict['Timestamp']),
+            ("Sex:",         info_dict['Sex'],            "Region:",     info_dict['Region']),
+            ("Age:",         info_dict['Age'],            "Survey:",     info_dict['Survey']),
+            ("Sequence ID:", info_dict['Sequence ID'],    "Station:",    info_dict['Station']),
+            ("External ID:", info_dict['External ID'],    "Camera:",     info_dict['Camera']),
+            ("Comment:",     info_dict['Comment'],        None,         None),
+        ]
+
+        for i, (label1, value1, label2, value2) in enumerate(rows):
+            bg = bg_secondary if i % 2 == 0 else None
+
+            def make_item(text, is_label=False, italic=False):
+                item = QTableWidgetItem(str(text) if text is not None else "")
+                item.setForeground(text_label if is_label else text_value)
+                if is_label:
+                    font = item.font()
+                    font.setBold(True)
+                    item.setFont(font)
+                if italic:
+                    font = item.font()
+                    font.setItalic(True)
+                    item.setFont(font)
+                if bg:
+                    item.setBackground(bg)
+                return item
+
+            if label2 is None:
+                # Comment row — spans columns 1-3
+                table.setItem(i, 0, make_item(label1, is_label=True))
+                table.setItem(i, 1, make_item(value1, italic=True))
+                table.setSpan(i, 1, 1, 3)
+            else:
+                table.setItem(i, 0, make_item(label1, is_label=True))
+                table.setItem(i, 1, make_item(value1))
+                table.setItem(i, 2, make_item(label2, is_label=True))
+                table.setItem(i, 3, make_item(value2))
+
+        # Fit row heights tightly
+        table.resizeRowsToContents()
+        total_height = sum(table.rowHeight(i) for i in range(table.rowCount()))
+        table.setMaximumHeight(total_height + 4)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(0, 120)
+        table.setColumnWidth(1, 150)
+        table.setColumnWidth(2, 120)
 
     # ==========================================================================
     # IMAGE MANIPULATION
