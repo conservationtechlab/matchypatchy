@@ -1,4 +1,18 @@
 #!/usr/bin/env bash
-# Lightweight wrapper that executes the .command file using bash.
-# This wrapper lets users run `matchypatchy` from terminal.
-exec /bin/bash /opt/matchypatchy/install.command "$@"
+set -euo pipefail
+
+INSTALL_ROOT="${INSTALL_DIR:-$HOME/.MatchyPatchy}"
+LAUNCHER="$INSTALL_ROOT/launcher.sh"
+INSTALLER="/opt/matchypatchy/install.sh"
+
+if [ -x "$LAUNCHER" ]; then
+  exec "$LAUNCHER" "$@"
+fi
+
+if [ -x "$INSTALLER" ]; then
+  exec "$INSTALLER" "$@"
+fi
+
+echo "MatchyPatchy is not installed for this user."
+echo "Run /opt/matchypatchy/install.sh"
+exit 1
