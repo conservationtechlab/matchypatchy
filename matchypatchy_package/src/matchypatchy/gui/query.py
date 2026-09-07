@@ -434,10 +434,11 @@ class QueryContainer(QObject):
                                         "station_id": "Station",
                                         "camera_id": "Camera",
                                         "sequence_id": "Sequence ID",
+                                        "external_id": "External ID",
                                         "viewpoint": "Viewpoint"})
 
         info_dict = roi_renamed[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station', 'Camera',
-                                 'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+                                 'External ID', 'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
 
         info_dict['Station'] = location['station_name']
         info_dict['Survey'] = location['survey_name']
