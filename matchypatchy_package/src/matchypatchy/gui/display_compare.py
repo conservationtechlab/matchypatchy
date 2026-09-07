@@ -341,6 +341,7 @@ class DisplayCompare(QWidget):
         """Attempt to use cached KNN results, calculate if not available."""
         # try cache first
         self.progress.update_prompt("Checking cache...")
+        #TODO: filter cache based on current filters
         cache_available = self.QueryContainer.load_knn_cache()
         if cache_available:
             self.logger.info("Using cached KNN results")
