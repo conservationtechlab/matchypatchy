@@ -4,6 +4,7 @@ Set Up matchypatchy Database
 from datetime import datetime
 import sqlite3
 import chromadb
+from chromadb.config import Settings
 
 from matchypatchy import __version__
 
@@ -140,7 +141,7 @@ def setup_database(key, filepath, db=None):
 
 def setup_chromadb(key, filepath):
     """Set up ChromaDB vector database for embeddings"""
-    client = chromadb.PersistentClient(str(filepath))
+    client = chromadb.PersistentClient(str(filepath), settings=Settings(anonymized_telemetry=False))
     client.create_collection(
         name="embedding_collection",
         metadata={

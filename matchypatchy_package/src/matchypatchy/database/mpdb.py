@@ -9,6 +9,7 @@ from pathlib import Path
 from random import randrange
 
 import chromadb
+from chromadb.config import Settings
 import numpy as np
 import pandas as pd
 
@@ -73,7 +74,8 @@ class MatchyPatchyDB():
     def chroma(self):
         """Get or create a Chroma client for the current thread"""
         if not hasattr(self.local, 'chroma') or self.local.chroma is None:
-            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
+            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath), 
+                                                          settings=Settings(anonymized_telemetry=False))
         return self.local.chroma
 
     @chroma.setter
