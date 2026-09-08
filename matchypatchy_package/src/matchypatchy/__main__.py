@@ -22,6 +22,8 @@ if __name__ == "__main__":
     logger.info("=" * 70)
     logger.info("MatchyPatchy starting up...")
 
+    exit_code = 1  # Default to error; overwritten on successful run
+
     try:
         app = QApplication(sys.argv)
         window = MainWindow(logger)

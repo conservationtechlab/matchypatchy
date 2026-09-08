@@ -8,7 +8,7 @@ from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal, QAbstractTableModel
 
 from matchypatchy.database.media import EditObject
 from matchypatchy.threads.model_download_thread import load_model
-from matchypatchy.database.location import fetch_stations
+from matchypatchy.database.location import fetch_stations, fetch_cameras
 from matchypatchy.database.media import fetch_individual
 
 
@@ -24,8 +24,9 @@ class MediaTable(QAbstractTableModel):
         self.mpDB = parent.mpDB
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.VIEWPOINTS = load_model('VIEWPOINTS')
-        self.updateStations()
-        self.updateIndividuals()
+        self.INDIVIDUALS = fetch_individual(self.mpDB)
+        self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
+        self.CAMERAS = fetch_cameras(self.mpDB, reset_index=True)
 
         self._data_filtered = pd.DataFrame()
         self.header_dict = headers
@@ -103,6 +104,12 @@ class MediaTable(QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 id = int(self._data_filtered.at[row, self._columns[col]])
                 return self.STATIONS.loc[id, "name"]
+
+        # station
+        if self._columns[col] == "camera_id":
+            if role == Qt.ItemDataRole.DisplayRole:
+                id = int(self._data_filtered.at[row, self._columns[col]])
+                return self.CAMERAS.loc[id, "name"]
 
         # viewpoint 
         if self._columns[col] == "viewpoint":
@@ -187,8 +194,9 @@ class MediaTable(QAbstractTableModel):
             self.updateHeaderDict(headers)
 
         # Fetch and reset index for stations and individuals
-        self.updateIndividuals()
-        self.updateStations()
+        self.INDIVIDUALS = fetch_individual(self.mpDB)
+        self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
+        self.CAMERAS = fetch_cameras(self.mpDB, reset_index=True)
         self.layoutChanged.emit()
 
     def updateHeaderDict(self, headers):
@@ -196,12 +204,6 @@ class MediaTable(QAbstractTableModel):
             self.header_dict = headers
             self._columns = [x[0] for x in headers.values()]
             self._headers = [x[1] for x in headers.values()]
-
-    def updateIndividuals(self):
-        self.INDIVIDUALS = fetch_individual(self.mpDB)
-
-    def updateStations(self):
-        self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         """Provide header data for the table view."""

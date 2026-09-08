@@ -39,10 +39,35 @@ def fetch_stations(mpDB, survey_id=None, reset_index=False):
     
     return pd.DataFrame(columns=["id", "name", "lat", "long", "survey_id"])
 
-def fetch_station_names_from_id(mpDB, station_id):
+
+def fetch_cameras(mpDB, station_id=None, reset_index=False):
+    """
+    Fetches cameras associated with given station, Converts to DataFrame
+    """
+    if station_id:
+        cameras = mpDB.select("camera", row_cond=f'station_id={station_id}')
+    else:
+        cameras = mpDB.select("camera")
+
+    if cameras:
+        df = pd.DataFrame(cameras, columns=["id", "name", "station_id"])
+        if reset_index:
+            df = df.set_index("id")
+        return df
+
+    return pd.DataFrame(columns=["id", "name", "station_id"])
+
+
+def fetch_station_names_from_id(mpDB, station_id, camera_id):
     """Given a station id, return names and ids of survey and region"""
     station_name, suvery_id = mpDB.select("station", "name, survey_id", row_cond=f"id={station_id}")[0]
     survey_name, region_id = mpDB.select("survey", "name, region_id", row_cond=f"id={suvery_id}")[0]
+    # camera
+    if camera_id is None:
+        camera_name = None
+    else:
+        camera_name = mpDB.select("camera", "name", row_cond=f"id={camera_id}")[0][0]
+    # region
     if region_id is None:
         region_name = None
     else:
@@ -52,7 +77,9 @@ def fetch_station_names_from_id(mpDB, station_id):
                    'suvery_id': suvery_id,
                    'survey_name': survey_name,
                    'region_id': region_id,
-                   'region_name': region_name}
+                   'region_name': region_name,
+                   'camera_id': camera_id,
+                   'camera_name': camera_name}
     return return_dict
 
 
