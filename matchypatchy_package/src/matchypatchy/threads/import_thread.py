@@ -402,11 +402,19 @@ class CSVImportThread(QThread):
         paths = [Path(fp).resolve() for fp in filepaths]
         # Then get parents and commonpath
         parents = [p.parent for p in paths]
-        base_dir = Path(os.path.commonpath(parents))
-        return str(base_dir)
+        try:
+            base_dir = Path(os.path.commonpath(parents))
+            return str(base_dir)
+        except ValueError:
+            # If the paths are on different drives, commonpath will raise a ValueError.
+            self.logger.error("Filepaths are on different drives, cannot determine a common base directory.")
+            return None
 
     def _get_relative_path(self, filepath, base_dir):
         """Get the relative path of a file given its base directory"""
+        # If base_dir is None, return the parent directory of the filepat
+        if base_dir is None:
+            return Path(filepath).parent 
         return str(Path(filepath).relative_to(base_dir))
 
     def survey(self, exemplar):
@@ -524,14 +532,40 @@ class CSVImportThread(QThread):
                 #TODO: limit sex and age to valid values
                 if self.selected_columns["sex"] != "None":
                     sex = self._roi_value(roi, self.selected_columns["sex"])
-                    sex = self._convert_to_str(sex)
+                    sex = self._convert_sex(sex)
                 if self.selected_columns["age"] != "None":
                     age = self._roi_value(roi, self.selected_columns["age"])
-                    age = self._convert_to_str(age)
+                    age = self._convert_age(age)
                 individual_id = self.mpDB.add_individual(individual_name, sex, age)
             self.individual_ref[individual_name] = individual_id
         return individual_id
 
+    def _convert_sex(self, listed_sex):
+        """Convert sex to standard format, handling None and NaN"""
+        if not pd.isna(listed_sex):
+            sex = str(listed_sex).strip()
+            if sex.lower() in ["male", "m"]:
+                return "Male"
+            elif sex.lower() in ["female", "f"]:
+                return "Female"
+            else:
+                return None
+        return None
+
+    def _convert_age(self, listed_age):
+        """Convert age to standard format, handling None and NaN"""
+        if not pd.isna(listed_age):
+            age = str(listed_age).strip()
+            if age.lower() in ["adult", "a"]:
+                return "Adult"
+            elif age.lower() in ["subadult", "sa"]:
+                return "Subadult"
+            elif age.lower() in ["juvenile", "j"]:
+                return "Juvenile"
+            else:
+                return None
+        return None
+    
     def favorite(self, roi):
         """Get favorite status"""
         if self.selected_columns["favorite"] != "None":

@@ -121,13 +121,13 @@ class DisplayMedia(QWidget):
         self.view.horizontalHeader().setSortIndicatorShown(True)
         self.view.horizontalHeader().setSectionsClickable(True)
         self.view.verticalHeader().setDefaultSectionSize(150)  # row size = thumbnail with
+        self.view.horizontalHeader().setDefaultSectionSize(80)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
-        for col in range(self.media_table.columnCount()):
-            self.view.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
-        self.view.setColumnWidth(0, 40)  # Set the width of the select column
+        self.view.setColumnWidth(0, 30)  # Set the width of the select column
         self.view.setColumnWidth(1, 150)  # Set the width of the thumbnail column
         self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
         self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+
 
         # Connect the selection changed signal from the media table to a handler
         self.media_table.user_edit.connect(self.add_edit_to_stack)
@@ -333,7 +333,7 @@ class DisplayMedia(QWidget):
         """Refresh the table by reapplying edits and filters"""
         self.apply_edits()
         self.filter_data()
-        self.media_table.receiveData(self._data_filtered)
+        self.media_table.receiveData(self._data_filtered, selected_rows=self.selected_rows)
         self.update_count_label()
         self.update_edd_buttons()
 
@@ -353,9 +353,9 @@ class DisplayMedia(QWidget):
 
             # get the correct id based on the data type
             if self.data_type == 1:
-                print("Applying edit for RID:", edit.rid)
+        #        print("Applying edit for RID:", edit.rid)
                 self._data_filtered.loc[self._data_filtered["id"] == edit.rid, edit.reference] = edit.new_value
-                print(self._data_filtered[self._data_filtered["id"] == edit.rid])
+         #       print(self._data_filtered[self._data_filtered["id"] == edit.rid])
             else:
                 self._data_filtered.loc[self._data_filtered["id"] == edit.mid, edit.reference] = edit.new_value
             
@@ -405,11 +405,11 @@ class DisplayMedia(QWidget):
 
     def update_count_label(self):
         """Set count label at bottom of media table"""
-        self.count_label.setText(f"Total Media: {self.media_table.rowCount()}")
-
-    def update_count_label_selected(self):
-        """Set count label at bottom of media table to show selected/total"""
-        self.count_label.setText(f"Selected: {len(self.media_table.selectedRows())} / {self.media_table.rowCount()}")
+        self.selected_rows = self.media_table.selectedRows()
+        if len(self.selected_rows) > 0:
+            self.count_label.setText(f"Selected: {len(self.selected_rows)} / {self.media_table.rowCount()}")
+        else:
+            self.count_label.setText(f"Total Media: {self.media_table.rowCount()}")
 
     def add_edit_to_stack(self, edit):
         """Slot to receive updates from QTableWidget to add edit to stack"""
@@ -429,41 +429,12 @@ class DisplayMedia(QWidget):
             self.button_edit.setEnabled(True)
             # self.button_duplicate.setEnabled(True)
             self.button_delete.setEnabled(True)
-            self.update_count_label_selected()
+            self.update_count_label()
         else:
             self.button_edit.setEnabled(False)
             self.button_duplicate.setEnabled(False)
             self.button_delete.setEnabled(False)
             self.update_count_label()
-
-    def save(self):
-        """Save changes to the media table"""
-        #self.media_table.save_changes()
-        while len(self.edit_stack) > 0:
-            edit = self.edit_stack.pop()
-            replace_dict = {edit.reference: edit.new_value}
-            # roi view
-            if self.data_type == 1:
-                # edit media table value
-                if edit.reference in {'station_id', 'sequence_id', 'external_id', 'comment'}:
-                    self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
-                # edit individual table value
-                elif edit.reference in {'age', 'sex'}:
-                    iid = self.data_filtered.loc[self.data_filtered['id'] == edit.rid, 'individual_id'].values[0]
-                    iid = int(iid) if pd.notna(iid) else None
-                    if iid is not None:
-                        self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
-                # edit roi table value
-                else:
-                    self.mpDB.edit_row("roi", edit.rid, replace_dict, allow_none=False, quiet=False)
-            # media view
-            else:
-                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
-
-        # reload data and refresh table
-        self.edit_stack = []
-        #self.clear_and_load_contents(self.data_type)
-        self.check_undo_button()
 
     # ==========================================================================
     # BUTTONS
@@ -490,19 +461,46 @@ class DisplayMedia(QWidget):
         """Handle Select All button press, invert selection"""
         if self.button_select.isChecked():
             self.media_table.selectAll(select=False)
-            self.update_count_label()
         else:
             self.media_table.selectAll(select=True)
-            self.update_count_label_selected()
+        self.handle_selection_change()
 
     def undo(self):
         """Undo last edit"""
         if len(self.edit_stack) > 0:
             print("Undoing last edit:", self.edit_stack[-1])
             self.edit_stack.pop()
-            self.refresh_table() 
+            self.refresh_table()
 
     # EDIT POPUP ---------------------------------------------------------------
+
+    def save(self):
+        """Save changes to the media table in queue order rather than stack"""
+        #self.media_table.save_changes()
+        for edit in self.edit_stack:
+            replace_dict = {edit.reference: edit.new_value}
+            # roi view
+            if self.data_type == 1:
+                # edit media table value
+                if edit.reference in {'station_id', 'sequence_id', 'external_id', 'comment'}:
+                    self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
+                # edit individual table value
+                elif edit.reference in {'age', 'sex'}:
+                    iid = self._data_filtered.loc[self._data_filtered['id'] == edit.rid, 'individual_id'].values[0]
+                    iid = int(iid) if pd.notna(iid) else None
+                    if iid is not None:
+                        self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
+                # edit roi table value
+                else:
+                    self.mpDB.edit_row("roi", edit.rid, replace_dict, allow_none=False, quiet=False)
+            # media view
+            else:
+                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
+
+        # reload data and refresh table
+        self.edit_stack = []
+        #self.clear_and_load_contents(self.data_type)
+        self.check_undo_button()
 
     def edit_row(self, row):
         """Edit a single row"""
@@ -528,29 +526,30 @@ class DisplayMedia(QWidget):
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
-            self.edit_stack_signal.emit(edit_stack)  # send to media table
+            self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
             del dialog
         # reload data and update buttons
-        self.load_table()
+        self.refresh_table()
 
     def edit_row_multiple(self):
         """Edit multiple selected rows"""
-        selected_rows = self.media_table.selectedRows()
-        data = self.media_table._data_filtered.iloc[selected_rows].reset_index(drop=True)
+        self.selected_rows = self.media_table.selectedRows()
+        data = self.media_table._data_filtered.iloc[self.selected_rows].reset_index(drop=True)
         current_image_index = 0
         # Launch Media Edit Popup
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
-            self.edit_stack_signal.emit(edit_stack)  # send to media table
+            self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
             del dialog
         # reload data and update buttons
-        self.load_table()
+        self.refresh_table()
 
     def duplicate(self):
         """Duplicate selected rows in the database."""
+        self.selected_rows = self.media_table.selectedRows()
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"Are you sure you want to duplicate {len(self.selected_rows)} files?", title="Warning")
             if dialog.exec():
@@ -565,6 +564,7 @@ class DisplayMedia(QWidget):
 
     def delete(self):
         """Delete selected rows from database"""
+        self.selected_rows = self.media_table.selectedRows()
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"""Are you sure you want to delete {len(self.selected_rows)} files? This cannot be undone.""", title="Warning")
             if dialog.exec():
@@ -575,12 +575,12 @@ class DisplayMedia(QWidget):
                         rois = fetch_roi(self.mpDB, media_id=id)
                         if len(rois) > 0:
                             for roi in rois['roi_id']:
-                                self.mpDB.delete_emb(id=roi)
+                                self.mpDB.delete_emb(roi)
                         # cascade delete will handle associated roi_thumbnails and roi entries
                         self.mpDB.delete('media', f'id={id}')
                     else:
                         id = int(self.media_table._data_filtered.at[row, "id"])
-                        self.mpDB.delete_emb(id=id)
+                        self.mpDB.delete_emb(id)
                         self.mpDB.delete('roi', f'id={id}')
                 # Reload updated data
                 self.load_table()
@@ -628,10 +628,10 @@ class DisplayMedia(QWidget):
             combo_items = list(self.VIEWPOINTS.values())[1:]
             self.view.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
             # SEX COMBOBOX
-            combo_items = ['Unknown', 'Male', 'Female']
+            combo_items = ['None', 'Male', 'Female']
             self.view.setItemDelegateForColumn(SEX_COLUMN, ComboBoxDelegate(combo_items, self))
             # AGE COMBOBOX
-            combo_items = ['Unknown', 'Juvenile', 'Subadult', 'Adult']
+            combo_items = ['None', 'Juvenile', 'Subadult', 'Adult']
             self.view.setItemDelegateForColumn(AGE_COLUMN, ComboBoxDelegate(combo_items, self))
 
         else:

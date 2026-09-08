@@ -2,7 +2,7 @@
 Custom assets for the GUI, such as buttons and separators.
 
 """
-from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QVBoxLayout, QWidget, QTextEdit, QLineEdit,
+from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QWidget, QTextEdit, QLineEdit,
                              QSlider, QLabel, QHBoxLayout, QSpacerItem, QStyledItemDelegate)
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
@@ -54,20 +54,27 @@ class ComboBoxDelegate(QStyledItemDelegate):
 
     def __init__(self, items, parent=None):
         super().__init__(parent)
-        self.items = items  # ComboBox items
+        self.items = items
 
     def createEditor(self, parent, option, index):
         """Create and return the ComboBox editor"""
         combo = QComboBox(parent)
         combo.addItems(self.items)
+        combo.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         return combo
 
     def setEditorData(self, editor, index):
         """Set the current value in the editor"""
-        current_text = index.data()
-        combo_index = editor.findText(current_text)  # Find matching index
+        current_text = str(index.data(Qt.ItemDataRole.DisplayRole)).strip()
+        combo_index = editor.findText(current_text)
         if combo_index >= 0:
             editor.setCurrentIndex(combo_index)
+        else:
+            for i, item in enumerate(self.items):
+                if item.lower() == current_text.lower():
+                    editor.setCurrentIndex(i)
+                    break
+        editor.showPopup()
 
     def setModelData(self, editor, model, index):
         """Save the selected value to the model"""

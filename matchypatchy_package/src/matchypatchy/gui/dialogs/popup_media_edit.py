@@ -307,7 +307,7 @@ class MediaEditPopup(QDialog):
         if dialog.exec():
             rid = self.data.iloc[self.current_image_index]["id"]  # roi
             self.mpDB.delete('roi', f"id={rid}")
-            self.mpDB.delete_emb(id=rid)
+            self.mpDB.delete_emb(rid)
 
             # update the list of IDs after deletion
             self.data = self.data.drop(self.data.index[self.current_image_index]).reset_index(drop=True)
@@ -375,8 +375,8 @@ class MetadataPanel(QWidget):
         metadata_layout.addLayout(name_layout)
         metadata_layout.addSpacing(self.vertical_gap)
 
-        self.sex = self._add_metadata_field(metadata_layout, "Sex: ", QComboBox(), 
-                                           is_editable=True, on_change=self.change_sex, stretch=True)
+        self.sex = self._add_metadata_field(metadata_layout, "Sex: ", QComboBox(),
+                                            is_editable=True, on_change=self.change_sex, stretch=True)
         self.age = self._add_metadata_field(metadata_layout, "Age: ", QComboBox(), 
                                            is_editable=True, on_change=self.change_age, stretch=True)
 

@@ -108,13 +108,16 @@ class MediaTable(QAbstractTableModel):
         # station
         if self._columns[col] == "camera_id":
             if role == Qt.ItemDataRole.DisplayRole:
-                id = int(self._data_filtered.at[row, self._columns[col]])
-                return self.CAMERAS.loc[id, "name"]
+                camera_id = self._data_filtered.at[row, self._columns[col]]
+                if camera_id is None:
+                    return None
+                return self.CAMERAS.loc[int(camera_id), "name"]
 
         # viewpoint 
         if self._columns[col] == "viewpoint":
             if role == Qt.ItemDataRole.DisplayRole:
-                value = str(self._data_filtered.at[row, self._columns[col]])
+                value = self._data_filtered.at[row, self._columns[col]]
+                value = str(value) if not pd.isna(value) else 'None'
                 return self.VIEWPOINTS.get(value, value)
 
         # individual
@@ -156,6 +159,7 @@ class MediaTable(QAbstractTableModel):
         elif reference == 'viewpoint':
             old_value = self._data_filtered.at[row, reference]
             key = [k for k, v in self.VIEWPOINTS.items() if v == value][0]
+            print(f"Key for {value}: {key}")
             new_value = None if key == 'None' else int(key)
 
         elif reference in ['individual_id', 'sex', 'age']:
@@ -187,11 +191,15 @@ class MediaTable(QAbstractTableModel):
         self.dataChanged.emit(index, index, [role])
         return True
 
-    def receiveData(self, data, headers=None):
+    def receiveData(self, data, headers=None, selected_rows=None):
         """Receiver of loaded data from the FetchTableThread"""
         self._data_filtered = data
         if headers is not None:
             self.updateHeaderDict(headers)
+
+        if selected_rows is not None:
+            self._data_filtered['select'] = 0
+            self._data_filtered.loc[selected_rows, 'select'] = 1
 
         # Fetch and reset index for stations and individuals
         self.INDIVIDUALS = fetch_individual(self.mpDB)
