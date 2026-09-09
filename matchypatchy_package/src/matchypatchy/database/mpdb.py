@@ -541,24 +541,29 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            # convert empty values to SQL NULL
+            set_clauses = []
+            params = []
             for key, value in replace.items():
                 if value in (None, ''):
                     if allow_none:
-                        replace[key] = 'NULL'
+                        set_clauses.append(f"{key}=NULL")
                     else:
                         self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
                         return False
-                # if value is a string, wrap it in quotes for SQL
-                if isinstance(value, str):
-                    replace[key] = f"'{value}'"
+                else:
+                    # bind values as parameters instead of interpolating them into
+                    # the SQL string, so values containing quotes (e.g. "O'Brien")
+                    # don't produce invalid/unsafe SQL
+                    set_clauses.append(f"{key}=?")
+                    params.append(value)
 
-            replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
+            replace_values = ",".join(set_clauses)
 
-            command = f"UPDATE {table} SET {replace_values} WHERE id={row_id}"
+            command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+            params.append(row_id)
             if not quiet:
-                print(command)
-            cursor.execute(command)
+                print(command, params)
+            cursor.execute(command, params)
             self.db.commit()
             return True
         except sqlite3.Error as error:
@@ -579,21 +584,28 @@ class MatchyPatchyDB():
             cursor.execute("BEGIN TRANSACTION")
 
             for row_id, replace in updates.items():
+                set_clauses = []
+                params = []
                 for key, value in replace.items():
                     if value in (None, ''):
                         if allow_none:
-                            replace[key] = 'NULL'
+                            set_clauses.append(f"{key}=NULL")
                         else:
                             self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
                             return False
-                    if isinstance(value, str):
-                        replace[key] = f"'{value}'"
+                    else:
+                        # bind values as parameters instead of interpolating them into
+                        # the SQL string, so values containing quotes don't produce
+                        # invalid/unsafe SQL
+                        set_clauses.append(f"{key}=?")
+                        params.append(value)
 
-                replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
-                command = f"UPDATE {table} SET {replace_values} WHERE id={row_id}"
+                replace_values = ",".join(set_clauses)
+                command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+                params.append(row_id)
                 if not quiet:
-                    print(command)
-                cursor.execute(command)
+                    print(command, params)
+                cursor.execute(command, params)
             self.db.commit()
             return True
         except sqlite3.Error as error:

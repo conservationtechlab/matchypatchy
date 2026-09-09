@@ -71,27 +71,45 @@ class ReIDThread(QThread):
 
         # filter rois without viewpoint
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
-        if len(filtered_rois) > 0:
+        n_rois = len(filtered_rois)
+        if n_rois > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
 
             model, classes = animl.load_classifier(self.viewpoint_filepath, device=self.device)
-            dataloader = animl.ManifestDataloader(filtered_rois, 
-                                                  resize_width=480,
-                                                  resize_height=480,
-                                                  crop=True,
-                                                  batch_size=self.batch_size)
+            # NOTE: the installed animl-lite release does not expose
+            # ManifestDataloader (only ManifestGenerator), so that name never
+            # resolved -- this call previously raised AttributeError.
+            dataloader = animl.ManifestGenerator(filtered_rois,
+                                                 resize_width=480,
+                                                 resize_height=480,
+                                                 crop=True,
+                                                 batch_size=self.batch_size)
 
-            for i, batch in enumerate(dataloader):
-                if not self.isInterruptionRequested():
-                    image = batch[0]
-                    output = model.run(None, {model.get_inputs()[0].name: image})[0]
-                    value = argmax(animl.softmax(output), axis=1)[0]
+            # row_ptr tracks our position in filtered_rois across batches.
+            # Each batch returns predictions for every image it contains (in
+            # the same order filtered_rois was given in), not just the first
+            # image -- so every value must be consumed and the pointer
+            # advanced accordingly, rather than reusing the batch's own
+            # enumerate index as if it were a row index.
+            row_ptr = 0
+            for batch in dataloader:
+                if self.isInterruptionRequested():
+                    break
 
-                    # TODO process by sequence
-                    # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
-                    roi_id = filtered_rois.at[i, 'roi_id']
+                images = batch[0]
+                output = model.run(None, {model.get_inputs()[0].name: images})[0]
+                values = argmax(animl.softmax(output), axis=1)
+
+                # TODO process by sequence
+                # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
+                for value in values:
+                    if row_ptr >= n_rois:
+                        break
+                    roi_id = filtered_rois.at[row_ptr, 'roi_id']
                     self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
+                    row_ptr += 1
+
+                self.progress_update.emit(round(100 * row_ptr / n_rois))
 
     def get_embeddings(self):
         """Process embeddings for ROIs"""
