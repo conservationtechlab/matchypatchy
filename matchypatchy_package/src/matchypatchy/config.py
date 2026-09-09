@@ -24,7 +24,7 @@ class mpConfig():
         self.FRAME_DIR = home_dir / 'Frames'
         self.BATCH_SIZE = 4
         self.N_FRAMES = 3
-        self.SMART_FRAMES = 3
+        self.SMART_FRAMES = True
         self.VIDEO_FPS = 1
         self.REID_KEY = None
         self.VIEWPOINT_KEY = None
@@ -62,7 +62,7 @@ class mpConfig():
                 self.BATCH_SIZE = cfg.get('BATCH_SIZE', 4)
                 self.VIDEO_FPS = cfg.get('VIDEO_FPS', 1)
                 self.N_FRAMES = cfg.get('N_FRAMES', 3)
-                self.SMART_FRAMES = cfg.get('SMART_FRAMES', 3)
+                self.SMART_FRAMES = cfg.get('SMART_FRAMES', True)
                 
                 self.REID_KEY = cfg.get('REID_KEY', None)
                 self.VIEWPOINT_KEY = cfg.get('VIEWPOINT_KEY', None)
@@ -114,7 +114,7 @@ class mpConfig():
         self.BATCH_SIZE = 4
         self.VIDEO_FPS = 1
         self.N_FRAMES = 3
-        self.SMART_FRAMES = 3
+        self.SMART_FRAMES = True
         self.REID_KEY = None
         self.VIEWPOINT_KEY = None
         self.DETECTOR_KEY = None

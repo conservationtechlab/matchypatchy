@@ -71,7 +71,8 @@ class ReIDThread(QThread):
 
         # filter rois without viewpoint
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
-        if len(filtered_rois) > 0:
+        n_rois = len(filtered_rois)
+        if n_rois > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
 
             model, classes = animl.load_classifier(self.viewpoint_filepath, device=self.device)
