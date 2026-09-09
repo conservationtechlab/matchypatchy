@@ -23,6 +23,7 @@ from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 from matchypatchy.gui.query import QueryContainer
 from matchypatchy.gui.qc_query import QC_QueryContainer
 from matchypatchy.gui.manual_query import ManualQueryContainer
+from matchypatchy.gui.widgets.gui_assets import NoHoverDelegate
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
 
@@ -136,7 +137,6 @@ class DisplayCompare(QWidget):
         # MetaData
         self.query_info = QTableWidget()
         self._set_table(self.query_info)
-
         query_layout.addWidget(self.query_info, 1)
         image_layout.addLayout(query_layout)
 
@@ -615,15 +615,25 @@ class DisplayCompare(QWidget):
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
         table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        table.setMouseTracking(False)
+        table.setItemDelegate(NoHoverDelegate())
         table.verticalHeader().setVisible(False)
         table.horizontalHeader().setVisible(False)
         table.setShowGrid(False)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        table.setMaximumHeight(250)
         table.setRowCount(7)
         table.setColumnCount(4) 
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        table.setColumnWidth(0, 120)
+        table.setColumnWidth(1, 150)
+        table.setColumnWidth(2, 120)
+        table.setMaximumHeight(250)
+        for i in range(table.rowCount() - 1):
+            table.setRowHeight(i, 34)  # Use consistent height for all rows
         table.setStyleSheet("""
             QTableWidget {
                 border: 1px solid;
@@ -683,15 +693,7 @@ class DisplayCompare(QWidget):
                 table.setItem(i, 3, make_item(value2))
 
         # Fit row heights tightly
-        table.resizeRowsToContents()
-        total_height = sum(table.rowHeight(i) for i in range(table.rowCount()))
-        table.setMaximumHeight(total_height + 4)
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        table.setColumnWidth(0, 120)
-        table.setColumnWidth(1, 150)
-        table.setColumnWidth(2, 120)
+
 
     # ==========================================================================
     # IMAGE MANIPULATION

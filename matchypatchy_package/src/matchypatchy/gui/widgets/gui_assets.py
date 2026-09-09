@@ -2,7 +2,7 @@
 Custom assets for the GUI, such as buttons and separators.
 
 """
-from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QWidget, QTextEdit, QLineEdit,
+from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QWidget, QTextEdit, QLineEdit, QStyle,
                              QSlider, QLabel, QHBoxLayout, QSpacerItem, QStyledItemDelegate)
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
@@ -310,3 +310,11 @@ class SliderWithLabel(QWidget):
             self.slider.setValue(int(val * 100))
             self.slider_value_changed.emit(int(val * 100))
 
+
+class NoHoverDelegate(QStyledItemDelegate):
+    """Custom delegate that disables hover/selection highlighting"""
+    def paint(self, painter, option, index):
+        # Remove hover and selection state
+        option.state &= ~QStyle.StateFlag.State_MouseOver
+        option.state &= ~QStyle.StateFlag.State_Selected
+        super().paint(painter, option, index)
