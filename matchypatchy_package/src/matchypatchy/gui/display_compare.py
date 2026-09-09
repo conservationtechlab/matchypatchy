@@ -649,6 +649,7 @@ class DisplayCompare(QWidget):
     def format_metadata(self, table, info_dict):
         """Populate the query_info QTableWidget with metadata."""
         palette = self.palette()
+        bg_primary = palette.color(QPalette.ColorRole.Base)
         bg_secondary = palette.color(QPalette.ColorRole.AlternateBase)
         text_label = palette.color(QPalette.ColorRole.Text)
         text_value = palette.color(QPalette.ColorRole.WindowText)
@@ -664,7 +665,7 @@ class DisplayCompare(QWidget):
         ]
 
         for i, (label1, value1, label2, value2) in enumerate(rows):
-            bg = bg_secondary if i % 2 == 0 else None
+            bg = bg_secondary if i % 2 == 0 else bg_primary
 
             def make_item(text, is_label=False, italic=False):
                 item = QTableWidgetItem(str(text) if text is not None else "")
