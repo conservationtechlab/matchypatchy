@@ -560,6 +560,7 @@ class MatchyPatchyDB():
             replace_values = ",".join(set_clauses)
 
             command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+            row_id = int(row_id)
             params.append(row_id)
             if not quiet:
                 print(command, params)
