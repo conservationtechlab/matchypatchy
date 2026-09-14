@@ -514,10 +514,11 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to add thumbnail: {error}")
             return None
 
-    def copy(self, table, row_id):
+    def copy(self, table, row_id: int):
         """Copy a row from a table by id"""
         try:
             cursor = self.db.cursor()
+            row_id = int(row_id)
             command = f"""INSERT INTO {table} SELECT * FROM {table} WHERE id={row_id};"""
             cursor.execute(command)
             new_id = cursor.lastrowid
@@ -603,6 +604,7 @@ class MatchyPatchyDB():
 
                 replace_values = ",".join(set_clauses)
                 command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+                row_id = int(row_id)
                 params.append(row_id)
                 if not quiet:
                     print(command, params)
