@@ -54,17 +54,7 @@ class MainWindow(QMainWindow):
 
         # set up main window
         self.setWindowTitle(f"MatchyPatchy v{__version__}")
-        screen_resolution = QGuiApplication.primaryScreen().availableGeometry()
-        minimum_height = 768
-        minimum_width = 1366
-        self.setMinimumSize(minimum_width, minimum_height)
-
-        preferred_width = min(int(screen_resolution.width() * 0.9), 1400) if screen_resolution.width() > minimum_width else minimum_width
-        preferred_height = min(int(screen_resolution.height() * 0.9), 900) if screen_resolution.height() > minimum_height else minimum_height
-        self.resize(preferred_width, preferred_height)
-
-        # TODO: find best default size based on screen resolution and available space
-        print(self.size())
+        self._set_window_size()
 
         # Create Menu Bar
         self._createMenuBar()
@@ -139,6 +129,41 @@ class MainWindow(QMainWindow):
         help.addAction(help_license)
 
     # PAGE VIEWS ---------------------------------------------------------------
+
+    def _set_window_size(self):
+        """Set the window size based on user preferences and screen resolution."""
+
+        # get the screen resolution
+        screen_resolution = QGuiApplication.primaryScreen().availableGeometry()
+
+        # get preferred window size from settings
+        preferred_width = self.settings.value("preferred_width", None)
+        preferred_height = self.settings.value("preferred_height", None)
+
+        if preferred_width is None:
+            default_width = 1500
+            minimum_width = 1446
+            if screen_resolution.width() > minimum_width:
+                preferred_width = min(int(screen_resolution.width() * 0.9), default_width)
+            else:
+                preferred_width = screen_resolution.width()
+
+        if preferred_height is None:
+            default_height = 900
+            minimum_height = 859
+            if screen_resolution.height() > minimum_height:
+                preferred_height = min(int(screen_resolution.height() * 0.9), default_height)
+            else:
+                preferred_height = screen_resolution.height()
+
+        preferred_width = int(preferred_width)
+        preferred_height = int(preferred_height)
+        self.resize(preferred_width, preferred_height)
+
+        self.settings.setValue("preferred_width", str(preferred_width))
+        self.settings.setValue("preferred_height", str(preferred_height))
+
+
     def _set_base_view(self):
         """Switch to the base view page.""" 
         self.pages.setCurrentIndex(0)
@@ -335,7 +360,16 @@ class MainWindow(QMainWindow):
         dialog.exec()
         del dialog
 
-    # CLOSE EVENT ================================================================
+    # CLOSE EVENT ==============================================================
+
+    def resizeEvent(self, a0):
+        preferred_width = a0.size().width()
+        preferred_height = a0.size().height()
+        self.settings.setValue("preferred_width", str(preferred_width))
+        self.settings.setValue("preferred_height", str(preferred_height))
+        return super().resizeEvent(a0)
+
+
     def closeEvent(self, event):
         """Close database connection when window closes"""
         if hasattr(self, 'mpDB') and self.mpDB:
