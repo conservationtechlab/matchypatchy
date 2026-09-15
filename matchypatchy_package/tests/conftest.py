@@ -85,6 +85,15 @@ class _QDialogStub(_QWidgetStub):
         pass
 
 
+class _QAbstractTableModelStub(_QObjectStub):
+    """Minimal QAbstractTableModel stub so MediaTable can subclass it."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.layoutChanged = _SignalStub()
+        self.layoutAboutToBeChanged = _SignalStub()
+        self.dataChanged = _SignalStub()
+
+
 class _MockModule(types.ModuleType):
     """A stub module whose attribute access always returns a fresh MagicMock."""
     def __getattr__(self, name: str):
@@ -99,6 +108,8 @@ class _MockModule(types.ModuleType):
             return _QWidgetStub
         if name in ('QDialog', 'QAbstractDialog'):
             return _QDialogStub
+        if name == 'QAbstractTableModel':
+            return _QAbstractTableModelStub
         if name == 'pyqtSignal':
             return lambda *args, **kwargs: _SignalStub()
         # For QtCore specifically, return a module-like object with PYQT_VERSION
@@ -107,7 +118,12 @@ class _MockModule(types.ModuleType):
             mock.PYQT_VERSION = _VersionMock(0x060900)
             mock.QT_VERSION = _VersionMock(0x060900)
             return mock
-        return MagicMock()
+        # Cache the MagicMock so the same object is returned on repeated imports.
+        # This ensures e.g. Qt.SortOrder.AscendingOrder is the same object in all
+        # modules that import from the stub, allowing equality comparisons to work.
+        result = MagicMock()
+        setattr(self, name, result)
+        return result
 
 
 def _stub_gui_dependencies():
