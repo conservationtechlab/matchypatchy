@@ -2,7 +2,7 @@
 Unit tests for matchypatchy.gui.media_table.MediaTable
 
 Tests focus on pure-Python logic methods that do not require a running Qt
-display server.  Qt widgets are stubbed out by conftest.py.
+display server. Qt widgets are stubbed out by conftest.py.
 """
 import pandas as pd
 import pytest
@@ -82,20 +82,23 @@ class TestRowColumnCount:
 # ---------------------------------------------------------------------------
 
 class TestSelectedRows:
-    def test_no_selection_returns_empty(self):
+    def test_selected_rows_none_selected(self):
+        """selectedRows returns empty list when nothing selected."""
         mt = _make_media_table()
         df = _sample_df()
         df["select"] = 0  # ensure nothing is selected
         mt._data_filtered = df
         assert mt.selectedRows() == []
 
-    def test_selected_rows_returns_correct_indices(self):
+    def test_selected_rows_one_selected(self):
+        """selectedRows returns correct row index."""
         mt = _make_media_table()
         mt._data_filtered = _sample_df()
         result = mt.selectedRows()
         assert result == [1]
 
-    def test_multiple_selected_rows(self):
+    def test_selected_rows_multiple_selected(self):
+        """selectedRows returns all selected row indices."""
         mt = _make_media_table()
         df = _sample_df()
         df.loc[0, "select"] = 1

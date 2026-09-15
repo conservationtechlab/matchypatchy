@@ -37,7 +37,7 @@ class TestMpConfigInit:
     def test_default_video_frames(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
-        assert cfg.SMART_FRAMES == 3
+        assert cfg.SMART_FRAMES is True
 
     def test_default_knn(self, tmp_path):
         home = tmp_path / "project"
@@ -172,7 +172,7 @@ class TestMpConfigSetDefault:
         cfg = mpConfig(home)
         cfg.SMART_FRAMES = 99
         cfg.set_default()
-        assert cfg.SMART_FRAMES == 3
+        assert cfg.SMART_FRAMES == True
 
     def test_set_default_resets_sequence_n(self, tmp_path):
         home = tmp_path / "project"

@@ -191,7 +191,7 @@ class TestCSVImportThread:
     def _selected_columns(self):
         return {
             "timestamp": "timestamp",
-            "survey": "Default Survey",
+            "survey": None,  # None means use active_survey
             "region": "region",
             "station": "station",
             "lat": "lat",
@@ -210,7 +210,7 @@ class TestCSVImportThread:
     def test_get_base_dir_finds_common_parent(self, tmp_db, null_logger, tmp_path):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
-        thread = import_thread.CSVImportThread(parent, pd.DataFrame().groupby(lambda _: 0), self._selected_columns())
+        thread = import_thread.CSVImportThread(parent, pd.DataFrame().groupby(lambda _: 0), self._selected_columns(), "Default Survey")
         common = thread._get_base_dir(
             [
                 str(tmp_path / "x" / "a.jpg"),
@@ -277,7 +277,7 @@ class TestCSVImportThread:
         monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
         monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
         grouped = df.groupby("filepath", sort=False)
-        thread = import_thread.CSVImportThread(parent, grouped, self._selected_columns())
+        thread = import_thread.CSVImportThread(parent, grouped, self._selected_columns(), "Default Survey")
         thread.progress_update = SignalSpy()
         thread.finished = SignalSpy()
         thread.isInterruptionRequested = lambda: False
@@ -327,7 +327,7 @@ class TestCSVImportThread:
         monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
         monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
         grouped = df.groupby("filepath", sort=False)
-        thread = import_thread.CSVImportThread(parent, grouped, self._selected_columns())
+        thread = import_thread.CSVImportThread(parent, grouped, self._selected_columns(), "Default Survey")
         thread.finished = SignalSpy()
         thread.isInterruptionRequested = lambda: False
         thread.run()
@@ -342,7 +342,7 @@ class TestCSVImportThread:
     def test_convert_helpers_handle_none_and_nan(self, tmp_db, null_logger, tmp_path):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
-        thread = import_thread.CSVImportThread(parent, pd.DataFrame().groupby(lambda _: 0), self._selected_columns())
+        thread = import_thread.CSVImportThread(parent, pd.DataFrame().groupby(lambda _: 0), self._selected_columns(), "Default Survey")
 
         assert thread._convert_to_str(None) is None
         assert thread._convert_to_str(pd.NA) is None
@@ -359,7 +359,7 @@ class TestCSVImportThread:
         file_path.write_bytes(b"1")
         df = pd.DataFrame([{"filepath": str(file_path)}])
         grouped = df.groupby("filepath", sort=False)
-        thread = import_thread.CSVImportThread(parent, grouped, self._selected_columns())
+        thread = import_thread.CSVImportThread(parent, grouped, self._selected_columns(), "Default Survey")
         thread.finished = SignalSpy()
         thread.isInterruptionRequested = lambda: True
 

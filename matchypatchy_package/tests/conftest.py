@@ -189,6 +189,7 @@ def populated_db(tmp_db):
     # The constructor already created a "Default Region" (id=1) and
     # "Default Survey" (id=1).  Add a dedicated station and media.
     station_id = db.add_station("Test Station", 1.0, 2.0, 1)
+    camera_id = db.add_camera("Test Camera", station_id) 
     individual_id = db.add_individual("Ind-1", "M", "Adult")
     upload_id = db.add_upload("/tmp")
     media_id = db.add_media(
@@ -198,6 +199,7 @@ def populated_db(tmp_db):
         ext=".jpg",
         timestamp="2024-01-01 12:00:00",
         station_id=station_id,
+        camera_id=camera_id,
     )
     roi_id = db.add_roi(
         media_id=media_id,
@@ -212,6 +214,7 @@ def populated_db(tmp_db):
         "region_id": 1,
         "survey_id": 1,
         "station_id": station_id,
+        "camera_id": camera_id,
         "individual_id": individual_id,
         "media_id": media_id,
         "roi_id": roi_id,

@@ -194,7 +194,6 @@ class DisplayMedia(QWidget):
         if not hasattr(self, 'progress') or self.progress is None:
             self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
         self.progress.update_prompt(prompt)
-        self.progress.show()
 
     def update_prompt(self, prompt):
         """Update the prompt in the progress popup"""
