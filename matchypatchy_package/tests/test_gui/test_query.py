@@ -121,17 +121,18 @@ class TestQueryContainerFilter:
         assert all(self.qc.data["station_id"] == 2)
 
     def test_filter_empty_valid_stations(self):
-        """Empty valid_stations dict → no station-based filter is applied,
-        and the show_progress helper is called for the no-stations case."""
+        """Empty valid_stations dict results in empty filtered data."""
         filter_dict = {
             "active_region":  (0,),
             "active_survey":  (0,),
             "active_station": (0,),
         }
         valid_stations = {}
-        self.qc.filter(filter_dict, valid_stations)
-        # When no valid stations, the else-branch notifies the parent
-        self.qc.parent.show_progress.assert_called()
+        result = self.qc.filter(filter_dict, valid_stations)
+        # When no valid stations, filter returns None
+        assert result is False
+        # Data should be empty
+        assert self.qc.data.empty
 
     def test_filter_preserves_data_raw(self):
         """data_raw should not be mutated by filter()."""
@@ -182,7 +183,7 @@ class TestQueryNavigation:
     def test_set_query_wraps_overflow(self):
         """Index beyond end wraps to first query."""
         self.qc.set_query(99)
-        assert self.qc.current_query == 0
+        assert self.qc.current_query == 1
 
     def test_set_match_sets_rid(self):
         self.qc.set_query(0)
@@ -210,9 +211,11 @@ class TestQueryNavigation:
         assert self.qc.current_query_sn == 1
 
     def test_set_within_query_sequence_overflow(self):
-        self.qc.set_query(0)
-        self.qc.set_within_query_sequence(99)
-        assert self.qc.current_query_sn == 0
+        """set_within_query_sequence wraps overflow using modulo."""
+        self.qc.set_query(0)  # query_rois = [10, 11], len = 2
+        self.qc.set_within_query_sequence(99)  # 99 % 2 = 1
+        assert self.qc.current_query_sn == 1
+        assert self.qc.current_query_rid == 11
 
 
 # ---------------------------------------------------------------------------

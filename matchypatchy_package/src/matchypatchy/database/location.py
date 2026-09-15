@@ -58,7 +58,7 @@ def fetch_cameras(mpDB, station_id=None, reset_index=False):
     return pd.DataFrame(columns=["id", "name", "station_id"])
 
 
-def fetch_station_names_from_id(mpDB, station_id, camera_id):
+def fetch_station_names_from_id(mpDB, station_id, camera_id=None):
     """Given a station id, return names and ids of survey and region"""
     station_name, suvery_id = mpDB.select("station", "name, survey_id", row_cond=f"id={station_id}")[0]
     survey_name, region_id = mpDB.select("survey", "name, region_id", row_cond=f"id={suvery_id}")[0]

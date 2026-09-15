@@ -2,102 +2,125 @@
 Unit tests for matchypatchy.gui.media_table.MediaTable
 
 Tests focus on pure-Python logic methods that do not require a running Qt
-display server.  Qt widgets are stubbed out by conftest.py.
+display server. Qt widgets are stubbed out by conftest.py.
 """
 import pandas as pd
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_cfg():
-    cfg = MagicMock()
-    cfg.THUMBNAIL_DIR = "/tmp/thumbs"
-    return cfg
-
-
-def _make_mpdb():
-    db = MagicMock()
-    db.select.return_value = []
-    return db
-
-
-def _sample_roi_filtered():
-    """Minimal data_filtered DataFrame for ROI mode."""
-    return pd.DataFrame(
-        {
-            "id":           [10, 11, 12],
-            "media_id":     [1,  1,  2],
-            "station_id":   [1,  1,  2],
-            "station":      ["S1", "S1", "S2"],
-            "individual_id": [100, 100, None],
-            "viewpoint":    [0,    1,   None],
-            "reviewed":     [1,    0,   0],
-            "favorite":     [0,    1,   0],
-            "comment":      ["",  "",   ""],
-            "select":       [0,    0,   0],
-            "sex":          ["Male", "Female", None],
-            "age":          ["Adult", "Juvenile", None],
-        }
-    )
-
-
-def _make_media_table():
+def _make_media_table(data_type=1):
     """Build a MediaTable with all Qt dependencies mocked."""
     from matchypatchy.gui.media_table import MediaTable
 
     parent = MagicMock()
-    parent.cfg = _make_cfg()
-    parent.mpDB = _make_mpdb()
-    parent.filters = {
-        "active_region":    (0,),
-        "active_survey":    (0,),
-        "active_station":   (0,),
-        "active_viewpoint": (0,),
-        "active_individual":(0,),
-        "unidentified_only": False,
-        "favorites_only":   False,
-        "no_roi_mids":      False,
+    parent.cfg = MagicMock()
+    parent.cfg.THUMBNAIL_DIR = Path("/tmp/thumbs")
+    parent.mpDB = MagicMock()
+    # Use side_effect to return a new list each time select is called
+    parent.mpDB.select.side_effect = lambda table, columns: [(1, "Cam1"), (2, "Cam2")]
+
+    headers = {
+        0: ["select", "Select"],
+        1: ["thumbnail_path", "Thumbnail"],
+        2: ["filepath", "Filepath"],
+        3: ["timestamp", "Timestamp"],
+        4: ["station_id", "Station"],
+        5: ["camera_id", "Camera"],
+        6: ["sequence_id", "Sequence ID"],
+        7: ["external_id", "External ID"],
     }
-    parent.valid_stations = {1: "S1", 2: "S2"}
+    if data_type == 1:  # ROI mode
+        headers.update({
+            8: ["viewpoint", "Viewpoint"],
+            9: ["individual_id", "Individual"],
+            10: ["sex", "Sex"],
+            11: ["age", "Age"],
+            12: ["reviewed", "Reviewed"],
+            13: ["favorite", "Favorite"],
+            14: ["comment", "Comment"],
+        })
+    else:  # Media mode
+        headers.update({
+            8: ["comment", "Comment"],
+            9: ["roi_count", "# of Rois"],
+        })
 
     with patch("matchypatchy.gui.media_table.load_model",
                return_value={"None": "None", "0": "Left", "1": "Any", "2": "Right"}):
         with patch("matchypatchy.gui.media_table.fetch_individual",
-                   return_value=pd.DataFrame({"id": [100], "name": ["Ind-1"]})):
-            mt = MediaTable.__new__(MediaTable)
-            mt.parent = parent
-            mt.cfg = parent.cfg
-            mt.mpDB = parent.mpDB
-            mt.data = pd.DataFrame()
-            mt.data_filtered = pd.DataFrame()
-            mt.individual_list = pd.DataFrame()
-            mt.thumbnails = {}
-            mt.data_type = 1
-            mt.VIEWPOINTS = {"None": "None", "0": "Left", "1": "Any", "2": "Right"}
-            mt.thumbnail_size = 150
-            mt.thumbnail_dir = "/tmp/thumbs"
-            mt.valid_stations = {1: "S1", 2: "S2"}
-            mt.valid_cameras = {}
-            mt.edit_stack = []
-            # Qt objects
-            mt.table = MagicMock()
-            mt.table.rowCount.return_value = 3
-            mt.columns = {
-                0: "select", 1: "thumbnail", 2: "filepath", 3: "timestamp",
-                4: "station", 5: "camera_id", 6: "sequence_id", 7: "external_id",
-                8: "viewpoint", 9: "individual_id", 10: "sex", 11: "age",
-                12: "reviewed", 13: "favorite", 14: "comment",
-            }
-            # Signals
-            from tests.conftest import _SignalStub
-            mt.update_signal = _SignalStub()
-            mt.checkbox_signal = _SignalStub()
-            mt.loaded_data = _SignalStub()
+                   return_value=pd.DataFrame({"id": [100, 200], "name": ["Ind-1", "Ind-2"]}).set_index("id")):
+            with patch("matchypatchy.gui.media_table.fetch_stations",
+                       return_value=pd.DataFrame({"id": [1, 2], "name": ["S1", "S2"]}).set_index("id")):
+                # Do NOT mock MediaTable itself - instantiate it
+                mt = MediaTable(parent, headers)
+                mt._data_filtered = pd.DataFrame()
+    
     return mt
+
+
+def _sample_roi_data():
+    """Create sample ROI data for testing."""
+    return pd.DataFrame({
+        "id": [10, 11, 12],
+        "media_id": [1, 1, 2],
+        "station_id": [1, 1, 2],
+        "individual_id": [100, 100, None],
+        "viewpoint": [0, 1, None],
+        "reviewed": [1, 0, 0],
+        "favorite": [0, 1, 0],
+        "comment": ["", "", ""],
+        "select": [0, 0, 0],
+        "sex": ["Male", "Female", None],
+        "age": ["Adult", "Juvenile", None],
+        "timestamp": ["2024-01-01", "2024-01-01", "2024-01-02"],
+        "filepath": ["a.jpg", "b.jpg", "c.jpg"],
+        "ext": [".jpg", ".jpg", ".jpg"],
+        "thumbnail_path": ["a.jpg", "b.jpg", "c.jpg"],
+    })
+
+
+def _sample_media_data():
+    """Create sample media data for testing."""
+    return pd.DataFrame({
+        "id": [1, 2, 3],
+        "station_id": [1, 1, 2],
+        "comment": ["", "", ""],
+        "select": [0, 0, 0],
+        "timestamp": ["2024-01-01", "2024-01-01", "2024-01-02"],
+        "filepath": ["a.jpg", "b.jpg", "c.jpg"],
+        "ext": [".jpg", ".jpg", ".jpg"],
+        "thumbnail_path": ["a.jpg", "b.jpg", "c.jpg"],
+        "roi_count": [5, 3, 2],
+    })
+
+
+# ---------------------------------------------------------------------------
+# TestRowCount and ColumnCount
+# ---------------------------------------------------------------------------
+
+class TestRowAndColumnCount:
+    def test_row_count_returns_data_length(self):
+        """rowCount returns the number of rows in _data_filtered."""
+        mt = _make_media_table()
+        mt._data_filtered = _sample_roi_data()
+        assert mt.rowCount() == 3
+
+    def test_row_count_empty(self):
+        """rowCount returns 0 for empty data."""
+        mt = _make_media_table()
+        mt._data_filtered = pd.DataFrame()
+        assert mt.rowCount() == 0
+
+    def test_column_count_returns_header_count(self):
+        """columnCount returns number of columns."""
+        mt = _make_media_table()
+        assert mt.columnCount() == len(mt._headers)
 
 
 # ---------------------------------------------------------------------------
@@ -105,268 +128,324 @@ def _make_media_table():
 # ---------------------------------------------------------------------------
 
 class TestSelectedRows:
-    def test_no_selection_returns_empty(self):
+    def test_selected_rows_none_selected(self):
+        """selectedRows returns empty list when nothing selected."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
+        mt._data_filtered = _sample_roi_data()
         assert mt.selectedRows() == []
 
-    def test_selected_rows_returns_correct_indices(self):
+    def test_selected_rows_one_selected(self):
+        """selectedRows returns correct row index."""
         mt = _make_media_table()
-        df = _sample_roi_filtered()
+        df = _sample_roi_data()
         df.loc[1, "select"] = 1
-        mt.data_filtered = df
-        result = mt.selectedRows()
-        assert result == [1]
+        mt._data_filtered = df
+        assert mt.selectedRows() == [1]
 
-    def test_multiple_selected_rows(self):
+    def test_selected_rows_multiple_selected(self):
+        """selectedRows returns all selected row indices."""
         mt = _make_media_table()
-        df = _sample_roi_filtered()
+        df = _sample_roi_data()
         df.loc[0, "select"] = 1
         df.loc[2, "select"] = 1
-        mt.data_filtered = df
+        mt._data_filtered = df
         result = mt.selectedRows()
         assert set(result) == {0, 2}
 
 
 # ---------------------------------------------------------------------------
-# TestGetEditTableItem
+# TestSelectAll
 # ---------------------------------------------------------------------------
 
-class TestGetEditTableItem:
-    def test_finds_existing_roi(self):
+class TestSelectAll:
+    def test_select_all_true(self):
+        """selectAll(True) selects all rows."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
-        mt.data_type = 1
+        mt._data_filtered = _sample_roi_data()
+        mt.selectAll(select=True)
+        assert all(mt._data_filtered["select"] == 1)
 
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=11, mid=1, reference="reviewed",
-                          previous_value=0, new_value=1)
-        row, col = mt.get_edit_table_item(edit)
-        assert row == 1
-        assert col == "reviewed"
-
-    def test_returns_none_for_missing_rid(self):
+    def test_select_all_false(self):
+        """selectAll(False) deselects all rows."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
-        mt.data_type = 1
-
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=None, mid=1, reference="reviewed",
-                          previous_value=0, new_value=1)
-        row, col = mt.get_edit_table_item(edit)
-        assert row is None
-        assert col is None
-
-    def test_returns_none_when_rid_not_in_data(self):
-        mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
-        mt.data_type = 1
-
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=9999, mid=1, reference="reviewed",
-                          previous_value=0, new_value=1)
-        row, col = mt.get_edit_table_item(edit)
-        assert row is None
-
-    def test_media_mode_uses_mid(self):
-        mt = _make_media_table()
-        mt.data_type = 0
-        df = pd.DataFrame({"id": [1, 2], "select": [0, 0]})
-        mt.data_filtered = df
-
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=None, mid=2, reference="comment",
-                          previous_value="", new_value="new")
-        row, col = mt.get_edit_table_item(edit)
-        assert row == 1
-        assert col == "comment"
+        df = _sample_roi_data()
+        df["select"] = 1
+        mt._data_filtered = df
+        mt.selectAll(select=False)
+        assert all(mt._data_filtered["select"] == 0)
 
 
 # ---------------------------------------------------------------------------
-# TestApplyEdits
+# TestFlags
 # ---------------------------------------------------------------------------
 
-class TestApplyEdits:
-    def test_apply_edits_no_edits_noop(self):
+class TestFlags:
+    def test_flags_checkbox_columns(self):
+        """Checkbox columns have ItemIsUserCheckable flag."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
-        original = mt.data_filtered["reviewed"].copy()
-        mt.apply_edits()
-        pd.testing.assert_series_equal(mt.data_filtered["reviewed"], original)
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        # "select" column is index 0
+        index = QModelIndex()
+        index._row = 0
+        index._col = 0
+        
+        flags = mt.flags(index)
+        # Should include ItemIsUserCheckable
+        assert flags & Qt.ItemFlag.ItemIsUserCheckable
 
-    def test_apply_edits_updates_value(self):
+    def test_flags_editable_columns(self):
+        """Editable columns have ItemIsEditable flag."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
-
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=10, mid=1, reference="reviewed",
-                          previous_value=1, new_value=0)
-        mt.edit_stack = [edit]
-        mt.apply_edits()
-        assert mt.data_filtered.loc[0, "reviewed"] == 0
-
-    def test_apply_edits_skips_missing_column(self):
-        mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
-
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=10, mid=1, reference="nonexistent_col",
-                          previous_value=None, new_value="x")
-        mt.edit_stack = [edit]
-        # Should not raise even if column not in data_filtered
-        mt.apply_edits()
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        # "comment" column is index 14
+        index = QModelIndex()
+        index._row = 0
+        index._col = 14
+        
+        flags = mt.flags(index)
+        assert flags & Qt.ItemFlag.ItemIsEditable
 
 
 # ---------------------------------------------------------------------------
-# TestUndoEdit
+# TestData
 # ---------------------------------------------------------------------------
 
-class TestUndoEdit:
-    def test_undo_reverts_last_edit(self):
+class TestData:
+    def test_data_checkbox_display_role(self):
+        """Checkbox columns return None for DisplayRole."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
+        mt._data_filtered = _sample_roi_data()
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        index = QModelIndex()
+        index._row = 0
+        index._col = 0  # "select" column
+        
+        result = mt.data(index, Qt.ItemDataRole.DisplayRole)
+        assert result is None
 
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=10, mid=1, reference="reviewed",
-                          previous_value=1, new_value=0)
-        mt.edit_stack = [edit]
-        mt.data_filtered.loc[0, "reviewed"] = 0  # simulate applied edit
-
-        with patch.object(mt, "refresh_table"):
-            mt.undo()
-
-        assert mt.data_filtered.loc[0, "reviewed"] == 1
-        assert len(mt.edit_stack) == 0
-
-    def test_undo_does_nothing_on_empty_stack(self):
+    def test_data_station_id_display(self):
+        """Station ID column displays station name."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
-        mt.edit_stack = []
-        original = mt.data_filtered["reviewed"].copy()
-        with patch.object(mt, "refresh_table"):
-            mt.undo()
-        pd.testing.assert_series_equal(mt.data_filtered["reviewed"], original)
+        df = _sample_roi_data()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        index = QModelIndex()
+        index._row = 0
+        index._col = 4  # "station_id" column
+        
+        result = mt.data(index, Qt.ItemDataRole.DisplayRole)
+        assert result == "S1"
 
-
-# ---------------------------------------------------------------------------
-# TestFilterLogic
-# ---------------------------------------------------------------------------
-
-class TestFilterLogic:
-    def test_filter_empty_valid_stations_empties_data(self):
+    def test_data_individual_id_display(self):
+        """Individual ID column displays individual name."""
         mt = _make_media_table()
-        mt.data = _sample_roi_filtered()
-        mt.parent.valid_stations = {}
-        mt.parent.filters = {
-            "active_station": (0,), "active_viewpoint": (0,),
-            "active_individual": (0,), "unidentified_only": False,
-            "favorites_only": False, "no_roi_mids": False,
-        }
-        with patch.object(mt, "refresh_table"):
-            with patch("matchypatchy.gui.media_table.fetch_individual",
-                       return_value=pd.DataFrame()):
-                mt.filter()
-        assert mt.data_filtered.empty
+        df = _sample_roi_data()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        index = QModelIndex()
+        index._row = 0
+        index._col = 9  # "individual_id" column
+        
+        result = mt.data(index, Qt.ItemDataRole.DisplayRole)
+        assert result == "Ind-1"
 
-    def test_filter_station_match(self):
+    def test_data_individual_none_display(self):
+        """Individual ID column displays None string when unidentified."""
         mt = _make_media_table()
-        mt.data = _sample_roi_filtered()
-        mt.data.rename(columns={"station": "station_name"}, inplace=True)
-        # Re-add station col
-        mt.data["station"] = mt.data["station_name"]
-        mt.parent.valid_stations = {1: "S1"}
-        mt.mpDB.select.return_value = [(1, "Cam1")]
-        mt.parent.filters = {
-            "active_station": (1,), "active_viewpoint": (0,),
-            "active_individual": (0,), "unidentified_only": False,
-            "favorites_only": False, "no_roi_mids": False,
-        }
-        with patch.object(mt, "refresh_table"):
-            with patch("matchypatchy.gui.media_table.fetch_individual",
-                       return_value=pd.DataFrame()):
-                mt.filter()
-        assert all(mt.data_filtered["station_id"] == 1)
-
-    def test_filter_favorites_only(self):
-        mt = _make_media_table()
-        mt.data = _sample_roi_filtered()
-        mt.parent.valid_stations = {1: "S1", 2: "S2"}
-        mt.mpDB.select.return_value = [(1, "Cam1")]
-        mt.parent.filters = {
-            "active_station": (0,), "active_viewpoint": (0,),
-            "active_individual": (0,), "unidentified_only": False,
-            "favorites_only": True, "no_roi_mids": False,
-        }
-        with patch.object(mt, "refresh_table"):
-            with patch("matchypatchy.gui.media_table.fetch_individual",
-                       return_value=pd.DataFrame()):
-                mt.filter()
-        assert all(mt.data_filtered["favorite"] == 1)
-
-    def test_filter_unidentified_only(self):
-        mt = _make_media_table()
-        mt.data = _sample_roi_filtered()
-        mt.parent.valid_stations = {1: "S1", 2: "S2"}
-        mt.mpDB.select.return_value = [(1, "Cam1")]
-        mt.parent.filters = {
-            "active_station": (0,), "active_viewpoint": (0,),
-            "active_individual": (0,), "unidentified_only": True,
-            "favorites_only": False, "no_roi_mids": False,
-        }
-        with patch.object(mt, "refresh_table"):
-            with patch("matchypatchy.gui.media_table.fetch_individual",
-                       return_value=pd.DataFrame()):
-                mt.filter()
-        assert all(mt.data_filtered["individual_id"].isna())
+        df = _sample_roi_data()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        index = QModelIndex()
+        index._row = 2  # ROI with None individual_id
+        index._col = 9
+        
+        result = mt.data(index, Qt.ItemDataRole.DisplayRole)
+        assert result == "None"
 
 
 # ---------------------------------------------------------------------------
-# TestEditStack
+# TestSetData
 # ---------------------------------------------------------------------------
 
-class TestEditStack:
-    def test_add_edit_stack_appends(self):
+class TestSetData:
+    def test_set_data_checkbox_change(self):
+        """setData handles checkbox state changes."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
+        df = _sample_roi_data()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        index = QModelIndex()
+        index._row = 0
+        index._col = 0  # "select" column
+        
+        result = mt.setData(index, Qt.CheckState.Checked, Qt.ItemDataRole.EditRole)
+        assert result is True
+        assert mt._data_filtered.at[0, "select"] == 1
 
-        from matchypatchy.database.media import EditObject
-        edits = [
-            EditObject(rid=10, mid=1, reference="reviewed",
-                       previous_value=1, new_value=0),
-        ]
-        with patch.object(mt, "refresh_table"):
-            mt.add_edit_stack(edits)
-        assert len(mt.edit_stack) == 1
-
-    def test_save_changes_clears_edit_stack(self):
+    def test_set_data_emits_user_edit_signal(self):
+        """setData emits user_edit signal."""
         mt = _make_media_table()
-        mt.data_filtered = _sample_roi_filtered()
-        mt.data_type = 1
+        df = _sample_roi_data()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        signal_captured = []
+        mt.user_edit.connect(lambda edit: signal_captured.append(edit))
+        
+        index = QModelIndex()
+        index._row = 0
+        index._col = 14  # "comment" column
+        
+        mt.setData(index, "test comment", Qt.ItemDataRole.EditRole)
+        
+        assert len(signal_captured) == 1
+        assert signal_captured[0].reference == "comment"
+        assert signal_captured[0].new_value == "test comment"
 
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=10, mid=1, reference="reviewed",
-                          previous_value=1, new_value=0)
-        mt.edit_stack = [edit]
-
-        with patch.object(mt, "clear_and_load_contents"):
-            mt.save_changes()
-
-        assert mt.edit_stack == []
-        mt.mpDB.edit_row.assert_called()
-
-    def test_save_changes_media_mode(self):
+    def test_set_data_viewpoint_conversion(self):
+        """setData converts viewpoint display value to internal value."""
         mt = _make_media_table()
-        mt.data_filtered = pd.DataFrame({"id": [1], "select": [0]})
-        mt.data_type = 0
+        df = _sample_roi_data()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt, QModelIndex
+        
+        index = QModelIndex()
+        index._row = 0
+        index._col = 8  # "viewpoint" column
+        
+        # "Left" in VIEWPOINTS dict maps to "0"
+        mt.setData(index, "Left", Qt.ItemDataRole.EditRole)
+        
+        assert mt._data_filtered.at[0, "viewpoint"] == 0
 
-        from matchypatchy.database.media import EditObject
-        edit = EditObject(rid=None, mid=1, reference="comment",
-                          previous_value="", new_value="updated")
-        mt.edit_stack = [edit]
 
-        with patch.object(mt, "clear_and_load_contents"):
-            mt.save_changes()
+# ---------------------------------------------------------------------------
+# TestReceiveData
+# ---------------------------------------------------------------------------
 
-        mt.mpDB.edit_row.assert_called_with(
-            "media", 1, {"comment": "updated"}, allow_none=False, quiet=False
-        )
+class TestReceiveData:
+    def test_receive_data_updates_filtered(self):
+        """receiveData updates _data_filtered."""
+        mt = _make_media_table()
+        data = _sample_roi_data()
+        
+        mt.receiveData(data)
+        
+        pd.testing.assert_frame_equal(mt._data_filtered, data)
+
+    def test_receive_data_with_headers(self):
+        """receiveData updates headers when provided."""
+        mt = _make_media_table()
+        data = _sample_roi_data()
+        new_headers = {0: ["select", "Select"], 1: ["id", "ID"]}
+        
+        mt.receiveData(data, headers=new_headers)
+        
+        assert mt.header_dict == new_headers
+        assert mt._columns[0] == "select"
+        assert mt._columns[1] == "id"
+
+
+# ---------------------------------------------------------------------------
+# TestUpdateMethods
+# ---------------------------------------------------------------------------
+
+class TestUpdateMethods:
+    def test_update_individuals(self):
+        """updateIndividuals fetches individual data from database."""
+        mt = _make_media_table()
+        mt.updateIndividuals()
+        
+        assert not mt.INDIVIDUALS.empty
+        assert "name" in mt.INDIVIDUALS.columns
+
+    def test_update_stations(self):
+        """updateStations fetches station data from database."""
+        mt = _make_media_table()
+        mt.updateStations()
+        
+        assert not mt.STATIONS.empty
+        assert "name" in mt.STATIONS.columns
+
+
+# ---------------------------------------------------------------------------
+# TestHeaderData
+# ---------------------------------------------------------------------------
+
+class TestHeaderData:
+    def test_header_data_horizontal(self):
+        """headerData returns column names for horizontal headers."""
+        mt = _make_media_table()
+        from PyQt6.QtCore import Qt
+        
+        result = mt.headerData(0, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
+        assert result == "Select"
+
+    def test_header_data_vertical(self):
+        """headerData returns row numbers for vertical headers."""
+        mt = _make_media_table()
+        from PyQt6.QtCore import Qt
+        
+        result = mt.headerData(0, Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole)
+        assert result == "1"
+
+
+# ---------------------------------------------------------------------------
+# TestSort
+# ---------------------------------------------------------------------------
+
+class TestSort:
+    def test_sort_ascending(self):
+        """sort sorts data in ascending order."""
+        mt = _make_media_table()
+        df = _sample_roi_data()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt
+        
+        # Sort by column 3 (timestamp) ascending
+        mt.sort(3, Qt.SortOrder.AscendingOrder)
+        
+        assert mt._data_filtered["timestamp"].iloc[0] <= mt._data_filtered["timestamp"].iloc[1]
+
+    def test_sort_descending(self):
+        """sort sorts data in descending order."""
+        mt = _make_media_table()
+        df = _sample_roi_data()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt
+        
+        # Sort by column 3 (timestamp) descending
+        mt.sort(3, Qt.SortOrder.DescendingOrder)
+        
+        assert mt._data_filtered["timestamp"].iloc[0] >= mt._data_filtered["timestamp"].iloc[1]
+
+    def test_sort_skips_thumbnail_column(self):
+        """sort does not sort by thumbnail column."""
+        mt = _make_media_table()
+        df = _sample_roi_data()
+        original_order = df.copy()
+        mt._data_filtered = df
+        from PyQt6.QtCore import Qt
+        
+        # Try to sort by thumbnail column (index 1)
+        mt.sort(1, Qt.SortOrder.AscendingOrder)
+        
+        # Data should remain unchanged
+        pd.testing.assert_frame_equal(mt._data_filtered, original_order)
+
+    def test_sort_empty_data(self):
+        """sort handles empty data gracefully."""
+        mt = _make_media_table()
+        mt._data_filtered = pd.DataFrame()
+        from PyQt6.QtCore import Qt
+        
+        # Should not raise exception
+        mt.sort(0, Qt.SortOrder.AscendingOrder)
+        assert mt._data_filtered.empty
