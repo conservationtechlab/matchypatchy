@@ -189,35 +189,41 @@ class DisplayMedia(QWidget):
         return
 
     # ALERT POPUP MANAGER ------------------------------------------------------
-    def show_progress(self, prompt):
+    def show_alert(self, prompt):
         """Progress Popup for Match Thread"""
-        if not hasattr(self, 'progress') or self.progress is None:
-            self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
-        self.progress.update_prompt(prompt)
+        if not hasattr(self, 'alert_box') or self.alert_box is None:
+            self.alert_box = AlertPopup(self, prompt, progressbar=True, cancel_only=True)
+        self.alert_box.update_prompt(prompt)
+        self.alert_box.show()
 
     def update_prompt(self, prompt):
         """Update the prompt in the progress popup"""
-        if hasattr(self, 'progress') and self.progress is not None:
-            self.progress.update_prompt(prompt)
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
+            self.alert_box.update_prompt(prompt)
+
+    def hide_progress(self):
+        """Hide the progress bar in the progress popup"""
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
+            self.alert_box.progress_bar.hide()
 
     def update_progress(self, progress):
         """Update the progress bar in the progress popup"""
-        if hasattr(self, 'progress') and self.progress is not None:
-            self.progress.set_counter(progress)
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
+            self.alert_box.set_counter(progress)
 
     def set_progress_max(self, max_value):
         """Set the maximum value for the progress bar"""
         # connects to FetchTableThread's progress_max signal
-        if hasattr(self, 'progress') and self.progress is not None:
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
             self.update_prompt("Collecting missing thumbnails...")
-            self.progress.set_max(max_value)
-            self.progress.progress_bar.setFormat("%v/%m")   # shows percentage, e.g. 42%
+            self.alert_box.set_max(max_value)
+            self.alert_box.progress_bar.setFormat("%v/%m")   # shows percentage, e.g. 42%
 
-    def close_progress(self):
-        """Close the progress popup"""
-        if hasattr(self, 'progress') and self.progress is not None:
-            self.progress.close()
-            self.progress = None
+    def close_alert(self):
+        """Close the alert popup"""
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
+            self.alert_box.close()
+            self.alert_box = None
 
     # =========================================================================
     # FILTERS
@@ -283,22 +289,25 @@ class DisplayMedia(QWidget):
     def load_table(self):
         """Load media/roi data into table based on current data_type"""
         # check if there are rois first
-        self.show_progress("Loading media...")
+        self.show_alert("Loading media...")
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
 
         if media_n == 0:
+            self.close_alert()
             # no media at all
            # self.media_table.clear_and_load_contents(self.data_type)
-            self.update_prompt("No images found! Please import media.")
-            if self.progress.exec():
+            dialog = AlertPopup(self, prompt="No images found! Please import media.")
+            if dialog.exec():
                 self.home()
+            del dialog
             return False
         else:
             if self.data_type == 1 and roi_n == 0:
                 # no rois, default to full images
                 self.data_type = 0
                 self.update_prompt("No rois found, defaulting to full images.")
+                self.hide_progress()
 
                 self.show_type.blockSignals(True)
                 self.show_type.setCurrentIndex(self.data_type)
@@ -311,9 +320,9 @@ class DisplayMedia(QWidget):
             self.dataloader.progress_max.connect(lambda n_missing: self.set_progress_max(n_missing))
             self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
             # Connect the progress popup's rejected signal to stop the query container's calculation
-            if hasattr(self, 'progress') and self.progress:
-                self.progress.rejected.connect(self.dataloader.requestInterruption)
-            self.dataloader.done.connect(self.close_progress)  # Close the progress dialog when done
+            if hasattr(self, 'alert_box') and self.alert_box:
+                self.alert_box.rejected.connect(self.dataloader.requestInterruption)
+            self.dataloader.done.connect(self.close_alert)  # Close the progress dialog when done
             self.dataloader.start()
             return True
 

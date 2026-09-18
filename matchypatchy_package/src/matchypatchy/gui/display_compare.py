@@ -241,8 +241,8 @@ class DisplayCompare(QWidget):
     # ==========================================================================
     def home(self, warn=False):
         """Return to Base View"""
-        if self.progress and self.progress.isVisible():
-            self.progress.close()
+        if self.alert_box and self.alert_box.isVisible():
+            self.alert_box.close()
         if warn:
             dialog = AlertPopup(self, prompt="No data to match, process images first.")
             dialog.exec()
@@ -265,33 +265,33 @@ class DisplayCompare(QWidget):
         self.QueryContainer.set_threshold(self.threshold)
 
     # ALERT POPUP MANAGER ------------------------------------------------------
-    def show_progress(self, prompt):
+    def show_alert(self, prompt):
         """Progress Popup for Match Thread"""
-        if not hasattr(self, 'progress') or self.progress is None:
-            self.progress = AlertPopup(self, prompt, progressbar=True, cancel_only=False)
-        self.progress.update_prompt(prompt)
-        self.progress.show()
+        if not hasattr(self, 'alert_box') or self.alert_box is None:
+            self.alert_box = AlertPopup(self, prompt, progressbar=True, cancel_only=False)
+        self.alert_box.update_prompt(prompt)
+        self.alert_box.show()
 
     def update_prompt(self, prompt):
         """Update the prompt in the progress popup"""
-        if hasattr(self, 'progress') and self.progress is not None:
-            self.progress.update_prompt(prompt)
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
+            self.alert_box.update_prompt(prompt)
 
     def update_progress(self, progress):
         """Update the progress bar in the progress popup"""
-        if hasattr(self, 'progress') and self.progress is not None:
-            self.progress.set_counter(progress)
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
+            self.alert_box.set_counter(progress)
 
     def set_progress_max(self, max_value):
         """Set the maximum value for the progress bar"""
-        if hasattr(self, 'progress') and self.progress is not None:
-            self.progress.set_max(max_value)
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
+            self.alert_box.set_max(max_value)
 
     def close_progress(self):
         """Close the progress popup"""
-        if hasattr(self, 'progress') and self.progress is not None:
-            self.progress.close()
-            self.progress = None
+        if hasattr(self, 'alert_box') and self.alert_box is not None:
+            self.alert_box.close()
+            self.alert_box = None
 
     # ==========================================================================
     # ON ENTRY
@@ -307,7 +307,7 @@ class DisplayCompare(QWidget):
         self.button_match_favorites.setStyleSheet("")
         # hide individual filter
         self.filterbar.individual_visible(False)
-        self.show_progress("Initializing...")
+        self.show_alert("Initializing...")
         self.set_progress_max(0)
         # Delay the heavy work so popup can render
         QTimer.singleShot(100, lambda: self._initialize_query_container(clear_cache))
@@ -317,8 +317,8 @@ class DisplayCompare(QWidget):
         self.QueryContainer.progress_update.connect(self.update_progress)
         self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
         # Connect the progress popup's rejected signal to stop the query container's calculation
-        if hasattr(self, 'progress') and self.progress:
-            self.progress.rejected.connect(self.QueryContainer.stop_calculation)
+        if hasattr(self, 'alert_box') and self.alert_box:
+            self.alert_box.rejected.connect(self.QueryContainer.stop_calculation)
         # try cache first
         if clear_cache:
             self.logger.info("Clearing KNN cache")
@@ -340,7 +340,7 @@ class DisplayCompare(QWidget):
     def _cache_or_calculate_neighbors(self):
         """Attempt to use cached KNN results, calculate if not available."""
         # try cache first
-        self.progress.update_prompt("Checking cache...")
+        self.alert_box.update_prompt("Checking cache...")
         #TODO: filter cache based on current filters
         cache_available = self.QueryContainer.load_knn_cache()
         if cache_available:
@@ -348,8 +348,8 @@ class DisplayCompare(QWidget):
             QTimer.singleShot(100, lambda: self.check_matchthread_success(True))
         else:
             # if cache not available, calculate neighbors
-            self.update_prompt("Matching embeddings...")
-            self.set_progress_max(100)
+            self.alert_box.update_prompt("Matching embeddings...")
+            self.alert_box.set_max(100)
             QTimer.singleShot(100, self.QueryContainer.calculate_neighbors)
 
     def check_matchthread_success(self, thread_success):
