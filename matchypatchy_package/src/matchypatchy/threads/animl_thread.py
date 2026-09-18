@@ -138,11 +138,6 @@ class AnimlThread(QThread):
     def detect_images(self):
         """Extract bboxes for images using ANIML"""
 
-        # SKIP if no detector selected
-        if self.detector is None:
-            self.prompt_update.emit("No detector selected, skipping detection...")
-            return
-
         # detect new images
         for batch_start in range(0, len(self.images), self.batch_size):
             if self.isInterruptionRequested():
@@ -151,16 +146,31 @@ class AnimlThread(QThread):
             batch_end = min(batch_start + self.batch_size, len(self.images))
             image_batch = self.images.iloc[batch_start:batch_end]
 
-            detections = animl.detect(self.detector,
-                                      image_batch,
-                                      MEGADETECTORv1000_SIZE,
-                                      MEGADETECTORv1000_SIZE,
-                                      confidence_threshold=self.confidence_threshold,
-                                      batch_size=self.batch_size,
-                                      use_progress_bar=False)
+            # if no detector is selected, use the full image as the ROI
+            if self.detector is None:
+                detections = pd.DataFrame([{
+                    'id': img['id'],
+                    'frame': 0,
+                    'bbox_x': 0,
+                    'bbox_y': 0,
+                    'bbox_w': 1,
+                    'bbox_h': 1,
+                    'filepath': img['filepath'],
+                    'ext': img['ext']
+                } for _, img in image_batch.iterrows()])
 
-            detections = animl.parse_detections(detections, manifest=image_batch)
-            detections = animl.get_animals(detections)
+            # run detector
+            else:
+                detections = animl.detect(self.detector,
+                                          image_batch,
+                                          MEGADETECTORv1000_SIZE,
+                                          MEGADETECTORv1000_SIZE,
+                                          confidence_threshold=self.confidence_threshold,
+                                          batch_size=self.batch_size,
+                                          use_progress_bar=False)
+
+                detections = animl.parse_detections(detections, manifest=image_batch)
+                detections = animl.get_animals(detections)
 
             for _, roi in detections.iterrows():
                 frame = roi['frame'] if 'frame' in roi.index else 0
@@ -182,7 +192,7 @@ class AnimlThread(QThread):
                                                    roi['filepath'],
                                                    roi['ext'],
                                                    frame,
-                                                    bbox_x, bbox_y, bbox_w, bbox_h)
+                                                   bbox_x, bbox_y, bbox_w, bbox_h)
                 self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
 
             self.progress_count += len(image_batch)
