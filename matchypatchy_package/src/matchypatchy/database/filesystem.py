@@ -4,12 +4,7 @@ import subprocess
 from pathlib import Path
 
 
-class RemoteFilesystemError(Exception):
-    """Raised when the database path is on a network/SMB mount."""
-    pass
-
-
-def is_network_path(path: Path) -> tuple[bool, str]:
+def _is_network_path(path: Path) -> tuple[bool, str]:
     """
     Detect if a path lives on a network filesystem (SMB/CIFS/NFS/AFP).
     Returns (is_network, filesystem_type_or_reason).

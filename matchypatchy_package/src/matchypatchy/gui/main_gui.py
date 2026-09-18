@@ -32,7 +32,7 @@ from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy import __version__
 from matchypatchy.config import mpConfig
 from matchypatchy.database.mpdb import MatchyPatchyDB
-from matchypatchy.database.filesystem import is_network_path
+from matchypatchy.database.filesystem import _is_network_path
 
 
 class MainWindow(QMainWindow):
@@ -281,7 +281,7 @@ class MainWindow(QMainWindow):
 
         home_dir = Path(home_dir)
 
-        is_remote, fs_info = is_network_path(home_dir)
+        is_remote, fs_info = _is_network_path(home_dir)
         if is_remote:
             msg = (
                 f"The selected database location appears to be a network/SMB share "
