@@ -32,6 +32,7 @@ from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy import __version__
 from matchypatchy.config import mpConfig
 from matchypatchy.database.mpdb import MatchyPatchyDB
+from matchypatchy.database.filesystem import is_network_path
 
 
 class MainWindow(QMainWindow):
@@ -278,12 +279,27 @@ class MainWindow(QMainWindow):
         # close existing database connection before creating a new project
         self.mpDB.close()
 
-        home_dir = Path(home_dir) / "MatchyPatchy-Share"  # Fallback to current working directory
-        self.settings.setValue("home_dir", str(home_dir))
-        self.logger.info(f"Creating project folder: {str(home_dir)}.")
+        home_dir = Path(home_dir)
 
+        is_remote, fs_info = is_network_path(home_dir)
+        if is_remote:
+            msg = (
+                f"The selected database location appears to be a network/SMB share "
+                f"(detected: {fs_info}). \n SQLite does not reliably support network "
+                f"filesystems and this can cause database corruption or lock errors.\n\n"
+                f"Please choose a folder on your local hard drive first and then sync to the network location instead."
+            )
+            self.logger.error(msg)
+            dialog = AlertPopup(self, prompt=msg)
+            dialog.exec()
+            del dialog
+            return
+        
+        self.logger.info(f"Creating project folder: {str(home_dir)}.")
         self.cfg = mpConfig(home_dir)
         self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
+        # save settings
+        self.settings.setValue("home_dir", str(home_dir))
         # update pages with the new configuration and database connection
         self.Base.update_project(self.cfg, self.mpDB)
         self.Media.update_project(self.cfg, self.mpDB)

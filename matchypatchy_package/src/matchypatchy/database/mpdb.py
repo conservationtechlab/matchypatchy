@@ -52,8 +52,8 @@ class MatchyPatchyDB():
         self.logger.info(f"Database file path: {self.filepath}")
         self.logger.info(f"Chroma database file path: {self.chroma_filepath}")
         self.logger.info(f"Using key: {self.key}")
-        self.db  # Trigger property initialization
-        setup_database(self.key, self.filepath, self.db)
+        # setup new databases
+        setup_database(self.key, self.filepath)
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
         self.collection = self.chroma.get_collection(name="embedding_collection")
         # add default region and survey
