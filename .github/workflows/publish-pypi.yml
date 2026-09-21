@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+# The publishable package lives in a subdirectory of this monorepo,
+# not the repo root.
+env:
+  PACKAGE_DIR: matchypatchy_package
+
 jobs:
   build:
     name: Build distribution
@@ -28,7 +33,7 @@ jobs:
         run: python -m pip install --upgrade build
 
       - name: Build sdist and wheel
-        run: python -m build
+        run: python -m build "$PACKAGE_DIR"
 
       - name: Verify tag matches package version
         # Only meaningful for real tag pushes; skipped on manual test runs
@@ -37,7 +42,7 @@ jobs:
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PKG_VERSION=$(python -c "import glob, re; \
-            f = glob.glob('dist/*.whl')[0]; \
+            f = glob.glob('$PACKAGE_DIR/dist/*.whl')[0]; \
             print(re.search(r'-([0-9][^-]*)-py', f).group(1))")
           echo "Tag version:     $TAG_VERSION"
           echo "Package version: $PKG_VERSION"
@@ -50,7 +55,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist
-          path: dist/
+          path: ${{ env.PACKAGE_DIR }}/dist/
 
   publish:
     name: Publish to PyPI
@@ -58,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/animl/
+      url: https://pypi.org/project/matchypatchy/
     permissions:
       id-token: write  # required for OIDC trusted publishing; no API token needed
     steps:
