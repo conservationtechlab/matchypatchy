@@ -132,16 +132,14 @@ class TestSetupChromadb:
 
     def test_collection_metadata_contains_key(self, tmp_path):
         chroma_dir = tmp_path / "emb.db"
-        setup_chromadb("MKEY", chroma_dir)
+        client = setup_chromadb("MKEY", chroma_dir)
 
-        client = chromadb.PersistentClient(str(chroma_dir))
         collection = client.get_collection("embedding_collection")
         assert collection.metadata["key"] == "MKEY"
 
     def test_collection_uses_cosine_space(self, tmp_path):
         chroma_dir = tmp_path / "emb.db"
-        setup_chromadb("CSPACE", chroma_dir)
+        client = setup_chromadb("CSPACE", chroma_dir)
 
-        client = chromadb.PersistentClient(str(chroma_dir))
         collection = client.get_collection("embedding_collection")
         assert collection.metadata.get("hnsw:space") == "cosine"

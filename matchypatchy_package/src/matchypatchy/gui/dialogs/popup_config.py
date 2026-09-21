@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import animl
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QComboBox,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QComboBox, QInputDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
@@ -277,8 +277,18 @@ class ConfigPopup(QDialog):
         """Create new project directory"""
         parent_dir = QFileDialog.getExistingDirectory(self, "Select new Project location",
                                                       os.path.expanduser('~'),)
-        if parent_dir:
-            self.parent.new_project(parent_dir)
+        if not parent_dir:
+            return  # user cancelled
+
+        project_name, ok = QInputDialog.getText(self, "New Project", "Project name:")
+        if not ok or not project_name.strip():
+            return  # user cancelled or entered nothing
+
+        project_name = project_name.strip()
+
+        if parent_dir and project_name:
+            new_project_path = Path(parent_dir) / project_name
+            self.parent.new_project(new_project_path)
             # Update local references to the new project's database and config
             self.mpDB = self.parent.mpDB
             self.cfg = self.parent.cfg

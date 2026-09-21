@@ -22,7 +22,7 @@ def fetch_regions(mpDB):
     return pd.DataFrame(columns=["id", "name", "timezone"])
 
 
-def fetch_stations(mpDB, survey_id=None):
+def fetch_stations(mpDB, survey_id=None, reset_index=False):
     """
     Fetches stations associated with given survey, Converts to DataFrame
     """
@@ -32,21 +32,54 @@ def fetch_stations(mpDB, survey_id=None):
         stations = mpDB.select("station")
 
     if stations:
-        return pd.DataFrame(stations, columns=["id", "name", "lat", "long", "survey_id"])
-
+        df = pd.DataFrame(stations, columns=["id", "name", "lat", "long", "survey_id"])
+        if reset_index:
+            df = df.set_index("id")
+        return df
+    
     return pd.DataFrame(columns=["id", "name", "lat", "long", "survey_id"])
 
 
-def fetch_station_names_from_id(mpDB, station_id):
+def fetch_cameras(mpDB, station_id=None, reset_index=False):
+    """
+    Fetches cameras associated with given station, Converts to DataFrame
+    """
+    if station_id:
+        cameras = mpDB.select("camera", row_cond=f'station_id={station_id}')
+    else:
+        cameras = mpDB.select("camera")
+
+    if cameras:
+        df = pd.DataFrame(cameras, columns=["id", "name", "station_id"])
+        if reset_index:
+            df = df.set_index("id")
+        return df
+
+    return pd.DataFrame(columns=["id", "name", "station_id"])
+
+
+def fetch_station_names_from_id(mpDB, station_id, camera_id=None):
     """Given a station id, return names and ids of survey and region"""
     station_name, suvery_id = mpDB.select("station", "name, survey_id", row_cond=f"id={station_id}")[0]
     survey_name, region_id = mpDB.select("survey", "name, region_id", row_cond=f"id={suvery_id}")[0]
-    region_name = mpDB.select("region", "name", row_cond=f"id={region_id}")[0][0]
+    # camera
+    if camera_id is None:
+        camera_name = None
+    else:
+        camera_name = mpDB.select("camera", "name", row_cond=f"id={camera_id}")[0][0]
+    # region
+    if region_id is None:
+        region_name = None
+    else:
+        region_name = mpDB.select("region", "name", row_cond=f"id={region_id}")
+        region_name = region_name[0][0] if region_name else None
     return_dict = {'station_name': station_name,
                    'suvery_id': suvery_id,
                    'survey_name': survey_name,
                    'region_id': region_id,
-                   'region_name': region_name}
+                   'region_name': region_name,
+                   'camera_id': camera_id,
+                   'camera_name': camera_name}
     return return_dict
 
 

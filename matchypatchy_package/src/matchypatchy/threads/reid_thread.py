@@ -25,6 +25,7 @@ class ReIDThread(QThread):
         self.mpDB = mpDB
         self.cfg = cfg
         self.device = self.cfg.DEVICE
+        self.batch_size = cfg.BATCH_SIZE
         self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
         self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
         
@@ -70,23 +71,29 @@ class ReIDThread(QThread):
 
         # filter rois without viewpoint
         filtered_rois = self.rois[self.rois['viewpoint'].isna()]
-        if len(filtered_rois) > 0:
+        n_rois = len(filtered_rois)
+        if n_rois > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
 
             model, classes = animl.load_classifier(self.viewpoint_filepath, device=self.device)
-            dataloader = animl.manifest_dataloader(filtered_rois, resize_width=480, resize_height=480, crop=True)
+            dataloader = animl.ManifestGenerator(filtered_rois, 
+                                                  resize_width=480,
+                                                  resize_height=480,
+                                                  crop=True,
+                                                  batch_size=1)
 
             for i, batch in enumerate(dataloader):
-                if not self.isInterruptionRequested():
-                    image = batch[0]
-                    output = model.run(None, {model.get_inputs()[0].name: image})[0]
-                    value = argmax(animl.softmax(output), axis=1)[0]
+                if self.isInterruptionRequested():
+                    break
+                image = batch[0]
+                output = model.run(None, {model.get_inputs()[0].name: image})[0]
+                value = argmax(animl.softmax(output), axis=1)[0]
 
-                    # TODO process by sequence
-                    # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
-                    roi_id = filtered_rois.at[i, 'roi_id']
-                    self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
+                # TODO process by sequence
+                # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
+                roi_id = filtered_rois.at[i, 'roi_id']
+                self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
+                self.progress_update.emit(round(100 * i / len(filtered_rois)))
 
     def get_embeddings(self):
         """Process embeddings for ROIs"""

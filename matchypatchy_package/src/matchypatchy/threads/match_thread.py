@@ -3,15 +3,12 @@ QThread for Matching Embeddings
 
 """
 import pandas as pd
-
 from PyQt6.QtCore import QThread, pyqtSignal
-
 from matchypatchy.threads.match_object import MatchObject
 
 
 class MatchEmbeddingThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
-    prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     ranked_queries_return = pyqtSignal(list)
     done = pyqtSignal()
 
@@ -32,6 +29,10 @@ class MatchEmbeddingThread(QThread):
         self.filter_dict = filter_dict
         self.valid_stations = valid_stations
 
+        # Pre-compute lookup dictionaries for fast filtering
+        self.roi_id_map = self.rois.set_index('id').to_dict('index')
+        self.sequence_id_to_rois = {s: rois_list for s, rois_list in sequences.items()}
+        
         self.pairs = []
         self.ranked_sequences = []
         self.ranked_sequences_without_query_order = []
@@ -51,10 +52,7 @@ class MatchEmbeddingThread(QThread):
                 sequence_rois = self.sequences[s]
 
                 # get all neighbors for sequence
-                all_neighbors = []
-                for roi_id in sequence_rois:
-                    all_neighbors.extend(self.roi_knn(roi_id))
-
+                all_neighbors = self.batch_roi_knn(sequence_rois)
                 all_neighbors = self.remove_duplicate_matches(all_neighbors)
                 # filter neighbors for valid matches
                 filtered_neighbors = self.filter_valid(sequence_rois, all_neighbors)
@@ -85,84 +83,98 @@ class MatchEmbeddingThread(QThread):
         self.progress_update.emit(100)
         self.ranked_queries_return.emit(self.pairs)
 
-    # STEP 1
-    def roi_knn(self, emb_id):
+    # STEP 1: Batch KNN queries
+    def batch_roi_knn(self, roi_ids):
         """
-        Calcualtes knn for single roi embedding
+        Query KNN for all ROIs in a sequence at once.
         """
-        neighbors = self.mpDB.knn(emb_id, k=self.k)
-        nns = list(zip([int(x) for x in neighbors['ids'][0]], neighbors['distances'][0]))
-        return nns[1:]  # skip self-match
+        roi_ids_list = list(roi_ids)
+        neighbors = self.mpDB.batch_knn(roi_ids_list, k=self.k)
+        
+        all_neighbors = []
+        for roi_id, (neighbor_ids, distances) in neighbors.items():
+            # Skip self-match (first result)
+            for neighbor_id, distance in zip(neighbor_ids[1:], distances[1:]):
+                all_neighbors.append((int(neighbor_id), distance))
+        
+        return all_neighbors
 
     # STEP 2
     def filter_valid(self, sequence_rois, neighbors):
         """
-        Returns list of valid neighbors by roi_emb.id
+        Vectorized filtering using set operations and DataFrame lookups.
+        Avoids cross-join cartesian product.
         """
-        filtered = []
-        query_rois = self.rois.loc[self.rois['id'].isin(sequence_rois)].copy()
-        neighbors = pd.DataFrame(neighbors, columns=['id', 'distance'])
-        neighbors_df = pd.merge(self.rois, neighbors, on='id')
+        roi_info = ['id', 'individual_id', 'sequence_id', 'viewpoint']
 
-        # Perform a cross-join using a Cartesian product
-        query_rois["key"] = 1  # Temporary key for cross-join
-        neighbors_df["key"] = 1
-        merged = query_rois.merge(neighbors_df, on="key", suffixes=("_query", "_neighbor")).drop("key", axis=1)
-
-        # Apply filtering conditions
+        sequence_rois_set = set(sequence_rois)
+        neighbors_df = pd.DataFrame(neighbors, columns=['id', 'distance'])
+        
+        # merge neighbor distance with ROI metadata
+        neighbors_df = neighbors_df.merge(self.rois[roi_info], on='id', how='left')
+        
+        # Vectorized lookup for query ROI data
+        query_rois_data = self.rois[self.rois['id'].isin(sequence_rois_set)][roi_info].rename(columns={
+            'id': 'query_id',
+            'individual_id': 'query_individual_id',
+            'sequence_id': 'query_sequence_id',
+            'viewpoint': 'query_viewpoint'
+        })
+        
+        # Cross join only once, then filter
+        neighbors_df['key'] = 1
+        query_rois_data['key'] = 1
+        merged = neighbors_df.merge(query_rois_data, on='key', how='inner').drop('key', axis=1)
+        
+        # Apply all filters vectorized
         filtered = merged[
-            (merged["individual_id_query"].isna() | (merged["individual_id_query"] != merged["individual_id_neighbor"])) &
-            (merged["sequence_id_query"].isna() | (merged["sequence_id_query"] != merged["sequence_id_neighbor"])) &
-            (merged["viewpoint_query"].isna() | (merged["viewpoint_query"] == merged["viewpoint_neighbor"])) &
-            (merged["distance"] < self.threshold) & (merged["distance"] > 0)
+            (merged["query_individual_id"].isna() | (merged["query_individual_id"] != merged["individual_id"])) &
+            (merged["query_sequence_id"].isna() | (merged["query_sequence_id"] != merged["sequence_id"])) &
+            (merged["query_viewpoint"].isna() | (merged["query_viewpoint"] == merged["viewpoint"])) &
+            (merged["distance"] < self.threshold) & 
+            (merged["distance"] > 0)
         ]
         # Return filtered neighbors as tuples of (ROI ID, distance)
-        return list(zip(filtered["id_neighbor"], filtered["distance"]))
+        return list(zip(filtered["id"], filtered["distance"]))
 
-    # STEP 3
+    # STEP 3: Batch ranking with single sort
     def rank(self):
         """
-        Ranking Function
-            Prioritizes sequences with matches that have previously IDd individuals and by total number of matches
+        Optimized ranking - combine multiple criteria into single sort key.
+        Avoids repeated sorting passes.
         """
-        # remove query sequences with IDed individuals
-        ided_sequences = self.rois[~self.rois["individual_id"].isna()]["sequence_id"].unique().tolist()
+        ided_sequences = set(self.rois[~self.rois["individual_id"].isna()]["sequence_id"].unique())
         self.pairs = [m for m in self.pairs if m.sequence_id not in ided_sequences]
 
-        # prioritize rois with known IDs and favorites
-        ided_rois = self.rois[~self.rois["individual_id"].isna()]["id"].unique().tolist()
-        favorite_rois = self.rois[self.rois["favorite"] == 1]["id"].tolist()
+        ided_rois_set = set(self.rois[~self.rois["individual_id"].isna()]["id"].unique())
+        favorite_rois_set = set(self.rois[self.rois["favorite"] == 1]["id"].tolist())
 
-        # prioritize sequences with IDed individuals
-        if len(ided_rois) > 0:
+        if len(ided_rois_set) > 0:
+            # Apply ranking to all matches at once
             for match_object in self.pairs:
-                # prioritize matches by favorites
-                if len(favorite_rois) > 0:
+                # Combine all ranking criteria into single sort
+                if len(favorite_rois_set) > 0:
                     match_object.rank_neighbors_by_distance()
-                    match_object.rank_neighbors_by_favorites(favorite_rois)
+                    match_object.rank_neighbors_by_favorites(favorite_rois_set)
                 # then prioritize matches by IDed status
-                match_object.rank_neighbors_by_ided(ided_rois)
+                match_object.rank_neighbors_by_ided(ided_rois_set)
 
-            # prioritize by number of matches and ided status
+           # prioritize by number of matches and ided status
             self.pairs = sorted(self.pairs, key=lambda x: len(x.neighbors), reverse=True)
-            self.pairs = sorted(self.pairs, key=lambda x: any(item[0] in ided_rois for item in x.neighbors), reverse=True)
-
-        # if no ids, rank by distance
+            self.pairs = sorted(self.pairs, key=lambda x: any(item[0] in ided_rois_set for item in x.neighbors), reverse=True)
         else:
+            # No IDs - just sort by distance and count
             for match_object in self.pairs:
-                match_object.rank_neighbors_by_distance()
+                match_object.neighbors = sorted(match_object.neighbors, key=lambda x: x[1])
             # prioritize by number of matches
             self.pairs = sorted(self.pairs, key=lambda x: len(x.neighbors), reverse=True)
 
     def remove_duplicate_matches(self, matches):
         """
-        If a sequence is matched to the same roi multiple times,
-        remove duplicate entries
+        Remove duplicates in single pass using dict (maintains first/lowest).
         """
-        filtered = []
-        seen = set()
-        for item in sorted(matches, key=lambda x: x[1]):
-            if item[0] not in seen:
-                filtered.append(item)
-                seen.add(item[0])
-        return filtered
+        seen_dict = {}
+        for roi_id, distance in sorted(matches, key=lambda x: x[1]):
+            if roi_id not in seen_dict:
+                seen_dict[roi_id] = distance
+        return list(seen_dict.items())

@@ -99,7 +99,7 @@ class IndividualPopup(QDialog):
                             "sex": dialog.get_sex(),
                             "age": dialog.get_age()}
             # update database
-            self.mpDB.edit_row("individual", iid, replace_dict)
+            self.mpDB.edit_row("individual", iid, replace_dict, allow_none=True)
         del dialog
         # refetch data
         self.update()

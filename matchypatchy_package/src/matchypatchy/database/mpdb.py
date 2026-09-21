@@ -9,6 +9,7 @@ from pathlib import Path
 from random import randrange
 
 import chromadb
+from chromadb.config import Settings
 import numpy as np
 import pandas as pd
 
@@ -51,8 +52,8 @@ class MatchyPatchyDB():
         self.logger.info(f"Database file path: {self.filepath}")
         self.logger.info(f"Chroma database file path: {self.chroma_filepath}")
         self.logger.info(f"Using key: {self.key}")
-        self.db  # Trigger property initialization
-        setup_database(self.key, self.filepath, self.db)
+        # setup new databases
+        setup_database(self.key, self.filepath)
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
         self.collection = self.chroma.get_collection(name="embedding_collection")
         # add default region and survey
@@ -73,7 +74,8 @@ class MatchyPatchyDB():
     def chroma(self):
         """Get or create a Chroma client for the current thread"""
         if not hasattr(self.local, 'chroma') or self.local.chroma is None:
-            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
+            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath), 
+                                                          settings=Settings(anonymized_telemetry=False))
         return self.local.chroma
 
     @chroma.setter
@@ -335,6 +337,7 @@ class MatchyPatchyDB():
                   sequence_id: Optional[int] = None,
                   external_id: Optional[int] = None,
                   comment: Optional[str] = None,
+                  commit: bool = True,
                   quiet: bool = True):
         """
         Media has 10 attributes not including id:
@@ -370,7 +373,8 @@ class MatchyPatchyDB():
                 print(f"DEBUG: Executing SQL command: {command} with data: {data_tuple}")
             cursor.execute(command, data_tuple)
             media_id = cursor.lastrowid
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return media_id
 
         # filepath already exists
@@ -400,6 +404,7 @@ class MatchyPatchyDB():
                 favorite: int = 0,
                 individual_id: Optional[int] = None,
                 emb: int = 0,
+                commit: bool = True,
                 quiet: bool = True):
         """
         Add a roi with:
@@ -436,7 +441,8 @@ class MatchyPatchyDB():
                 print(f"Executing SQL command: {command} with data: {data_tuple}")
             cursor.execute(command, data_tuple)
             roi_id = cursor.lastrowid
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return roi_id
         except sqlite3.Error as error:
             if not quiet:
@@ -475,7 +481,7 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to add camera: {error}")
             return None
 
-    def add_thumbnail(self, table, fid, filepath):
+    def add_thumbnail(self, table, fid, filepath, commit=True):
         """Add a thumbnail entry to media_thumbnails or roi_thumbnails table
 
         Args:
@@ -489,7 +495,8 @@ class MatchyPatchyDB():
             data_tuple = (fid, filepath)
             cursor.execute(command, data_tuple)
             thumbnail_id = cursor.lastrowid
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return thumbnail_id
 
         # filepath already exists
@@ -507,10 +514,11 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to add thumbnail: {error}")
             return None
 
-    def copy(self, table, row_id):
+    def copy(self, table, row_id: int):
         """Copy a row from a table by id"""
         try:
             cursor = self.db.cursor()
+            row_id = int(row_id)
             command = f"""INSERT INTO {table} SELECT * FROM {table} WHERE id={row_id};"""
             cursor.execute(command)
             new_id = cursor.lastrowid
@@ -534,28 +542,109 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            # convert empty values to SQL NULL
+            set_clauses = []
+            params = []
             for key, value in replace.items():
                 if value in (None, ''):
                     if allow_none:
-                        replace[key] = 'NULL'
+                        set_clauses.append(f"{key}=NULL")
                     else:
                         self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
                         return False
-                # if value is a string, wrap it in quotes for SQL
-                if isinstance(value, str):
-                    replace[key] = f"'{value}'"
+                else:
+                    # bind values as parameters instead of interpolating them into
+                    # the SQL string, so values containing quotes (e.g. "O'Brien")
+                    # don't produce invalid/unsafe SQL
+                    set_clauses.append(f"{key}=?")
+                    params.append(value)
 
-            replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
+            replace_values = ",".join(set_clauses)
 
-            command = f"UPDATE {table} SET {replace_values} WHERE id={row_id}"
+            command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+            row_id = int(row_id)
+            params.append(row_id)
             if not quiet:
-                print(command)
-            cursor.execute(command)
+                print(command, params)
+            cursor.execute(command, params)
             self.db.commit()
             return True
         except sqlite3.Error as error:
             self.logger.error(f"Failed to update table: {error}")
+            return False
+
+    def batch_edit(self, table: str, updates: dict, allow_none=False, quiet=True):
+        """
+        Batch edit multiple rows in a table
+
+        Args
+            - table (str): table name
+            - updates (dict): dictionary of row_id: {column: value} updates
+            - quiet (bool): if False, prints the executed commands
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute("BEGIN TRANSACTION")
+
+            for row_id, replace in updates.items():
+                set_clauses = []
+                params = []
+                for key, value in replace.items():
+                    if value in (None, ''):
+                        if allow_none:
+                            set_clauses.append(f"{key}=NULL")
+                        else:
+                            self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
+                            return False
+                    else:
+                        # bind values as parameters instead of interpolating them into
+                        # the SQL string, so values containing quotes don't produce
+                        # invalid/unsafe SQL
+                        set_clauses.append(f"{key}=?")
+                        params.append(value)
+
+                replace_values = ",".join(set_clauses)
+                command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+                row_id = int(row_id)
+                params.append(row_id)
+                if not quiet:
+                    print(command, params)
+                cursor.execute(command, params)
+            self.db.commit()
+            return True
+        except sqlite3.Error as error:
+            self.logger.error(f"Failed batch update on table {table}: {error}")
+            return False
+
+    def batch_update_thumbnails(self, table, id_column, batch_updates):
+        """
+        Batch update multiple thumbnail entries.
+        batch_updates: {id: {column: value, ...}, ...}
+        """
+        if not batch_updates:
+            return
+
+        try:
+            # Simple approach: execute individual UPDATEs in a transaction
+            cursor = self.db.cursor()
+            cursor.execute("BEGIN TRANSACTION")
+            
+            for row_id, changes in batch_updates.items():
+                # Add the ID to the changes
+                all_columns = {id_column: row_id, **changes}
+                
+                columns = ', '.join(all_columns.keys())
+                placeholders = ', '.join('?' * len(all_columns))
+                values = list(all_columns.values())
+                
+                query = f"INSERT OR REPLACE INTO {table} ({columns}) VALUES ({placeholders})"
+                cursor.execute(query, values)
+                
+            self.db.commit()
+            self.logger.info(f"Updated {len(batch_updates)} thumbnail entries in {table}")
+            return True
+        except Exception as e:
+            self.db.rollback()
+            self.logger.error(f"Error batch updating {table}: {e}")
             return False
 
     def select(self, table: str, columns: str = "*", row_cond: Optional[str] = None, quiet=True):
@@ -581,7 +670,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()
             return rows
         except sqlite3.Error as error:
-            self.logger.error(f"Failed fetch: {error}")
+            self.logger.error(f"Failed fetch on {table}: {error}")
             return None
 
     def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None, quiet=True):
@@ -610,7 +699,7 @@ class MatchyPatchyDB():
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error(f"Failed fetch: {error}")
+            self.logger.error(f"Failed fetch on {table} with join on {join_table}: {error}")
             return None, None
 
     def get_media_with_filepath(self, row_cond: Optional[str] = None):
@@ -801,6 +890,23 @@ class MatchyPatchyDB():
         knn = self.collection.query(query_embeddings=query, n_results=k + 1)
         return knn
 
+    def batch_knn(self, query_ids, k=3):
+        """
+        Query KNN for multiple ROI IDs at once (much faster than individual queries).
+        Returns dict: {roi_id: (neighbor_ids, distances)}
+        """
+        query_ids_str = [str(qid) for qid in query_ids]
+        queries = self.collection.get(ids=query_ids_str, include=['embeddings'])['embeddings']
+        
+        results = {}
+        for roi_id, embedding in zip(query_ids, queries):
+            knn = self.collection.query(query_embeddings=[embedding], n_results=k + 1)
+            results[roi_id] = (
+                [int(x) for x in knn['ids'][0]],
+                knn['distances'][0]
+            )
+        return results
+
     def calculate_similarity(self, query_id, match_id):
         results1 = self.collection.get(ids=[str(query_id)], include=["embeddings"])
         results2 = self.collection.get(ids=[str(match_id)], include=["embeddings"])
@@ -816,6 +922,33 @@ class MatchyPatchyDB():
         norm2 = np.linalg.norm(emb2)
         similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
         return float(similarity)
+
+    def batch_calculate_similarity(self, query_id, match_ids):
+        """
+        Calculate similarities between a query embedding and multiple match embeddings.
+        Returns a dict: {match_id: similarity}
+        """
+        query_results = self.collection.get(ids=[str(query_id)], include=["embeddings"])
+        query_emb = query_results['embeddings'][0]
+
+        if query_emb is None:
+            return {mid: None for mid in match_ids}
+
+        match_ids_str = [str(mid) for mid in match_ids]
+        match_results = self.collection.get(ids=match_ids_str, include=["embeddings"])
+
+        similarities = {}
+        for mid, emb in zip(match_ids, match_results['embeddings']):
+            if emb is None:
+                similarities[mid] = None
+                continue
+            dot_product = np.dot(query_emb, emb)
+            norm1 = np.linalg.norm(query_emb)
+            norm2 = np.linalg.norm(emb)
+            similarity = dot_product / (norm1 * norm2) if norm1 != 0 and norm2 != 0 else 0
+            similarities[mid] = float(similarity)
+
+        return similarities
 
     def clear_emb(self):
         """Clear vector database and rebuild (no way to delete)"""

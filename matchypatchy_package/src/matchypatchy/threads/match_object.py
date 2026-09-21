@@ -8,18 +8,35 @@ class MatchObject():
     Class definition for MatchObject, contains all matches for a given query sequence
     """
     def __init__(self, sequence_id, filtered_neighbors, query_data, match_data):
-        self.sequence_id = sequence_id  # ID of the query sequence
-        self.neighbors = filtered_neighbors  # valid matches, will padded with full sequences
-        self.query_data = query_data  # query ROI rows
-        self.match_data = match_data  # match ROI rois
+        self.sequence_id = sequence_id
+        self.neighbors = filtered_neighbors
+        self.query_data = query_data
+        self.match_data = match_data
 
-        self.zip_viewpoint()  # create dict of id:viewpoints for both sides
+        # Cache viewpoint maps to avoid re-zipping
+        self._viewpoint_cache_valid = False
+        self.query_viewpoint_map = {}
+        self.match_viewpoint_map = {}
+        self._invalidate_cache()
 
         self.ranked_query_rids = []  # ranked query ROI IDs after ordering by viewpoint
         self.ranked_matches = []  # ranked match tuples (roi_id, distance) after ordering by viewpoint
 
         self.og_ranked_query_rids = []  # original ranked query ROI IDs
         self.og_ranked_matches = []  # original ranked match tuples (roi_id, distance)
+
+    def _invalidate_cache(self):
+        """Invalidate cache and rebuild viewpoint maps with None handling"""
+        self.query_viewpoint_map = self._build_safe_viewpoint_map(self.query_data['id'], self.query_data['viewpoint'])
+        self.match_viewpoint_map = self._build_safe_viewpoint_map(self.match_data.index, self.match_data['viewpoint'])
+        self._viewpoint_cache_valid = True
+
+    def _build_safe_viewpoint_map(self, ids, viewpoints):
+        """
+        Build viewpoint map with None values converted to a sort-safe high value.
+        This centralizes None handling instead of spreading it through sort keys.
+        """
+        return {roi_id: (vp if vp is not None else float('inf')) for roi_id, vp in zip(ids, viewpoints)} 
 
     def get_ranked_query_rids(self):
         """Get the ranked query ROI IDs"""
@@ -30,16 +47,18 @@ class MatchObject():
         return self.ranked_matches
 
     def rank_neighbors_by_distance(self):
-        """Rank matches by distance"""
+        """Rank by distance"""
         self.neighbors = sorted(self.neighbors, key=lambda x: x[1])
 
     def rank_neighbors_by_favorites(self, favorite_rois):
-        """Rank matches by favorites"""
-        self.neighbors = sorted(self.neighbors, key=lambda x: (x[0] not in favorite_rois))
+        """Rank by favorites"""
+        favorite_set = set(favorite_rois)
+        self.neighbors = sorted(self.neighbors, key=lambda x: x[0] not in favorite_set)
 
     def rank_neighbors_by_ided(self, ided_rois):
-        """Rank matches by IDed status"""
-        self.neighbors = sorted(self.neighbors, key=lambda x: (x[0] not in ided_rois))
+        """Rank by IDed status"""
+        ided_set = set(ided_rois) 
+        self.neighbors = sorted(self.neighbors, key=lambda x: x[0] not in ided_set)
 
     def pad_sequences(self, rois, sequences):
         """

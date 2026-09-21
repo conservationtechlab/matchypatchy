@@ -136,7 +136,7 @@ class TestFetchStationNamesFromId:
 
     def test_station_name_correct(self, populated_db):
         db, _, ids = populated_db
-        result = fetch_station_names_from_id(db, ids["station_id"])
+        result = fetch_station_names_from_id(db, ids["station_id"], ids["camera_id"])
         assert result["station_name"] == "Test Station"
 
     def test_survey_name_correct(self, populated_db):
@@ -148,6 +148,16 @@ class TestFetchStationNamesFromId:
         db, _, ids = populated_db
         result = fetch_station_names_from_id(db, ids["station_id"])
         assert result["region_name"] == "Default Region"
+
+    def test_camera_id_correct(self, populated_db):
+        db, _, ids = populated_db
+        result = fetch_station_names_from_id(db, ids["station_id"], ids["camera_id"])
+        assert result["camera_id"] == ids["camera_id"]
+
+    def test_camera_id_missing(self, populated_db):
+        db, _, ids = populated_db
+        result = fetch_station_names_from_id(db, ids["station_id"])
+        assert result["camera_id"] is None
 
 
 # ---------------------------------------------------------------------------

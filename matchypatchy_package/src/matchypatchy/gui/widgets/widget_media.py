@@ -70,7 +70,7 @@ class MediaWidget(QWidget):
         # IMAGE
         if Path(self.filepath).suffix.lower() in IMAGE_EXT:
             self.playbackbar.setVisible(False)
-            self.image_widget.load(self.filepath, bbox=bbox, frame=frame, crop=crop)
+            self.image_widget.load(self.filepath, bbox=bbox, frame=None, crop=crop)
             self.stacked.setCurrentWidget(self.image_widget)
 
         # VIDEO
@@ -214,6 +214,7 @@ class ImageWidget(QLabel):
         Args:
             frame (int): Frame number to load
         """
+        print(self.image_path, selected_frame)
         cap = cv2.VideoCapture(self.image_path)
         cap.set(cv2.CAP_PROP_POS_FRAMES, int(selected_frame))
         ret, frame = cap.read()

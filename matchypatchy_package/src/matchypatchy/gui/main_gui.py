@@ -8,13 +8,14 @@ Display Pages:
     1. DisplayMedia
     2. DisplayCompare
 """
+import os
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog,
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog, QDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction, QGuiApplication
-from PyQt6.QtCore import QSettings
+from PyQt6.QtCore import QSettings, QTimer
 
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
@@ -24,11 +25,14 @@ from matchypatchy.gui.dialogs.popup_config import ConfigPopup
 from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
 from matchypatchy.gui.dialogs.popup_readme import READMEPopup
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
 from matchypatchy.config import mpConfig
 from matchypatchy.database.mpdb import MatchyPatchyDB
+from matchypatchy.database.filesystem import _is_network_path
 
 
 class MainWindow(QMainWindow):
@@ -51,17 +55,7 @@ class MainWindow(QMainWindow):
 
         # set up main window
         self.setWindowTitle(f"MatchyPatchy v{__version__}")
-        screen_resolution = QGuiApplication.primaryScreen().availableGeometry()
-        minimum_height = 768
-        minimum_width = 1366
-        self.setMinimumSize(minimum_width, minimum_height)
-
-        preferred_width = min(int(screen_resolution.width() * 0.9), 1400) if screen_resolution.width() > minimum_width else minimum_width
-        preferred_height = min(int(screen_resolution.height() * 0.9), 900) if screen_resolution.height() > minimum_height else minimum_height
-        self.resize(preferred_width, preferred_height)
-
-        # TODO: find best default size based on screen resolution and available space
-        print(self.size())
+        self._set_window_size()
 
         # Create Menu Bar
         self._createMenuBar()
@@ -91,10 +85,10 @@ class MainWindow(QMainWindow):
         # view = menuBar.addMenu("View")
         help = menuBar.addMenu("Help")
 
-        file.addAction("New")
-
         # FILE IMPORT
         file_import = QMenu("Import", self)
+        file_import.addAction("Import CSV", self.import_csv)
+        file_import.addAction("Import Folder", self.import_folder)
         file.addMenu(file_import)
 
         file_export = QAction("Export", self)
@@ -136,6 +130,41 @@ class MainWindow(QMainWindow):
         help.addAction(help_license)
 
     # PAGE VIEWS ---------------------------------------------------------------
+
+    def _set_window_size(self):
+        """Set the window size based on user preferences and screen resolution."""
+
+        # get the screen resolution
+        screen_resolution = QGuiApplication.primaryScreen().availableGeometry()
+
+        # get preferred window size from settings
+        preferred_width = self.settings.value("preferred_width", None)
+        preferred_height = self.settings.value("preferred_height", None)
+
+        if preferred_width is None:
+            default_width = 1500
+            minimum_width = 1446
+            if screen_resolution.width() > minimum_width:
+                preferred_width = min(int(screen_resolution.width() * 0.9), default_width)
+            else:
+                preferred_width = screen_resolution.width()
+
+        if preferred_height is None:
+            default_height = 900
+            minimum_height = 859
+            if screen_resolution.height() > minimum_height:
+                preferred_height = min(int(screen_resolution.height() * 0.9), default_height)
+            else:
+                preferred_height = screen_resolution.height()
+
+        preferred_width = int(preferred_width)
+        preferred_height = int(preferred_height)
+        self.resize(preferred_width, preferred_height)
+
+        self.settings.setValue("preferred_width", str(preferred_width))
+        self.settings.setValue("preferred_height", str(preferred_height))
+
+
     def _set_base_view(self):
         """Switch to the base view page.""" 
         self.pages.setCurrentIndex(0)
@@ -145,34 +174,66 @@ class MainWindow(QMainWindow):
         """Switch to the media view page and apply optional filters.""" 
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
-        self.Media.refresh_filters(filters)
-        self.Media.load_table()
+        # wait to load
+        QTimer.singleShot(100, lambda: self.Media.refresh_filters(filters))
+        QTimer.singleShot(100, self.Media.load_table)
 
     def _set_compare_view(self):
         """Switch to the compare view page.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
-        self.Compare.refresh_filters()
+        # wait to load
+        QTimer.singleShot(100, self.Compare.refresh_filters)
         self.Compare.calculate_neighbors()
 
     def _set_manual_view(self, selected_ids=None):
         """Switch to the manual comparison view page with selected IDs.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
-        self.Compare.refresh_filters()
+        # wait to load
+        QTimer.singleShot(100, self.Compare.refresh_filters)
         self.Compare.compare_manual(selected_ids=selected_ids)
 
     # FILE =====================================================================
-    def new(self):
-        # TODO
-        pass
+    def import_csv(self):
+        """Add media from a CSV manifest"""
+        selected_survey = self.Base.select_survey()
+        if not selected_survey:
+            dialog = AlertPopup(self, "Please select a survey before importing.")
+            dialog.exec()
+            del dialog
+            return
+        else:
+            self.active_survey = self.Base.active_survey
+            manifest = QFileDialog.getOpenFileName(self, "Open File",
+                                                   os.path.expanduser('~'),
+                                                   ("CSV Files (*.csv)"))[0]
+            if manifest:
+                self.logger.info(f"Importing from manifest: {manifest}")
+                dialog = ImportCSVPopup(self, manifest)
+                dialog.exec()
+                del dialog
 
-    def import_popup(self, table):
-        """
-        Launch file browser
-        """
-        # TODO: Implement file import functionality
-        pass
+    # STEP 1: Import from FOLDER
+    def import_folder(self):
+        """Add media from a folder"""
+        selected_survey = self.Base.select_survey()
+        if not selected_survey:
+            dialog = AlertPopup(self, "Please select a survey before importing.")
+            dialog.exec()
+            del dialog
+            return
+        else:
+            self.active_survey = self.Base.active_survey
+            directory = QFileDialog.getExistingDirectory(self, "Open File",
+                                                         os.path.expanduser('~'),
+                                                         QFileDialog.Option.ShowDirsOnly)
+            if directory:
+                dialog = ImportFolderPopup(self, directory)
+                self.logger.info(f"Importing from directory: {directory}")
+                if dialog.exec() == QDialog.DialogCode.Rejected:
+                    self.import_folder()
+                del dialog
 
     def export(self):
         data = self.mpDB.export_data()
@@ -218,12 +279,27 @@ class MainWindow(QMainWindow):
         # close existing database connection before creating a new project
         self.mpDB.close()
 
-        home_dir = Path(home_dir) / "MatchyPatchy-Share"  # Fallback to current working directory
-        self.settings.setValue("home_dir", str(home_dir))
-        self.logger.info(f"Creating project folder: {str(home_dir)}.")
+        home_dir = Path(home_dir)
 
+        is_remote, fs_info = _is_network_path(home_dir)
+        if is_remote:
+            msg = (
+                f"The selected database location appears to be a network/SMB share "
+                f"(detected: {fs_info}). \n SQLite does not reliably support network "
+                f"filesystems and this can cause database corruption or lock errors.\n\n"
+                f"Please choose a folder on your local hard drive first and then sync to the network location instead."
+            )
+            self.logger.error(msg)
+            dialog = AlertPopup(self, prompt=msg)
+            dialog.exec()
+            del dialog
+            return
+        
+        self.logger.info(f"Creating project folder: {str(home_dir)}.")
         self.cfg = mpConfig(home_dir)
         self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
+        # save settings
+        self.settings.setValue("home_dir", str(home_dir))
         # update pages with the new configuration and database connection
         self.Base.update_project(self.cfg, self.mpDB)
         self.Media.update_project(self.cfg, self.mpDB)
@@ -238,7 +314,6 @@ class MainWindow(QMainWindow):
         valid = mpDB.key
         # Check if the database key is valid
         if valid:
-            print(f"Changing project to {str(project_folder)}")
             self.settings.setValue("home_dir", str(project_folder))
             self.logger.info(f"Updating project folder to {str(project_folder)}.")
             self.cfg = cfg
@@ -301,7 +376,16 @@ class MainWindow(QMainWindow):
         dialog.exec()
         del dialog
 
-    # CLOSE EVENT ================================================================
+    # CLOSE EVENT ==============================================================
+
+    def resizeEvent(self, a0):
+        preferred_width = a0.size().width()
+        preferred_height = a0.size().height()
+        self.settings.setValue("preferred_width", str(preferred_width))
+        self.settings.setValue("preferred_height", str(preferred_height))
+        return super().resizeEvent(a0)
+
+
     def closeEvent(self, event):
         """Close database connection when window closes"""
         if hasattr(self, 'mpDB') and self.mpDB:

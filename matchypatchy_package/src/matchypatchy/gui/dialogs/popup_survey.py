@@ -117,7 +117,7 @@ class SurveyPopup(QDialog):
                             "region_id": region_id,
                             "year_start": dialog.get_year_start(),
                             "year_end": dialog.get_year_end()}
-            self.mpDB.edit_row("survey", survey_id, replace_dict)
+            self.mpDB.edit_row("survey", survey_id, replace_dict, allow_none=True)
         del dialog
         # refresh the survey list after editing a survey
         self.update()

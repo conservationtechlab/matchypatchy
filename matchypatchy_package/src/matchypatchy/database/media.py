@@ -134,7 +134,7 @@ def fetch_roi(mpDB, media_id=None):
     return pd.DataFrame()
 
 
-def fetch_roi_media(mpDB, rids=None, reset_index=True):
+def fetch_roi_media(mpDB, rids=None, sequence_ids=None,reset_index=True):
     """
     Fetch Combined Roi and Media Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
@@ -145,6 +145,9 @@ def fetch_roi_media(mpDB, rids=None, reset_index=True):
     if rids:
         ids_str = ', '.join(map(str, rids))
         media, column_names = mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
+    elif sequence_ids:
+        sequence_ids_str = ', '.join(map(str, sequence_ids))
+        media, column_names = mpDB.all_media(row_cond=f"media.sequence_id IN ({sequence_ids_str})")
     else:
         media, column_names = mpDB.all_media()
     rois = pd.DataFrame(media, columns=column_names)
