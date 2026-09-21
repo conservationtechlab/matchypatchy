@@ -15,6 +15,11 @@ Page directory
 Page components
 Page instfiles
 
+; Finish page with "Run MatchyPatchy" option
+!define MUI_FINISHPAGE_RUN "$INSTDIR\launcher.vbs"
+!define MUI_FINISHPAGE_RUN_TEXT "Launch MatchyPatchy"
+!insertmacro MUI_PAGE_FINISH
+
 ; -------------------------
 ; .onInit - optional checks
 ; -------------------------
