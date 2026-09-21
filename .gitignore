@@ -7,6 +7,7 @@ __pycache__/
 *.db
 
 Jaguar/
+Jaguar_Full/
 Giraffe/
 examples/
 Models/
@@ -15,6 +16,7 @@ installation/windows/python_env/
 installation/windows/python_env_base/
 installation/windows/python_env_gpu/
 installation/windows/wheels/
+installation/linux/matchypatchy_installer/opt/matchypatchy/python_env/
 config.yml
 
 # Distribution / packaging
@@ -93,6 +95,9 @@ target/
 # IPython
 profile_default/
 ipython_config.py
+
+# VS Code settings
+.vscode/
 
 # pyenv
 #   For a library or package, you might want to ignore these files since the code is

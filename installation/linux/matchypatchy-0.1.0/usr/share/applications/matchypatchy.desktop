@@ -1,7 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=MatchyPatchy
-Exec=/opt/matchypatchy/install.sh
-Icon=matchypatchy
-Terminal=true
-Categories=Utility;

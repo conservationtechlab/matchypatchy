@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=MatchyPatchy
+Comment=Individual re-identication matching tool
+Exec=$HOME/.MatchyPatchy/launcher.sh
+Icon=$HOME/.MatchyPatchy/matchypatchy/assets/graphics/desktop_icon.ico
+Terminal=false
+Categories=Utility;
+StartupNotify=true
