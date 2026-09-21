@@ -1,10 +1,7 @@
 name: Build Linux Installer
 
 on:
-  push:
-    tags:
-      - 'v*'  # Only build on version tags (v0.2.0, etc)
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch: # Manual trigger
 
 jobs:
   build:
