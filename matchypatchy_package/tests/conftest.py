@@ -48,6 +48,52 @@ class _QThreadStub:
         self._interrupted = True
 
 
+class _QObjectStub:
+    """Minimal QObject stub — real Python class so subclasses can be instantiated."""
+    def __init__(self, *args, **kwargs):
+        pass
+
+
+class _QWidgetStub(_QObjectStub):
+    """Minimal QWidget stub — real Python class so subclasses can be instantiated."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._layout = None
+
+    def setLayout(self, layout):
+        self._layout = layout
+
+    def setFocusPolicy(self, policy):
+        pass
+
+    def setWindowTitle(self, title):
+        pass
+
+    def setStyleSheet(self, style):
+        pass
+
+
+class _QDialogStub(_QWidgetStub):
+    """Minimal QDialog stub — real Python class so subclasses can be instantiated."""
+    def exec(self):
+        return False
+
+    def accept(self):
+        pass
+
+    def reject(self):
+        pass
+
+
+class _QAbstractTableModelStub(_QObjectStub):
+    """Minimal QAbstractTableModel stub so MediaTable can subclass it."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.layoutChanged = _SignalStub()
+        self.layoutAboutToBeChanged = _SignalStub()
+        self.dataChanged = _SignalStub()
+
+
 class _MockModule(types.ModuleType):
     """A stub module whose attribute access always returns a fresh MagicMock."""
     def __getattr__(self, name: str):
@@ -56,6 +102,14 @@ class _MockModule(types.ModuleType):
             return _VersionMock(0x060900)  # PyQt6 6.9.0
         if name == 'QThread':
             return _QThreadStub
+        if name == 'QObject':
+            return _QObjectStub
+        if name in ('QWidget', 'QAbstractScrollArea', 'QFrame'):
+            return _QWidgetStub
+        if name in ('QDialog', 'QAbstractDialog'):
+            return _QDialogStub
+        if name == 'QAbstractTableModel':
+            return _QAbstractTableModelStub
         if name == 'pyqtSignal':
             return lambda *args, **kwargs: _SignalStub()
         # For QtCore specifically, return a module-like object with PYQT_VERSION
@@ -64,7 +118,12 @@ class _MockModule(types.ModuleType):
             mock.PYQT_VERSION = _VersionMock(0x060900)
             mock.QT_VERSION = _VersionMock(0x060900)
             return mock
-        return MagicMock()
+        # Cache the MagicMock so the same object is returned on repeated imports.
+        # This ensures e.g. Qt.SortOrder.AscendingOrder is the same object in all
+        # modules that import from the stub, allowing equality comparisons to work.
+        result = MagicMock()
+        setattr(self, name, result)
+        return result
 
 
 def _stub_gui_dependencies():
@@ -130,6 +189,7 @@ def populated_db(tmp_db):
     # The constructor already created a "Default Region" (id=1) and
     # "Default Survey" (id=1).  Add a dedicated station and media.
     station_id = db.add_station("Test Station", 1.0, 2.0, 1)
+    camera_id = db.add_camera("Test Camera", station_id) 
     individual_id = db.add_individual("Ind-1", "M", "Adult")
     upload_id = db.add_upload("/tmp")
     media_id = db.add_media(
@@ -139,6 +199,7 @@ def populated_db(tmp_db):
         ext=".jpg",
         timestamp="2024-01-01 12:00:00",
         station_id=station_id,
+        camera_id=camera_id,
     )
     roi_id = db.add_roi(
         media_id=media_id,
@@ -153,6 +214,7 @@ def populated_db(tmp_db):
         "region_id": 1,
         "survey_id": 1,
         "station_id": station_id,
+        "camera_id": camera_id,
         "individual_id": individual_id,
         "media_id": media_id,
         "roi_id": roi_id,

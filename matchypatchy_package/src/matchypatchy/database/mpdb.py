@@ -9,6 +9,7 @@ from pathlib import Path
 from random import randrange
 
 import chromadb
+from chromadb.config import Settings
 import numpy as np
 import pandas as pd
 
@@ -51,8 +52,8 @@ class MatchyPatchyDB():
         self.logger.info(f"Database file path: {self.filepath}")
         self.logger.info(f"Chroma database file path: {self.chroma_filepath}")
         self.logger.info(f"Using key: {self.key}")
-        self.db  # Trigger property initialization
-        setup_database(self.key, self.filepath, self.db)
+        # setup new databases
+        setup_database(self.key, self.filepath)
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
         self.collection = self.chroma.get_collection(name="embedding_collection")
         # add default region and survey
@@ -73,7 +74,8 @@ class MatchyPatchyDB():
     def chroma(self):
         """Get or create a Chroma client for the current thread"""
         if not hasattr(self.local, 'chroma') or self.local.chroma is None:
-            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath))
+            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath), 
+                                                          settings=Settings(anonymized_telemetry=False))
         return self.local.chroma
 
     @chroma.setter
@@ -512,10 +514,11 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to add thumbnail: {error}")
             return None
 
-    def copy(self, table, row_id):
+    def copy(self, table, row_id: int):
         """Copy a row from a table by id"""
         try:
             cursor = self.db.cursor()
+            row_id = int(row_id)
             command = f"""INSERT INTO {table} SELECT * FROM {table} WHERE id={row_id};"""
             cursor.execute(command)
             new_id = cursor.lastrowid
@@ -539,24 +542,30 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            # convert empty values to SQL NULL
+            set_clauses = []
+            params = []
             for key, value in replace.items():
                 if value in (None, ''):
                     if allow_none:
-                        replace[key] = 'NULL'
+                        set_clauses.append(f"{key}=NULL")
                     else:
                         self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
                         return False
-                # if value is a string, wrap it in quotes for SQL
-                if isinstance(value, str):
-                    replace[key] = f"'{value}'"
+                else:
+                    # bind values as parameters instead of interpolating them into
+                    # the SQL string, so values containing quotes (e.g. "O'Brien")
+                    # don't produce invalid/unsafe SQL
+                    set_clauses.append(f"{key}=?")
+                    params.append(value)
 
-            replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
+            replace_values = ",".join(set_clauses)
 
-            command = f"UPDATE {table} SET {replace_values} WHERE id={row_id}"
+            command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+            row_id = int(row_id)
+            params.append(row_id)
             if not quiet:
-                print(command)
-            cursor.execute(command)
+                print(command, params)
+            cursor.execute(command, params)
             self.db.commit()
             return True
         except sqlite3.Error as error:
@@ -577,21 +586,29 @@ class MatchyPatchyDB():
             cursor.execute("BEGIN TRANSACTION")
 
             for row_id, replace in updates.items():
+                set_clauses = []
+                params = []
                 for key, value in replace.items():
                     if value in (None, ''):
                         if allow_none:
-                            replace[key] = 'NULL'
+                            set_clauses.append(f"{key}=NULL")
                         else:
                             self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
                             return False
-                    if isinstance(value, str):
-                        replace[key] = f"'{value}'"
+                    else:
+                        # bind values as parameters instead of interpolating them into
+                        # the SQL string, so values containing quotes don't produce
+                        # invalid/unsafe SQL
+                        set_clauses.append(f"{key}=?")
+                        params.append(value)
 
-                replace_values = ",".join(f"{k}={v}" for k, v in replace.items())
-                command = f"UPDATE {table} SET {replace_values} WHERE id={row_id}"
+                replace_values = ",".join(set_clauses)
+                command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+                row_id = int(row_id)
+                params.append(row_id)
                 if not quiet:
-                    print(command)
-                cursor.execute(command)
+                    print(command, params)
+                cursor.execute(command, params)
             self.db.commit()
             return True
         except sqlite3.Error as error:

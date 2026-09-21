@@ -1,6 +1,7 @@
 To package:
 - use python_env python.exe to pip install new version of matchypatchy_package
+- uninstall onnxruntime, install onnxruntime-gpu==1.22.0
 - Move .nsi to top directory
 - run nsis and test installer
 - make sure resource_path and asset_path are working correcty
-- check cuda if gpu
+- check cuda if gpucuda

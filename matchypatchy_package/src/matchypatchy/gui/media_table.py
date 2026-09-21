@@ -8,7 +8,7 @@ from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal, QAbstractTableModel
 
 from matchypatchy.database.media import EditObject
 from matchypatchy.threads.model_download_thread import load_model
-from matchypatchy.database.location import fetch_stations
+from matchypatchy.database.location import fetch_stations, fetch_cameras
 from matchypatchy.database.media import fetch_individual
 
 
@@ -24,8 +24,9 @@ class MediaTable(QAbstractTableModel):
         self.mpDB = parent.mpDB
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.VIEWPOINTS = load_model('VIEWPOINTS')
-        self.updateStations()
-        self.updateIndividuals()
+        self.INDIVIDUALS = fetch_individual(self.mpDB)
+        self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
+        self.CAMERAS = fetch_cameras(self.mpDB, reset_index=True)
 
         self._data_filtered = pd.DataFrame()
         self.header_dict = headers
@@ -104,10 +105,19 @@ class MediaTable(QAbstractTableModel):
                 id = int(self._data_filtered.at[row, self._columns[col]])
                 return self.STATIONS.loc[id, "name"]
 
+        # station
+        if self._columns[col] == "camera_id":
+            if role == Qt.ItemDataRole.DisplayRole:
+                camera_id = self._data_filtered.at[row, self._columns[col]]
+                if camera_id is None:
+                    return None
+                return self.CAMERAS.loc[int(camera_id), "name"]
+
         # viewpoint 
         if self._columns[col] == "viewpoint":
             if role == Qt.ItemDataRole.DisplayRole:
-                value = str(self._data_filtered.at[row, self._columns[col]])
+                value = self._data_filtered.at[row, self._columns[col]]
+                value = str(value) if not pd.isna(value) else 'None'
                 return self.VIEWPOINTS.get(value, value)
 
         # individual
@@ -149,6 +159,7 @@ class MediaTable(QAbstractTableModel):
         elif reference == 'viewpoint':
             old_value = self._data_filtered.at[row, reference]
             key = [k for k, v in self.VIEWPOINTS.items() if v == value][0]
+            print(f"Key for {value}: {key}")
             new_value = None if key == 'None' else int(key)
 
         elif reference in ['individual_id', 'sex', 'age']:
@@ -180,15 +191,20 @@ class MediaTable(QAbstractTableModel):
         self.dataChanged.emit(index, index, [role])
         return True
 
-    def receiveData(self, data, headers=None):
+    def receiveData(self, data, headers=None, selected_rows=None):
         """Receiver of loaded data from the FetchTableThread"""
         self._data_filtered = data
         if headers is not None:
             self.updateHeaderDict(headers)
 
+        if selected_rows is not None:
+            self._data_filtered['select'] = 0
+            self._data_filtered.loc[selected_rows, 'select'] = 1
+
         # Fetch and reset index for stations and individuals
-        self.updateIndividuals()
-        self.updateStations()
+        self.INDIVIDUALS = fetch_individual(self.mpDB)
+        self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
+        self.CAMERAS = fetch_cameras(self.mpDB, reset_index=True)
         self.layoutChanged.emit()
 
     def updateHeaderDict(self, headers):
@@ -196,12 +212,6 @@ class MediaTable(QAbstractTableModel):
             self.header_dict = headers
             self._columns = [x[0] for x in headers.values()]
             self._headers = [x[1] for x in headers.values()]
-
-    def updateIndividuals(self):
-        self.INDIVIDUALS = fetch_individual(self.mpDB)
-
-    def updateStations(self):
-        self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
         """Provide header data for the table view."""

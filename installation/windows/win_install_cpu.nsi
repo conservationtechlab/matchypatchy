@@ -1,10 +1,10 @@
 ; MatchyPatchy NSIS installer - creates venv, pip installs requirements, and creates shortcuts.
 
 ; Version constant - update this for each release
-!define APP_VERSION "0.1.7"
+!define APP_VERSION "0.2.0"
 
 Name "MatchyPatchy"
-OutFile "MatchyPatchy-v0.1.7-CPU-Setup.exe"
+OutFile "MatchyPatchy-v0.2.0-CPU-Setup.exe"
 ; Per-user install (no admin required)
 InstallDir "$LOCALAPPDATA\MatchyPatchy"
 
@@ -14,6 +14,11 @@ InstallDir "$LOCALAPPDATA\MatchyPatchy"
 Page directory
 Page components
 Page instfiles
+
+; Finish page with "Run MatchyPatchy" option
+!define MUI_FINISHPAGE_RUN "$INSTDIR\launcher.vbs"
+!define MUI_FINISHPAGE_RUN_TEXT "Launch MatchyPatchy"
+!insertmacro MUI_PAGE_FINISH
 
 ; -------------------------
 ; .onInit - optional checks

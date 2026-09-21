@@ -165,7 +165,7 @@ class MLOptionsPopup(QDialog):
         self.detector = QComboBox()
         layout.addWidget(self.detector_label)
         layout.addWidget(self.detector)
-        self.available_detectors = self.get_subset('DETECTOR_MODELS')
+        self.available_detectors = ['None'] + self.get_subset('DETECTOR_MODELS')
         self.detector.addItems(self.available_detectors)
 
         # Re-ID
@@ -221,7 +221,7 @@ class MLOptionsPopup(QDialog):
 
     def select_detector(self):
         """Return the selected detector model"""
-        if len(self.available_detectors) == 0:
+        if self.detector.currentIndex() == 0:
             return None
         else:
             selected_DETECTOR_KEY = self.available_detectors[self.detector.currentIndex()]

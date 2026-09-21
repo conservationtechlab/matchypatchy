@@ -307,6 +307,22 @@ class TestSelectEditDeleteCount:
         result = db.edit_row("individual", ids["individual_id"], {"sex": None})
         assert result is False
 
+    def test_edit_row_value_with_apostrophe(self, populated_db):
+        """Regression test: values containing quotes must not break/inject SQL."""
+        db, _, ids = populated_db
+        result = db.edit_row("individual", ids["individual_id"], {"name": "O'Brien"})
+        assert result is True
+        row = db.select("individual", row_cond=f"id={ids['individual_id']}")[0]
+        assert row[1] == "O'Brien"
+
+    def test_batch_edit_value_with_apostrophe(self, populated_db):
+        """Regression test: batch_edit must also bind values instead of interpolating."""
+        db, _, ids = populated_db
+        result = db.batch_edit("individual", {ids["individual_id"]: {"name": "D'Angelo"}})
+        assert result is True
+        row = db.select("individual", row_cond=f"id={ids['individual_id']}")[0]
+        assert row[1] == "D'Angelo"
+
     def test_delete(self, populated_db):
         db, _, ids = populated_db
         result = db.delete("individual", f"id={ids['individual_id']}")

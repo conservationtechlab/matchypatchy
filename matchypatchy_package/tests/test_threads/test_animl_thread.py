@@ -79,6 +79,7 @@ def _cfg(tmp_path, smart_frames=True, n_frames=2):
         N_FRAMES=n_frames,
         THUMBNAIL_DIR=str(tmp_path / "thumbs"),
         DEVICE="cpu",
+        BATCH_SIZE=2,
     )
 
 
@@ -197,11 +198,41 @@ class TestAnimlThread:
 
         monkeypatch.setattr(animl_thread.animl, "detect", lambda *_args, **_kwargs: pd.DataFrame())
         monkeypatch.setattr(animl_thread.animl, "parse_detections", lambda detections, **_kwargs: detections)
-        monkeypatch.setattr(
-            animl_thread.animl,
-            "get_animals",
-            lambda _detections: pd.DataFrame([{"frame": 2, "bbox_x": 0.1, "bbox_y": 0.2, "bbox_w": 0.3, "bbox_h": 0.4}]),
-        )
+        
+        # Track which batch is being processed
+        call_count = [0]
+        def mock_get_animals(_detections):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                # First call: new images batch
+                return pd.DataFrame([
+                    {
+                        "id": 3,  # media_id for new images
+                        "frame": 2,
+                        "bbox_x": 0.1,
+                        "bbox_y": 0.2,
+                        "bbox_w": 0.3,
+                        "bbox_h": 0.4,
+                        "filepath": "/base/new.jpg",
+                        "ext": ".jpg"
+                    }
+                ])
+            else:
+                # Second call: existing rois batch
+                return pd.DataFrame([
+                    {
+                        "id": 20,  # roi id for existing rois
+                        "frame": 0,
+                        "bbox_x": 0.5,
+                        "bbox_y": 0.6,
+                        "bbox_w": 0.7,
+                        "bbox_h": 0.8,
+                        "filepath": "/base/old.jpg",
+                        "ext": ".jpg"
+                    }
+                ])
+        
+        monkeypatch.setattr(animl_thread.animl, "get_animals", mock_get_animals)
 
         thread.detect_images()
 

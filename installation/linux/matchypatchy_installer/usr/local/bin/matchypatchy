@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTALL_ROOT="${INSTALL_DIR:-$HOME/.MatchyPatchy}"
+LAUNCHER="$INSTALL_ROOT/launcher.sh"
+INSTALLER="/opt/matchypatchy/install.sh"
+
+if [ -x "$LAUNCHER" ]; then
+  exec "$LAUNCHER" "$@"
+fi
+
+if [ -x "$INSTALLER" ]; then
+  exec "$INSTALLER" "$@"
+fi
+
+echo "MatchyPatchy is not installed for this user."
+echo "Run /opt/matchypatchy/install.sh"
+exit 1
