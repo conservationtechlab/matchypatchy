@@ -5,16 +5,20 @@ INSTALL_DIR="/opt/matchypatchy"
 WRAPPER="/usr/local/bin/matchypatchy"
 DESKTOP="/usr/share/applications/matchypatchy.desktop"
 
-# Ensure files are executable and readable
 if [ -f "$INSTALL_DIR/install.command" ]; then
   chmod 0755 "$INSTALL_DIR/install.command"
 fi
-if [ -d "$INSTALL_DIR/matchypatchy" ]; then
-  # make python files readable (they are already because packaging copied them)
-  chmod -R a+r "$INSTALL_DIR/matchypatchy"
+if [ -f "$INSTALL_DIR/install.sh" ]; then
+  chmod 0755 "$INSTALL_DIR/install.sh"
 fi
-if [ -d "$INSTALL_DIR/assets" ]; then
-  chmod -R a+r "$INSTALL_DIR/assets"
+if [ -f "$INSTALL_DIR/launcher.sh" ]; then
+  chmod 0755 "$INSTALL_DIR/launcher.sh"
+fi
+if [ -f "$INSTALL_DIR/uninstall.sh" ]; then
+  chmod 0755 "$INSTALL_DIR/uninstall.sh"
+fi
+if [ -d "$INSTALL_DIR/python_env" ]; then
+  chmod -R a+r "$INSTALL_DIR/python_env"
 fi
 if [ -f "$WRAPPER" ]; then
   chmod 0755 "$WRAPPER"

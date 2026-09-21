@@ -1,6 +1,6 @@
 [project]
 name = "matchypatchy"
-version = "0.2.0_dev"
+version = ["version"]
 authors = [
   { name="Kyra Swanson", email="tswanson@sdzwa.org" },
 ]
@@ -17,10 +17,19 @@ dependencies = [
 Homepage = "https://github.com/onservationtechlab/matchypatchy"
 Issues = "https://github.com/onservationtechlab/matchypatchy/issues"
 
-
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "matchypatchy.__version__"}
+
+[tool.setuptools]
+packages = ["matchypatchy"]
+package-dir = {"" = "src"}
+ 
+[tool.setuptools.package-data]
+matchypatchy = ["assets/**/*", "assets/graphics/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
