@@ -102,16 +102,22 @@ class MediaTable(QAbstractTableModel):
         # station
         if self._columns[col] == "station_id":
             if role == Qt.ItemDataRole.DisplayRole:
-                id = int(self._data_filtered.at[row, self._columns[col]])
-                return self.STATIONS.loc[id, "name"]
+                station_id = int(self._data_filtered.at[row, self._columns[col]])
+                try:
+                    name = self.STATIONS.loc[station_id, "name"]
+                except KeyError:
+                    name = None
+                return name
 
         # station
         if self._columns[col] == "camera_id":
             if role == Qt.ItemDataRole.DisplayRole:
                 camera_id = self._data_filtered.at[row, self._columns[col]]
-                if camera_id is None:
-                    return None
-                return self.CAMERAS.loc[int(camera_id), "name"]
+                try:
+                    name = self.CAMERAS.loc[int(camera_id), "name"]
+                except KeyError:
+                    name = None
+                return name
 
         # viewpoint 
         if self._columns[col] == "viewpoint":
@@ -123,10 +129,12 @@ class MediaTable(QAbstractTableModel):
         # individual
         if self._columns[col] == "individual_id":
             if role == Qt.ItemDataRole.DisplayRole:
-                id = self._data_filtered.at[row, self._columns[col]]
-                if id is not None:
-                    return self.INDIVIDUALS.at[id, "name"]
-                return str(id)
+                iid = self._data_filtered.at[row, self._columns[col]]
+                try:
+                    name = self.INDIVIDUALS.at[iid, "name"]
+                except KeyError:
+                    name = str(iid)
+                return name
 
         if role == Qt.ItemDataRole.DisplayRole:
             # Return the raw data directly from your memory structure
