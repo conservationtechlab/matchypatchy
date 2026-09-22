@@ -169,7 +169,21 @@ class MatchyPatchyDB():
         schema_path = asset_path('schema.txt')
         with open(schema_path, 'r', encoding='utf-8') as file:
             content = file.read()
-        match_schema = (content == s)
+
+        def normalize_schema(text):
+            """Remove all whitespace and formatting for comparison"""
+            import re
+            # Remove all whitespace (newlines, tabs, extra spaces)
+            normalized = re.sub(r'\s+', ' ', text)
+            # Remove space after commas and parentheses for consistency
+            normalized = re.sub(r',\s+', ', ', normalized)
+            normalized = re.sub(r'\(\s+', '(', normalized)
+            normalized = re.sub(r'\s+\)', ')', normalized)
+            return normalized.strip()
+        
+        content_normalized = normalize_schema(content)
+        s_normalized = normalize_schema(s)
+        match_schema = (content_normalized == s_normalized)
 
         # Check that the database build version and key match
         cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
@@ -189,7 +203,6 @@ class MatchyPatchyDB():
                                   {db_build_version} does not match current version {__version__}.""")
             else:
                 self.logger.error("Schema of selected DB invalid. Database content does not match expected schema.")
-            print(s)
             return False
 
     def _command(self, command, quiet=True):
