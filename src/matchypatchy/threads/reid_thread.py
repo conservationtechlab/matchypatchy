@@ -25,7 +25,7 @@ class ReIDThread(QThread):
         self.mpDB = mpDB
         self.cfg = cfg
         self.device = self.cfg.DEVICE
-        self.batch_size = cfg.BATCH_SIZE
+        self.batch_size = 1  # set to 1 for now
         self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
         self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
         
@@ -80,7 +80,7 @@ class ReIDThread(QThread):
                                                   resize_width=480,
                                                   resize_height=480,
                                                   crop=True,
-                                                  batch_size=1)
+                                                  batch_size=self.batch_size)
 
             for i, batch in enumerate(dataloader):
                 if self.isInterruptionRequested():

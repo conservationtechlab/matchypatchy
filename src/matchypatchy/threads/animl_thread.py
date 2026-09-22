@@ -88,7 +88,7 @@ class AnimlThread(QThread):
         self.n_frames = cfg.N_FRAMES
         self.thumbnail_dir = cfg.THUMBNAIL_DIR
         self.device = cfg.DEVICE
-        self.batch_size = cfg.BATCH_SIZE  # Set a default batch size for processing images
+        self.batch_size = 1  # Set a default batch size for processing images
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
@@ -146,6 +146,8 @@ class AnimlThread(QThread):
             batch_end = min(batch_start + self.batch_size, len(self.images))
             image_batch = self.images.iloc[batch_start:batch_end]
 
+            print(image_batch)
+
             # if no detector is selected, use the full image as the ROI
             if self.detector is None:
                 detections = pd.DataFrame([{
@@ -169,8 +171,12 @@ class AnimlThread(QThread):
                                           batch_size=self.batch_size,
                                           use_progress_bar=False)
 
+                print(detections)
+
                 detections = animl.parse_detections(detections, manifest=image_batch)
                 detections = animl.get_animals(detections)
+
+                print(detections)
 
             for _, roi in detections.iterrows():
                 frame = roi['frame'] if 'frame' in roi.index else 0

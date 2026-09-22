@@ -79,7 +79,7 @@ def _cfg(tmp_path, smart_frames=True, n_frames=2):
         N_FRAMES=n_frames,
         THUMBNAIL_DIR=str(tmp_path / "thumbs"),
         DEVICE="cpu",
-        BATCH_SIZE=2,
+        BATCH_SIZE=1,
     )
 
 
