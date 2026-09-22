@@ -1,77 +1,257 @@
-name: Publish to PyPI
+name: Release
 
 on:
   push:
     tags:
-      # Triggers on any tag matching v1.0.0, v1.2.3, v1.2.3rc1, etc.
-      - "v[0-9]+.[0-9]+.[0-9]+*"
-  workflow_dispatch: {}
-
-# Restrict default GITHUB_TOKEN permissions; this workflow doesn't need write access.
-permissions:
-  contents: read
-
-# The publishable package lives in a subdirectory of this monorepo,
-# not the repo root.
-env:
-  PACKAGE_DIR: matchypatchy_package
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
-  build:
-    name: Build distribution
+  # ============================================
+  # JOB 1: Publish to PyPI (runs first)
+  # ============================================
+  publish-pypi:
     runs-on: ubuntu-latest
+    environment: pypi  # Should match the environment name you set in PyPI's trusted publisher config (if any)
+    permissions:
+      id-token: write  # Required for PyPI trusted publishing (OIDC)
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
-      - name: Install build tool
-        run: python -m pip install --upgrade build
-
-      - name: Build sdist and wheel
-        run: python -m build "$PACKAGE_DIR"
-
-      - name: Verify tag matches package version
-        # Only meaningful for real tag pushes; skipped on manual test runs
-        # since there's no tag to check against.
-        if: github.event_name == 'push'
+      - name: Extract version from tag
+        id: version
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION=$(python -c "import glob, re; \
-            f = glob.glob('$PACKAGE_DIR/dist/*.whl')[0]; \
-            print(re.search(r'-([0-9][^-]*)-py', f).group(1))")
-          echo "Tag version:     $TAG_VERSION"
-          echo "Package version: $PKG_VERSION"
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "::error::Tag ($TAG_VERSION) does not match built package version ($PKG_VERSION)."
-            exit 1
-          fi
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: ${{ env.PACKAGE_DIR }}/dist/
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
 
-  publish:
-    name: Publish to PyPI
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/matchypatchy/
-    permissions:
-      id-token: write  # required for OIDC trusted publishing; no API token needed
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
+      - name: Build distribution
+        run: python -m build
+
+      - name: Check distribution
+        run: twine check dist/*
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        # No password/token needed — uses OIDC trusted publishing
+
+      - name: Wait for PyPI index to update
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Waiting for matchypatchy==$VERSION to become installable from PyPI..."
+          for i in $(seq 1 20); do
+            if pip index versions matchypatchy 2>/dev/null | grep -q "$VERSION"; then
+              echo "✓ Version $VERSION is live on PyPI"
+              exit 0
+            fi
+            echo "  Not yet available, waiting 15s... (attempt $i/20)"
+            sleep 15
+          done
+          echo "✗ Timed out waiting for PyPI to show $VERSION"
+          exit 1
+
+  # ============================================
+  # JOB 2: Build Linux installers (waits for PyPI)
+  # ============================================
+  build-linux:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [cpu, gpu]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.variant }}-${{ hashFiles(format('requirements-{0}.txt', matrix.variant)) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.variant }}-
+
+      - name: Build bundled Python environment (${{ matrix.variant }})
+        env:
+          VERSION: ${{ needs.publish-pypi.outputs.version }}
+        run: |
+          echo "Creating Python virtual environment for ${{ matrix.variant }}..."
+          python3 -m venv python_env
+          source python_env/bin/activate
+
+          pip install --upgrade pip setuptools wheel
+
+          echo "Installing packages from requirements-${{ matrix.variant }}.txt without dependencies..."
+          pip install --no-deps -r requirements-${{ matrix.variant }}.txt
+
+          echo "Verifying matchypatchy==$VERSION was pulled from PyPI..."
+          pip show matchypatchy
+
+      - name: Create installer directory structure (${{ matrix.variant }})
+        run: |
+          mkdir -p build/opt/matchypatchy
+          mkdir -p build/usr/local/bin
+          mkdir -p build/usr/share/applications
+
+          cp -r python_env build/opt/matchypatchy/python_env
+          cp installation/linux/opt/matchypatchy/install.sh build/opt/matchypatchy/
+          cp installation/linux/opt/matchypatchy/launcher.sh build/opt/matchypatchy/
+          cp installation/linux/opt/matchypatchy/uninstall.sh build/opt/matchypatchy/
+          chmod +x build/opt/matchypatchy/*.sh
+
+          cp installation/linux/usr/local/bin/matchypatchy build/usr/local/bin/
+          chmod +x build/usr/local/bin/matchypatchy
+          cp installation/linux/usr/share/applications/matchypatchy.desktop build/usr/share/applications/
+
+      - name: Update version in install script (${{ matrix.variant }})
+        env:
+          VERSION: ${{ needs.publish-pypi.outputs.version }}
+        run: |
+          sed -i "s/VERSION=\".*\"/VERSION=\"$VERSION\"/g" build/opt/matchypatchy/install.sh
+
+      - name: Create tarball (${{ matrix.variant }})
+        env:
+          VERSION: ${{ needs.publish-pypi.outputs.version }}
+        run: |
+          mkdir -p dist
+          cd build
+          tar -czf "../dist/matchypatchy-${VERSION}-linux-${{ matrix.variant }}-x86_64.tar.gz" .
+          cd ..
+
+      - name: Create .deb package (${{ matrix.variant }})
+        env:
+          VERSION: ${{ needs.publish-pypi.outputs.version }}
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          mkdir -p build/DEBIAN
+
+          {
+            printf 'Package: matchypatchy\n'
+            printf 'Version: %s\n' "$VERSION"
+            printf 'Section: utils\n'
+            printf 'Priority: optional\n'
+            printf 'Architecture: amd64\n'
+            printf 'Maintainer: Conservation Technology Lab <info@example.com>\n'
+            printf 'Depends: bash\n'
+            printf 'Description: MatchyPatchy - Image matching application\n'
+            printf ' MatchyPatchy with bundled Python runtime.\n'
+          } > build/DEBIAN/control
+
+          {
+            printf '#!/bin/bash\n'
+            printf 'set -e\n'
+            printf 'chmod +x /opt/matchypatchy/install.sh\n'
+            printf 'chmod +x /opt/matchypatchy/launcher.sh\n'
+            printf 'chmod +x /opt/matchypatchy/uninstall.sh\n'
+            printf 'chmod +x /usr/local/bin/matchypatchy\n'
+            printf '/opt/matchypatchy/install.sh\n'
+          } > build/DEBIAN/postinst
+          chmod +x build/DEBIAN/postinst
+
+          dpkg-deb --build build "dist/matchypatchy-${VERSION}-linux-${VARIANT}_amd64.deb" 2>/dev/null && \
+            echo "✓ .deb package created" || \
+            echo "Note: dpkg not available, skipping .deb creation"
+
+      - name: Clean up for next variant
+        run: rm -rf build python_env
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================
+  # JOB 3: Build Windows installers (waits for PyPI)
+  # ============================================
+  build-windows:
+    needs: publish-pypi
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        variant: [cpu, gpu]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ matrix.variant }}-${{ hashFiles(format('requirements-{0}.txt', matrix.variant)) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.variant }}-
+
+      - name: Build bundled Python environment (${{ matrix.variant }})
+        shell: powershell
+        run: |
+          python -m venv python_env
+          .\python_env\Scripts\Activate.ps1
+          pip install --upgrade pip setuptools wheel
+          pip install --no-deps -r requirements-${{ matrix.variant }}.txt
+          pip show matchypatchy
+
+      - name: Create installer directory structure (${{ matrix.variant }})
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Path "build\installation\windows" -Force | Out-Null
+          Copy-Item -Path "python_env" -Destination "build\installation\windows\python_env" -Recurse -Force
+          Remove-Item -Path "python_env" -Recurse -Force
+          Copy-Item -Path "installation\windows\launcher.vbs" -Destination "build\installation\windows\" -Force
+          Copy-Item -Path "installation\windows\MatchyPatchy-${{ matrix.variant }}.nsi" -Destination "build\installation\windows\" -Force
+
+      - name: Update version in NSIS script (${{ matrix.variant }})
+        shell: powershell
+        env:
+          VERSION: ${{ needs.publish-pypi.outputs.version }}
+        run: |
+          $nsiPath = "build\installation\windows\MatchyPatchy-${{ matrix.variant }}.nsi"
+          (Get-Content $nsiPath) -replace '!define APP_VERSION ".*"', "!define APP_VERSION ""$env:VERSION""" | Set-Content $nsiPath
+          (Get-Content $nsiPath) -replace 'OutFile "MatchyPatchy-v.*-.*-setup\.exe"', "OutFile ""MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe""" | Set-Content $nsiPath
+
+      - name: Build NSIS installer (${{ matrix.variant }})
+        shell: cmd
+        run: |
+          cd build\installation\windows
+          "C:\Program Files (x86)\NSIS\makensis.exe" MatchyPatchy-${{ matrix.variant }}.nsi
+
+      - name: Move installer to dist (${{ matrix.variant }})
+        shell: powershell
+        env:
+          VERSION: ${{ needs.publish-pypi.outputs.version }}
+        run: |
+          New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+          Copy-Item -Path "build\installation\windows\MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe" -Destination "dist\" -Force
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/MatchyPatchy-v*-*-setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

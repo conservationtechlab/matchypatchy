@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_NAME="MatchyPatchy"
-APP_VERSION="0.2.0"
+APP_VERSION="0.2.1"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.MatchyPatchy}"
 VERSION_FILE="$INSTALL_DIR/version.txt"
 LAUNCHER_PATH="$INSTALL_DIR/launcher.sh"

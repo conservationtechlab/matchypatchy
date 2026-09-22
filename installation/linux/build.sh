@@ -6,7 +6,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-VERSION="0.2.0"
+VERSION="0.2.1"
 BUILD_DIR="./build"
 OUTPUT_DIR="./dist"
 PACKAGE_NAME="matchypatchy-${VERSION}-linux"
