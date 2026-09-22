@@ -20,7 +20,6 @@ from matchypatchy.database.thumbnails import save_roi_thumbnail
 
 class MediaEditPopup(QDialog):
     """Popup for viewing and editing media/ROI metadata"""
-    roi_updated = pyqtSignal()  # Signal to notify that ROI has been updated
 
     def __init__(self, parent, data, data_type, current_image_index=0, crop=False):
         super().__init__(parent)
@@ -47,6 +46,7 @@ class MediaEditPopup(QDialog):
 
         # edit stack
         self.edit_stack = []
+        self.roi_updated = False
 
         # Layout ---------------------------------------------------------------
         container_layout = QVBoxLayout()
@@ -268,8 +268,12 @@ class MediaEditPopup(QDialog):
                     # add new thumbnail
                     self.mpDB.add_thumbnail("roi", new_rid, roi_thumbnail)
                     # update internal data
-                    self.data.iloc[self.current_image_index,
-                                  ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]] = [bbox_x, bbox_y, bbox_w, bbox_h]
+                    row_label = self.data.index[self.current_image_index]
+                    cols = ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]
+                    self.data.loc[row_label, cols] = [bbox_x, bbox_y, bbox_w, bbox_h]
+                    self.data.loc[row_label, "thumbnail_path"] = roi_thumbnail
+                    self.roi_updated = True
+
                 del dialog
 
             # create new roi
@@ -287,6 +291,12 @@ class MediaEditPopup(QDialog):
                                                        frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     # add new thumbnail
                     self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
+                    # update internal data
+                    row_label = self.data.index[self.current_image_index]
+                    cols = ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]
+                    self.data.loc[row_label, cols] = [bbox_x, bbox_y, bbox_w, bbox_h]
+                    self.data.loc[row_label, "thumbnail_path"] = roi_thumbnail
+                    self.roi_updated = True
 
                 del dialog
 

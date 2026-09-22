@@ -9,8 +9,6 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail, THUMBNAIL_NOTFOUND
 from matchypatchy.database.media import get_sha256
-from matchypatchy.config import asset_path
-
 
 
 # CSV MIGRATE ==================================================================
@@ -316,7 +314,7 @@ class CSVImportThread(QThread):
                 # save thumbnail for new media
                 else:
                     media_thumbnail = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
-                    self.mpDB.add_thumbnail("media", media_id, media_thumbnail)
+                    self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
 
                 # add rois
                 for roi in group.itertuples(index=False):
@@ -363,10 +361,7 @@ class CSVImportThread(QThread):
                                                emb=0,
                                                commit=False)
                     # save thumbnails
-                    if bbox_w == -1:
-                        roi_thumbnail = asset_path(THUMBNAIL_NOTFOUND)
-                        self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail), commit=False)
-                    else:
+                    if bbox_w != -1:
                         roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext,
                                                            frame, bbox_x, bbox_y, bbox_w, bbox_h)
                         self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail), commit=False)

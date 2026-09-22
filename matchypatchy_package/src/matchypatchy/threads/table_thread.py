@@ -3,6 +3,7 @@ QThread for saving thumbnails to temp dir for media table
 """
 import pandas as pd
 from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtGui import QImage
 
 from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
 from matchypatchy.database import thumbnails
@@ -28,6 +29,11 @@ class FetchTableThread(QThread):
         self.thumbnails = pd.DataFrame()
         self.BATCH_SIZE = 50
 
+        # make a copy of the thumbnail not found path
+        thumbnail_notfound = QImage(str(asset_path(thumbnails.THUMBNAIL_NOTFOUND)))
+        thumbnail_notfound.save(str(self.thumbnail_dir) + "/thumbnail_notfound.png", format="PNG")
+
+
     def run(self):
         """
         Select all media, store in dataframe
@@ -51,7 +57,7 @@ class FetchTableThread(QThread):
                 self.thumbnails = thumbnails.fetch_roi_thumbnails(self.mpDB)
                 self.data = pd.merge(self.data, self.thumbnails, on="id", how="left")
                 
-                self.data.loc[self.data['bbox_w'] == -1, "thumbnail_path"] = asset_path(thumbnails.THUMBNAIL_NOTFOUND)
+                self.data.loc[self.data['bbox_w'] == -1, "thumbnail_path"] = "thumbnail_notfound.png"
 
             # media
             elif self.data_type == 0:
@@ -64,6 +70,14 @@ class FetchTableThread(QThread):
                 self.data = pd.merge(self.data, self.thumbnails, on="id", how="left")
             else:
                 self.data = pd.DataFrame()
+
+            # sort
+            if not self.data.empty:
+                sort_cols = [c for c in ("timestamp", "filepath", "frame", "id")
+                             if c in self.data.columns]
+                self.data = (self.data
+                             .sort_values(sort_cols, kind="stable", na_position="last")
+                             .reset_index(drop=True))
 
             self.data['select'] = 0
             self.loaded_data.emit(self.data)
@@ -90,6 +104,9 @@ class FetchTableThread(QThread):
                 break
 
             roi_id = row['id']
+            # Skip generating thumbnails for ROIs with invalid bounding boxes
+            if row['bbox_w'] == -1:
+                continue
             try:
                 # Generate thumbnail
                 thumbnail_path = thumbnails.save_roi_thumbnail(self.thumbnail_dir,

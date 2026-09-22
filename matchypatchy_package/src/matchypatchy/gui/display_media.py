@@ -333,17 +333,22 @@ class DisplayMedia(QWidget):
         self.filter_data()  # Apply filters to the raw data to get the filtered data
         headers = self._get_headers()
         self.media_table.receiveData(self._data_filtered, headers=headers) # Send the filtered data to the media table for display
+        self._apply_sort()
         self._set_delegates()
         self.update_count_label()
         self.update_edd_buttons()
 
-    def refresh_table(self):
+    def refresh_table(self, reload=False):
         """Refresh the table by reapplying edits and filters"""
-        self.apply_edits()
-        self.filter_data()
-        self.media_table.receiveData(self._data_filtered, selected_rows=self.selected_rows)
-        self.update_count_label()
-        self.update_edd_buttons()
+        if reload:
+            self.load_table()
+        else:
+            self.apply_edits()
+            self.filter_data()
+            self.media_table.receiveData(self._data_filtered, selected_rows=self.selected_rows)
+            self._apply_sort()
+            self.update_count_label()
+            self.update_edd_buttons()
 
     def apply_edits(self):
         """Apply any user edits from the filtered data back to the raw data before filtering"""
@@ -418,6 +423,13 @@ class DisplayMedia(QWidget):
             self.count_label.setText(f"Selected: {len(self.selected_rows)} / {self.media_table.rowCount()}")
         else:
             self.count_label.setText(f"Total Media: {self.media_table.rowCount()}")
+
+    def _apply_sort(self):
+        """Reapply the current sort order to the media table"""
+        header = self.view.horizontalHeader()
+        col = header.sortIndicatorSection()
+        if 0 <= col < self.media_table.columnCount():
+            self.media_table.sort(col, header.sortIndicatorOrder())
 
     def add_edit_to_stack(self, edit):
         """Slot to receive updates from QTableWidget to add edit to stack"""
@@ -531,14 +543,16 @@ class DisplayMedia(QWidget):
                 data = pd.concat([data, video_row], ignore_index=True)  # add video row
 
         # Launch Media Edit Popup
+        roi_updated = False
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
+            roi_updated = dialog.roi_updated
             self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
             del dialog
         # reload data and update buttons
-        self.refresh_table()
+        self.refresh_table(reload=roi_updated)
 
     def edit_row_multiple(self):
         """Edit multiple selected rows"""
