@@ -10,10 +10,7 @@ __pycache__/
 *.ipynb
 
 
-Jaguar_Full/
-Jaguar/
-Jaguar_Full/
-Giraffe/
+data/
 examples/
 Models/
 MatchyPatchy-Share/
