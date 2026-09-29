@@ -215,62 +215,50 @@ jobs:
     strategy:
       matrix:
         variant: [cpu, gpu]
+    env:
+      VERSION: ${{ needs.publish-pypi.outputs.version }}
+      PYTHON_VERSION: "3.12.10"
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
+      - name: Check requirements pin matches the release (${{ matrix.variant }})
+        shell: powershell
+        run: |
+          $pin = (Select-String -Path "requirements-${{ matrix.variant }}.txt" -Pattern '^matchypatchy==(\S+)').Matches[0].Groups[1].Value
+          if ($pin -ne $env:VERSION) {
+            throw "requirements-${{ matrix.variant }}.txt pins matchypatchy==$pin but the release is $env:VERSION"
+          }
 
       - name: Install NSIS
         run: choco install nsis -y
 
-      - name: Cache pip packages
-        uses: actions/cache@v3
-        with:
-          path: ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ matrix.variant }}-${{ hashFiles(format('requirements-{0}.txt', matrix.variant)) }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ matrix.variant }}-
-
-      - name: Build bundled Python environment (${{ matrix.variant }})
+      - name: Prepare installer files (${{ matrix.variant }})
         shell: powershell
         run: |
-          python -m venv python_env
-          .\python_env\Scripts\Activate.ps1
-          pip install --upgrade pip setuptools wheel
-          pip install --no-deps -r requirements-${{ matrix.variant }}.txt
-          pip show matchypatchy
-
-      - name: Create installer directory structure (${{ matrix.variant }})
-        shell: powershell
-        run: |
+          $ErrorActionPreference = "Stop"
+          $ProgressPreference = "SilentlyContinue"
           New-Item -ItemType Directory -Path "build" -Force | Out-Null
-          Copy-Item -Path "python_env" -Destination "build\python_env" -Recurse -Force
-          Remove-Item -Path "python_env" -Recurse -Force
-          Copy-Item -Path "installation\windows\launcher.vbs" -Destination "build\" -Force
-          Copy-Item -Path "installation\windows\MatchyPatchy_${{ matrix.variant }}.nsi" -Destination "build\" -Force
 
-      - name: Update version in NSIS script (${{ matrix.variant }})
-        shell: powershell
-        env:
-          VERSION: ${{ needs.publish-pypi.outputs.version }}
-        run: |
-          $nsiPath = "build\MatchyPatchy_${{ matrix.variant }}.nsi"
-          (Get-Content $nsiPath) -replace '!define APP_VERSION ".*"', "!define APP_VERSION ""$env:VERSION""" | Set-Content $nsiPath
-          (Get-Content $nsiPath) -replace 'OutFile "MatchyPatchy-v.*-.*-setup\.exe"', "OutFile ""MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe""" | Set-Content $nsiPath
+          # Official embeddable Python (relocatable) + pip bootstrap
+          Invoke-WebRequest "https://www.python.org/ftp/python/${env:PYTHON_VERSION}/python-${env:PYTHON_VERSION}-embed-amd64.zip" -OutFile "python-embed.zip"
+          Expand-Archive -Path "python-embed.zip" -DestinationPath "build\python_env"
+          Invoke-WebRequest "https://bootstrap.pypa.io/get-pip.py" -OutFile "build\get-pip.py"
+
+          # Installer inputs
+          Copy-Item "requirements-${{ matrix.variant }}.txt" "build\requirements.txt"
+          Copy-Item "installation\windows\MatchyPatchy.nsi" "build\"
+          Copy-Item "installation\windows\launcher.vbs" "build\"
+          Copy-Item "installation\windows\matchypatchy.ico" "build\"
+          Copy-Item "installation\windows\python._pth" "build\"
 
       - name: Build NSIS installer (${{ matrix.variant }})
         shell: cmd
         run: |
           cd build
-          "C:\Program Files (x86)\NSIS\makensis.exe" MatchyPatchy_${{ matrix.variant }}.nsi
+          "C:\Program Files (x86)\NSIS\makensis.exe" /DVARIANT=${{ matrix.variant }} /DAPP_VERSION=%VERSION% MatchyPatchy.nsi
 
       - name: Move installer to dist (${{ matrix.variant }})
         shell: powershell
-        env:
-          VERSION: ${{ needs.publish-pypi.outputs.version }}
         run: |
           New-Item -ItemType Directory -Path "dist" -Force | Out-Null
           Copy-Item -Path "build\MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe" -Destination "dist\" -Force

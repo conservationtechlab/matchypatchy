@@ -1,0 +1,6 @@
+# Replaces the embeddable Python's python312._pth at install time (see MatchyPatchy.nsi).
+# Keep "python312.zip" in sync with PY_TAG in MatchyPatchy.nsi if Python is upgraded.
+python312.zip
+.
+Lib\site-packages
+import site

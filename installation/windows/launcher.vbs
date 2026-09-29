@@ -1,6 +1,6 @@
 Option Explicit
-' launcher.vbs - robust launcher for venv/pythonw
-' Sets CWD to the install folder and launches __main__.py with pythonw (or python/pyw fallback).
+' launcher.vbs - launcher for the bundled Python (python_env\pythonw.exe)
+' Sets CWD to the install folder and runs "python -m matchypatchy" with pythonw (or python fallback).
 ' Writes errors to launcher.log and shows a message box if launch fails.
 
 Dim fso, wsh, scriptPath, scriptDir, pythonwPath, pythonPath, cmd, logPath
@@ -25,8 +25,11 @@ ElseIf fso.FileExists(pythonPath) Then
   ' fallback to python (will show a console if used)
   cmd = """" & pythonPath & """ -m matchypatchy"
 Else
-  ' final fallback: try Python launcher on PATH
-  cmd = "pyw -3 -m matchypatchy"
+  ' The bundled Python is created by the installer; if it is gone, reinstall.
+  MsgBox "MatchyPatchy's Python environment was not found in:" & vbCrLf & _
+         scriptDir & "\python_env" & vbCrLf & vbCrLf & _
+         "Please reinstall MatchyPatchy.", vbExclamation, "Launcher error"
+  WScript.Quit 1
 End If
 
 ' Attempt to run the command hidden (0 = hidden window). Do not wait for it to finish (False).
