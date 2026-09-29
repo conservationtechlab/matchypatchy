@@ -25,6 +25,11 @@ command -v dpkg-deb >/dev/null 2>&1 || die "dpkg-deb not found (sudo apt install
 VERSION="$(sed -n 's/^__version__ *= *"\(.*\)".*/\1/p' src/matchypatchy/__init__.py)"
 [ -n "$VERSION" ] || die "could not read __version__ from src/matchypatchy/__init__.py"
 
+SITE="$("$PY" -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+for SUB in database gui threads; do
+    [ -f "$SITE/matchypatchy/$SUB/__init__.py" ] || die "installed matchypatchy is missing the '$SUB' subpackage (check pyproject packaging)"
+done
+
 REQ="$ROOT/requirements-$VARIANT.txt"
 [ -f "$REQ" ] || die "missing $REQ"
 
