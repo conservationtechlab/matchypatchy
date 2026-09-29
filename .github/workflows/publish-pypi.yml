@@ -34,23 +34,38 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
 
+      - name: Check if version already exists on PyPI
+        id: check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://pypi.org/pypi/matchypatchy/$VERSION/json")
+          if [ "$STATUS" = "200" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Version $VERSION already exists on PyPI — will skip build/upload."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Version $VERSION not found on PyPI — will build and publish."
+          fi
+
       - name: Install build tools
+        if: steps.check.outputs.exists != 'true'
         run: |
           python -m pip install --upgrade pip
           pip install build twine
 
       - name: Build distribution
+        if: steps.check.outputs.exists != 'true'
         run: python -m build
 
       - name: Check distribution
+        if: steps.check.outputs.exists != 'true'
         run: twine check dist/*
 
       - name: Publish to PyPI
+        if: steps.check.outputs.exists != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         # No password/token needed — uses OIDC trusted publishing
-        with:
-          skip-existing: true
-
 
       - name: Wait for PyPI index to update
         run: |
