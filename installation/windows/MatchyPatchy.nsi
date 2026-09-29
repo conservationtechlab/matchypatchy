@@ -5,7 +5,7 @@
 ; install needs an internet connection.
 ;
 ; Build (from the folder holding the files listed below):
-;   makensis /DVARIANT=cpu /DAPP_VERSION=0.2.1 MatchyPatchy.nsi
+;   makensis /DVARIANT=cpu /DAPP_VERSION=0.2.2 MatchyPatchy.nsi
 ;
 ; Files expected next to this script:
 ;   python_env\        contents of python-3.12.x-embed-amd64.zip
@@ -19,7 +19,7 @@
   !define VARIANT "cpu"
 !endif
 !ifndef APP_VERSION
-  !define APP_VERSION "0.2.1"
+  !define APP_VERSION "0.2.2"
 !endif
 ; Python major+minor without the dot (312 = 3.12); must match the embeddable zip
 !define PY_TAG "312"

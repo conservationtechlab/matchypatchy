@@ -24,10 +24,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.dynamic]
 version = {attr = "matchypatchy.__version__"}
 
-[tool.setuptools]
-packages = ["matchypatchy"]
-package-dir = {"" = "src"}
- 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.setuptools.package-data]
 matchypatchy = ["assets/**/*", "assets/graphics/*"]
 
