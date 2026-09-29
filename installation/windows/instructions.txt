@@ -1,7 +1,31 @@
-To package:
-- use python_env python.exe to pip install new version of matchypatchy_package
-- uninstall onnxruntime, install onnxruntime-gpu==1.22.0
-- Move .nsi to top directory
-- run nsis and test installer
-- make sure resource_path and asset_path are working correcty
-- check cuda if gpucuda
+MatchyPatchy Windows installer
+==============================
+
+The installer does not contain the app's Python packages. It ships the official
+embeddable Python and get-pip.py, and at install time runs pip to install
+requirements-<cpu|gpu>.txt from PyPI. Installing therefore needs internet access
+and the matchypatchy version pinned in the requirements file must already be
+published on PyPI.
+
+To package (CI does this automatically; these are the manual steps):
+
+1. Bump the version in src/matchypatchy/__init__.py and the "matchypatchy=="
+   line in requirements-cpu.txt and requirements-gpu.txt, and publish to PyPI.
+2. Make a build folder containing:
+     python_env\        contents of python-3.12.10-embed-amd64.zip
+                        https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip
+     get-pip.py         https://bootstrap.pypa.io/get-pip.py
+     requirements.txt   copy of requirements-cpu.txt (or requirements-gpu.txt)
+     MatchyPatchy.nsi, launcher.vbs, matchypatchy.ico, python._pth
+                        (from installation\windows)
+3. From that folder run NSIS:
+     makensis /DVARIANT=cpu /DAPP_VERSION=0.2.2 MatchyPatchy.nsi
+   (use /DVARIANT=gpu with the GPU requirements). Output:
+     MatchyPatchy-v0.2.2-cpu-setup.exe
+
+To test: run the installer on a Windows machine or VM WITHOUT Python installed,
+launch MatchyPatchy from the Start menu, then uninstall and check that the
+install folder (%LOCALAPPDATA%\MatchyPatchy) is gone.
+
+If you change the Python version, update PY_TAG in MatchyPatchy.nsi and the
+"python312.zip" line in python._pth to match.

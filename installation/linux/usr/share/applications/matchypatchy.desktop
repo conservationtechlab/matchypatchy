@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=MatchyPatchy
-Comment=Individual re-identication matching tool
-Exec=$HOME/.MatchyPatchy/launcher.sh
-Icon=$HOME/.MatchyPatchy/matchypatchy/assets/graphics/desktop_icon.ico
+Comment=Individual re-identification matching tool
+Exec=/usr/bin/matchypatchy
+Icon=matchypatchy
 Terminal=false
-Categories=Utility;
+Categories=Science;Utility;
 StartupNotify=true
