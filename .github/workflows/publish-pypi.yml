@@ -250,14 +250,14 @@ jobs:
           Copy-Item -Path "python_env" -Destination "build\installation\windows\python_env" -Recurse -Force
           Remove-Item -Path "python_env" -Recurse -Force
           Copy-Item -Path "installation\windows\launcher.vbs" -Destination "build\installation\windows\" -Force
-          Copy-Item -Path "installation\windows\MatchyPatchy-${{ matrix.variant }}.nsi" -Destination "build\installation\windows\" -Force
+          Copy-Item -Path "installation\windows\MatchyPatchy_${{ matrix.variant }}.nsi" -Destination "build\installation\windows\" -Force
 
       - name: Update version in NSIS script (${{ matrix.variant }})
         shell: powershell
         env:
           VERSION: ${{ needs.publish-pypi.outputs.version }}
         run: |
-          $nsiPath = "build\installation\windows\MatchyPatchy-${{ matrix.variant }}.nsi"
+          $nsiPath = "build\installation\windows\MatchyPatchy_${{ matrix.variant }}.nsi"
           (Get-Content $nsiPath) -replace '!define APP_VERSION ".*"', "!define APP_VERSION ""$env:VERSION""" | Set-Content $nsiPath
           (Get-Content $nsiPath) -replace 'OutFile "MatchyPatchy-v.*-.*-setup\.exe"', "OutFile ""MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe""" | Set-Content $nsiPath
 
@@ -265,7 +265,7 @@ jobs:
         shell: cmd
         run: |
           cd build\installation\windows
-          "C:\Program Files (x86)\NSIS\makensis.exe" MatchyPatchy-${{ matrix.variant }}.nsi
+          "C:\Program Files (x86)\NSIS\makensis.exe" MatchyPatchy_${{ matrix.variant }}.nsi
 
       - name: Move installer to dist (${{ matrix.variant }})
         shell: powershell
