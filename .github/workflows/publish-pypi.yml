@@ -48,18 +48,24 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         # No password/token needed — uses OIDC trusted publishing
+        with:
+          skip-existing: true
+
 
       - name: Wait for PyPI index to update
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          echo "Waiting for matchypatchy==$VERSION to become installable from PyPI..."
-          for i in $(seq 1 20); do
-            if pip index versions matchypatchy 2>/dev/null | grep -q "$VERSION"; then
+          echo "Waiting for matchypatchy==$VERSION to become available on PyPI..."
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Cache-Control: no-cache" \
+              "https://pypi.org/pypi/matchypatchy/$VERSION/json")
+            if [ "$STATUS" = "200" ]; then
               echo "✓ Version $VERSION is live on PyPI"
               exit 0
             fi
-            echo "  Not yet available, waiting 15s... (attempt $i/20)"
-            sleep 15
+            echo "  Not yet available (HTTP $STATUS), waiting 20s... (attempt $i/30)"
+            sleep 20
           done
           echo "✗ Timed out waiting for PyPI to show $VERSION"
           exit 1
