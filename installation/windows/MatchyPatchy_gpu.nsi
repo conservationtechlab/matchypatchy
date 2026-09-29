@@ -4,7 +4,7 @@
 !define APP_VERSION "0.2.1"
 
 Name "MatchyPatchy"
-OutFile "MatchyPatchy-v0.2.1-cpu-setup.exe"
+OutFile "MatchyPatchy-v0.2.1-gpu-setup.exe"
 ; Per-user install (no admin required)
 InstallDir "$LOCALAPPDATA\MatchyPatchy"
 
@@ -64,13 +64,13 @@ Section "Install MatchyPatchy ${APP_VERSION}" SEC_MAIN
   SetOutPath "$INSTDIR"
 
   ; Include pip requirements and launcher
-  File "installation\windows\launcher.vbs"
+  File "launcher.vbs"
 
   ; Include python
   DetailPrint "Installing Python 3.13.."
   SetOutPath "$INSTDIR\python_env"
   CreateDirectory "$INSTDIR\python_env"
-  File /r "installation\windows\python_env_gpu\*.*"
+  File /r "python_env\*.*"
 
   ; Write uninstaller
   WriteUninstaller "$INSTDIR\Uninstall.exe"
