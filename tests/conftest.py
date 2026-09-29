@@ -55,28 +55,29 @@ class _QObjectStub:
 
 
 class _QWidgetStub(_QObjectStub):
-    """Minimal QWidget stub — real Python class so subclasses can be instantiated."""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._layout = None
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.accepted = MagicMock()
+        self.rejected = MagicMock()
 
-    def setLayout(self, layout):
-        self._layout = layout
+    def close(self):
+        return True
 
-    def setFocusPolicy(self, policy):
+    def show(self):
         pass
 
-    def setWindowTitle(self, title):
+    def hide(self):
         pass
 
-    def setStyleSheet(self, style):
+    def setWindowTitle(self, *a, **k):
         pass
 
+    def setLayout(self, *a, **k):
+        pass
 
 class _QDialogStub(_QWidgetStub):
-    """Minimal QDialog stub — real Python class so subclasses can be instantiated."""
     def exec(self):
-        return False
+        return 1
 
     def accept(self):
         pass

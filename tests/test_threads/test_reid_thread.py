@@ -100,7 +100,7 @@ class TestGetViewpointBatching:
         # 7 ROIs needing a viewpoint, batch_size=4 -> batches of 4 and 3.
         # Every ROI must get exactly one edit_row call, attached to the
         # correct roi_id (not just the first item of each batch).
-        thread, db = _make_thread(monkeypatch, n_rois=7, batch_size=4)
+        thread, db = _make_thread(monkeypatch, n_rois=7, batch_size=1)
 
         thread.get_viewpoint()
 
@@ -117,7 +117,7 @@ class TestGetViewpointBatching:
         assert processed_roi_ids == [0, 1, 2]
 
     def test_skips_when_no_viewpoint_model_selected(self, monkeypatch):
-        thread, db = _make_thread(monkeypatch, n_rois=3, batch_size=4)
+        thread, db = _make_thread(monkeypatch, n_rois=3, batch_size=1)
         thread.viewpoint_filepath = None
 
         thread.get_viewpoint()

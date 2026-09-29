@@ -243,21 +243,25 @@ class TestAnimlThread:
         assert db.edit_row_calls[0][0][1] == 20
         assert thread.progress_update.calls == [(50,), (100,)]
 
-    def test_detect_images_skips_when_detector_none(self, tmp_path, monkeypatch):
+    def test_detect_images_uses_full_image_when_detector_none(self, tmp_path, monkeypatch):
         db = FakeDB()
-        monkeypatch.setattr(animl_thread, "get_path", lambda *_args, **_kwargs: None)
-        monkeypatch.setattr(animl_thread, "fetch_roi_media", lambda *_args, **_kwargs: _empty_roi_media())
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: None)
+        monkeypatch.setattr(animl_thread, "fetch_roi_media", lambda *_a, **_k: _empty_roi_media())
+        monkeypatch.setattr(animl_thread, "save_roi_thumbnail", lambda *_a, **_k: "thumb.jpg")
 
         thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY=None)
         thread.images = pd.DataFrame([{"id": 3, "filepath": "/base/new.jpg", "ext": ".jpg"}])
         thread.rois = pd.DataFrame()
         thread.prompt_update = SignalSpy()
+        thread.to_process = 1
 
         thread.detect_images()
 
-        assert db.add_roi_calls == []
+        # one full-frame ROI per image, no detector run
+        assert db.add_roi_calls == [
+            ((3, 0, 0, 0, 1, 1), {"viewpoint": None, "individual_id": None, "emb": 0})
+        ]
         assert db.edit_row_calls == []
-        assert ("No detector selected, skipping detection...",) in thread.prompt_update.calls
 
     def test_detect_videos_adds_top_frame_rois(self, tmp_path, monkeypatch):
         db = FakeDB()
