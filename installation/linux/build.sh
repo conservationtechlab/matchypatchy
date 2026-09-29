@@ -1,115 +1,133 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Build the MatchyPatchy Linux packages: a .deb (installs to /opt) and a
+# tarball (per-user install via install.sh).
+#
+# Both contain a ready-made Python environment, built here from
+# requirements-<variant>.txt, so installing needs no internet and no system Python.
+#
+# Usage (from anywhere):  bash installation/linux/build.sh [cpu|gpu]
+# Requires: uv (pip install uv), dpkg-deb, internet access (build time only).
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
+die() { echo -e "${RED}Error: $*${NC}" >&2; exit 1; }
 
-VERSION="0.2.1"
-BUILD_DIR="./build"
-OUTPUT_DIR="./dist"
-PACKAGE_NAME="matchypatchy-${VERSION}-linux"
+VARIANT="${1:-cpu}"
+case "$VARIANT" in cpu|gpu) ;; *) die "usage: $0 [cpu|gpu]" ;; esac
 
-echo -e "${GREEN}Building MatchyPatchy ${VERSION} Linux installer...${NC}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+cd "$ROOT"
 
-# Clean up previous builds
-rm -rf "$BUILD_DIR" "$OUTPUT_DIR"
-mkdir -p "$BUILD_DIR" "$OUTPUT_DIR"
+command -v uv >/dev/null 2>&1 || die "uv not found (pip install uv)"
+command -v dpkg-deb >/dev/null 2>&1 || die "dpkg-deb not found (sudo apt install dpkg-dev)"
 
-# Create directory structure
-mkdir -p "$BUILD_DIR/opt/matchypatchy"
-mkdir -p "$BUILD_DIR/usr/local/bin"
-mkdir -p "$BUILD_DIR/usr/share/applications"
+VERSION="$(sed -n 's/^__version__ *= *"\(.*\)".*/\1/p' src/matchypatchy/__init__.py)"
+[ -n "$VERSION" ] || die "could not read __version__ from src/matchypatchy/__init__.py"
 
-# ============================================
-# BUILD BUNDLED PYTHON
-# ============================================
-echo -e "${YELLOW}Building bundled Python environment...${NC}"
-if [ ! -d "python_env" ]; then
-    python3 -m venv python_env
+REQ="$ROOT/requirements-$VARIANT.txt"
+[ -f "$REQ" ] || die "missing $REQ"
+
+if [ "$VARIANT" = "gpu" ]; then
+    PKG="matchypatchy-gpu"; CONFLICTS="matchypatchy"
+else
+    PKG="matchypatchy";     CONFLICTS="matchypatchy-gpu"
 fi
 
-source python_env/bin/activate
+WORK="$ROOT/build/linux-$VARIANT"
+OUT="$ROOT/dist"
+TAR_NAME="matchypatchy-${VERSION}-linux-${VARIANT}-x86_64"
+STAGE_TAR="$WORK/$TAR_NAME"
+STAGE_DEB="$WORK/deb"
 
-# Upgrade pip first
-pip install --upgrade pip setuptools wheel
+echo -e "${GREEN}Building MatchyPatchy $VERSION ($VARIANT)...${NC}"
+rm -rf "$WORK"
+mkdir -p "$WORK" "$OUT" "$STAGE_TAR"
 
-# Install requirements as-is, WITHOUT dependency resolution
-echo -e "${YELLOW}Installing packages from requirements.txt (--no-deps)...${NC}"
-pip install --no-deps -r requirements.txt
+# ---------------------------------------------------------------
+# 1. Python environment.
+#    A normal venv is NOT portable (it symlinks to the build machine's
+#    interpreter), so start from a standalone, relocatable Python
+#    (python-build-standalone, fetched by uv).
+# ---------------------------------------------------------------
+echo -e "${YELLOW}Fetching standalone Python 3.12...${NC}"
+uv python install 3.12 --install-dir "$WORK/pbs"
+PBS_PY="$(find "$WORK/pbs" -maxdepth 1 -type d -name 'cpython-3.12.*' | sort | tail -1)"
+[ -n "$PBS_PY" ] || die "standalone Python not found in $WORK/pbs"
 
-# Verify installation
-echo -e "${YELLOW}Verifying installation...${NC}"
-pip list
+cp -a "$PBS_PY" "$STAGE_TAR/python_env"
+rm -f "$STAGE_TAR"/python_env/lib/python3.12/EXTERNALLY-MANAGED   # allow pip
+PY="$STAGE_TAR/python_env/bin/python"
 
-deactivate
+# ---------------------------------------------------------------
+# 2. Install requirements-<variant>.txt exactly as written
+#    (includes the released matchypatchy from PyPI)
+# ---------------------------------------------------------------
+echo -e "${YELLOW}Installing packages from requirements-$VARIANT.txt...${NC}"
+"$PY" -m pip install --no-cache-dir --no-deps -r "$REQ"
 
-echo -e "${GREEN}✓ Python environment ready${NC}"
+INSTALLED="$("$PY" -c 'import importlib.metadata as m; print(m.version("matchypatchy"))')"
+[ "$INSTALLED" = "$VERSION" ] || die "installed matchypatchy $INSTALLED != __version__ $VERSION (update the pin in $REQ)"
+echo -e "${GREEN}✓ Python environment ready (matchypatchy $INSTALLED)${NC}"
 
-# ============================================
-# Copy bundled Python
-# ============================================
-echo -e "${YELLOW}Copying Python runtime...${NC}"
-cp -r python_env "$BUILD_DIR/opt/matchypatchy/"
+# ---------------------------------------------------------------
+# 3. Tarball (per-user install: run install.sh)
+# ---------------------------------------------------------------
+echo -e "${YELLOW}Assembling tarball...${NC}"
+for F in install.sh launcher.sh uninstall.sh; do
+    install -m 0755 "$SCRIPT_DIR/opt/matchypatchy/$F" "$STAGE_TAR/$F"
+done
+cp -r "$SCRIPT_DIR/icons" "$STAGE_TAR/icons"
+echo "$VERSION" > "$STAGE_TAR/VERSION"
+chmod -R a+rX,go-w "$STAGE_TAR"
 
-echo -e "${YELLOW}Copying application...${NC}"
-cp -r src/matchypatchy "$BUILD_DIR/opt/matchypatchy/"
+tar -C "$WORK" -czf "$OUT/$TAR_NAME.tar.gz" "$TAR_NAME"
+echo -e "${GREEN}✓ $OUT/$TAR_NAME.tar.gz${NC}"
 
-echo -e "${YELLOW}Copying scripts...${NC}"
-cp installation/linux/opt/matchypatchy/install.sh "$BUILD_DIR/opt/matchypatchy/"
-cp installation/linux/opt/matchypatchy/launcher.sh "$BUILD_DIR/opt/matchypatchy/"
-cp installation/linux/opt/matchypatchy/uninstall.sh "$BUILD_DIR/opt/matchypatchy/"
-chmod +x "$BUILD_DIR/opt/matchypatchy"/*.sh
+# ---------------------------------------------------------------
+# 4. .deb (system-wide, runs straight from /opt/matchypatchy)
+# ---------------------------------------------------------------
+echo -e "${YELLOW}Assembling .deb...${NC}"
+mkdir -p "$STAGE_DEB/DEBIAN" "$STAGE_DEB/opt/matchypatchy" \
+         "$STAGE_DEB/usr/bin" "$STAGE_DEB/usr/share/applications"
 
-echo -e "${YELLOW}Copying wrapper and desktop entry...${NC}"
-cp installation/linux/usr/local/bin/matchypatchy "$BUILD_DIR/usr/local/bin/"
-chmod +x "$BUILD_DIR/usr/local/bin/matchypatchy"
-cp installation/linux/usr/share/applications/matchypatchy.desktop "$BUILD_DIR/usr/share/applications/"
+cp -al "$STAGE_TAR/python_env" "$STAGE_DEB/opt/matchypatchy/python_env"   # hardlinks: no second copy
+install -m 0755 "$SCRIPT_DIR/opt/matchypatchy/launcher.sh" "$STAGE_DEB/opt/matchypatchy/launcher.sh"
+echo "$VERSION" > "$STAGE_DEB/opt/matchypatchy/VERSION"
+install -m 0755 "$SCRIPT_DIR/usr/bin/matchypatchy" "$STAGE_DEB/usr/bin/matchypatchy"
+install -m 0644 "$SCRIPT_DIR/usr/share/applications/matchypatchy.desktop" \
+                "$STAGE_DEB/usr/share/applications/matchypatchy.desktop"
 
-# ============================================
-# CREATE TARBALL
-# ============================================
-echo -e "${YELLOW}Creating tarball...${NC}"
-cd "$BUILD_DIR"
-tar -czf "../$OUTPUT_DIR/${PACKAGE_NAME}-x86_64.tar.gz" .
-cd ..
+ICON_COUNT=0
+for ICON in "$SCRIPT_DIR"/icons/hicolor/*/apps/matchypatchy.png; do
+    [ -f "$ICON" ] || continue
+    REL="${ICON#"$SCRIPT_DIR"/icons/}"
+    install -D -m 0644 "$ICON" "$STAGE_DEB/usr/share/icons/$REL"
+    ICON_COUNT=$((ICON_COUNT + 1))
+done
+[ "$ICON_COUNT" -gt 0 ] || die "no icons found in $SCRIPT_DIR/icons/hicolor"
 
-TARBALL_SIZE=$(du -h "$OUTPUT_DIR/${PACKAGE_NAME}-x86_64.tar.gz" | cut -f1)
-echo -e "${GREEN}✓ Tarball created: $OUTPUT_DIR/${PACKAGE_NAME}-x86_64.tar.gz ($TARBALL_SIZE)${NC}"
+install -m 0755 "$SCRIPT_DIR/DEBIAN/postinst" "$STAGE_DEB/DEBIAN/postinst"
+install -m 0755 "$SCRIPT_DIR/DEBIAN/postrm"   "$STAGE_DEB/DEBIAN/postrm"
 
-# ============================================
-# CREATE .DEB PACKAGE
-# ============================================
-echo -e "${YELLOW}Creating .deb package...${NC}"
-mkdir -p "$BUILD_DIR/DEBIAN"
-cat > "$BUILD_DIR/DEBIAN/control" <<EOF
-Package: matchypatchy
+INSTALLED_SIZE="$(du -sk "$STAGE_DEB" | cut -f1)"
+cat > "$STAGE_DEB/DEBIAN/control" <<EOF_CONTROL
+Package: $PKG
 Version: $VERSION
-Section: utils
+Section: science
 Priority: optional
 Architecture: amd64
-Maintainer: Conservation Technology Lab <info@example.com>
-Depends: bash
-Description: MatchyPatchy - Image matching application
- MatchyPatchy with bundled Python runtime.
-EOF
+Installed-Size: $INSTALLED_SIZE
+Maintainer: Kyra Swanson <tswanson@sdzwa.org>
+Depends: libc6 (>= 2.28), libgl1, libegl1, libfontconfig1, libdbus-1-3, libxkbcommon-x11-0, libxcb-cursor0, libxcb-icccm4, libxcb-image0, libxcb-keysyms1, libxcb-randr0, libxcb-render-util0, libxcb-shape0, libxcb-xinerama0, libxcb-xkb1
+Conflicts: $CONFLICTS
+Homepage: https://github.com/conservationtechlab/matchypatchy
+Description: GUI tool for human validation of AI-powered animal re-identification
+ MatchyPatchy ($VARIANT build) with a bundled Python runtime, installed in
+ /opt/matchypatchy. Start it from the application menu or with "matchypatchy".
+EOF_CONTROL
 
-cat > "$BUILD_DIR/DEBIAN/postinst" <<'EOF'
-#!/bin/bash
-set -e
-chmod +x /opt/matchypatchy/install.sh
-chmod +x /opt/matchypatchy/launcher.sh
-chmod +x /opt/matchypatchy/uninstall.sh
-chmod +x /usr/local/bin/matchypatchy
-/opt/matchypatchy/install.sh
-EOF
-chmod +x "$BUILD_DIR/DEBIAN/postinst"
+dpkg-deb --root-owner-group -Zxz --build "$STAGE_DEB" "$OUT/${PKG}_${VERSION}_amd64.deb"
+echo -e "${GREEN}✓ $OUT/${PKG}_${VERSION}_amd64.deb${NC}"
 
-dpkg-deb --build "$BUILD_DIR" "$OUTPUT_DIR/${PACKAGE_NAME}_amd64.deb" 2>/dev/null && \
-    echo -e "${GREEN}✓ .deb package created${NC}" || \
-    echo -e "${YELLOW}Note: dpkg not available, skipping .deb creation${NC}"
-
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}✓ All builds complete in $OUTPUT_DIR/${NC}"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}All builds complete in $OUT/${NC}"
