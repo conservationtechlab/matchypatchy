@@ -33,8 +33,8 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
           else
-            echo "Not triggered by a version tag (ref: $GITHUB_REF) — reading version from pyproject.toml instead."
-            VERSION=$(grep '^version' pyproject.toml | head -1 | sed -E 's/version *= *"([^"]+)"/\1/')
+            echo "Not triggered by a version tag (ref: $GITHUB_REF) — reading version from src/matchypatchy/__init__.py instead."
+            VERSION=$(grep '__version__' src/matchypatchy/__init__.py | head -1 | sed -E 's/.*__version__ *= *"([^"]+)".*/\1/')
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
