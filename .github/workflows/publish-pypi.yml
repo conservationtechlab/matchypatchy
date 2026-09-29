@@ -246,26 +246,26 @@ jobs:
       - name: Create installer directory structure (${{ matrix.variant }})
         shell: powershell
         run: |
-          New-Item -ItemType Directory -Path "build\installation\windows" -Force | Out-Null
-          Copy-Item -Path "python_env" -Destination "build\installation\windows\python_env" -Recurse -Force
+          New-Item -ItemType Directory -Path "build" -Force | Out-Null
+          Copy-Item -Path "python_env" -Destination "build\python_env" -Recurse -Force
           Remove-Item -Path "python_env" -Recurse -Force
-          Copy-Item -Path "installation\windows\launcher.vbs" -Destination "build\installation\windows\" -Force
-          Copy-Item -Path "installation\windows\MatchyPatchy-${{ matrix.variant }}.nsi" -Destination "build\installation\windows\" -Force
+          Copy-Item -Path "installation\windows\launcher.vbs" -Destination "build\" -Force
+          Copy-Item -Path "installation\windows\MatchyPatchy_${{ matrix.variant }}.nsi" -Destination "build\" -Force
 
       - name: Update version in NSIS script (${{ matrix.variant }})
         shell: powershell
         env:
           VERSION: ${{ needs.publish-pypi.outputs.version }}
         run: |
-          $nsiPath = "build\installation\windows\MatchyPatchy-${{ matrix.variant }}.nsi"
+          $nsiPath = "build\MatchyPatchy_${{ matrix.variant }}.nsi"
           (Get-Content $nsiPath) -replace '!define APP_VERSION ".*"', "!define APP_VERSION ""$env:VERSION""" | Set-Content $nsiPath
           (Get-Content $nsiPath) -replace 'OutFile "MatchyPatchy-v.*-.*-setup\.exe"', "OutFile ""MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe""" | Set-Content $nsiPath
 
       - name: Build NSIS installer (${{ matrix.variant }})
         shell: cmd
         run: |
-          cd build\installation\windows
-          "C:\Program Files (x86)\NSIS\makensis.exe" MatchyPatchy-${{ matrix.variant }}.nsi
+          cd build
+          "C:\Program Files (x86)\NSIS\makensis.exe" MatchyPatchy_${{ matrix.variant }}.nsi
 
       - name: Move installer to dist (${{ matrix.variant }})
         shell: powershell
@@ -273,7 +273,7 @@ jobs:
           VERSION: ${{ needs.publish-pypi.outputs.version }}
         run: |
           New-Item -ItemType Directory -Path "dist" -Force | Out-Null
-          Copy-Item -Path "build\installation\windows\MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe" -Destination "dist\" -Force
+          Copy-Item -Path "build\MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe" -Destination "dist\" -Force
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
