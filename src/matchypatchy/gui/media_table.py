@@ -233,17 +233,49 @@ class MediaTable(QAbstractTableModel):
         return super().headerData(section, orientation, role)
 
     def sort(self, column, order):
-        """Sorts the underlying Python data instantly."""
+        """Sorts the underlying data; None/NaN are treated as the smallest value."""
         if self._data_filtered.empty:
             return
 
-        if column == 1: # do not sort by thumbnail
+        col_name = self._columns[column]
+        if col_name == "thumbnail_path":  # do not sort by thumbnail
             return
 
-        self.layoutAboutToBeChanged.emit()
-        # Sort the python list in place
         ascending = order == Qt.SortOrder.AscendingOrder
-        self._data_filtered.sort_values(by=self._columns[column], ascending=ascending, inplace=True)
-        self._data_filtered.reset_index(inplace=True, drop=True)
 
-        self.layoutChanged.emit()
+        self.layoutAboutToBeChanged.emit()
+        try:
+            self._data_filtered = self._data_filtered.sort_values(
+                by=col_name,
+                ascending=ascending,
+                key=self._sort_key,
+                # None acts as the lowest value: first when ascending, last when descending
+                na_position="first" if ascending else "last",
+                kind="mergesort",).reset_index(drop=True)
+        except Exception as e:
+            print(f"Sort failed on column {col_name}: {e}")
+        finally:
+            self.layoutChanged.emit()
+
+    def _sort_key(self, series):
+        """Key function for sort_values: maps IDs to displayed names, handles None/NaN,
+        and avoids mixed-type comparisons."""
+        name = series.name
+
+        # Sort by what the user actually sees for lookup columns
+        if name == "station_id":
+            series = series.map(lambda v: self.STATIONS["name"].get(int(v)) if pd.notna(v) else None)
+        elif name == "camera_id":
+            series = series.map(lambda v: self.CAMERAS["name"].get(int(v)) if pd.notna(v) else None)
+        elif name == "individual_id":
+            series = series.map(lambda v: self.INDIVIDUALS["name"].get(v, str(v)) if pd.notna(v) else None)
+        elif name == "viewpoint":
+            series = series.map(lambda v: self.VIEWPOINTS.get(str(v), str(v)) if pd.notna(v) else None)
+
+        # Numeric column (ignoring nulls)? Sort numerically.
+        numeric = pd.to_numeric(series, errors="coerce")
+        if numeric.notna().sum() == series.notna().sum():
+            return numeric
+
+        # Otherwise compare everything as lowercase strings, keeping nulls as nulls
+        return series.map(lambda v: None if pd.isna(v) else str(v).lower())
