@@ -334,12 +334,14 @@ class QueryContainer(QObject):
             self.filter(self.filter_dict, self._get_valid_stations_from_current())
             return
 
+        # Combine the newly fetched rows for the query and match sequences
+        new_rows = pd.concat([query_df, match_df])
+        new_rows = new_rows[~new_rows.index.duplicated()]
+        seq_ids = [query_seq_id, match_seq_id]
         # Remove old sequence data and insert updated data
         # Using index-based filtering since 'id' is the index
-        self.data = self.data[~self.data['sequence_id'].isin([query_seq_id, match_seq_id])]
-
-        # Concatenate new data and preserve index
-        self.data = pd.concat([self.data, query_df, match_df])
+        self.data = pd.concat([self.data[~self.data['sequence_id'].isin(seq_ids)], new_rows])
+        self.data_raw = pd.concat([self.data_raw[~self.data_raw['sequence_id'].isin(seq_ids)], new_rows])
 
         # Rebuild indices with updated data
         self._build_seq_indices()
@@ -433,16 +435,20 @@ class QueryContainer(QObject):
         filtered_neighbors = [(fid, 1 - self._similarities_cache[fid]) for fid in favorite_ids]
         return filtered_neighbors
 
+    def _clean_iid(self, v):
+        """None/NaN -> None, otherwise int"""
+        return None if v is None or pd.isna(v) else int(v)
+
     def is_existing_match(self):
         """Return whether current query and match have same individual_id"""
-        query_iid = self._get_roi_field(self.current_query_rid, 'individual_id')
-        match_iid = self._get_roi_field(self.current_match_rid, 'individual_id')
-        return query_iid == match_iid and query_iid is not None
+        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
+        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
+        return query_iid is not None and query_iid == match_iid
 
     def both_unnamed(self):
         """Return whether both current query and match are unnamed"""
-        return (self._get_roi_field(self.current_query_rid, 'individual_id') is None and
-                self._get_roi_field(self.current_match_rid, 'individual_id') is None)
+        return (self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id')) is None and
+                self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id')) is None)
 
     def current_distance(self):
         """Return distance between current sequence and match"""
@@ -462,11 +468,12 @@ class QueryContainer(QObject):
         return None
 
     def _update_roi_index(self, updates_dict):
-        """Update local index with batch changes"""
-        for roi_id, changes in updates_dict.items():
-            # Update DataFrame
-            for key, value in changes.items():
-                self.data.loc[roi_id, key] = value
+        """Apply changes to both the filtered and raw frames (existing ids only)"""
+        for df in (self.data, self.data_raw):
+            for roi_id, changes in updates_dict.items():
+                if roi_id in df.index:
+                    for key, value in changes.items():
+                        df.loc[roi_id, key] = value
 
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
@@ -531,30 +538,30 @@ class QueryContainer(QObject):
         self.mpDB.batch_edit('roi', roi_updates, quiet=True)
 
     def merge(self):
-        """Merge two individuals after match (optimized)"""
-        query_data = self._get_roi_full_record(self.current_query_rid)
-        match_data = self._get_roi_full_record(self.current_match_rid)
+        """Merge two individuals after a match"""
+        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
+        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
 
-        if query_data is None or match_data is None:
+        if query_iid is None and match_iid is None:
             return
 
-        query_iid = query_data.get('individual_id')
-        match_iid = match_data.get('individual_id')
+        # keep the older (lower) id
+        ids = [i for i in (query_iid, match_iid) if i is not None]
+        keep_id = min(ids)
 
-        # Determine which ID to keep
-        if query_iid is not None:
-            # keep the older one (inputted into the db first)
-            keep_id = query_iid if (match_iid is None or match_iid < query_iid) else match_iid
-        else:
-            keep_id = match_iid
+        # find all ROIs associated with the query and match sequences
+        query_seq = self.current_match_object.sequence_id
+        match_seq = self._get_roi_field(self.current_match_rid, 'sequence_id')
+        rois = set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, []))
+        for iid in set(ids) - {keep_id}:
+            rois.update(self.data_raw.index[self.data_raw['individual_id'] == iid])
 
-        # Find all ROIs in affected sequence
-        to_merge_seq = self.current_match_object.sequence_id
-        merge_rois = self._seq_index.get(to_merge_seq, [])
+        if not rois:
+            self.logger.warning("merge: no ROIs to update")
+            return
 
-        # Batch update all ROIs
-        roi_updates = {roi: {"individual_id": int(keep_id), "reviewed": 1} 
-                       for roi in merge_rois}
+        roi_updates = {int(r): {"individual_id": keep_id, "reviewed": 1}
+                       for r in rois}
         self.mpDB.batch_edit('roi', roi_updates, quiet=False)
         
         # Update local index
