@@ -167,6 +167,7 @@ class QueryContainer(QObject):
     def capture_ranked_sequences(self, ranked_sequences):
         """Capture ranked_sequences from MatchEmbeddingThread"""
         self.ranked_sequences = ranked_sequences
+        self.n_queries = len(ranked_sequences)
 
     # Finalize the results after calculation or cache load
     def finish_calculating(self):
