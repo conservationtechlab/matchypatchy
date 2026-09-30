@@ -507,7 +507,6 @@ class DisplayCompare(QWidget):
         Change Match button to Green when query and match are same iid,
         normal button when not
         """
-        print("Toggling match button. Existing match:", self.QueryContainer.is_existing_match())
         if self.QueryContainer.is_existing_match():
             self.button_match.setChecked(True)
         else:

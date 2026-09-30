@@ -562,7 +562,7 @@ class QueryContainer(QObject):
 
         roi_updates = {int(r): {"individual_id": keep_id, "reviewed": 1}
                        for r in rois}
-        self.mpDB.batch_edit('roi', roi_updates, quiet=False)
+        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
         
         # Update local index
         self._update_roi_index(roi_updates)
@@ -575,8 +575,7 @@ class QueryContainer(QObject):
         # update database
         self.mpDB.edit_row('roi', self.current_query_rid,
                            {'individual_id': None, "reviewed": 0},
-                           allow_none=True,
-                           quiet=False)
+                           allow_none=True, quiet=True)
 
     # ==========================================================================
     # KNN CACHE MANAGEMENT
