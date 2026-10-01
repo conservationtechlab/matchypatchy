@@ -15,7 +15,7 @@
 
 ; Must come before any File instruction. Solid LZMA gives the best compression
 ; for the large Python environment and keeps the installer under the 2 GB limit.
-SetCompressor /SOLID lzma
+; SetCompressor /SOLID lzma
 
 !ifndef VARIANT
   !define VARIANT "cpu"

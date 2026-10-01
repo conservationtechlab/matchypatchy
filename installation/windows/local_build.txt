@@ -1,0 +1,30 @@
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
+$variant = "gpu"          # or gpu
+$pyver   = "3.12.10"
+$version = (Select-String -Path src\matchypatchy\__init__.py -Pattern '^__version__\s*=\s*"(.*)"').Matches[0].Groups[1].Value
+
+$b = "build\windows-$variant"
+Remove-Item $b -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Path $b | Out-Null
+
+# Embeddable Python + pip bootstrap
+Invoke-WebRequest "https://www.python.org/ftp/python/$pyver/python-$pyver-embed-amd64.zip" -OutFile "$b\python-embed.zip"
+Expand-Archive "$b\python-embed.zip" -DestinationPath "$b\python_env"
+Invoke-WebRequest "https://bootstrap.pypa.io/get-pip.py" -OutFile "$b\get-pip.py"
+
+# Enable site-packages, install pip and the pinned requirements
+Copy-Item installation\windows\python._pth "$b\python_env\python312._pth" -Force
+$py = "$b\python_env\python.exe"
+& $py "$b\get-pip.py" --no-warn-script-location --disable-pip-version-check
+if ($LASTEXITCODE -ne 0) { throw "get-pip failed" }
+& $py -m pip install --no-cache-dir --no-deps --no-warn-script-location --disable-pip-version-check -r "requirements-$variant.txt"
+if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+
+$installed = & $py -c "import importlib.metadata as m; print(m.version('matchypatchy'))"
+if ($installed -ne $version) { throw "installed matchypatchy $installed != $version" }
+Remove-Item "$b\python_env\Scripts" -Recurse -Force -ErrorAction SilentlyContinue
+
+# Installer inputs, then compile
+Copy-Item installation\windows\MatchyPatchy.nsi, installation\windows\launcher.vbs, installation\windows\matchypatchy.ico $b
+& "C:\Program Files (x86)\NSIS\makensis.exe" "/DVARIANT=$variant" "/DAPP_VERSION=$version" "$b\MatchyPatchy.nsi"
