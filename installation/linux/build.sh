@@ -134,7 +134,7 @@ Description: GUI tool for human validation of AI-powered animal re-identificatio
  /opt/matchypatchy. Start it from the application menu or with "matchypatchy".
 EOF_CONTROL
 
-dpkg-deb --root-owner-group -Zxz --build "$STAGE_DEB" "$OUT/${PKG}_${VERSION}_amd64.deb"
-echo -e "${GREEN}✓ $OUT/${PKG}_${VERSION}_amd64.deb${NC}"
+dpkg-deb --root-owner-group -Zxz --build "$STAGE_DEB" "$OUT/${PKG}_${VERSION}_${VARIANT}_amd64.deb"
+echo -e "${GREEN}✓ $OUT/${PKG}_${VERSION}_${VARIANT}_amd64.deb${NC}"
 
 echo -e "${GREEN}All builds complete in $OUT/${NC}"
