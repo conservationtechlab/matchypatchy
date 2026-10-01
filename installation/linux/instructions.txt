@@ -1,0 +1,10 @@
+MatchyPatchy Linux installer
+==============================
+
+
+1. Bump the version in src/matchypatchy/__init__.py and the "matchypatchy=="
+   line in requirements-cpu.txt and requirements-gpu.txt, and publish to PyPI.
+2. Run 
+    > bash build.sh cpu
+    > bash build.sh gpu
+3. sudo apt install ./dist/.deb
