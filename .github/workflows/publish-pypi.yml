@@ -199,3 +199,29 @@ jobs:
           files: dist/MatchyPatchy-v*-*-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================
+  # JOB 3: Build MacOS installers (waits for PyPI)
+  # ============================================
+  build-macos:
+    strategy:
+      matrix:
+        include:
+          - { os: macos-14,       arch: arm64 }
+          - { os: macos-15-intel, arch: x86_64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with: { python-version: "3.12" }
+      - run: python -m pip install uv
+      - name: Check version
+        run: |
+          SRC="$(sed -n 's/^__version__ *= *"\(.*\)".*/\1/p' src/matchypatchy/__init__.py)"
+          [ "$SRC" = "$VERSION" ] || { echo "::error::__version__ ($SRC) does not match $VERSION"; exit 1; }
+      - run: bash installation/macos/build.sh
+        env:
+          MAC_SIGN_IDENTITY: ${{ secrets.MAC_SIGN_IDENTITY }}
+          NOTARY_PROFILE: ${{ secrets.NOTARY_PROFILE }}
+      - uses: softprops/action-gh-release@v1
+        with: { files: dist/*.dmg }
