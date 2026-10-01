@@ -99,105 +99,35 @@ jobs:
     strategy:
       matrix:
         variant: [cpu, gpu]
+    env:
+      VERSION: ${{ needs.publish-pypi.outputs.version }}
     steps:
       - uses: actions/checkout@v6
+
+      - name: Check release version matches source
+        run: |
+          SRC="$(sed -n 's/^__version__ *= *"\(.*\)".*/\1/p' src/matchypatchy/__init__.py)"
+          if [ "$SRC" != "$VERSION" ]; then
+            echo "::error::__version__ ($SRC) does not match the release ($VERSION)"
+            exit 1
+          fi
+
+      - name: Free disk space
+        run: |
+          # The GPU environment is several GB; make room on the runner
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h /
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: Cache pip packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.variant }}-${{ hashFiles(format('requirements-{0}.txt', matrix.variant)) }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ matrix.variant }}-
+      - name: Install uv
+        run: python -m pip install uv
 
-      - name: Build bundled Python environment (${{ matrix.variant }})
-        env:
-          VERSION: ${{ needs.publish-pypi.outputs.version }}
-        run: |
-          echo "Creating Python virtual environment for ${{ matrix.variant }}..."
-          python3 -m venv python_env
-          source python_env/bin/activate
-
-          pip install --upgrade pip setuptools wheel
-
-          echo "Installing packages from requirements-${{ matrix.variant }}.txt without dependencies..."
-          pip install --no-deps -r requirements-${{ matrix.variant }}.txt
-
-          echo "Verifying matchypatchy==$VERSION was pulled from PyPI..."
-          pip show matchypatchy
-
-      - name: Create installer directory structure (${{ matrix.variant }})
-        run: |
-          mkdir -p build/opt/matchypatchy
-          mkdir -p build/usr/local/bin
-          mkdir -p build/usr/share/applications
-
-          cp -r python_env build/opt/matchypatchy/python_env
-          cp installation/linux/opt/matchypatchy/install.sh build/opt/matchypatchy/
-          cp installation/linux/opt/matchypatchy/launcher.sh build/opt/matchypatchy/
-          cp installation/linux/opt/matchypatchy/uninstall.sh build/opt/matchypatchy/
-          chmod +x build/opt/matchypatchy/*.sh
-
-          cp installation/linux/usr/local/bin/matchypatchy build/usr/local/bin/
-          chmod +x build/usr/local/bin/matchypatchy
-          cp installation/linux/usr/share/applications/matchypatchy.desktop build/usr/share/applications/
-
-      - name: Update version in install script (${{ matrix.variant }})
-        env:
-          VERSION: ${{ needs.publish-pypi.outputs.version }}
-        run: |
-          sed -i "s/VERSION=\".*\"/VERSION=\"$VERSION\"/g" build/opt/matchypatchy/install.sh
-
-      - name: Create tarball (${{ matrix.variant }})
-        env:
-          VERSION: ${{ needs.publish-pypi.outputs.version }}
-        run: |
-          mkdir -p dist
-          cd build
-          tar -czf "../dist/matchypatchy-${VERSION}-linux-${{ matrix.variant }}-x86_64.tar.gz" .
-          cd ..
-
-      - name: Create .deb package (${{ matrix.variant }})
-        env:
-          VERSION: ${{ needs.publish-pypi.outputs.version }}
-          VARIANT: ${{ matrix.variant }}
-        run: |
-          mkdir -p build/DEBIAN
-
-          {
-            printf 'Package: matchypatchy\n'
-            printf 'Version: %s\n' "$VERSION"
-            printf 'Section: utils\n'
-            printf 'Priority: optional\n'
-            printf 'Architecture: amd64\n'
-            printf 'Maintainer: Conservation Technology Lab <info@example.com>\n'
-            printf 'Depends: bash\n'
-            printf 'Description: MatchyPatchy - Image matching application\n'
-            printf ' MatchyPatchy with bundled Python runtime.\n'
-          } > build/DEBIAN/control
-
-          {
-            printf '#!/bin/bash\n'
-            printf 'set -e\n'
-            printf 'chmod +x /opt/matchypatchy/install.sh\n'
-            printf 'chmod +x /opt/matchypatchy/launcher.sh\n'
-            printf 'chmod +x /opt/matchypatchy/uninstall.sh\n'
-            printf 'chmod +x /usr/local/bin/matchypatchy\n'
-            printf '/opt/matchypatchy/install.sh\n'
-          } > build/DEBIAN/postinst
-          chmod +x build/DEBIAN/postinst
-
-          dpkg-deb --build build "dist/matchypatchy-${VERSION}-linux-${VARIANT}_amd64.deb" 2>/dev/null && \
-            echo "✓ .deb package created" || \
-            echo "Note: dpkg not available, skipping .deb creation"
-
-      - name: Clean up for next variant
-        run: rm -rf build python_env
+      - name: Build .deb and tarball (${{ matrix.variant }})
+        run: bash installation/linux/build.sh ${{ matrix.variant }}
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
@@ -215,62 +145,50 @@ jobs:
     strategy:
       matrix:
         variant: [cpu, gpu]
+    env:
+      VERSION: ${{ needs.publish-pypi.outputs.version }}
+      PYTHON_VERSION: "3.12.10"
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
+      - name: Check requirements pin matches the release (${{ matrix.variant }})
+        shell: powershell
+        run: |
+          $pin = (Select-String -Path "requirements-${{ matrix.variant }}.txt" -Pattern '^matchypatchy==(\S+)').Matches[0].Groups[1].Value
+          if ($pin -ne $env:VERSION) {
+            throw "requirements-${{ matrix.variant }}.txt pins matchypatchy==$pin but the release is $env:VERSION"
+          }
 
       - name: Install NSIS
         run: choco install nsis -y
 
-      - name: Cache pip packages
-        uses: actions/cache@v3
-        with:
-          path: ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ matrix.variant }}-${{ hashFiles(format('requirements-{0}.txt', matrix.variant)) }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ matrix.variant }}-
-
-      - name: Build bundled Python environment (${{ matrix.variant }})
+      - name: Prepare installer files (${{ matrix.variant }})
         shell: powershell
         run: |
-          python -m venv python_env
-          .\python_env\Scripts\Activate.ps1
-          pip install --upgrade pip setuptools wheel
-          pip install --no-deps -r requirements-${{ matrix.variant }}.txt
-          pip show matchypatchy
-
-      - name: Create installer directory structure (${{ matrix.variant }})
-        shell: powershell
-        run: |
+          $ErrorActionPreference = "Stop"
+          $ProgressPreference = "SilentlyContinue"
           New-Item -ItemType Directory -Path "build" -Force | Out-Null
-          Copy-Item -Path "python_env" -Destination "build\python_env" -Recurse -Force
-          Remove-Item -Path "python_env" -Recurse -Force
-          Copy-Item -Path "installation\windows\launcher.vbs" -Destination "build\" -Force
-          Copy-Item -Path "installation\windows\MatchyPatchy_${{ matrix.variant }}.nsi" -Destination "build\" -Force
 
-      - name: Update version in NSIS script (${{ matrix.variant }})
-        shell: powershell
-        env:
-          VERSION: ${{ needs.publish-pypi.outputs.version }}
-        run: |
-          $nsiPath = "build\MatchyPatchy_${{ matrix.variant }}.nsi"
-          (Get-Content $nsiPath) -replace '!define APP_VERSION ".*"', "!define APP_VERSION ""$env:VERSION""" | Set-Content $nsiPath
-          (Get-Content $nsiPath) -replace 'OutFile "MatchyPatchy-v.*-.*-setup\.exe"', "OutFile ""MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe""" | Set-Content $nsiPath
+          # Official embeddable Python (relocatable) + pip bootstrap
+          Invoke-WebRequest "https://www.python.org/ftp/python/${env:PYTHON_VERSION}/python-${env:PYTHON_VERSION}-embed-amd64.zip" -OutFile "python-embed.zip"
+          Expand-Archive -Path "python-embed.zip" -DestinationPath "build\python_env"
+          Invoke-WebRequest "https://bootstrap.pypa.io/get-pip.py" -OutFile "build\get-pip.py"
+
+          # Installer inputs
+          Copy-Item "requirements-${{ matrix.variant }}.txt" "build\requirements.txt"
+          Copy-Item "installation\windows\MatchyPatchy.nsi" "build\"
+          Copy-Item "installation\windows\launcher.vbs" "build\"
+          Copy-Item "installation\windows\matchypatchy.ico" "build\"
+          Copy-Item "installation\windows\python._pth" "build\"
 
       - name: Build NSIS installer (${{ matrix.variant }})
         shell: cmd
         run: |
           cd build
-          "C:\Program Files (x86)\NSIS\makensis.exe" MatchyPatchy_${{ matrix.variant }}.nsi
+          "C:\Program Files (x86)\NSIS\makensis.exe" /DVARIANT=${{ matrix.variant }} /DAPP_VERSION=%VERSION% MatchyPatchy.nsi
 
       - name: Move installer to dist (${{ matrix.variant }})
         shell: powershell
-        env:
-          VERSION: ${{ needs.publish-pypi.outputs.version }}
         run: |
           New-Item -ItemType Directory -Path "dist" -Force | Out-Null
           Copy-Item -Path "build\MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe" -Destination "dist\" -Force

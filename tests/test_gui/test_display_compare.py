@@ -281,18 +281,24 @@ class TestQueryStateHelpers:
 # ---------------------------------------------------------------------------
 
 class TestFinishCalculating:
-    def test_emits_true_when_sequences_present(self):
+    def test_saves_and_finalizes_when_sequences_present(self):
         qc = _make_qc()
-        qc.ranked_sequences = [MagicMock()]
-        emitted = []
-        qc.thread_signal.connect(emitted.append)
+        seq = MagicMock()
+        seq.sequence_id = 1
+        seq.neighbors = [(12, 0.1)]
+        seq.og_ranked_query_rids = [10]
+        seq.og_ranked_matches = [(12, 0.1)]
+        qc.ranked_sequences = [seq]
+        qc.save_knn_cache = MagicMock()
+        qc.finalize = MagicMock()
         qc.finish_calculating()
-        assert emitted == [True]
+        qc.save_knn_cache.assert_called_once()
+        qc.finalize.assert_called_once()
 
-    def test_emits_false_when_no_sequences(self):
+    def test_cancelled_does_nothing(self):
         qc = _make_qc()
-        qc.ranked_sequences = []
-        emitted = []
-        qc.thread_signal.connect(emitted.append)
+        qc._stop_requested = True
+        qc.ranked_sequences = [MagicMock()]
+        qc.finalize = MagicMock()
         qc.finish_calculating()
-        assert emitted == [False]
+        qc.finalize.assert_not_called()

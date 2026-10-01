@@ -2,8 +2,7 @@
 set -e
 
 case "$1" in
-    configure)
-        chmod 0755 /opt/matchypatchy/launcher.sh 2>/dev/null || true
+    remove|purge)
         if command -v update-desktop-database >/dev/null 2>&1; then
             update-desktop-database -q /usr/share/applications || true
         fi

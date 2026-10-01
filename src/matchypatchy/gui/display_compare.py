@@ -49,8 +49,6 @@ class DisplayCompare(QWidget):
         self.compare_type = 'default'  # whether 'default', 'qc' or 'manual'
         self.QueryContainer = QueryContainer(self)
         self.edit_stack = []  # placeholder for media edit stack
-        self.query_load_thread = None  # placeholder for image load thread
-        self.match_load_thread = None  # placeholder for image load thread
 
         # Options Bar ==============================================================
         layout = QVBoxLayout()
@@ -69,7 +67,7 @@ class DisplayCompare(QWidget):
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         button_recalc = QPushButton("Recalculate Matches")
-        button_recalc.clicked.connect(lambda: self.calculate_neighbors(clear_cache=True))
+        button_recalc.clicked.connect(lambda: self.initialize(clear_cache=True))
         first_layer.addWidget(button_recalc)
 
         button_recalc = QPushButton("Quality Control by Individual")
@@ -180,11 +178,13 @@ class DisplayCompare(QWidget):
         self.match_selector.button_next.clicked.connect(lambda: self.change_match(self.QueryContainer.current_match + 1))
         match_options.addWidget(self.match_selector)
 
+        # Similarity Label
         self.match_distance = QLabel("Similarity: ")
         self.match_distance.setFixedHeight(25)
         self.match_distance.setStyleSheet("border: 1px solid black;")
         match_options.addWidget(self.match_distance)
 
+        # Toggle match favorites button
         self.button_match_favorites = QPushButton("Show ♥")
         self.button_match_favorites.setCheckable(True)
         self.button_match_favorites.setChecked(False)
@@ -276,6 +276,7 @@ class DisplayCompare(QWidget):
         """Update the prompt in the progress popup"""
         if hasattr(self, 'alert_box') and self.alert_box is not None:
             self.alert_box.update_prompt(prompt)
+            self.alert_box.show()
 
     def update_progress(self, progress):
         """Update the progress bar in the progress popup"""
@@ -296,7 +297,7 @@ class DisplayCompare(QWidget):
     # ==========================================================================
     # ON ENTRY
     # ==========================================================================
-    def calculate_neighbors(self, clear_cache=False):
+    def initialize(self, clear_cache=False):
         """Calculate neighbors for all query ROIs, load first query and match"""
         # Disable individual select until feature is implemented on QC
         self.k = self.cfg.KNN  # default knn
@@ -313,50 +314,100 @@ class DisplayCompare(QWidget):
         QTimer.singleShot(100, lambda: self._initialize_query_container(clear_cache))
 
     def _initialize_query_container(self, clear_cache=False):
-        self.QueryContainer = QueryContainer(self)  # re-establish object
+        """
+        Create the container, load data, then hand off to cache/compute. 
+        Filtering happens inside the container as the final step.
+        """
+        # Tear down any existing query container before creating a new one
+        self._teardown_query_container()
+        self._cancelled = False
+        # Create a new query container instance
+        self.QueryContainer = QueryContainer(self)
         self.QueryContainer.progress_update.connect(self.update_progress)
         self.QueryContainer.thread_signal.connect(self.check_matchthread_success)
-        # Connect the progress popup's rejected signal to stop the query container's calculation
-        if hasattr(self, 'alert_box') and self.alert_box:
-            self.alert_box.rejected.connect(self.QueryContainer.stop_calculation)
-        # try cache first
+
+        # Ensure the alert box rejection is properly connected to the handler
+        box = getattr(self, "alert_box", None)
+        if box is not None:
+            try:
+                box.rejected.disconnect(self._on_alert_rejected)
+            except (TypeError, RuntimeError):
+                pass                      # wasn't connected yet
+            box.rejected.connect(self._on_alert_rejected)
+
         if clear_cache:
             self.logger.info("Clearing KNN cache")
             print("Clearing KNN cache")
             self.QueryContainer.clear_knn_cache()
 
-        # Load embeddings and filter data before calculating neighbors
-        emb_exist = self.QueryContainer.load_data()
-        if emb_exist:
-            matches_exist = self.QueryContainer.filter(filter_dict=self.filters, 
-                                                        valid_stations=self.valid_stations)
-            if matches_exist:
-                self._cache_or_calculate_neighbors()
-            else:
-                self.update_prompt("No matches found within filter.")
-        else:
+        # Load raw data only. filter() now runs later, in QueryContainer.finalize()
+        if not self.QueryContainer.load_data():
             self.home(warn=True)
+            return
+
+        # Store the filter; it's applied after cache load / neighbor calculation
+        self.QueryContainer.set_filter(self.filters, self.valid_stations)
+        self._cache_or_calculate_neighbors()
+
+    def _teardown_query_container(self):
+        """Tear down the existing query container, disconnect signals, and stop its thread."""
+        qc = getattr(self, "QueryContainer", None)
+        if qc is None:
+            return
+        # stop receiving signals from the old container
+        for sig in (qc.progress_update, qc.thread_signal):
+            try:
+                sig.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+        qc.stop_calculation()
+        # block until the worker thread really finishes
+        thread = getattr(qc, "match_thread", None)  # adjust to your attribute name
+        if thread is not None and thread.isRunning():
+            thread.requestInterruption()
+            thread.quit()
+            if not thread.wait(3000):
+                self.logger.warning("Query thread did not stop in time")
+        qc.deleteLater()  # if QueryContainer is a QObject
+        self.QueryContainer = None
+
+    def _on_alert_rejected(self):
+        """Handle the rejection of the alert box by the user."""
+        self._cancelled = True
+        qc = getattr(self, "QueryContainer", None)
+        if qc is not None:
+            qc.stop_calculation()
+        box, self.alert_box = self.alert_box, None
+        if box is not None:
+            try:
+                box.rejected.disconnect(self._on_alert_rejected)
+            except (TypeError, RuntimeError):
+                pass
+            box.deleteLater()
 
     def _cache_or_calculate_neighbors(self):
-        """Attempt to use cached KNN results, calculate if not available."""
-        # try cache first
-        self.alert_box.update_prompt("Checking cache...")
-        #TODO: filter cache based on current filters
-        cache_available = self.QueryContainer.load_knn_cache()
-        if cache_available:
+        """Use cached raw KNN results if available, otherwise compute on unfiltered data."""
+        if self._cancelled:
+            return
+        self.update_prompt("Checking cache...")
+        if self.QueryContainer.load_knn_cache():
             self.logger.info("Using cached KNN results")
-            QTimer.singleShot(100, lambda: self.check_matchthread_success(True))
+            # skip to finalize step
+            QTimer.singleShot(100, self.QueryContainer.finalize)
         else:
-            # if cache not available, calculate neighbors
-            self.alert_box.update_prompt("Matching embeddings...")
+            self.update_prompt("Matching embeddings...")
             self.alert_box.set_max(100)
             QTimer.singleShot(100, self.QueryContainer.calculate_neighbors)
 
     def check_matchthread_success(self, thread_success):
-        """Check if match thread was successful, load first query if so"""
+        cancelled = self._cancelled
         self.close_progress()
+        if cancelled:
+            return
         if thread_success:
             self.change_query(0)
+        elif not self.QueryContainer.filter_matched:
+            self.update_prompt("No matches found within filter.")
         else:
             self.update_prompt("No data to compare, all available data from same sequence/capture.")
 
@@ -373,7 +424,6 @@ class DisplayCompare(QWidget):
             self.compare_type = 'qc'
             self.button_match_favorites.setVisible(False)  # hide favorite toggle
             self.QueryContainer = QC_QueryContainer(self)
-            self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
             self.filterbar.individual_visible(True)
             self.QueryContainer.load_data()
             filtered = self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
@@ -395,7 +445,6 @@ class DisplayCompare(QWidget):
         self.button_match_favorites.setVisible(False)  # hide favorite toggle
         self.filterbar.individual_visible(False)
         self.QueryContainer = ManualQueryContainer(self, selected_ids=selected_ids)  # re-establish object
-        self.QueryContainer.loaded_data.connect(self.handle_query_data_loaded)
         emb_exist = self.QueryContainer.load_data()
         if emb_exist:
             self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
@@ -439,7 +488,7 @@ class DisplayCompare(QWidget):
         elif self.compare_type == 'manual':
             self.compare_manual()
         else:
-            self.calculate_neighbors()
+            self.initialize()
 
     # ==========================================================================
     # MATCHING PROCESS

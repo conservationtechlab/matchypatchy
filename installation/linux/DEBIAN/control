@@ -1,9 +1,0 @@
-Package: matchypatchy
-Version: 0.2.1
-Section: utils
-Priority: optional
-Architecture: all
-Maintainer: Your Name <you@example.com>
-Depends: bash
-Description: MatchyPatchy packaged app (example)
- MatchyPatchy installs to ~/.MatchyPatchy with bundled python_env and launcher scripts.
