@@ -92,8 +92,17 @@ cat > "$APP/Contents/MacOS/$APP_NAME" <<'EOF_LAUNCHER'
 #!/bin/bash
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 PYENV="$HERE/Resources/python_env"
+
+# Finder starts apps in "/", which is read-only. MatchyPatchy writes
+# matchypatchy.log (and possibly other files) relative to the working directory.
+DATA="$HOME/Library/Application Support/MatchyPatchy"
+mkdir -p "$DATA"
+cd "$DATA"
+
+export PATH="$HERE/Resources/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 export PYTHONNOUSERSITE=1
-export PYTHONDONTWRITEBYTECODE=1     # the signed bundle must stay unmodified
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONFAULTHANDLER=1
 exec "$PYENV/bin/python3" -m matchypatchy "$@"
 EOF_LAUNCHER
 chmod 0755 "$APP/Contents/MacOS/$APP_NAME"
