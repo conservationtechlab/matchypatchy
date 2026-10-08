@@ -28,12 +28,7 @@ VERSION="$(sed -n 's/^__version__ *= *"\(.*\)".*/\1/p' src/matchypatchy/__init__
 REQ="$ROOT/requirements-$VARIANT.txt"
 [ -f "$REQ" ] || die "missing $REQ"
 
-if [ "$VARIANT" = "gpu" ]; then
-    PKG="matchypatchy-gpu"; CONFLICTS="matchypatchy"
-else
-    PKG="matchypatchy";     CONFLICTS="matchypatchy-gpu"
-fi
-
+PKG="matchypatchy"
 WORK="$ROOT/build/linux-$VARIANT"
 OUT="$ROOT/dist"
 TAR_NAME="matchypatchy-${VERSION}-linux-${VARIANT}-x86_64"

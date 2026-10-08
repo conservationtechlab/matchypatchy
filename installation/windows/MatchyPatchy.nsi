@@ -28,7 +28,7 @@
 
 Unicode true
 Name "MatchyPatchy"
-OutFile "MatchyPatchy-v${APP_VERSION}-${VARIANT}-setup.exe"
+OutFile "matchypatchy-v${APP_VERSION}-win-${VARIANT}-setup.exe"
 InstallDir "$LOCALAPPDATA\MatchyPatchy"
 ; Per-user install. Stated explicitly so Windows doesn't guess (and show a UAC
 ; prompt) just because the file name contains "setup".
