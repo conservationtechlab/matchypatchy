@@ -109,10 +109,12 @@ class MediaTable(QAbstractTableModel):
                     name = None
                 return name
 
-        # station
+        # camera
         if self._columns[col] == "camera_id":
             if role == Qt.ItemDataRole.DisplayRole:
                 camera_id = self._data_filtered.at[row, self._columns[col]]
+                if pd.isna(camera_id):
+                    return None
                 try:
                     name = self.CAMERAS.loc[int(camera_id), "name"]
                 except KeyError:
@@ -138,6 +140,8 @@ class MediaTable(QAbstractTableModel):
 
         if role == Qt.ItemDataRole.DisplayRole:
             # Return the raw data directly from your memory structure
+            if pd.isna(self._data_filtered.at[row, self._columns[col]]):
+                return None
             return str(self._data_filtered.at[row, self._columns[col]])
 
         return None   
