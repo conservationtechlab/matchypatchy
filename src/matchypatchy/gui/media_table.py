@@ -53,6 +53,11 @@ class MediaTable(QAbstractTableModel):
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
 
+        # add bounds checking for column index
+        col = index.column()
+        if col < 0 or col >= len(self._columns):
+            return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+
         base_flags = (Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
 
         # Checkbox
@@ -76,6 +81,10 @@ class MediaTable(QAbstractTableModel):
 
         row = index.row()
         col = index.column()
+
+        # Add bounds checking
+        if col < 0 or col >= len(self._columns):
+            return None
 
         if self._columns[col] in ["select", "reviewed", "favorite"]:
             if role == Qt.ItemDataRole.CheckStateRole:
@@ -109,10 +118,12 @@ class MediaTable(QAbstractTableModel):
                     name = None
                 return name
 
-        # station
+        # camera
         if self._columns[col] == "camera_id":
             if role == Qt.ItemDataRole.DisplayRole:
                 camera_id = self._data_filtered.at[row, self._columns[col]]
+                if pd.isna(camera_id):
+                    return None
                 try:
                     name = self.CAMERAS.loc[int(camera_id), "name"]
                 except KeyError:
@@ -130,14 +141,18 @@ class MediaTable(QAbstractTableModel):
         if self._columns[col] == "individual_id":
             if role == Qt.ItemDataRole.DisplayRole:
                 iid = self._data_filtered.at[row, self._columns[col]]
+                if pd.isna(iid):
+                    return None
                 try:
                     name = self.INDIVIDUALS.at[iid, "name"]
                 except KeyError:
-                    name = str(iid)
+                    name = None
                 return name
 
         if role == Qt.ItemDataRole.DisplayRole:
             # Return the raw data directly from your memory structure
+            if pd.isna(self._data_filtered.at[row, self._columns[col]]):
+                return None
             return str(self._data_filtered.at[row, self._columns[col]])
 
         return None   
@@ -235,6 +250,9 @@ class MediaTable(QAbstractTableModel):
     def sort(self, column, order):
         """Sorts the underlying Python data instantly."""
         if self._data_filtered.empty:
+            return
+
+        if column < 0 or column >= len(self._columns):
             return
 
         if column == 1: # do not sort by thumbnail

@@ -9,7 +9,7 @@ from PIL import Image
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QHeaderView, QTableWidget, QTableWidgetItem)
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QPalette
+from PyQt6.QtGui import QPalette, QColor
 
 from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
 from matchypatchy.gui.widgets.widget_image_adjustment import ImageAdjustBar
@@ -100,13 +100,15 @@ class DisplayCompare(QWidget):
         image_layout = QHBoxLayout()
         # QUERY ----------------------------------------------------------------
         query_layout = QVBoxLayout()
+        query_layout.setSpacing(4)
         query_label = QLabel("Query")
         query_label.setStyleSheet("font-size: 18px;")
         query_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         query_layout.addWidget(query_label)
-        query_layout.addSpacing(5)
         # Options
         query_options = QHBoxLayout()
+        query_options.setContentsMargins(0, 0, 0, 0)
+        query_options.setSpacing(6)
         query_options.addStretch()
         # # Query Number
 
@@ -123,7 +125,10 @@ class DisplayCompare(QWidget):
         query_options.addWidget(self.sequence_selector)
 
         query_options.addStretch()
-        query_layout.addLayout(query_options)
+        query_options_widget = QWidget()
+        query_options_widget.setContentsMargins(0, 0, 0, 0)
+        query_options_widget.setLayout(query_options)
+        query_layout.addWidget(query_options_widget)
         # Query Image
         self.query_image = MediaWidget()
         self.query_image.setStyleSheet("border: 1px solid black;")
@@ -157,13 +162,15 @@ class DisplayCompare(QWidget):
 
         # MATCH ----------------------------------------------------------------
         match_layout = QVBoxLayout()
+        match_layout.setSpacing(4)
         match_label = QLabel("Match")
         match_label.setStyleSheet("font-size: 18px;")
         match_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         match_layout.addWidget(match_label)
-        match_layout.addSpacing(5)
         # OptionsVIEWPOINT_DICT
         match_options = QHBoxLayout()
+        match_options.setContentsMargins(0, 0, 0, 0)
+        match_options.setSpacing(6)
         match_options.addStretch()
 
         # Viewpoint Toggle
@@ -192,7 +199,14 @@ class DisplayCompare(QWidget):
         match_options.addWidget(self.button_match_favorites)
 
         match_options.addStretch()
-        match_layout.addLayout(match_options)
+        match_options_widget = QWidget()
+        match_options_widget.setContentsMargins(0, 0, 0, 0)
+        match_options_widget.setLayout(match_options)
+        match_layout.addWidget(match_options_widget)
+
+        options_row_height = max(query_options_widget.sizeHint().height(), match_options_widget.sizeHint().height())
+        query_options_widget.setFixedHeight(options_row_height)
+        match_options_widget.setFixedHeight(options_row_height)
 
         # Match Image
         self.match_image = MediaWidget()
@@ -696,12 +710,39 @@ class DisplayCompare(QWidget):
         """)
 
     def format_metadata(self, table, info_dict):
-        """Populate the query_info QTableWidget with metadata."""
-        palette = self.palette()
-        bg_primary = palette.color(QPalette.ColorRole.Base)
-        bg_secondary = palette.color(QPalette.ColorRole.AlternateBase)
-        text_label = palette.color(QPalette.ColorRole.Text)
-        text_value = palette.color(QPalette.ColorRole.WindowText)
+        table.setAlternatingRowColors(False)  # we are doing custom row shading
+
+        base = self.palette().color(QPalette.ColorRole.Base)
+        r, g, b = base.red(), base.green(), base.blue()
+
+        offset = 24
+        # light mode
+        if r + offset > 255:
+            offset = -offset
+
+        alt = QColor(
+            min(255, r + offset),
+            min(255, g + offset),
+            min(255, b + offset),)
+        alt.setAlpha(90)  # very subtle, adjust 20-40 as desired
+
+        def make_item(text, is_label=False, italic=False, row_bg=None):
+            item = QTableWidgetItem(str(text) if text is not None else "")
+            if row_bg is not None:
+                item.setBackground(row_bg)
+
+            item.setForeground(self.palette().color(QPalette.ColorRole.Text) if is_label else self.palette().color(QPalette.ColorRole.WindowText))
+            if is_label:
+                font = item.font()
+                font.setBold(True)
+                item.setFont(font)
+
+            if italic:
+                font = item.font()
+                font.setItalic(True)
+                item.setFont(font)
+
+            return item
 
         rows = [
             ("Name:",        info_dict['Name'],          "File Name",  os.path.basename(info_dict['Filepath'])),
@@ -714,35 +755,17 @@ class DisplayCompare(QWidget):
         ]
 
         for i, (label1, value1, label2, value2) in enumerate(rows):
-            bg = bg_secondary if i % 2 == 0 else bg_primary
-
-            def make_item(text, is_label=False, italic=False):
-                item = QTableWidgetItem(str(text) if text is not None else "")
-                item.setForeground(text_label if is_label else text_value)
-                if is_label:
-                    font = item.font()
-                    font.setBold(True)
-                    item.setFont(font)
-                if italic:
-                    font = item.font()
-                    font.setItalic(True)
-                    item.setFont(font)
-                if bg:
-                    item.setBackground(bg)
-                return item
+            row_bg = alt if i % 2 else base
 
             if label2 is None:
-                # Comment row — spans columns 1-3
-                table.setItem(i, 0, make_item(label1, is_label=True))
-                table.setItem(i, 1, make_item(value1, italic=True))
+                table.setItem(i, 0, make_item(label1, is_label=True, row_bg=row_bg))
+                table.setItem(i, 1, make_item(value1, italic=True, row_bg=row_bg))
                 table.setSpan(i, 1, 1, 3)
             else:
-                table.setItem(i, 0, make_item(label1, is_label=True))
-                table.setItem(i, 1, make_item(value1))
-                table.setItem(i, 2, make_item(label2, is_label=True))
-                table.setItem(i, 3, make_item(value2))
-
-        # Fit row heights tightly
+                table.setItem(i, 0, make_item(label1, is_label=True, row_bg=row_bg))
+                table.setItem(i, 1, make_item(value1, row_bg=row_bg))
+                table.setItem(i, 2, make_item(label2, is_label=True, row_bg=row_bg))
+                table.setItem(i, 3, make_item(value2, row_bg=row_bg))
 
 
     # ==========================================================================

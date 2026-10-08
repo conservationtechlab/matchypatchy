@@ -1,28 +1,28 @@
 ; MatchyPatchy Windows installer (per-user, no admin rights needed).
 ;
-; Ships the official embeddable Python plus get-pip.py. At install time it runs
-; pip to install the pinned requirements from PyPI, so the machine doing the
-; install needs an internet connection.
+; Ships a ready-made Python environment: the official embeddable Python with
+; pip and all pinned requirements already installed at build time (in CI), so
+; installing needs no internet connection.
 ;
 ; Build (from the folder holding the files listed below):
-;   makensis /DVARIANT=cpu /DAPP_VERSION=0.2.2 MatchyPatchy.nsi
+;   makensis /DVARIANT=cpu /DAPP_VERSION=X.Y.Z MatchyPatchy.nsi
 ;
 ; Files expected next to this script:
-;   python_env\        contents of python-3.12.x-embed-amd64.zip
-;   get-pip.py         from https://bootstrap.pypa.io/get-pip.py
-;   requirements.txt   copy of requirements-<variant>.txt
-;   python._pth        (from installation\windows)
+;   python_env\        embeddable Python with site-packages already populated
+;                      (python312._pth in place, Scripts\ folder removed)
 ;   launcher.vbs
 ;   matchypatchy.ico
+
+; Must come before any File instruction. Solid LZMA gives the best compression
+; for the large Python environment and keeps the installer under the 2 GB limit.
+; SetCompressor /SOLID lzma
 
 !ifndef VARIANT
   !define VARIANT "cpu"
 !endif
 !ifndef APP_VERSION
-  !define APP_VERSION "0.2.2"
+  !define APP_VERSION "0.2.3"
 !endif
-; Python major+minor without the dot (312 = 3.12); must match the embeddable zip
-!define PY_TAG "312"
 
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy"
 
@@ -61,12 +61,12 @@ Function LaunchApp
   ExecShell "open" "$INSTDIR\launcher.vbs"
 FunctionEnd
 
-; Report a failed step, remove the half-built environment and stop the install
+; Report a failed step, remove the half-installed environment and stop the install
 Function FailInstall
   Pop $1
   RMDir /r "$INSTDIR\python_env"
   MessageBox MB_OK|MB_ICONSTOP|MB_SETFOREGROUND \
-    "$1$\n$\nMake sure you are connected to the internet and try again.$\nThe Details view of the installer shows the full error." \
+    "$1$\n$\nThe installation files may be damaged or blocked by antivirus software.$\nTry downloading the installer again. The Details view shows the full error." \
     /SD IDOK
   Abort "Installation failed."
 FunctionEnd
@@ -104,45 +104,23 @@ Section "MatchyPatchy ${APP_VERSION} (${VARIANT})" SEC_MAIN
   CreateDirectory "$INSTDIR"
   SetOutPath "$INSTDIR"
 
-  ; Update/reinstall starts clean: the environment is rebuilt from requirements.txt
+  ; Update/reinstall starts clean: the whole environment is replaced
   RMDir /r "$INSTDIR\python_env"
 
   File "launcher.vbs"
-  File "requirements.txt"
-  File "get-pip.py"
   File "matchypatchy.ico"
 
-  ; --- Python runtime (official embeddable distribution) ---
-  DetailPrint "Installing Python runtime..."
+  ; --- Python runtime with all packages already installed ---
+  DetailPrint "Installing Python environment (this can take a minute)..."
   SetOutPath "$INSTDIR\python_env"
   File /r "python_env\*.*"
   SetOutPath "$INSTDIR"
-  ; Enable site-packages (the embeddable Python ignores them by default)
-  File "/oname=python_env\python${PY_TAG}._pth" "python._pth"
-
-  ; --- pip ---
-  DetailPrint "Installing pip..."
-  nsExec::ExecToLog '"$INSTDIR\python_env\python.exe" "$INSTDIR\get-pip.py" --no-warn-script-location --disable-pip-version-check'
-  Pop $0
-  ${If} $0 != "0"
-    Push "Could not install pip (exit code $0)."
-    Call FailInstall
-  ${EndIf}
-
-  ; --- packages from requirements.txt ---
-  DetailPrint "Downloading and installing packages - this can take several minutes..."
-  nsExec::ExecToLog '"$INSTDIR\python_env\python.exe" -m pip install --no-cache-dir --no-deps --no-warn-script-location --disable-pip-version-check -r "$INSTDIR\requirements.txt"'
-  Pop $0
-  ${If} $0 != "0"
-    Push "Could not install the required packages (exit code $0)."
-    Call FailInstall
-  ${EndIf}
 
   ; --- confirm the app itself is installed ---
   nsExec::ExecToLog `"$INSTDIR\python_env\python.exe" -c "import importlib.metadata as m; print('matchypatchy', m.version('matchypatchy'))"`
   Pop $0
   ${If} $0 != "0"
-    Push "MatchyPatchy was not found after installing the packages."
+    Push "MatchyPatchy was not found in the installed Python environment."
     Call FailInstall
   ${EndIf}
 
@@ -182,7 +160,7 @@ Section "Start Menu Shortcuts" SEC_STARTMENU
 SectionEnd
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_MAIN} "MatchyPatchy and its Python environment (required). Needs an internet connection."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_MAIN} "MatchyPatchy and its Python environment (required)."
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DESKTOP} "Create a shortcut on the desktop"
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_STARTMENU} "Create shortcuts in the Start Menu"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
@@ -196,12 +174,10 @@ Section "Uninstall"
   Delete "$SMPROGRAMS\MatchyPatchy\Uninstall.lnk"
   RMDir "$SMPROGRAMS\MatchyPatchy"
 
-  ; The Python environment (including everything pip installed)
+  ; The Python environment (including all installed packages)
   RMDir /r "$INSTDIR\python_env"
 
   Delete "$INSTDIR\launcher.vbs"
-  Delete "$INSTDIR\requirements.txt"
-  Delete "$INSTDIR\get-pip.py"
   Delete "$INSTDIR\matchypatchy.ico"
   Delete "$INSTDIR\launcher.log"
   Delete "$INSTDIR\matchypatchy.log*"
