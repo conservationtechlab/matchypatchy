@@ -2,8 +2,13 @@
 Functions for managing ML models
 
 """
+import os
+import sys
+import tempfile
+import httpx
 import yaml
 import logging
+logger = logging.getLogger(__name__)
 import urllib.request
 from pathlib import Path
 from queue import Queue, Empty
@@ -13,30 +18,71 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.config import asset_path
 
 
-def update_model_yml():
-    """
-    Downloads the most recent version of the models.yml file from SDZWA server and updates internal file
-    """
-    # download current version
-    model_yml_path = asset_path("models.yml")
+MODELS_YML_URL = "https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml"
+
+
+def user_data_dir():
+    """Return the user data directory for storing models.yml."""
+    # macOS
+    if sys.platform == "darwin":
+        return Path.home() / "Library/Application Support/MatchyPatchy"
+    # Windows
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", Path.home())) / "MatchyPatchy"
+    # Linux and other Unix-like systems
+    return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "matchypatchy"
+
+
+def _read_yml(path):
+    """Parse a models.yml; return a dict, or None if missing or invalid."""
+    if not path.exists():
+        logger.debug("%s not found", path)
+        return None
     try:
-        urllib.request.urlretrieve("https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml", model_yml_path)
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        logger.warning("Could not read %s: %s", path, e)
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def update_model_yml():
+    """Download the latest models.yml from the remote URL and save it locally."""
+    dest = user_data_dir() / "models.yml"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = None
+    try:
+        r = httpx.get(MODELS_YML_URL, timeout=10, follow_redirects=True)
+        r.raise_for_status()
+        if not isinstance(yaml.safe_load(r.content), dict):
+            raise ValueError("downloaded file is not a YAML mapping")
+
+        fd, tmp = tempfile.mkstemp(dir=dest.parent, suffix=".tmp")
+        with os.fdopen(fd, "wb") as f:
+            f.write(r.content)
+        os.replace(tmp, dest)
+        tmp = None
         return True
-    except urllib.error.URLError:
-        logging.error("Unable to connect to server.")
+    except Exception as e:
+        logger.warning("models.yml update failed, using existing copy: %s", e)
         return False
+    finally:
+        if tmp:
+            Path(tmp).unlink(missing_ok=True)
+
+def load_yml():
+    """Return the user's downloaded models.yml if valid, else the bundled one."""
+    for path in (user_data_dir() / "models.yml", asset_path("models.yml")):
+        data = _read_yml(path)
+        if data:
+            return data
+    raise RuntimeError("No valid models.yml found (user or bundled)")
 
 
 def load_model(key=None):
-    """Loads ML model configuration from models.yml, returns full dict or specific key"""
-    model_yml_path = asset_path("models.yml")
-
-    with open(model_yml_path, 'r') as cfg_file:
-        cfg = yaml.safe_load(cfg_file)
-        if key:
-            return cfg[key]
-        else:
-            return cfg
+    """Return the full models config, or a specific key."""
+    cfg = load_yml()
+    return cfg[key] if key else cfg
 
 
 def is_valid_reid_model(basename):
