@@ -19,9 +19,9 @@ To package (CI does this automatically; these are the manual steps):
      MatchyPatchy.nsi, launcher.vbs, matchypatchy.ico, python._pth
                         (from installation\windows)
 3. From that folder run NSIS:
-     makensis /DVARIANT=cpu /DAPP_VERSION=0.2.2 MatchyPatchy.nsi
+     makensis /DVARIANT=cpu /DAPP_VERSION=X.Y.Z MatchyPatchy.nsi
    (use /DVARIANT=gpu with the GPU requirements). Output:
-     MatchyPatchy-v0.2.2-cpu-setup.exe
+     MatchyPatchy-vX.Y.Z-cpu-setup.exe
 
 To test: run the installer on a Windows machine or VM WITHOUT Python installed,
 launch MatchyPatchy from the Start menu, then uninstall and check that the

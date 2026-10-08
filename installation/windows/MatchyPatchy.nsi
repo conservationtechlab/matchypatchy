@@ -5,7 +5,7 @@
 ; installing needs no internet connection.
 ;
 ; Build (from the folder holding the files listed below):
-;   makensis /DVARIANT=cpu /DAPP_VERSION=0.2.2 MatchyPatchy.nsi
+;   makensis /DVARIANT=cpu /DAPP_VERSION=X.Y.Z MatchyPatchy.nsi
 ;
 ; Files expected next to this script:
 ;   python_env\        embeddable Python with site-packages already populated
@@ -21,7 +21,7 @@
   !define VARIANT "cpu"
 !endif
 !ifndef APP_VERSION
-  !define APP_VERSION "0.2.2"
+  !define APP_VERSION "0.2.3"
 !endif
 
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy"
