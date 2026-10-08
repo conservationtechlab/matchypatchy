@@ -1,3 +1,5 @@
+VERSION: "1.0.0"
+
 MODELS: 
   "MegaDetector": 
     - ["md_v1000.0.0-sorrel.onnx"]
@@ -10,7 +12,6 @@ MODELS:
     - ["sdzwa_jaguar_viewpoint.onnx", "sdzwa_jaguar_viewpoint.onnx.data"]
     - ["https://sandiegozoo.box.com/shared/static/nkuku5aeicg9hugo0hogdjxg667xodlb.onnx",
        "https://sandiegozoo.box.com/shared/static/3563emet6b6tubtgtqce8144dlq3z8y5.data"]
-
 
 DETECTOR_MODELS: 
   - "MegaDetector"
