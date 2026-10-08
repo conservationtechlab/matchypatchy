@@ -715,13 +715,15 @@ class DisplayCompare(QWidget):
         base = self.palette().color(QPalette.ColorRole.Base)
         r, g, b = base.red(), base.green(), base.blue()
 
-        # shift slightly lighter or darker for alt row
-        offset = 24  # adjust 8-20 to taste
+        offset = 24
+        # light mode
+        if r + offset > 255:
+            offset = -offset
+
         alt = QColor(
             min(255, r + offset),
             min(255, g + offset),
             min(255, b + offset),)
-
         alt.setAlpha(90)  # very subtle, adjust 20-40 as desired
 
         def make_item(text, is_label=False, italic=False, row_bg=None):
@@ -764,14 +766,6 @@ class DisplayCompare(QWidget):
                 table.setItem(i, 1, make_item(value1, row_bg=row_bg))
                 table.setItem(i, 2, make_item(label2, is_label=True, row_bg=row_bg))
                 table.setItem(i, 3, make_item(value2, row_bg=row_bg))
-
-        item = table.item(0, 0)
-        print("row 0 bg:", item.background().color().name())
-        item = table.item(1, 0)
-        print("row 1 bg:", item.background().color().name())
-        print("base:", base.name())
-        print("alt:", alt.name())
-        print("alt alpha:", alt.alpha())
 
 
     # ==========================================================================
