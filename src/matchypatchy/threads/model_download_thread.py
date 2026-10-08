@@ -22,11 +22,16 @@ MODELS_YML_URL = "https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarij
 
 
 def user_data_dir():
+    """Return the user data directory for storing models.yml."""
+    # macOS
     if sys.platform == "darwin":
         return Path.home() / "Library/Application Support/MatchyPatchy"
+    # Windows
     if sys.platform == "win32":
         return Path(os.environ.get("APPDATA", Path.home())) / "MatchyPatchy"
+    # Linux and other Unix-like systems
     return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "matchypatchy"
+
 
 def _read_yml(path):
     """Parse a models.yml; return a dict, or None if missing or invalid."""
@@ -40,7 +45,9 @@ def _read_yml(path):
         return None
     return data if isinstance(data, dict) else None
 
-def update_model_yml() -> bool:
+
+def update_model_yml():
+    """Download the latest models.yml from the remote URL and save it locally."""
     dest = user_data_dir() / "models.yml"
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = None
