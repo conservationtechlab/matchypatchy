@@ -181,6 +181,22 @@ jobs:
           Copy-Item "installation\windows\matchypatchy.ico" "build\"
           Copy-Item "installation\windows\python._pth" "build\"
 
+          # Enable site-packages in the embedded Python, then bootstrap pip
+          Copy-Item "installation\windows\python._pth" "build\python_env\python312._pth" -Force
+          $py = "build\python_env\python.exe"
+
+          & $py "build\get-pip.py" --no-warn-script-location --disable-pip-version-check
+          if ($LASTEXITCODE -ne 0) { throw "get-pip failed" }
+
+          & $py -m pip install --no-cache-dir --no-deps --no-warn-script-location --disable-pip-version-check -r "requirements-${{ matrix.variant }}.txt"
+          if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
+
+          # Same guard as the Linux build
+          $installed = & $py -c "import importlib.metadata as m; print(m.version('matchypatchy'))"
+          if ($installed -ne $env:VERSION) { throw "installed matchypatchy $installed != $env:VERSION" }
+
+          Remove-Item "build\python_env\Scripts" -Recurse -Force -ErrorAction SilentlyContinue
+
       - name: Build NSIS installer (${{ matrix.variant }})
         shell: cmd
         run: |
