@@ -207,12 +207,12 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Path "dist" -Force | Out-Null
-          Copy-Item -Path "build\MatchyPatchy-v$env:VERSION-${{ matrix.variant }}-setup.exe" -Destination "dist\" -Force
+          Copy-Item -Path "build\matchypatchy-v$env:VERSION-win-${{ matrix.variant }}-setup.exe" -Destination "dist\" -Force
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/MatchyPatchy-v*-*-setup.exe
+          files: dist/matchypatchy-v*-win-*-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
