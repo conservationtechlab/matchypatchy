@@ -85,7 +85,7 @@ jobs:
               exit 0
             fi
             echo "  Not yet available (HTTP $STATUS), waiting 20s... (attempt $i/30)"
-            sleep 20
+            sleep 30
           done
           echo "✗ Timed out waiting for PyPI to show $VERSION"
           exit 1
