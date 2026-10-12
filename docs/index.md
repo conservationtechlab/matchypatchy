@@ -4,8 +4,8 @@ layout: default
 # <a name="installation"></a>Installation
 
 ## Installer
-Download MatchyPatchy Installer from current [release](https://github.com/conservationtechlab/matchypatchy/releases).
-
+Download MatchyPatchy Installer from current [release](https://github.com/conservationtechlab/matchypatchy/releases). 
+<br><br>
 Windows: After downloading installer .exe, right click, go to properties and select "Unblock".<br>
 Linux: Run the downloaded .deb file with sudo dpkg -i matchypatchy-*.deb.
 
