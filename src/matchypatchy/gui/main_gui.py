@@ -41,17 +41,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         # Initialize main window settings and components
         self.settings = QSettings("SDZWA", "MatchyPatchy")
-        # load previous home dir or start fresh
-        home_dir = self.load_home_dir()
         # set logger
         self.logger = logger
-        # set up config and create dirs if necessary
-        self.cfg = mpConfig(home_dir)
-        logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
-
-        # set up database
-        self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
-        logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
+        # load previous home dir or start fresh, falling back to a default project
+        # if the saved project or its database cannot be loaded
+        self._startup_project()
 
         # set up main window
         self.setWindowTitle(f"MatchyPatchy v{__version__}")
@@ -269,6 +263,46 @@ class MainWindow(QMainWindow):
             self.settings.setValue("home_dir", str(path))
             return path
 
+    def _open_project(self, home_dir):
+        """Load config and database for a project folder, raise if either is unusable"""
+        cfg = mpConfig(home_dir)
+        mpDB = MatchyPatchyDB(cfg.DB_DIR, self.logger)
+        if not mpDB.key:
+            mpDB.close()
+            raise ValueError(f"Database at {cfg.DB_DIR} is invalid.")
+        return cfg, mpDB
+
+    def _startup_project(self):
+        """Open the saved project, or fall back to a default project so the app can still launch"""
+        saved_dir = self.load_home_dir()
+        candidates = [saved_dir,
+                      Path.cwd() / "MatchyPatchy-Share",
+                      Path.home() / "MatchyPatchy-Share"]
+
+        failed = []
+        for home_dir in candidates:
+            if str(home_dir) in failed:
+                continue
+            try:
+                self.cfg, self.mpDB = self._open_project(home_dir)
+            except Exception as e:
+                self.logger.error(f"Could not load project at {home_dir}: {e}", exc_info=True)
+                failed.append(str(home_dir))
+                continue
+            self.logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
+            self.logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
+            break
+        else:
+            raise RuntimeError(f"Could not load or create a project at any of: {failed}")
+
+        if failed:
+            # leave the saved home_dir setting alone so the project loads next time if it becomes available
+            msg = (f"Could not load the project database at:\n{failed[0]}\n\n"
+                   f"A default project was opened instead at:\n{self.cfg.HOME_DIR}\n\n"
+                   f"Use Edit > Configuration to select another project. See the log for details.")
+            # show after the main window is up
+            QTimer.singleShot(0, lambda: AlertPopup(self, prompt=msg).exec())
+
     def save_home_dir(self, path):
         """Save selected path"""
         self.settings.setValue("home_dir", str(path))
@@ -296,8 +330,14 @@ class MainWindow(QMainWindow):
             return
         
         self.logger.info(f"Creating project folder: {str(home_dir)}.")
-        self.cfg = mpConfig(home_dir)
-        self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
+        try:
+            self.cfg, self.mpDB = self._open_project(home_dir)
+        except Exception as e:
+            self.logger.error(f"Could not create project at {home_dir}: {e}", exc_info=True)
+            dialog = AlertPopup(self, prompt=f"Could not create project at {home_dir}:\n{e}")
+            dialog.exec()
+            del dialog
+            return
         # save settings
         self.settings.setValue("home_dir", str(home_dir))
         # update pages with the new configuration and database connection
@@ -309,9 +349,12 @@ class MainWindow(QMainWindow):
         """Change the current project to the specified project folder."""
         # close existing database connection before creating a new project
         self.mpDB.close()
-        cfg = mpConfig(project_folder)
-        mpDB = MatchyPatchyDB(cfg.DB_DIR, self.logger)
-        valid = mpDB.key
+        try:
+            cfg, mpDB = self._open_project(project_folder)
+            valid = True
+        except Exception as e:
+            self.logger.error(f"Could not load project at {project_folder}: {e}", exc_info=True)
+            valid = False
         # Check if the database key is valid
         if valid:
             self.settings.setValue("home_dir", str(project_folder))
