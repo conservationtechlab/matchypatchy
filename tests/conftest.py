@@ -191,7 +191,7 @@ def populated_db(tmp_db):
     # "Default Survey" (id=1).  Add a dedicated station and media.
     station_id = db.add_station("Test Station", 1.0, 2.0, 1)
     camera_id = db.add_camera("Test Camera", station_id) 
-    individual_id = db.add_individual("Ind-1", "M", "Adult")
+    individual_id = db.add_individual("Ind-1", "M")
     upload_id = db.add_upload("/tmp")
     media_id = db.add_media(
         base_dir_id=upload_id,
