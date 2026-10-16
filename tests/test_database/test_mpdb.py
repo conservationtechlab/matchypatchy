@@ -1,11 +1,13 @@
 """
 Tests for matchypatchy.database.mpdb — MatchyPatchyDB class and thread safety.
 """
+import shutil
 import threading
 import sqlite3
 
 import numpy as np
 import pytest
+from chromadb.api.client import SharedSystemClient
 
 from matchypatchy.database.mpdb import MatchyPatchyDB
 
@@ -50,6 +52,68 @@ class TestInitialisation:
 
         db2 = MatchyPatchyDB(str(tmp_path), null_logger)
         assert db2.key == original_key
+        db2.close()
+
+
+class TestOpenInvalidDatabase:
+    """Opening a folder that holds an incomplete or foreign database is rejected without changing it"""
+
+    def test_sqlite_without_embeddings_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        shutil.rmtree(tmp_path / "emb.db")
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
+        db2.close()
+        # no second metadata row and no new embedding database
+        conn = sqlite3.connect(tmp_path / "matchypatchy.db")
+        assert conn.execute("SELECT COUNT(*) FROM metadata").fetchone()[0] == 1
+        conn.close()
+        assert not (tmp_path / "emb.db").exists()
+
+    def test_embeddings_without_sqlite_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        (tmp_path / "matchypatchy.db").unlink()
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
+        db2.close()
+        assert not (tmp_path / "matchypatchy.db").exists()
+
+    def test_sqlite_without_metadata_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        (tmp_path / "matchypatchy.db").unlink()
+        conn = sqlite3.connect(tmp_path / "matchypatchy.db")
+        conn.execute("CREATE TABLE other (id INTEGER PRIMARY KEY)")
+        conn.commit()
+        conn.close()
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
+        db2.close()
+
+    def test_non_sqlite_file_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        (tmp_path / "matchypatchy.db").write_bytes(b"not a database" * 100)
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
+        db2.close()
+
+    def test_embedding_folder_without_collection_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        shutil.rmtree(tmp_path / "emb.db")
+        (tmp_path / "emb.db").mkdir()
+        # chroma caches clients per path in-process, clear it to behave like a fresh launch
+        SharedSystemClient.clear_system_cache()
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
         db2.close()
 
 
