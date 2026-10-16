@@ -11,7 +11,7 @@ from matchypatchy import __version__
 
 # Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
 # Databases created before schema versioning have no schema_version column and are treated as version 1.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 1
 
 
 def setup_database(key, filepath, db=None):
@@ -203,7 +203,6 @@ def get_schema_version(db):
 def _migrate_1_to_2(db):
     """Add schema_version to metadata"""
     db.execute("ALTER TABLE metadata ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0;")
-
 
 # MIGRATIONS[n] upgrades a database from version n to n + 1
 MIGRATIONS = {
