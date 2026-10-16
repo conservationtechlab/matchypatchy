@@ -184,7 +184,7 @@ class MainWindow(QMainWindow):
         self.Compare.setFocus()
         # wait to load
         QTimer.singleShot(100, self.Compare.refresh_filters)
-        self.Compare.calculate_neighbors()
+        self.Compare.initialize()
 
     def _set_manual_view(self, selected_ids=None):
         """Switch to the manual comparison view page with selected IDs.""" 

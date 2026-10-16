@@ -271,7 +271,7 @@ class DisplayMedia(QWidget):
     def change_type(self):
         """Change between full image and ROI view"""
         if len(self.edit_stack) > 0:
-            dialog = AlertPopup(self, prompt="There are unsaved changes. Are you sure you want to change view?")
+            dialog = AlertPopup(self, prompt="Are you sure you want to change view? There are unsaved changes that will be lost.")
             cont = dialog.exec()
             del dialog
             if cont == QDialog.DialogCode.Rejected:
@@ -279,6 +279,10 @@ class DisplayMedia(QWidget):
                 self.show_type.setCurrentIndex(self.data_type)
                 self.show_type.blockSignals(False)
                 return
+        # Clear unsaved edits since user confirmed they want to change view
+        self.edit_stack.clear()
+        self.check_undo_button()
+            
         # change type to selected
         self.data_type = self.show_type.currentIndex()
         # reload table

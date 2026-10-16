@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import time
 
+import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
@@ -14,6 +15,10 @@ from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
 from matchypatchy.threads.match_object import FavoriteMatchObject
+
+# Neighbors fetched per query = k * KNN_OVERFETCH, so filters can remove some
+# candidates without dropping below k.
+KNN_OVERFETCH = 3
 
 
 class QueryContainer(QObject):
@@ -31,8 +36,10 @@ class QueryContainer(QObject):
         self.logger = parent.logger
         self.metric = parent.distance_metric
         self.k = parent.k
+        self.k_cache = self.k * KNN_OVERFETCH
         self.threshold = parent.threshold
         self.filter_dict = {}
+        self.valid_stations = None
         self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
         self.match_thread = None
@@ -74,51 +81,45 @@ class QueryContainer(QObject):
 
         # KNN Cache
         self.cache_timeout = 3600  # Cache valid for 1 hour (seconds)
+        self._raw_ranked = None    # serialized UNFILTERED results (from compute or cache)
+        self._from_cache = False   # True if _raw_ranked came from disk
+        self._stop_requested = False
+        self.filter_matched = True
 
-    # STEP 0: Load data and build indices for fast lookups
+    # STEP 1: Load data
     def load_data(self):
         """
-        Load ROI media and build fast lookup indices.
+        Load ROI media. Filtering happens later, in finalize().
         """
+        self._stop_requested = False
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
         self.loaded_data.emit(self.data_raw)
-        # no data
         if self.data_raw.empty:
+            self.logger.warning("No ROI media found in the database.")
             return False
-        
         # Must have embeddings to continue
         return not (self.data_raw["emb"] == 0).all()
 
-    # STEP 2: Filter data
-    def filter(self, filter_dict=None, valid_stations=None):
-        """
-        Filter media efficiently using vectorized operations.
-        Avoid full DataFrame copy and multiple redundant filters.
-        """
-        if filter_dict is None or valid_stations is None:
-            # return full data
-            self.data = self.data_raw.copy()
-        else:
-            # Single filter pass instead of multiple identical checks
-            station_ids = self._get_valid_stations(filter_dict, valid_stations)
-            
-            if station_ids is None:
-                self.data = pd.DataFrame()
-                self.logger.info("No valid stations found, resulting in empty data.")
-                return False
-            else:
-                # Single vectorized filter
-                self.data = self.data_raw[self.data_raw['station_id'].isin(station_ids)]
-        
-        # Rebuild index with filtered data
-        self._build_seq_indices()
-        self.sequences = db_roi.sequence_roi_dict(self.data)
-        self.logger.info(f"Filtered data contains {len(self.data)} entries.")
-        return True
+    # STEP 2: Store filter state (applied later in finalize)
+    def set_filter(self, filter_dict, valid_stations):
+        """Remember the filter; it is applied after cache load / neighbor calculation."""
+        self.filter_dict = filter_dict
+        self.valid_stations = valid_stations
 
-    def _build_seq_indices(self):
-        """Build sequence indices for fast lookups"""
-        self._seq_index = self.data_raw.reset_index().groupby('sequence_id')['id'].apply(list).to_dict()
+    # STEP 3: Compute neighbors on UNFILTERED data
+    def calculate_neighbors(self):
+        """Start MatchEmbeddingThread over the unfiltered data with extra headroom."""
+        self._from_cache = False
+        sequences_raw = db_roi.sequence_roi_dict(self.data_raw)
+        self.match_thread = MatchEmbeddingThread(self.mpDB, self.data_raw, sequences_raw,
+                                                 k=self.k_cache, metric=self.metric,
+                                                 threshold=self.threshold)
+        # Connect signals for progress updates and results capture
+        self.match_thread.progress_update.connect(self.update_progress)
+        self.match_thread.ranked_queries_return.connect(self.capture_ranked_sequences)
+        self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished
+        # start the match thread after a short delay to allow the GUI to update
+        QTimer.singleShot(100, self.start_thread)
 
     def _get_valid_stations_from_current(self):
         """
@@ -136,53 +137,79 @@ class QueryContainer(QObject):
         """
         self._current_valid_stations = valid_stations
         valid_set = set(valid_stations.keys()) if valid_stations else set()
-        
         if not valid_set:
             return None
-        
+
         # Priority: single station > survey > region
         if filter_dict['active_station'][0] > 0:
             return {filter_dict['active_station'][0]}
-        
+
         # Survey and region filters use the same pre-filtered valid_stations
         if filter_dict['active_survey'][0] > 0 or filter_dict['active_region'][0] > 0:
             return valid_set
-        
-        return valid_set
 
-    # RUN ON ENTRY IF LOAD_DATA
-    def calculate_neighbors(self):
-        """Start MatchEmbeddingThread to calculate neighbors"""
-        #self.logger.info("Using cached KNN results")
-        # cache cleared or not found
-        self.match_thread = MatchEmbeddingThread(self.mpDB, self.data, self.sequences,
-                                                 k=self.k, metric=self.metric, threshold=self.threshold)
-        self.match_thread.progress_update.connect(lambda value: self.update_progress(value))
-        self.match_thread.ranked_queries_return.connect(self.capture_ranked_sequences)
-        self.match_thread.finished.connect(self.finish_calculating)  # do not continue until finished
-        # start the match thread after a short delay to allow the GUI to update
-        QTimer.singleShot(100, self.start_thread)
+        return valid_set
 
     def start_thread(self):
         """Start the match thread after a short delay"""
-        if hasattr(self, 'match_thread') and self.match_thread is not None:
+        if self._stop_requested:
+            return
+        if self.match_thread is not None:
             self.match_thread.start()
 
     def stop_calculation(self):
         """Request the match thread to stop calculation"""
-        if hasattr(self, 'match_thread') and self.match_thread is not None:
+        self._stop_requested = True
+        self.logger.info("Stop requested for query container %s", id(self))
+        if self.match_thread is not None:
             self.match_thread.requestInterruption()
 
     def capture_ranked_sequences(self, ranked_sequences):
         """Capture ranked_sequences from MatchEmbeddingThread"""
         self.ranked_sequences = ranked_sequences
-        # set number of queries to validate
-        self.n_queries = len(self.ranked_sequences)
+        self.n_queries = len(ranked_sequences)
 
+    # Finalize the results after calculation or cache load
     def finish_calculating(self):
-        """Finish calculating neighbors, signal to DisplayCompare to update with gui"""
-        self.save_knn_cache()
-        self.thread_signal.emit(bool(self.ranked_sequences))
+        """Thread done: cache the raw results, then filter and narrow them."""
+        if self._stop_requested:  # cancelled: no cache write, no signal
+            return
+        self._raw_ranked = self._serialize_ranked_sequences(self.ranked_sequences)
+        if self._raw_ranked:
+            self.save_knn_cache(self._raw_ranked)
+        self.finalize()
+
+    # STEP 4: Finalize results (called after calculation or cache load)
+    def finalize(self):
+        """
+        Filter, then narrow raw KNN results to the filtered data.
+        Runs after BOTH cache load and fresh compute.
+        """
+        if self._stop_requested:
+            return
+
+        if self._raw_ranked is None:
+            self.ranked_sequences, self.n_queries = [], 0
+            self.thread_signal.emit(False)
+            return
+
+        self.filter_matched = self.filter(self.filter_dict, self.valid_stations)
+        if not self.filter_matched:
+            self.ranked_sequences, self.n_queries = [], 0
+            self.thread_signal.emit(False)
+            return
+
+        # strict only for cache: if headroom ran out, recompute instead of showing < k
+        ranked = self._restrict_to_data(self._raw_ranked, strict=self._from_cache)
+        if ranked is None:
+            self.logger.info("Cache lacks headroom for this filter, recalculating")
+            self.calculate_neighbors()
+            return
+
+        self.ranked_sequences = ranked
+        self.n_queries = len(ranked)
+        self.filter_matched = bool(ranked)
+        self.thread_signal.emit(bool(ranked))
 
     def update_progress(self, value):
         """Update the progress in the parent progress popup"""
@@ -192,6 +219,40 @@ class QueryContainer(QObject):
     def set_threshold(self, threshold):
         """Set the similarity threshold for the query container"""
         self.threshold = threshold
+
+    # STEP 5: Filter data (called from finalize)
+    def filter(self, filter_dict=None, valid_stations=None):
+        """
+        Filter media efficiently using vectorized operations.
+        Avoid full DataFrame copy and multiple redundant filters.
+        """
+        if filter_dict is None or valid_stations is None:
+            # return full data
+            self.data = self.data_raw.copy()
+        else:
+            station_ids = self._get_valid_stations(filter_dict, valid_stations)
+
+            if station_ids is None:
+                self.data = pd.DataFrame()
+                self.logger.info("No valid stations found, resulting in empty data.")
+                return False
+            else:
+                # Single vectorized filter; copy so later .loc writes don't hit a view
+                self.data = self.data_raw[self.data_raw['station_id'].isin(station_ids)].copy()
+
+        if self.data.empty:
+            self.logger.info("Filter removed all data.")
+            return False
+
+        # Rebuild index with filtered data
+        self._build_seq_indices()
+        self.sequences = db_roi.sequence_roi_dict(self.data)
+        self.logger.info(f"Filtered data contains {len(self.data)} entries.")
+        return True
+
+    def _build_seq_indices(self):
+        """Build sequence indices for fast lookups"""
+        self._seq_index = self.data_raw.reset_index().groupby('sequence_id')['id'].apply(list).to_dict()
 
     # QUERY NAVIGATION ---------------------------------------------------------
     def set_query(self, n):
@@ -213,7 +274,7 @@ class QueryContainer(QObject):
         """Set the display to the nth element in the sequence"""
         if not self.current_query_rois:
             return
-        
+
         n = n % len(self.current_query_rois)
         self.current_query_sn = n  # number within sequence
         self.current_query_rid = self.current_query_rois[self.current_query_sn]
@@ -234,7 +295,7 @@ class QueryContainer(QObject):
         """Set the current match index and id"""
         if not self.current_match_rois:
             return
-        
+
         n = n % len(self.current_match_rois)
         self.current_match = n
         self.current_match_rid = self.current_match_rois[self.current_match]
@@ -254,7 +315,7 @@ class QueryContainer(QObject):
 
     def update_sequences_in_place(self, query_seq_id, match_seq_id):
         """
-        Update only the two affected sequences in local cache 
+        Update only the two affected sequences in local cache
         instead of reloading everything from DB.
         Much faster than full load_data() + filter().
         """
@@ -274,16 +335,17 @@ class QueryContainer(QObject):
             self.filter(self.filter_dict, self._get_valid_stations_from_current())
             return
 
+        # Combine the newly fetched rows for the query and match sequences
+        new_rows = pd.concat([query_df, match_df])
+        new_rows = new_rows[~new_rows.index.duplicated()]
+        seq_ids = [query_seq_id, match_seq_id]
         # Remove old sequence data and insert updated data
         # Using index-based filtering since 'id' is the index
-        self.data = self.data[~self.data['sequence_id'].isin([query_seq_id, match_seq_id])]
-        
-        # Concatenate new data and preserve index
-        self.data = pd.concat([self.data, query_df, match_df])
-        
+        self.data = pd.concat([self.data[~self.data['sequence_id'].isin(seq_ids)], new_rows])
+        self.data_raw = pd.concat([self.data_raw[~self.data_raw['sequence_id'].isin(seq_ids)], new_rows])
+
         # Rebuild indices with updated data
         self._build_seq_indices()
-
 
     def update_partial_sequences(self, sequence_ids):
         """
@@ -292,16 +354,16 @@ class QueryContainer(QObject):
         """
         if not sequence_ids:
             return
-        
+
         # Remove old data for these sequences
         self.data = self.data[~self.data['sequence_id'].isin(sequence_ids)]
-        
+
         # Fetch fresh data for each sequence
         updated_dfs = []
         seq_df = db_roi.fetch_roi_media(self.mpDB, sequence_ids=sequence_ids)
         if not seq_df.empty:
             updated_dfs.append(seq_df)
-        
+
         if updated_dfs:
             self.data = pd.concat([self.data] + updated_dfs)
             self._build_seq_indices()
@@ -374,16 +436,20 @@ class QueryContainer(QObject):
         filtered_neighbors = [(fid, 1 - self._similarities_cache[fid]) for fid in favorite_ids]
         return filtered_neighbors
 
+    def _clean_iid(self, v):
+        """None/NaN -> None, otherwise int"""
+        return None if v is None or pd.isna(v) else int(v)
+
     def is_existing_match(self):
         """Return whether current query and match have same individual_id"""
-        query_iid = self._get_roi_field(self.current_query_rid, 'individual_id')
-        match_iid = self._get_roi_field(self.current_match_rid, 'individual_id')
-        return query_iid == match_iid and query_iid is not None
+        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
+        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
+        return query_iid is not None and query_iid == match_iid
 
     def both_unnamed(self):
         """Return whether both current query and match are unnamed"""
-        return (self._get_roi_field(self.current_query_rid, 'individual_id') is None and
-                self._get_roi_field(self.current_match_rid, 'individual_id') is None)
+        return (self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id')) is None and
+                self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id')) is None)
 
     def current_distance(self):
         """Return distance between current sequence and match"""
@@ -403,11 +469,12 @@ class QueryContainer(QObject):
         return None
 
     def _update_roi_index(self, updates_dict):
-        """Update local index with batch changes"""
-        for roi_id, changes in updates_dict.items():
-            # Update DataFrame
-            for key, value in changes.items():
-                self.data.loc[roi_id, key] = value
+        """Apply changes to both the filtered and raw frames (existing ids only)"""
+        for df in (self.data, self.data_raw):
+            for roi_id, changes in updates_dict.items():
+                if roi_id in df.index:
+                    for key, value in changes.items():
+                        df.loc[roi_id, key] = value
 
     def get_info(self, rid, column=None):
         """Get info from data table for given rid and column"""
@@ -461,7 +528,7 @@ class QueryContainer(QObject):
     # Batch database updates
     def new_iid(self, individual_id):
         """Update records for roi after confirming a match (batched)"""
-        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1} 
+        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1}
                        for roi in self.current_query_rois}
         roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
 
@@ -472,31 +539,31 @@ class QueryContainer(QObject):
         self.mpDB.batch_edit('roi', roi_updates, quiet=True)
 
     def merge(self):
-        """Merge two individuals after match (optimized)"""
-        query_data = self._get_roi_full_record(self.current_query_rid)
-        match_data = self._get_roi_full_record(self.current_match_rid)
+        """Merge two individuals after a match"""
+        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
+        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
 
-        if query_data is None or match_data is None:
+        if query_iid is None and match_iid is None:
             return
 
-        query_iid = query_data.get('individual_id')
-        match_iid = match_data.get('individual_id')
+        # keep the older (lower) id
+        ids = [i for i in (query_iid, match_iid) if i is not None]
+        keep_id = min(ids)
 
-        # Determine which ID to keep
-        if query_iid is not None:
-            # keep the older one (inputted into the db first)
-            keep_id = query_iid if (match_iid is None or match_iid < query_iid) else match_iid
-        else:
-            keep_id = match_iid
+        # find all ROIs associated with the query and match sequences
+        query_seq = self.current_match_object.sequence_id
+        match_seq = self._get_roi_field(self.current_match_rid, 'sequence_id')
+        rois = set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, []))
+        for iid in set(ids) - {keep_id}:
+            rois.update(self.data_raw.index[self.data_raw['individual_id'] == iid])
 
-        # Find all ROIs in affected sequence
-        to_merge_seq = self.current_match_object.sequence_id
-        merge_rois = self._seq_index.get(to_merge_seq, [])
+        if not rois:
+            self.logger.warning("merge: no ROIs to update")
+            return
 
-        # Batch update all ROIs
-        roi_updates = {roi: {"individual_id": int(keep_id), "reviewed": 1} 
-                      for roi in merge_rois}
-        self.mpDB.batch_edit('roi', roi_updates, quiet=False)
+        roi_updates = {int(r): {"individual_id": keep_id, "reviewed": 1}
+                       for r in rois}
+        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
         
         # Update local index
         self._update_roi_index(roi_updates)
@@ -509,11 +576,10 @@ class QueryContainer(QObject):
         # update database
         self.mpDB.edit_row('roi', self.current_query_rid,
                            {'individual_id': None, "reviewed": 0},
-                           allow_none=True,
-                           quiet=False)
+                           allow_none=True, quiet=True)
 
     # ==========================================================================
-    # KNN CACHE MANAGEMENT 
+    # KNN CACHE MANAGEMENT
     # ==========================================================================
     def clear_knn_cache(self):
         """Clear the KNN cache"""
@@ -521,91 +587,98 @@ class QueryContainer(QObject):
         self.CACHE_PATH.unlink(missing_ok=True)
         self.logger.info("KNN cache cleared")
 
-    def save_knn_cache(self):
-        """
-        Save cache as JSON for portability and debuggability.
-        JSON is human-readable and more portable than pickle.
-        """
-        cache_data = {
-            'ranked_sequences': self._serialize_ranked_sequences(self.ranked_sequences),
-            'timestamp': time.time()
-        }
-        
-        try:
-            with open(self.CACHE_PATH, 'w') as f:
-                json.dump(cache_data, f, indent=2)
-            self.logger.info(f"KNN cache saved to {self.CACHE_PATH}")
-        except Exception as e:
-            self.logger.error(f"Failed to save JSON cache: {e}")
+    @staticmethod
+    def _json_default(o):
+        """JSON fallback for numpy types"""
+        if isinstance(o, np.integer):
+            return int(o)
+        if isinstance(o, np.floating):
+            return float(o)
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        raise TypeError(f"{type(o)} not JSON serializable")
 
     def _serialize_ranked_sequences(self, ranked_sequences):
         """
-        Convert MatchObject list to serializable dictionaries.
-        Stores only the essential data needed to rebuild.
+        Convert MatchObject list to serializable dicts.
+        Stores IDs and distances only; DataFrames are rebuilt from self.data.
         """
-        serialized = []
-        
-        for match_obj in ranked_sequences:
-            serialized.append({
-                'sequence_id': match_obj.sequence_id,
-                'neighbors': match_obj.neighbors,  # [(roi_id, distance), ...]
-                'query_data': match_obj.query_data.to_dict('records'),  # Convert DataFrame to list of dicts
-                'match_data': match_obj.match_data.to_dict('records'),
-                'og_ranked_query_rids': match_obj.og_ranked_query_rids,
-                'og_ranked_matches': match_obj.og_ranked_matches
-            })
-        
-        return serialized
+        return [{
+            'sequence_id': m.sequence_id,
+            'neighbors': [(rid, d) for rid, d in m.neighbors],  # [(roi_id, distance), ...]
+            'truncated': len(m.neighbors) >= self.k_cache,
+            'og_ranked_query_rids': list(m.og_ranked_query_rids),
+            'og_ranked_matches': [tuple(x) for x in m.og_ranked_matches],  # (rid, dist)
+        } for m in ranked_sequences]
+
+    def save_knn_cache(self, serialized):
+        """Save UNFILTERED results as JSON (atomic write)."""
+        payload = {
+            'timestamp': time.time(),
+            'n_raw': len(self.data_raw),
+            'k_cache': self.k_cache,
+            'metric': str(self.metric),
+            'threshold': self.threshold,
+            'ranked_sequences': serialized,
+        }
+        tmp = self.CACHE_PATH.with_suffix('.tmp')
+        try:
+            with open(tmp, 'w') as f:
+                json.dump(payload, f, default=self._json_default)
+            tmp.replace(self.CACHE_PATH)  # atomic, never a half-written file
+            self.logger.info(f"KNN cache saved to {self.CACHE_PATH}")
+        except Exception as e:
+            self.logger.error(f"Failed to save JSON cache: {e}")
+            tmp.unlink(missing_ok=True)
 
     def load_knn_cache(self):
-        """Load KNN cache from JSON"""
-        # Check if the cache file exists before attempting to load it
+        """Load RAW cached results only. Filtering happens in finalize()."""
         if not self.CACHE_PATH.exists():
             return False
-        
         try:
-            print(f"Loading KNN cache from {self.CACHE_PATH}")
             with open(self.CACHE_PATH, 'r') as f:
-                cache_data = json.load(f)
-            
-            cache_age = time.time() - cache_data['timestamp']
-            if cache_age > self.cache_timeout:
+                cache = json.load(f)
+            if (time.time() - cache['timestamp'] > self.cache_timeout
+                    or cache.get('n_raw') != len(self.data_raw)
+                    or cache.get('metric') != str(self.metric)
+                    or cache.get('threshold') != self.threshold
+                    or cache.get('k_cache', 0) < self.k):
                 return False
-            
-            self.ranked_sequences = self._deserialize_ranked_sequences(cache_data['ranked_sequences'])
-            self.n_queries = len(self.ranked_sequences)
+            self._raw_ranked = cache['ranked_sequences']
+            self._from_cache = True
             return True
-            
         except Exception as e:
             self.logger.error(f"Failed to load JSON cache: {e}")
             return False
 
-    def _deserialize_ranked_sequences(self, serialized_sequences):
+    def _restrict_to_data(self, serialized, strict):
         """
-        Rebuild MatchObject instances from serialized data.
+        Narrow raw KNN results to the currently filtered self.data.
+        Returns list of MatchObjects, or None if strict and the cache ran out of headroom.
         """
-        rebuilt = []
-        
-        for i, seq_data in enumerate(serialized_sequences):
-            # Convert dicts back to DataFrames
-            query_data = pd.DataFrame(seq_data['query_data'])
-            match_data = pd.DataFrame(seq_data['match_data'])
-            
-            # Rebuild MatchObject
-            match_obj = MatchObject(
-                sequence_id=seq_data['sequence_id'],
-                filtered_neighbors=seq_data['neighbors'],
-                query_data=query_data,
-                match_data=match_data
-            )
-            
-            # Restore cached ranking if available
-            if seq_data.get('og_ranked_query_rids'):
-                match_obj.og_ranked_query_rids = seq_data['og_ranked_query_rids']
-                match_obj.og_ranked_matches = seq_data['og_ranked_matches']
-                match_obj.ranked_query_rids = seq_data['og_ranked_query_rids']
-                match_obj.ranked_matches = seq_data['og_ranked_matches']
-            
-            rebuilt.append(match_obj)
+        keep = set(self.data.index)  # roi ids are the index
+        out = []
+        for s in serialized:
+            q_rids = [r for r in s['og_ranked_query_rids'] if r in keep]
+            if not q_rids:
+                continue  # whole sequence filtered out
 
-        return rebuilt
+            neighbors = [(rid, d) for rid, d in s['neighbors'] if rid in keep]
+            if strict and s['truncated'] and len(neighbors) < self.k:
+                return None  # cache was cut off, recompute
+            neighbors = neighbors[:self.k]  # assumes sorted by distance
+            if not neighbors:
+                continue
+
+            ranked_matches = [tuple(m) for m in s['og_ranked_matches'] if m[0] in keep][:self.k]
+
+            mo = MatchObject(sequence_id=s['sequence_id'],
+                             filtered_neighbors=neighbors,
+                             query_data=self.data.loc[q_rids].reset_index(),
+                             match_data=self.data.loc[[rid for rid, _ in neighbors]].reset_index())
+            mo.og_ranked_query_rids = q_rids
+            mo.og_ranked_matches = ranked_matches
+            mo.ranked_query_rids = list(q_rids)
+            mo.ranked_matches = list(ranked_matches)
+            out.append(mo)
+        return out
