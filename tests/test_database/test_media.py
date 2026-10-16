@@ -175,10 +175,10 @@ class TestFetchIndividual:
         df = fetch_individual(db)
         assert df.empty
 
-    def test_has_name_sex_age_columns(self, populated_db):
+    def test_has_name_sex_column(self, populated_db):
         db, _, ids = populated_db
         df = fetch_individual(db)
-        for col in ["name", "sex", "age"]:
+        for col in ["name", "sex"]:
             assert col in df.columns
 
 

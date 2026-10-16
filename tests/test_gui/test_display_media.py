@@ -113,7 +113,6 @@ def _sample_roi_data():
         "comment": ["", "", ""],
         "select": [0, 0, 0],
         "sex": ["M", "F", None],
-        "age": ["Adult", "Juvenile", None],
         "timestamp": ["2024-01-01", "2024-01-01", "2024-01-02"],
         "filepath": ["a.jpg", "b.jpg", "c.jpg"],
         "ext": [".jpg", ".jpg", ".jpg"],

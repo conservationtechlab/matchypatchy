@@ -548,7 +548,7 @@ class TestRoiMetadata:
     @staticmethod
     def _roi(viewpoint=1):
         return pd.Series({
-            "name": "Bob", "sex": "M", "age": 5, "filepath": "/x/a.jpg",
+            "name": "Bob", "sex": "M", "filepath": "/x/a.jpg",
             "comment": "hi", "timestamp": "2024-01-01", "station_id": 1,
             "camera_id": 2, "sequence_id": 7, "external_id": "E1",
             "viewpoint": viewpoint,

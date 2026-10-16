@@ -85,7 +85,7 @@ class ImportCSVPopup(QDialog):
                 "favorite": self.columns[0],
                 "viewpoint": self.columns[0],
                 "individual": self.columns[0],
-                "sex": self.columns[0],             
+                "sex": self.columns[0]
             }
 
             # Create a grid layout for 4 columns x 3 rows

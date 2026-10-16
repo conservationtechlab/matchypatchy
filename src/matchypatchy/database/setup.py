@@ -2,11 +2,16 @@
 Set Up matchypatchy Database
 """
 from datetime import datetime
+import shutil
 import sqlite3
 import chromadb
 from chromadb.config import Settings
 
 from matchypatchy import __version__
+
+# Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
+# Databases created before schema versioning have no schema_version column and are treated as version 1.
+SCHEMA_VERSION = 1
 
 
 def setup_database(key, filepath, db=None):
@@ -32,8 +37,10 @@ def setup_database(key, filepath, db=None):
             '''CREATE TABLE IF NOT EXISTS metadata (
                 id INTEGER PRIMARY KEY,
                 mp_version TEXT NOT NULL,
-                key TEXT UNIQUE NOT NULL );''')
-        cursor.execute(f"""INSERT INTO metadata (mp_version, key) VALUES ('{__version__}', '{key}');""")
+                key TEXT UNIQUE NOT NULL,
+                schema_version INTEGER NOT NULL DEFAULT 0);''')
+        cursor.execute("INSERT INTO metadata (mp_version, key, schema_version) VALUES (?, ?, ?);",
+                       (__version__, key, SCHEMA_VERSION))
 
         # REGION
         cursor.execute(
@@ -119,8 +126,7 @@ def setup_database(key, filepath, db=None):
             '''CREATE TABLE IF NOT EXISTS individual (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
-                sex TEXT,
-                age TEXT);''')
+                sex TEXT);''')
 
         # SEQUENCE
         cursor.execute(
@@ -150,6 +156,80 @@ def setup_database(key, filepath, db=None):
             db.close()
 
     return db
+
+
+def schema_signature(db):
+    """Structural description of a SQLite schema (columns, foreign keys, unique constraints per table)
+
+    Compared instead of the raw CREATE statements, which SQLite rewrites after ALTER TABLE
+    """
+    cursor = db.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+    signature = {}
+    for (table,) in cursor.fetchall():
+        # (name, type, notnull, default, pk)
+        columns = [(c[1], c[2].upper(), c[3], c[4], c[5])
+                   for c in cursor.execute(f'PRAGMA table_info("{table}")').fetchall()]
+        # (referenced table, from, to, on_update, on_delete)
+        foreign_keys = sorted((f[2], f[3], f[4], f[5], f[6])
+                              for f in cursor.execute(f'PRAGMA foreign_key_list("{table}")').fetchall())
+        uniques = []
+        for index in cursor.execute(f'PRAGMA index_list("{table}")').fetchall():
+            if index[2]:  # unique
+                uniques.append(tuple(i[2] for i in cursor.execute(f'PRAGMA index_info("{index[1]}")').fetchall()))
+        signature[table] = {"columns": columns, "foreign_keys": foreign_keys, "unique": sorted(uniques)}
+    return signature
+
+
+def expected_schema_signature():
+    """Schema signature of a freshly created database"""
+    db = sqlite3.connect(":memory:")
+    try:
+        setup_database("00000", None, db=db)
+        return schema_signature(db)
+    finally:
+        db.close()
+
+
+# MIGRATIONS ===================================================================
+def get_schema_version(db):
+    """Get schema version of an existing database, 1 if it predates schema versioning"""
+    columns = [c[1] for c in db.execute("PRAGMA table_info(metadata)").fetchall()]
+    if "schema_version" not in columns:
+        return 1
+    return db.execute("SELECT schema_version FROM metadata WHERE id=1;").fetchone()[0]
+
+
+def _migrate_1_to_2(db):
+    """Add schema_version to metadata"""
+    db.execute("ALTER TABLE metadata ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0;")
+
+# MIGRATIONS[n] upgrades a database from version n to n + 1
+MIGRATIONS = {
+    1: _migrate_1_to_2,
+}
+
+
+def migrate_database(db, filepath, logger):
+    """Upgrade an existing database to SCHEMA_VERSION, backing up the file first
+
+    Returns the schema version of the database after migration
+    """
+    version = get_schema_version(db)
+    if version >= SCHEMA_VERSION:
+        return version
+
+    backup_path = filepath.with_name(f"{filepath.name}.schema{version}.bak")
+    shutil.copy2(filepath, backup_path)
+    logger.info(f"Migrating database schema from version {version} to {SCHEMA_VERSION}, backup saved to {backup_path}")
+
+    while version < SCHEMA_VERSION:
+        MIGRATIONS[version](db)
+        version += 1
+        db.execute("UPDATE metadata SET schema_version=? WHERE id=1;", (version,))
+        db.commit()
+        logger.info(f"Database schema migrated to version {version}")
+    return version
 
 
 def setup_chromadb(key, filepath):

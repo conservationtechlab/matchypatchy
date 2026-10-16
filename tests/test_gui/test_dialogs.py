@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch, call
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_individual_fill_popup(name=None, sex=None, age=None, existing_names=None):
+def _make_individual_fill_popup(name=None, sex=None, existing_names=None):
     """
     Build an IndividualFillPopup bypassing __init__ and injecting stubs.
     """
@@ -30,7 +30,6 @@ def _make_individual_fill_popup(name=None, sex=None, age=None, existing_names=No
     popup.mpDB = mpDB
     popup.existing_name = name
     popup.existing_sex = sex
-    popup.existing_age = age
 
     # Stub Qt widgets
     name_widget = MagicMock()
@@ -40,10 +39,6 @@ def _make_individual_fill_popup(name=None, sex=None, age=None, existing_names=No
     sex_widget = MagicMock()
     sex_widget.currentText.return_value = sex or "Unknown"
     popup.sex = sex_widget
-
-    age_widget = MagicMock()
-    age_widget.currentText.return_value = age or "Unknown"
-    popup.age = age_widget
 
     secret = MagicMock()
     popup.secret_text = secret
@@ -74,14 +69,6 @@ class TestIndividualFillPopupGetters:
     def test_get_sex_default_unknown(self):
         popup = _make_individual_fill_popup()
         assert popup.get_sex() == "Unknown"
-
-    def test_get_age_returns_selected(self):
-        popup = _make_individual_fill_popup(age="Adult")
-        assert popup.get_age() == "Adult"
-
-    def test_get_age_default_unknown(self):
-        popup = _make_individual_fill_popup()
-        assert popup.get_age() == "Unknown"
 
 
 # ---------------------------------------------------------------------------

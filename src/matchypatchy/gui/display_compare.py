@@ -686,7 +686,7 @@ class DisplayCompare(QWidget):
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        table.setRowCount(7)
+        table.setRowCount(6)
         table.setColumnCount(4) 
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -695,8 +695,8 @@ class DisplayCompare(QWidget):
         table.setColumnWidth(1, 150)
         table.setColumnWidth(2, 120)
         table.setMaximumHeight(250)
-        for i in range(table.rowCount() - 1):
-            table.setRowHeight(i, 34)  # Use consistent height for all rows
+        # stretch rows evenly to fill the table height
+        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setStyleSheet("""
             QTableWidget {
                 border: 1px solid;
@@ -746,12 +746,11 @@ class DisplayCompare(QWidget):
 
         rows = [
             ("Name:",        info_dict['Name'],          "File Name",  os.path.basename(info_dict['Filepath'])),
-            ("Viewpoint:",   info_dict['Viewpoint'],      "Timestamp:",  info_dict['Timestamp']),
-            ("Sex:",         info_dict['Sex'],            "Region:",     info_dict['Region']),
-            ("Age:",         info_dict['Age'],            "Survey:",     info_dict['Survey']),
-            ("Sequence ID:", info_dict['Sequence ID'],    "Station:",    info_dict['Station']),
-            ("External ID:", info_dict['External ID'],    "Camera:",     info_dict['Camera']),
-            ("Comment:",     info_dict['Comment'],        None,         None),
+            ("Viewpoint:",   info_dict['Viewpoint'],     "Timestamp:",  info_dict['Timestamp']),
+            ("Sex:",         info_dict['Sex'],           "Region:",     info_dict['Region']),
+            ("Sequence ID:", info_dict['Sequence ID'],   "Survey:",     info_dict['Survey']),
+            ("External ID:", info_dict['External ID'],   "Station:",    info_dict['Station']),
+            ("Comment:",     info_dict['Comment'],       "Camera:",     info_dict['Camera']),
         ]
 
         for i, (label1, value1, label2, value2) in enumerate(rows):
@@ -798,7 +797,7 @@ class DisplayCompare(QWidget):
             id = edit['rid']
             replace_dict = {edit['reference']: edit['new_value']}
             # determine table to edit based on reference column
-            if edit['reference'] in {'age', 'sex'}:
+            if edit['reference'] in {'sex'}:
                 iid = self.QueryContainer.get_info(id, "individual_id")
                 self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
             elif edit['reference'] in {'comment'}:

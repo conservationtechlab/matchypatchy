@@ -14,8 +14,8 @@ from chromadb.config import Settings
 import numpy as np
 import pandas as pd
 
-from matchypatchy.database.setup import setup_database, setup_chromadb
-from matchypatchy.config import asset_path
+from matchypatchy.database.setup import (setup_database, setup_chromadb, migrate_database,
+                                         schema_signature, expected_schema_signature, SCHEMA_VERSION)
 from matchypatchy.database.location import TZ_CONVERT_DICT
 from matchypatchy import __version__
 
@@ -40,8 +40,11 @@ class MatchyPatchyDB():
             self.db  # Trigger property initialization
             self.chroma  # Trigger property initialization
             self.collection  # Trigger property initialization
-            # check key
-            self.key = self.validate()
+            # upgrade outdated schemas, then check key
+            if self.migrate():
+                self.key = self.validate()
+            else:
+                self.key = False
         # initialize new databases
         else:
             self.key = f'{randrange(1, 10 ** 5):05}'
@@ -156,37 +159,25 @@ class MatchyPatchyDB():
         print(f"ROI: {roi}")
         self.logger.info(f"ROI: {roi}")
 
+    def migrate(self):
+        """Upgrade the database schema if it was built by an older version, return False if it cannot be used"""
+        try:
+            version = migrate_database(self.db, self.filepath, self.logger)
+        except Exception as e:
+            self.logger.error(f"Failed to migrate database schema: {e}", exc_info=True)
+            return False
+        if version > SCHEMA_VERSION:
+            self.logger.error(f"Database schema version {version} is newer than supported version {SCHEMA_VERSION}. "
+                              f"Please update MatchyPatchy.")
+            return False
+        return True
+
     def validate(self):
         """Confirm that the database schema matches expected schema"""
-        cursor = self.db.cursor()
-        cursor.execute("SELECT name, type, sql FROM sqlite_master WHERE type IN ('table', 'index', 'view', 'trigger')")
-        schema = cursor.fetchall()
-
-        # compare schema to expected schema
-        s = ""
-        for name, obj_type, sql in schema:
-            s = s + (f"{obj_type.upper()}: {name}\n{sql}\n")
-
-        schema_path = asset_path('schema.txt')
-        with open(schema_path, 'r', encoding='utf-8') as file:
-            content = file.read()
-
-        def normalize_schema(text):
-            """Remove all whitespace and formatting for comparison"""
-            import re
-            # Remove all whitespace (newlines, tabs, extra spaces)
-            normalized = re.sub(r'\s+', ' ', text)
-            # Remove space after commas and parentheses for consistency
-            normalized = re.sub(r',\s+', ', ', normalized)
-            normalized = re.sub(r'\(\s+', '(', normalized)
-            normalized = re.sub(r'\s+\)', ')', normalized)
-            return normalized.strip()
-        
-        content_normalized = normalize_schema(content)
-        s_normalized = normalize_schema(s)
-        match_schema = (content_normalized == s_normalized)
+        match_schema = (schema_signature(self.db) == expected_schema_signature())
 
         # Check that the database build version and key match
+        cursor = self.db.cursor()
         cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
         db_build_version, mpkey = cursor.fetchone()
         chroma_key = self.collection.metadata['key']
@@ -199,11 +190,8 @@ class MatchyPatchyDB():
             self.logger.error("Key mismatch for Image DB and Emb DB.")
             return False
         else:
-            if db_build_version != __version__:
-                self.logger.error(f"""Schema of selected DB invalid. Database was built with MatchyPatchy version 
-                                  {db_build_version} does not match current version {__version__}.""")
-            else:
-                self.logger.error("Schema of selected DB invalid. Database content does not match expected schema.")
+            self.logger.error(f"Schema of selected DB invalid. Database was built with MatchyPatchy version "
+                              f"{db_build_version} and does not match the expected schema version {SCHEMA_VERSION}.")
             return False
 
     def _command(self, command, quiet=True):
@@ -300,23 +288,22 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to add station: {error}")
             return None
 
-    def add_individual(self, name: str, sex: Optional[str] = None, age: Optional[str] = None):
+    def add_individual(self, name: str, sex: Optional[str] = None):
         """
         Add an individual with
             - name (str)
             - sex (str)
-            - age (str)
         """
         try:
             cursor = self.db.cursor()
             command = """INSERT INTO individual
-                        (name, sex, age)
-                        VALUES (?, ?, ?);"""
-            data_tuple = (str(name), sex, age)
+                        (name, sex)
+                        VALUES (?, ?);"""
+            data_tuple = (str(name), sex)
             cursor.execute(command, data_tuple)
             individual_id = cursor.lastrowid
             self.db.commit()
-            self.logger.info(f"Added individual: {name} with sex: {sex}, age: {age}")
+            self.logger.info(f"Added individual: {name} with sex: {sex}")
             return individual_id
         except sqlite3.Error as error:
             self.logger.error(f"Failed to add individual: {error}")
@@ -747,7 +734,7 @@ class MatchyPatchyDB():
             cursor = self.db.cursor()
             columns = f"""roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
                         roi.media_id, roi.individual_id, emb, base_dir_id, relative_path, ext, timestamp,
-                        station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age,
+                        station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex,
                         uploads.base_dir || '{os.sep}' || media.relative_path AS filepath"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi
@@ -830,7 +817,7 @@ class MatchyPatchyDB():
         columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                    'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
                    'relative_path', 'ext', 'timestamp', 'station_id', 'sequence_id',
-                   'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex', 'age',
+                   'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex',
                    'filepath', 'station_name', 'lat', 'long', 'station_survey_id',
                    'survey_name', 'region_name', 'camera_name']
         """

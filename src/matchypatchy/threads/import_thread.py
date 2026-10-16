@@ -19,7 +19,7 @@ class CSVMigrateThread(QThread):
     EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                         'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
                         'relative_path', 'ext', 'timestamp', 'station_id', 'sequence_id',
-                        'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex', 'age',
+                        'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex',
                         'filepath', 'station_name', 'lat', 'long', 'station_survey_id',
                         'survey_name', 'region_name', 'camera_name'}
 
@@ -87,7 +87,7 @@ class CSVMigrateThread(QThread):
                 self.mpDB.add_thumbnail("media", media_id, media_thumbnail)
 
                 # individual
-                individual_id = self.individual(row.individual_id, row.name, row.sex, row.age)
+                individual_id = self.individual(row.individual_id, row.name, row.sex)
 
                 # get bounding box coordinates, if any are missing, set to -1
                 bbox_x = row.bbox_x if not pd.isna(row.bbox_x) else -1
@@ -196,7 +196,7 @@ class CSVMigrateThread(QThread):
         else:
             return None
 
-    def individual(self, old_individual_id, name, sex, age):
+    def individual(self, old_individual_id, name, sex):
         """Get or create individual ID, not required for import"""
         if not pd.isna(old_individual_id):
             try:
@@ -208,9 +208,7 @@ class CSVMigrateThread(QThread):
                     individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{name}"')[0][0]
                 # if not in database, add individual
                 except IndexError:
-                    individual_id = self.mpDB.add_individual(str(name),
-                                                             sex if not pd.isna(sex) else None,
-                                                             age if not pd.isna(age) else None)
+                    individual_id = self.mpDB.add_individual(str(name), sex if not pd.isna(sex) else None)
             return individual_id
         # if no individual name, return None
         else:
@@ -524,15 +522,11 @@ class CSVImportThread(QThread):
                 individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{individual_name}"')[0][0]
             except IndexError:
                 sex = None
-                age = None
-                #TODO: limit sex and age to valid values
+                #TODO: limit sex to valid values
                 if self.selected_columns["sex"] != "None":
                     sex = self._roi_value(roi, self.selected_columns["sex"])
                     sex = self._convert_sex(sex)
-                if self.selected_columns["age"] != "None":
-                    age = self._roi_value(roi, self.selected_columns["age"])
-                    age = self._convert_age(age)
-                individual_id = self.mpDB.add_individual(individual_name, sex, age)
+                individual_id = self.mpDB.add_individual(individual_name, sex)
             self.individual_ref[individual_name] = individual_id
         return individual_id
 
@@ -548,20 +542,6 @@ class CSVImportThread(QThread):
                 return None
         return None
 
-    def _convert_age(self, listed_age):
-        """Convert age to standard format, handling None and NaN"""
-        if not pd.isna(listed_age):
-            age = str(listed_age).strip()
-            if age.lower() in ["adult", "a"]:
-                return "Adult"
-            elif age.lower() in ["subadult", "sa"]:
-                return "Subadult"
-            elif age.lower() in ["juvenile", "j"]:
-                return "Juvenile"
-            else:
-                return None
-        return None
-    
     def favorite(self, roi):
         """Get favorite status"""
         if self.selected_columns["favorite"] != "None":
