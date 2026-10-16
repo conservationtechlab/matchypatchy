@@ -15,8 +15,7 @@ COLUMNS = [
     'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
     'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
     'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id',
-    'sequence_id', 'external_id', 'comment', 'name', 'sex', 'age',
-]
+    'sequence_id', 'external_id', 'comment', 'name', 'sex', ]
 
 
 @dataclass
@@ -140,7 +139,7 @@ def fetch_roi_media(mpDB, rids=None, sequence_ids=None,reset_index=True):
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
                 'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-                'comment', 'name', 'sex', 'age']
+                'comment', 'name', 'sex']
     """
     if rids:
         ids_str = ', '.join(map(str, rids))
@@ -163,9 +162,9 @@ def fetch_individual(mpDB):
     """Fetches Individual Table, Converts to DataFrame"""
     individual = mpDB.select("individual")
     if individual:
-        return pd.DataFrame(individual, columns=["id", "name", "sex", "age"]).set_index("id")
+        return pd.DataFrame(individual, columns=["id", "name", "sex"]).set_index("id")
     # return empty dataframe if no individual found
-    return pd.DataFrame(columns=["id", "name", "sex", "age"]).set_index("id")
+    return pd.DataFrame(columns=["id", "name", "sex"]).set_index("id")
 
 
 def get_roi_bbox(roi):

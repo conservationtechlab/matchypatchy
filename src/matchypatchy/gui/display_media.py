@@ -509,7 +509,7 @@ class DisplayMedia(QWidget):
                 if edit.reference in {'station_id', 'sequence_id', 'external_id', 'comment'}:
                     self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
                 # edit individual table value
-                elif edit.reference in {'age', 'sex'}:
+                elif edit.reference in {'sex'}:
                     iid = self._data_filtered.loc[self._data_filtered['id'] == edit.rid, 'individual_id'].values[0]
                     iid = int(iid) if pd.notna(iid) else None
                     if iid is not None:
@@ -543,7 +543,7 @@ class DisplayMedia(QWidget):
                 video_row['media_id'] = mid
                 # clear out roi columns for video row so mediawidget behaves correctly
                 video_row[['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h',
-                           'viewpoint', 'individual_id', 'age', 'sex']] = pd.NA
+                           'viewpoint', 'individual_id', 'sex']] = pd.NA
                 data = pd.concat([data, video_row], ignore_index=True)  # add video row
 
         # Launch Media Edit Popup
@@ -627,10 +627,9 @@ class DisplayMedia(QWidget):
                            8: ["viewpoint", "Viewpoint"],
                            9: ["individual_id", "Individual"],
                            10: ["sex", "Sex"],
-                           11: ["age", "Age"],
-                           12: ["reviewed", "Reviewed"],
-                           13: ["favorite", "Favorite"],
-                           14: ["comment", "Comment"]}
+                           11: ["reviewed", "Reviewed"],
+                           12: ["favorite", "Favorite"],
+                           13: ["comment", "Comment"]}
             else:
                 headers = {0: ["select", "Select"],
                            1: ["thumbnail_path", "Thumbnail"],
@@ -648,7 +647,6 @@ class DisplayMedia(QWidget):
         """Set delegates for the table based on the data type"""
         VIEWPOINT_COLUMN = 8
         SEX_COLUMN = 10
-        AGE_COLUMN = 11    
 
         if self.data_type == 1:  # ROI view
             combo_items = list(self.VIEWPOINTS.values())[1:]
@@ -656,11 +654,7 @@ class DisplayMedia(QWidget):
             # SEX COMBOBOX
             combo_items = ['None', 'Male', 'Female']
             self.view.setItemDelegateForColumn(SEX_COLUMN, ComboBoxDelegate(combo_items, self))
-            # AGE COMBOBOX
-            combo_items = ['None', 'Juvenile', 'Subadult', 'Adult']
-            self.view.setItemDelegateForColumn(AGE_COLUMN, ComboBoxDelegate(combo_items, self))
 
         else:
             self.view.setItemDelegateForColumn(VIEWPOINT_COLUMN, None)
             self.view.setItemDelegateForColumn(SEX_COLUMN, None)
-            self.view.setItemDelegateForColumn(AGE_COLUMN, None)

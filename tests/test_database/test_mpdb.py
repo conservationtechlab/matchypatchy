@@ -178,10 +178,9 @@ class TestCRUD:
         assert isinstance(iid, int)
         rows = db.select("individual", row_cond=f"id={iid}")
         assert len(rows) == 1
-        name, sex, age = rows[0][1], rows[0][2], rows[0][3]
+        name, sex, = rows[0][1], rows[0][2]
         assert name == "Lion-42"
         assert sex == "F"
-        assert age == "Juvenile"
 
     def test_add_media(self, tmp_db):
         db, _ = tmp_db

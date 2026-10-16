@@ -126,8 +126,7 @@ def setup_database(key, filepath, db=None):
             '''CREATE TABLE IF NOT EXISTS individual (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
-                sex TEXT,
-                age TEXT);''')
+                sex TEXT);''')
 
         # SEQUENCE
         cursor.execute(

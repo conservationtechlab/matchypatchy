@@ -76,7 +76,7 @@ class TestEditObject:
         assert obj.new_value == "F"
 
     def test_supports_none_values(self):
-        obj = EditObject(rid=0, mid=0, reference="age", previous_value=None, new_value=None)
+        obj = EditObject(rid=0, mid=0, reference="name", previous_value=None, new_value=None)
         assert obj.previous_value is None
         assert obj.new_value is None
 
@@ -227,7 +227,7 @@ class TestFetchIndividual:
     def test_has_expected_columns(self, populated_db):
         db, _, ids = populated_db
         result = fetch_individual(db)
-        for col in ("name", "sex", "age"):
+        for col in ("name", "sex"):
             assert col in result.columns
 
     def test_returns_one_individual(self, populated_db):

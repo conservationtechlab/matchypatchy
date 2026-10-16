@@ -287,23 +287,22 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to add station: {error}")
             return None
 
-    def add_individual(self, name: str, sex: Optional[str] = None, age: Optional[str] = None):
+    def add_individual(self, name: str, sex: Optional[str] = None):
         """
         Add an individual with
             - name (str)
             - sex (str)
-            - age (str)
         """
         try:
             cursor = self.db.cursor()
             command = """INSERT INTO individual
-                        (name, sex, age)
-                        VALUES (?, ?, ?);"""
-            data_tuple = (str(name), sex, age)
+                        (name, sex)
+                        VALUES (?, ?);"""
+            data_tuple = (str(name), sex)
             cursor.execute(command, data_tuple)
             individual_id = cursor.lastrowid
             self.db.commit()
-            self.logger.info(f"Added individual: {name} with sex: {sex}, age: {age}")
+            self.logger.info(f"Added individual: {name} with sex: {sex}")
             return individual_id
         except sqlite3.Error as error:
             self.logger.error(f"Failed to add individual: {error}")
@@ -734,7 +733,7 @@ class MatchyPatchyDB():
             cursor = self.db.cursor()
             columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
                         roi.media_id, roi.individual_id, emb, base_dir_id, relative_path, ext, timestamp,
-                        station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age,
+                        station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex,
                         uploads.base_dir || '/' || media.relative_path AS filepath"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi
@@ -817,7 +816,7 @@ class MatchyPatchyDB():
         columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                    'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
                    'relative_path', 'ext', 'timestamp', 'station_id', 'sequence_id',
-                   'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex', 'age',
+                   'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex',
                    'filepath', 'station_name', 'lat', 'long', 'station_survey_id',
                    'survey_name', 'region_name', 'camera_name']
         """

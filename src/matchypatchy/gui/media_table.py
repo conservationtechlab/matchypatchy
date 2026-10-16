@@ -65,7 +65,7 @@ class MediaTable(QAbstractTableModel):
             return base_flags | Qt.ItemFlag.ItemIsUserCheckable
 
         # Combobox
-        if self._columns[index.column()] in ["viewpoint", "age", "sex"]:
+        if self._columns[index.column()] in ["viewpoint", "sex"]:
             return base_flags | Qt.ItemFlag.ItemIsEditable 
 
 
@@ -185,7 +185,7 @@ class MediaTable(QAbstractTableModel):
             print(f"Key for {value}: {key}")
             new_value = None if key == 'None' else int(key)
 
-        elif reference in ['individual_id', 'sex', 'age']:
+        elif reference in ['individual_id', 'sex']:
             iid = self._data_filtered.at[row, "individual_id"]
             if iid is None:
                 return False

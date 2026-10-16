@@ -387,8 +387,6 @@ class MetadataPanel(QWidget):
 
         self.sex = self._add_metadata_field(metadata_layout, "Sex: ", QComboBox(),
                                             is_editable=True, on_change=self.change_sex, stretch=True)
-        self.age = self._add_metadata_field(metadata_layout, "Age: ", QComboBox(), 
-                                           is_editable=True, on_change=self.change_age, stretch=True)
 
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         self.viewpoint = self._add_metadata_field(metadata_layout, "Viewpoint: ", QComboBox(), 
@@ -429,7 +427,6 @@ class MetadataPanel(QWidget):
         """Refresh metadata values based on current image index"""
         # disable comboboxes
         self.name.blockSignals(True)
-        self.age.blockSignals(True)
         self.sex.blockSignals(True)
         self.viewpoint.blockSignals(True)
         self.comment.blockSignals(True)
@@ -456,13 +453,11 @@ class MetadataPanel(QWidget):
             if iid == 0 or iid is None or pd.isna(iid):
                 # media only, no individual column
                 self.name.setCurrentIndex(0)
-                self.age.setDisabled(True)
                 self.sex.setDisabled(True)
             else:
                 name_index = self.name.findText(self.individuals.loc[iid, 'name'])
                 self.name.setCurrentIndex(name_index)
                 self.sex.setDisabled(False)
-                self.age.setDisabled(False)
 
             self.set_sex_combobox(current_image_index)
             self.set_age_combobox(current_image_index)
@@ -473,7 +468,6 @@ class MetadataPanel(QWidget):
             self.name.setCurrentIndex(0)
             self.name.setDisabled(True)
             self.sex.setDisabled(True)
-            self.age.setDisabled(True)
             self.viewpoint.setDisabled(True)
             self.add_individual.setDisabled(True)
 
@@ -482,7 +476,6 @@ class MetadataPanel(QWidget):
 
         # renable comboboxes
         self.name.blockSignals(False)
-        self.age.blockSignals(False)
         self.sex.blockSignals(False)
         self.viewpoint.blockSignals(False)
         self.comment.blockSignals(False)
@@ -512,27 +505,6 @@ class MetadataPanel(QWidget):
                 self.sex.setCurrentIndex(0)
             else:
                 self.sex.setCurrentIndex(self.sex.findText(str(current_sex)))
-
-    def set_age_combobox(self, current_image_index):
-        """Set the age combobox based on the current image index."""
-        self.age.clear()
-        if len(self.ids) > 1:
-            self.age.addItems(['— Mixed —', 'Unknown', 'Juvenile', 'Subadult', 'Adult'])
-            unique_ages = self.data["age"].dropna().unique() if {"age"}.issubset(self.data.columns) else []
-            if len(unique_ages) == 0:
-                self.age.setCurrentIndex(1)  # 'Unknown'
-            elif len(unique_ages) == 1:
-                age_text = unique_ages[0]
-                self.age.setCurrentIndex(self.age.findText(str(age_text)))
-            else:
-                self.age.setCurrentIndex(0)  # '— Mixed —'
-        else:
-            self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
-            current_age = self.data.iloc[current_image_index]["age"] if {"age"}.issubset(self.data.columns) else None
-            if current_age is None:
-                self.age.setCurrentIndex(0)
-            else:
-                self.age.setCurrentIndex(self.age.findText(str(current_age)))
 
     def set_viewpoint_combobox(self, current_image_index):
         """Set the viewpoint combobox based on the current image index."""
@@ -574,8 +546,6 @@ class MetadataPanel(QWidget):
 
             self.sex.setCurrentIndex(self.sex.findText(str(self.individuals.loc[iid, 'sex'])))
             self.sex.setDisabled(False)
-            self.age.setCurrentIndex(self.age.findText(str(self.individuals.loc[iid, 'age'])))
-            self.age.setDisabled(False)
         else:
             dialog = AlertPopup(self, "Are you sure you want to set the name to 'Unknown'?\nThis will remove the ID assignment from the selected ROI(s).")
             if dialog.exec():
@@ -588,8 +558,6 @@ class MetadataPanel(QWidget):
                     self.send_edit(edit)
             self.sex.setCurrentIndex(0)
             self.sex.setDisabled(True)
-            self.age.setCurrentIndex(0)
-            self.age.setDisabled(True)
 
     def change_sex(self):
         """Update sex for all selected ROIs."""
@@ -601,18 +569,6 @@ class MetadataPanel(QWidget):
                                   reference='sex',
                                   previous_value=row.sex,
                                   new_value=self.sex.currentText())
-                self.send_edit(edit)
-
-    def change_age(self):
-        """Update age for all selected ROIs"""
-        # updates individual table when transposed
-        if self.name.currentIndex() > 0:
-            for row in self.data.itertuples():
-                edit = EditObject(rid=row.id,
-                                  mid=row.media_id,
-                                  reference='age',
-                                  previous_value=row.age,
-                                  new_value=self.age.currentText())
                 self.send_edit(edit)
 
     def change_viewpoint(self):

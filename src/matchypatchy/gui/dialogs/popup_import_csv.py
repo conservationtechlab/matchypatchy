@@ -19,7 +19,7 @@ class ImportCSVPopup(QDialog):
     EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                         'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
                         'relative_path', 'ext', 'timestamp', 'station_id', 'sequence_id',
-                        'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex', 'age',
+                        'camera_id', 'external_id', 'comment', 'favorite', 'name', 'sex',
                         'filepath', 'station_name', 'lat', 'long', 'station_survey_id',
                         'survey_name', 'region_name', 'camera_name'}
 
@@ -66,8 +66,7 @@ class ImportCSVPopup(QDialog):
                 "favorite": self.columns[0],
                 "viewpoint": self.columns[0],
                 "individual": self.columns[0],
-                "sex": self.columns[0],
-                "age": self.columns[0],               
+                "sex": self.columns[0],         
             }
 
             # Create a grid layout for 4 columns x 3 rows
@@ -90,7 +89,6 @@ class ImportCSVPopup(QDialog):
                 ("Viewpoint", "viewpoint", False),
                 ("Individual", "individual", False),
                 ("Sex", "sex", False),
-                ("Age", "age", False),
             ]
 
             row = 0

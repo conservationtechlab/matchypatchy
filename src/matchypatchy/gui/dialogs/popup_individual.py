@@ -3,8 +3,7 @@ Create a new Individual Fillable Form
 
 individual (id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
-            sex TEXT,
-            age TEXT);'''
+            sex TEXT);'''
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem,
                              QLabel, QLineEdit, QDialogButtonBox, QPushButton)
@@ -91,13 +90,12 @@ class IndividualPopup(QDialog):
             return
 
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
-        iid, name, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
+        iid, name, sex = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
         # open edit dialog with current values
-        dialog = IndividualFillPopup(self, name=name, sex=sex, age=age)
+        dialog = IndividualFillPopup(self, name=name, sex=sex)
         if dialog.exec():
             replace_dict = {"name": dialog.get_name(),
-                            "sex": dialog.get_sex(),
-                            "age": dialog.get_age()}
+                            "sex": dialog.get_sex()}
             # update database
             self.mpDB.edit_row("individual", iid, replace_dict, allow_none=True)
         del dialog
@@ -119,7 +117,7 @@ class IndividualFillPopup(QDialog):
     """
     Popup for adding or editing an individual.
     """
-    def __init__(self, parent, name=None, sex=None, age=None):
+    def __init__(self, parent, name=None, sex=None):
         super().__init__(parent)
         self.mpDB = parent.mpDB
         self.setWindowTitle("Edit Individual")
@@ -127,7 +125,6 @@ class IndividualFillPopup(QDialog):
 
         self.existing_name = name
         self.existing_sex = sex
-        self.existing_age = age
 
         # Name
         layout.addWidget(QLabel('Name'))
@@ -141,13 +138,6 @@ class IndividualFillPopup(QDialog):
         if sex is not None:
             self.sex.setCurrentText(sex)
         layout.addWidget(self.sex)
-        # Age
-        layout.addWidget(QLabel('Age'))
-        self.age = QComboBox()
-        self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
-        if age is not None:
-            self.age.setCurrentText(age)
-        layout.addWidget(self.age)
 
         self.secret_text = QLabel('')
         self.secret_text.setStyleSheet("QLabel { color : red; }")
@@ -156,7 +146,6 @@ class IndividualFillPopup(QDialog):
 
         self.name.textChanged.connect(self.checkInput)
         self.sex.currentIndexChanged.connect(self.checkInput)
-        self.age.currentIndexChanged.connect(self.checkInput)
 
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -181,10 +170,6 @@ class IndividualFillPopup(QDialog):
     def get_sex(self):
         """Return the currently selected sex."""
         return self.sex.currentText()
-
-    def get_age(self):
-        """Return the currently selected age."""
-        return self.age.currentText()
 
     def accept_verify(self):
         """Verify input before accepting."""
