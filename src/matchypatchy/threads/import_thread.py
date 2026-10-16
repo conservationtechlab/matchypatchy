@@ -234,6 +234,7 @@ class CSVImportThread(QThread):
 
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     progress_message = pyqtSignal(str)  # Signal to reset the progress bar
+    import_failed = pyqtSignal(str)  # Signal to report a fatal import error
 
     # How many ROIs to process between progress signal emissions.
     # Raising this reduces cross-thread signal overhead on large imports.
@@ -374,9 +375,12 @@ class CSVImportThread(QThread):
 
             self.mpDB.db.commit()  # commit anything remaining
 
-        except Exception:
+        except Exception as error:
+            # an unhandled exception in a QThread aborts the whole app, report it instead
             self.mpDB.db.rollback()
-            raise
+            self.logger.exception("Import failed")
+            self.import_failed.emit(str(error))
+            return
 
         # make sure the progress bar reaches its true final value
         if emitted_counter != roi_counter:
@@ -433,10 +437,23 @@ class CSVImportThread(QThread):
             except IndexError:
                 region_name = exemplar.get(self.selected_columns["region"])
                 region_name = self._convert_to_str(region_name)
-                survey_id = self.mpDB.add_survey(str(survey_name), region_name, None, None)
+                region_id = self.region(region_name) if region_name is not None else None
+                survey_id = self.mpDB.add_survey(str(survey_name), region_id, None, None)
+                if survey_id is None:
+                    raise RuntimeError(f"Failed to add survey '{survey_name}' (region: {region_name}), see log for database error")
 
         self.survey_ref[cache_key] = survey_id
         return survey_id
+
+    def region(self, region_name):
+        """Get or create region"""
+        try:
+            region_id = self.mpDB.select("region", columns="id", row_cond=f'name="{region_name}"')[0][0]
+        except IndexError:
+            region_id = self.mpDB.add_region(str(region_name), None)
+            if region_id is None:
+                raise RuntimeError(f"Failed to add region '{region_name}', see log for database error")
+        return region_id
 
     def station(self, exemplar, survey_id):
         """Get or create station"""
@@ -453,6 +470,8 @@ class CSVImportThread(QThread):
             long = exemplar.get(self.selected_columns["long"])
             long = self._convert_to_float(long)
             station_id = self.mpDB.add_station(str(station_name), lat, long, survey_id)
+            if station_id is None:
+                raise RuntimeError(f"Failed to add station '{station_name}' (survey_id: {survey_id}), see log for database error")
         self.station_ref[station_name] = station_id
         return station_id
 
@@ -470,6 +489,8 @@ class CSVImportThread(QThread):
                 camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name='{camera_name}'")[0][0]
             except IndexError:
                 camera_id = self.mpDB.add_camera(str(camera_name), station_id)
+                if camera_id is None:
+                    raise RuntimeError(f"Failed to add camera '{camera_name}' (station_id: {station_id}), see log for database error")
             self.camera_ref[camera_name] = camera_id
         return camera_id
 
