@@ -878,10 +878,15 @@ class MatchyPatchyDB():
         Returns dict: {roi_id: (neighbor_ids, distances)}
         """
         query_ids_str = [str(qid) for qid in query_ids]
-        queries = self.collection.get(ids=query_ids_str, include=['embeddings'])['embeddings']
+        queries = self.collection.get(ids=query_ids_str, include=['embeddings'])
+        # chroma omits missing ids and does not preserve request order, so key by returned id
+        embeddings = dict(zip(queries['ids'], queries['embeddings']))
 
         results = {}
-        for roi_id, embedding in zip(query_ids, queries):
+        for roi_id in query_ids:
+            embedding = embeddings.get(str(roi_id))
+            if embedding is None:
+                continue
             knn = self.collection.query(query_embeddings=[embedding], n_results=k + 1)
             results[roi_id] = (
                 [int(x) for x in knn['ids'][0]],
@@ -911,16 +916,18 @@ class MatchyPatchyDB():
         Returns a dict: {match_id: similarity}
         """
         query_results = self.collection.get(ids=[str(query_id)], include=["embeddings"])
-        query_emb = query_results['embeddings'][0]
-
-        if query_emb is None:
+        if len(query_results['embeddings']) == 0 or query_results['embeddings'][0] is None:
             return {mid: None for mid in match_ids}
+        query_emb = query_results['embeddings'][0]
 
         match_ids_str = [str(mid) for mid in match_ids]
         match_results = self.collection.get(ids=match_ids_str, include=["embeddings"])
+        # chroma omits missing ids and does not preserve request order, so key by returned id
+        match_embeddings = dict(zip(match_results['ids'], match_results['embeddings']))
 
         similarities = {}
-        for mid, emb in zip(match_ids, match_results['embeddings']):
+        for mid in match_ids:
+            emb = match_embeddings.get(str(mid))
             if emb is None:
                 similarities[mid] = None
                 continue
