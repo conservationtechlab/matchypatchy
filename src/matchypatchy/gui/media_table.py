@@ -258,6 +258,7 @@ class MediaTable(QAbstractTableModel):
         if column == 1: # do not sort by thumbnail
             return
 
+        col_name = self._columns[column]
         ascending = order == Qt.SortOrder.AscendingOrder
 
         self.layoutAboutToBeChanged.emit()
