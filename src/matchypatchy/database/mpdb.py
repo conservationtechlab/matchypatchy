@@ -33,17 +33,31 @@ class MatchyPatchyDB():
         self.logger = logger
         self.local = threading.local()  # Thread-local storage
 
+        db_exists = self.filepath.is_file()
+        chroma_exists = self.chroma_filepath.is_dir()
+
         # load existing databases if they exist
-        if self.filepath.is_file() and self.chroma_filepath.is_dir():
-            # initialize
-            self.db  # Trigger property initialization
-            self.chroma  # Trigger property initialization
-            self.collection  # Trigger property initialization
-            # upgrade outdated schemas, then check key
-            if self.migrate():
-                self.key = self.validate()
-            else:
+        if db_exists and chroma_exists:
+            try:
+                # initialize
+                self.db  # Trigger property initialization
+                self.chroma  # Trigger property initialization
+                self.collection  # Trigger property initialization
+                # upgrade outdated schemas, then check key
+                if self.migrate():
+                    self.key = self.validate()
+                else:
+                    self.key = False
+            # not a MatchyPatchy database, eg. no embedding collection or not an sqlite file
+            except Exception as e:
+                self.logger.error(f"Could not open database at {DB_PATH}: {e}", exc_info=True)
+                self.close()
                 self.key = False
+        # only one of the pair exists, creating the other would pair existing data with a new key
+        elif db_exists or chroma_exists:
+            missing = self.chroma_filepath if db_exists else self.filepath
+            self.logger.error(f"Incomplete database at {DB_PATH}, {missing} is missing.")
+            self.key = False
         # initialize new databases
         else:
             self.key = f'{randrange(1, 10 ** 5):05}'
@@ -108,30 +122,6 @@ class MatchyPatchyDB():
         if hasattr(self.local, 'collection') and self.local.collection is not None:
             self.local.collection = None
 
-    def update_paths(self, DB_PATH):
-        """Update database paths, create new database if not found"""
-        filepath = Path(DB_PATH) / 'matchypatchy.db'
-        chroma_filepath = Path(DB_PATH) / 'emb.db'
-        # Close existing connection
-        self.close()
-        # check if new database exists and is valid
-        if filepath.is_file() and chroma_filepath.is_dir():
-            valid = self.validate()
-            if valid:
-                self.key = valid
-                self.filepath = filepath
-                self.chroma_filepath = chroma_filepath
-                return True
-            else:
-                return False
-        else:
-            # create new databases
-            self.filepath = filepath
-            self.chroma_filepath = chroma_filepath
-            self.key = f'{randrange(1, 10 ** 5):05}'
-            self._setup_new_databases()
-            return True
-
     def retrieve_key(self):
         """Retrieve key from both databases to confirm match"""
         cursor = self.db.cursor()
@@ -177,8 +167,14 @@ class MatchyPatchyDB():
 
         # Check that the database build version and key match
         cursor = self.db.cursor()
-        cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
-        db_build_version, mpkey = cursor.fetchone()
+        try:
+            metadata = cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;").fetchone()
+        except sqlite3.OperationalError:
+            metadata = None  # no metadata table
+        if metadata is None:
+            self.logger.error("Selected DB is not a MatchyPatchy database, metadata is missing.")
+            return False
+        db_build_version, mpkey = metadata
         chroma_key = self.collection.metadata['key']
 
         if match_schema:
@@ -387,6 +383,8 @@ class MatchyPatchyDB():
             if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
                 self.logger.error(f"Failed to add {relative_path}, file is a duplicate.")
                 return "duplicate_error"
+            # eg. foreign key or not null constraint
+            self.logger.error(f"Failed to add {relative_path}: {error}")
             return None
 
         except sqlite3.Error as error:
@@ -581,37 +579,42 @@ class MatchyPatchyDB():
             - updates (dict): dictionary of row_id: {column: value} updates
             - quiet (bool): if False, prints the executed commands
         """
-        try:
-            cursor = self.db.cursor()
-            cursor.execute("BEGIN TRANSACTION")
-
-            for row_id, replace in updates.items():
-                set_clauses = []
-                params = []
-                for key, value in replace.items():
-                    if value in (None, ''):
-                        if allow_none:
-                            set_clauses.append(f"{key}=NULL")
-                        else:
-                            self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
-                            return False
+        # build and validate every statement before touching the database,
+        # so an illegal value can't leave a partially applied batch
+        statements = []
+        for row_id, replace in updates.items():
+            set_clauses = []
+            params = []
+            for key, value in replace.items():
+                if value in (None, ''):
+                    if allow_none:
+                        set_clauses.append(f"{key}=NULL")
                     else:
-                        # bind values as parameters instead of interpolating them into
-                        # the SQL string, so values containing quotes don't produce
-                        # invalid/unsafe SQL
-                        set_clauses.append(f"{key}=?")
-                        params.append(value)
+                        self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
+                        return False
+                else:
+                    # bind values as parameters instead of interpolating them into
+                    # the SQL string, so values containing quotes don't produce
+                    # invalid/unsafe SQL
+                    set_clauses.append(f"{key}=?")
+                    params.append(value)
 
-                replace_values = ",".join(set_clauses)
-                command = f"UPDATE {table} SET {replace_values} WHERE id=?"
-                row_id = int(row_id)
-                params.append(row_id)
+            replace_values = ",".join(set_clauses)
+            command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+            params.append(int(row_id))
+            statements.append((command, params))
+
+        try:
+            # sqlite3 opens a transaction implicitly on the first UPDATE
+            cursor = self.db.cursor()
+            for command, params in statements:
                 if not quiet:
                     print(command, params)
                 cursor.execute(command, params)
             self.db.commit()
             return True
         except sqlite3.Error as error:
+            self.db.rollback()
             self.logger.error(f"Failed batch update on table {table}: {error}")
             return False
 
@@ -625,8 +628,8 @@ class MatchyPatchyDB():
 
         try:
             # Simple approach: execute individual UPDATEs in a transaction
+            # (sqlite3 opens it implicitly on the first INSERT)
             cursor = self.db.cursor()
-            cursor.execute("BEGIN TRANSACTION")
 
             for row_id, changes in batch_updates.items():
                 # Add the ID to the changes
@@ -834,7 +837,8 @@ class MatchyPatchyDB():
             cameras = self.select("camera")
             if cameras:
                 cameras = pd.DataFrame(cameras, columns=["camera_id", "camera_name", "station_id"])
-                export_data = pd.merge(export_data, cameras[["camera_id", "camera_name"]], on="camera_id")
+                # left join to keep media without a camera
+                export_data = pd.merge(export_data, cameras[["camera_id", "camera_name"]], on="camera_id", how="left")
             else:
                 # no camera, set column to blank
                 export_data['camera_name'] = None
@@ -896,10 +900,15 @@ class MatchyPatchyDB():
         Returns dict: {roi_id: (neighbor_ids, distances)}
         """
         query_ids_str = [str(qid) for qid in query_ids]
-        queries = self.collection.get(ids=query_ids_str, include=['embeddings'])['embeddings']
+        queries = self.collection.get(ids=query_ids_str, include=['embeddings'])
+        # chroma omits missing ids and does not preserve request order, so key by returned id
+        embeddings = dict(zip(queries['ids'], queries['embeddings']))
 
         results = {}
-        for roi_id, embedding in zip(query_ids, queries):
+        for roi_id in query_ids:
+            embedding = embeddings.get(str(roi_id))
+            if embedding is None:
+                continue
             knn = self.collection.query(query_embeddings=[embedding], n_results=k + 1)
             results[roi_id] = (
                 [int(x) for x in knn['ids'][0]],
@@ -911,6 +920,9 @@ class MatchyPatchyDB():
         results1 = self.collection.get(ids=[str(query_id)], include=["embeddings"])
         results2 = self.collection.get(ids=[str(match_id)], include=["embeddings"])
 
+        # chroma returns an empty list for ids without an embedding
+        if len(results1['embeddings']) == 0 or len(results2['embeddings']) == 0:
+            return None
         emb1 = results1['embeddings'][0]
         emb2 = results2['embeddings'][0]
 
@@ -929,16 +941,18 @@ class MatchyPatchyDB():
         Returns a dict: {match_id: similarity}
         """
         query_results = self.collection.get(ids=[str(query_id)], include=["embeddings"])
-        query_emb = query_results['embeddings'][0]
-
-        if query_emb is None:
+        if len(query_results['embeddings']) == 0 or query_results['embeddings'][0] is None:
             return {mid: None for mid in match_ids}
+        query_emb = query_results['embeddings'][0]
 
         match_ids_str = [str(mid) for mid in match_ids]
         match_results = self.collection.get(ids=match_ids_str, include=["embeddings"])
+        # chroma omits missing ids and does not preserve request order, so key by returned id
+        match_embeddings = dict(zip(match_results['ids'], match_results['embeddings']))
 
         similarities = {}
-        for mid, emb in zip(match_ids, match_results['embeddings']):
+        for mid in match_ids:
+            emb = match_embeddings.get(str(mid))
             if emb is None:
                 similarities[mid] = None
                 continue

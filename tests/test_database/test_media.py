@@ -86,6 +86,11 @@ class TestFetchMedia:
         df = fetch_media(db, ids=[99999])
         assert df.empty
 
+    def test_filter_by_empty_ids_returns_nothing(self, populated_db):
+        db, _, ids = populated_db
+        df = fetch_media(db, ids=[])
+        assert df.empty
+
     def test_counts_mode(self, populated_db):
         db, _, ids = populated_db
         df = fetch_media(db, counts=True)
@@ -147,6 +152,17 @@ class TestFetchRoiMedia:
         db, _, ids = populated_db
         df = fetch_roi_media(db, rids=[ids["roi_id"]])
         assert len(df) == 1
+
+    def test_filter_by_empty_rids_returns_nothing(self, populated_db):
+        db, _, ids = populated_db
+        df = fetch_roi_media(db, rids=[])
+        assert df.empty
+        assert df.index.name == "id"
+
+    def test_filter_by_empty_sequence_ids_returns_nothing(self, populated_db):
+        db, _, ids = populated_db
+        df = fetch_roi_media(db, sequence_ids=[])
+        assert df.empty
 
     def test_no_reset_index(self, populated_db):
         db, _, ids = populated_db

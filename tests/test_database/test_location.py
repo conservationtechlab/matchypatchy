@@ -205,7 +205,7 @@ class TestCascadeDeletes:
     def test_delete_individual_sets_roi_individual_id_null(self, tmp_db):
         db, _ = tmp_db
         st_id = db.add_station("IndStation", 0.0, 0.0, 1)
-        iid = db.add_individual("Wolf-7", "M", None)
+        iid = db.add_individual("Wolf-7", "M")
         upload_id = db.add_upload("/img")
         mid = db.add_media(upload_id, "ind.jpg", "ind_sha" * 8, ".jpg",
                            "2024-01-01", st_id)

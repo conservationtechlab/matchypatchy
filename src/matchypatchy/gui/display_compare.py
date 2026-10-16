@@ -2,6 +2,7 @@
 GUI Window for Match Comparisons
 
 """
+import math
 import os
 from pathlib import Path
 from PIL import Image
@@ -642,8 +643,12 @@ class DisplayCompare(QWidget):
         """
         Load Image and Metadata for Current Match ROI
         """
-        distance = 1 - self.QueryContainer.current_distance()
-        self.match_distance.setText(f"Similarity: {distance:.2f}")
+        distance = self.QueryContainer.current_distance()
+        # missing embedding (None/NaN) or no match (inf) has no similarity to show
+        if distance is None or not math.isfinite(distance):
+            self.match_distance.setText("Similarity: N/A")
+        else:
+            self.match_distance.setText(f"Similarity: {1 - distance:.2f}")
 
         self.match_image.load(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "filepath"),
                               frame=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "frame"),
