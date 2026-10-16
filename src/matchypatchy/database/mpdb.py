@@ -557,37 +557,42 @@ class MatchyPatchyDB():
             - updates (dict): dictionary of row_id: {column: value} updates
             - quiet (bool): if False, prints the executed commands
         """
-        try:
-            cursor = self.db.cursor()
-            cursor.execute("BEGIN TRANSACTION")
-
-            for row_id, replace in updates.items():
-                set_clauses = []
-                params = []
-                for key, value in replace.items():
-                    if value in (None, ''):
-                        if allow_none:
-                            set_clauses.append(f"{key}=NULL")
-                        else:
-                            self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
-                            return False
+        # build and validate every statement before touching the database,
+        # so an illegal value can't leave a partially applied batch
+        statements = []
+        for row_id, replace in updates.items():
+            set_clauses = []
+            params = []
+            for key, value in replace.items():
+                if value in (None, ''):
+                    if allow_none:
+                        set_clauses.append(f"{key}=NULL")
                     else:
-                        # bind values as parameters instead of interpolating them into
-                        # the SQL string, so values containing quotes don't produce
-                        # invalid/unsafe SQL
-                        set_clauses.append(f"{key}=?")
-                        params.append(value)
+                        self.logger.error(f"Failed to update table {table}, value illegal for key '{key}': {value}")
+                        return False
+                else:
+                    # bind values as parameters instead of interpolating them into
+                    # the SQL string, so values containing quotes don't produce
+                    # invalid/unsafe SQL
+                    set_clauses.append(f"{key}=?")
+                    params.append(value)
 
-                replace_values = ",".join(set_clauses)
-                command = f"UPDATE {table} SET {replace_values} WHERE id=?"
-                row_id = int(row_id)
-                params.append(row_id)
+            replace_values = ",".join(set_clauses)
+            command = f"UPDATE {table} SET {replace_values} WHERE id=?"
+            params.append(int(row_id))
+            statements.append((command, params))
+
+        try:
+            # sqlite3 opens a transaction implicitly on the first UPDATE
+            cursor = self.db.cursor()
+            for command, params in statements:
                 if not quiet:
                     print(command, params)
                 cursor.execute(command, params)
             self.db.commit()
             return True
         except sqlite3.Error as error:
+            self.db.rollback()
             self.logger.error(f"Failed batch update on table {table}: {error}")
             return False
 
@@ -601,8 +606,8 @@ class MatchyPatchyDB():
 
         try:
             # Simple approach: execute individual UPDATEs in a transaction
+            # (sqlite3 opens it implicitly on the first INSERT)
             cursor = self.db.cursor()
-            cursor.execute("BEGIN TRANSACTION")
 
             for row_id, changes in batch_updates.items():
                 # Add the ID to the changes
