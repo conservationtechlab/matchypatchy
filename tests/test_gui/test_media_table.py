@@ -134,16 +134,19 @@ class TestSort:
         mt = _make_media_table()
         from PyQt6.QtCore import Qt
         mt._data_filtered = _sample_df()
+        # station_id sorts by displayed station name, which is opposite to id order here
+        mt.STATIONS = pd.DataFrame({"name": ["Beta", "Alpha"]}, index=[1, 2])
         # Sort by station_id (col 4) ascending
         mt.sort(4, Qt.SortOrder.AscendingOrder)
-        assert list(mt._data_filtered["station_id"]) == [1, 1, 2]
+        assert list(mt._data_filtered["station_id"]) == [2, 1, 1]
 
     def test_sort_descending_by_column(self):
         mt = _make_media_table()
         from PyQt6.QtCore import Qt
         mt._data_filtered = _sample_df()
+        mt.STATIONS = pd.DataFrame({"name": ["Beta", "Alpha"]}, index=[1, 2])
         mt.sort(4, Qt.SortOrder.DescendingOrder)
-        assert list(mt._data_filtered["station_id"]) == [2, 1, 1]
+        assert list(mt._data_filtered["station_id"]) == [1, 1, 2]
 
     def test_sort_skips_thumbnail_column(self):
         mt = _make_media_table()
