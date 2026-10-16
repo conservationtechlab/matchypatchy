@@ -3,6 +3,7 @@ QThreads for Importing Data
 
 """
 import os
+from collections import Counter
 import pandas as pd
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -307,11 +308,13 @@ class CSVImportThread(QThread):
                                                external_id=self.external(exemplar),
                                                comment=self.comment(exemplar),
                                                commit=False)
-                # image already added, get correct media_id
+                # image already added, get correct media_id and its existing rois
                 if media_id == "duplicate_error":
                     media_id = self.mpDB.select("media", columns="id", row_cond=f'sha256="{hash}"')[0][0]
+                    existing_rois = self._existing_rois(media_id)
                 # save thumbnail for new media
                 else:
+                    existing_rois = Counter()
                     media_thumbnail = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
                     self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
 
@@ -336,6 +339,14 @@ class CSVImportThread(QThread):
                         bbox_y = -1
                         bbox_w = -1
                         bbox_h = -1
+
+                    # skip rois already imported (eg. resuming an interrupted import)
+                    # each existing roi accounts for one row, so repeated keys (eg. -1 bboxes) are counted
+                    roi_key = self._roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                    if existing_rois[roi_key] > 0:
+                        existing_rois[roi_key] -= 1
+                        roi_counter += 1
+                        continue
 
                     # viewpoint
                     viewpoint_col = self.selected_columns["viewpoint"]
@@ -520,6 +531,17 @@ class CSVImportThread(QThread):
         return comment
 
     # ROI-RELATED METHODS
+    @staticmethod
+    def _roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h):
+        """Identify a roi by frame and bbox, rounded the same way add_roi stores them."""
+        return (int(frame),) + tuple(round(float(b), 4) for b in (bbox_x, bbox_y, bbox_w, bbox_h))
+
+    def _existing_rois(self, media_id):
+        """Return a count of each roi key already in the database for media_id."""
+        rows = self.mpDB.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h",
+                                row_cond=f'media_id={media_id}')
+        return Counter(self._roi_key(*row) for row in rows or [])
+
     def _roi_value(self, roi, column):
         """Get ROI value by selected column supporting string or integer references."""
         if column == "None" or column is None:

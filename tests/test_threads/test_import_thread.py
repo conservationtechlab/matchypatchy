@@ -333,6 +333,79 @@ class TestCSVImportThread:
         assert roi[4:] == (None, 0, 0, None)
         assert len(thread.finished.calls) == 1
 
+    def test_rerun_skips_existing_rois(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+
+        image_path = tmp_path / "r" / "img.jpg"
+        image_path.parent.mkdir(parents=True)
+        image_path.write_bytes(b"img")
+
+        def _row(frame, bbox):
+            return {"filepath": str(image_path), "timestamp": "2024-01-01 10:00:00",
+                    "station": "Station A", "lat": pd.NA, "long": pd.NA, "camera": pd.NA,
+                    "sequence_id": pd.NA, "external_id": pd.NA, "comment": pd.NA,
+                    "viewpoint": pd.NA, "individual": pd.NA, "sex": pd.NA, "favorite": pd.NA,
+                    "frame": frame, "bbox_x": bbox[0], "bbox_y": bbox[1], "bbox_w": bbox[2], "bbox_h": bbox[3]}
+
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+
+        def _run(df):
+            thread = import_thread.CSVImportThread(parent, df.groupby("filepath", sort=False),
+                                                   self._selected_columns(), "Default Survey")
+            thread.progress_update = SignalSpy()
+            thread.finished = SignalSpy()
+            thread.isInterruptionRequested = lambda: False
+            thread.run()
+            return thread
+
+        # first (partial) import
+        _run(pd.DataFrame([_row(0, (0.123456, 0.2, 0.3, 0.4))]))
+        assert db.count("roi") == 1
+
+        # resumed import with full csv: existing roi skipped, new one added
+        thread = _run(pd.DataFrame([_row(0, (0.123456, 0.2, 0.3, 0.4)),
+                                    _row(1, (0.5, 0.6, 0.7, 0.8))]))
+        assert db.count("media") == 1
+        assert db.count("roi") == 2
+        assert thread.progress_update.calls[-1] == (2,)
+
+    def test_rerun_without_bboxes_adds_only_missing_rois(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+
+        image_path = tmp_path / "e" / "img.jpg"
+        image_path.parent.mkdir(parents=True)
+        image_path.write_bytes(b"img")
+
+        row = {"filepath": str(image_path), "timestamp": "2024-01-01 10:00:00",
+               "station": "Station A", "lat": pd.NA, "long": pd.NA, "camera": pd.NA,
+               "sequence_id": pd.NA, "external_id": pd.NA, "comment": pd.NA,
+               "viewpoint": pd.NA, "individual": pd.NA, "sex": pd.NA, "favorite": pd.NA}
+
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+
+        def _run(n_rows):
+            df = pd.DataFrame([row] * n_rows)
+            thread = import_thread.CSVImportThread(parent, df.groupby("filepath", sort=False),
+                                                   self._selected_columns(), "Default Survey")
+            thread.finished = SignalSpy()
+            thread.isInterruptionRequested = lambda: False
+            thread.run()
+
+        # interrupted partway through the image's rows
+        _run(2)
+        assert db.count("roi") == 2
+
+        # resume: the two existing empty rois cover two rows, the third is added
+        _run(3)
+        assert db.count("roi") == 3
+
+        # running again adds nothing
+        _run(3)
+        assert db.count("roi") == 3
+
     def test_convert_helpers_handle_none_and_nan(self, tmp_db, null_logger, tmp_path):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
