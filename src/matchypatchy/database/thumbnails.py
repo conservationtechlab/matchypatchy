@@ -3,7 +3,7 @@ QThread for saving thumbnails to temp dir for media table
 """
 import logging
 from pathlib import Path
-import random
+import uuid
 
 import cv2
 import pandas as pd
@@ -56,8 +56,9 @@ def save_thumbnail(thumbnail_dir, filepath, image):
     scaled_image = image.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE,
                                 Qt.AspectRatioMode.KeepAspectRatio,
                                 Qt.TransformationMode.SmoothTransformation)
-    rand = random.randint(1000, 9999)
-    thumbnail_filepath = f"{str(Path(filepath).stem)}_{rand}.jpg"
+    # unique suffix, camera trap filenames (e.g. IMG_0001) repeat across folders and
+    # every roi of a media file shares its stem, so a short random number collides
+    thumbnail_filepath = f"{str(Path(filepath).stem)}_{uuid.uuid4().hex}.jpg"
     if not scaled_image.save(str(Path(thumbnail_dir) / thumbnail_filepath), format="JPG"):
         logger.error(f"Could not save thumbnail for {filepath} to {thumbnail_dir}")
         return str(asset_path(THUMBNAIL_NOTFOUND))
