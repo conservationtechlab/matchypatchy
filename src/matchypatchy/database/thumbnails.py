@@ -1,6 +1,7 @@
 """
 QThread for saving thumbnails to temp dir for media table
 """
+import logging
 from pathlib import Path
 import random
 
@@ -15,71 +16,79 @@ from matchypatchy.config import asset_path
 
 THUMBNAIL_NOTFOUND = "graphics/thumbnail_notfound.png"
 THUMBNAIL_SIZE = 150
+VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
+
+logger = logging.getLogger(__name__)
+
+
+def load_image(filepath):
+    """
+    Load an image file as QImage, reading the bytes with Python rather than
+    letting Qt open the path. Qt can fail to open files on Windows mapped or
+    network drives that Python reads fine, which returned a silent null image.
+    """
+    try:
+        with open(filepath, "rb") as f:
+            data = f.read()
+    except OSError as e:
+        logger.error(f"Could not read {filepath} for thumbnail: {e}")
+        return None
+    image = QImage.fromData(data)
+    if image.isNull():
+        logger.error(f"Could not decode {filepath} for thumbnail")
+        return None
+    return image
+
+
+def load_media(filepath, ext, frame=0):
+    """Load the given frame of a video, or the image itself, as QImage"""
+    if ext in VIDEO_EXT:
+        image = get_frame(filepath, frame=frame)
+        if image is None:
+            logger.error(f"Could not read frame {frame} of {filepath} for thumbnail")
+        return image
+    return load_image(filepath)
+
+
+def save_thumbnail(thumbnail_dir, filepath, image):
+    """Scale image to thumbnail size and save it, returning the thumbnail filename"""
+    scaled_image = image.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE,
+                                Qt.AspectRatioMode.KeepAspectRatio,
+                                Qt.TransformationMode.SmoothTransformation)
+    rand = random.randint(1000, 9999)
+    thumbnail_filepath = f"{str(Path(filepath).stem)}_{rand}.jpg"
+    if not scaled_image.save(str(Path(thumbnail_dir) / thumbnail_filepath), format="JPG"):
+        logger.error(f"Could not save thumbnail for {filepath} to {thumbnail_dir}")
+        return str(asset_path(THUMBNAIL_NOTFOUND))
+    return thumbnail_filepath
 
 
 def save_media_thumbnail(thumbnail_dir, filepath, ext):
     """Save thumbnail for full media file"""
-    if ext in ['.mp4', '.avi', '.mov', '.mkv', '.wmv']:
-        # use first frame for video
-        original = get_frame(filepath, frame=0)
-    else:
-        original = QImage(filepath)
-
-    if not original.isNull() and original is not None:
-        # crop for rois
-        image = original.copy()
-        # scale it to 150x150
-        scaled_image = image.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE,
-                                    Qt.AspectRatioMode.KeepAspectRatio,
-                                    Qt.TransformationMode.SmoothTransformation)
-
-        # create a temporary file to hold thumbnail
-        rand = random.randint(1000, 9999)
-        thumbnail_filepath = f"{str(Path(filepath).stem)}_{rand}.jpg"
-        # save the image
-        scaled_image.save(str(thumbnail_dir) + "/" + thumbnail_filepath, format="JPG")
-    else:
-        thumbnail_filepath = str(asset_path(THUMBNAIL_NOTFOUND))
-
-    return thumbnail_filepath
+    original = load_media(filepath, ext, frame=0)
+    if original is None:
+        return str(asset_path(THUMBNAIL_NOTFOUND))
+    return save_thumbnail(thumbnail_dir, filepath, original)
 
 
 def save_roi_thumbnail(thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox_w, bbox_h):
     """Save thumbnail for ROI given bbox coordinates"""
-    original = QImage(filepath)
-    if ext in ['.mp4', '.avi', '.mov', '.mkv', '.wmv']:
-        original = get_frame(filepath, frame=frame)
-    else:
-        original = QImage(filepath)
+    original = load_media(filepath, ext, frame=frame)
+    if original is None:
+        return str(asset_path(THUMBNAIL_NOTFOUND))
 
-    if not original.isNull() and original is not None:
-        # crop for rois
-        left = original.width() * bbox_x
-        top = original.height() * bbox_y
-        right = original.width() * bbox_w
-        bottom = original.height() * bbox_h
-        crop_rect = QRect(int(left), int(top), int(right), int(bottom))
-        image = original.copy(crop_rect)
-
-        # scale it to 150x150
-        scaled_image = image.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE,
-                                    Qt.AspectRatioMode.KeepAspectRatio,
-                                    Qt.TransformationMode.SmoothTransformation)
-
-        # create a temporary file to hold thumbnail
-        rand = random.randint(1000, 9999)
-        thumbnail_filepath = f"{str(Path(filepath).stem)}_{rand}.jpg"
-        # save the image
-        scaled_image.save(str(thumbnail_dir) + "/" + thumbnail_filepath, format="JPG")
-    else:
-        thumbnail_filepath = str(asset_path(THUMBNAIL_NOTFOUND))
-
-    return thumbnail_filepath
+    # crop for rois
+    left = original.width() * bbox_x
+    top = original.height() * bbox_y
+    width = original.width() * bbox_w
+    height = original.height() * bbox_h
+    image = original.copy(QRect(int(left), int(top), int(width), int(height)))
+    return save_thumbnail(thumbnail_dir, filepath, image)
 
 
 def get_frame(video_path, frame=0):
     """Extract a given frame from video as QImage"""
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(str(video_path))
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
     ret, still = cap.read()  # Read the first frame
     cap.release()
@@ -88,7 +97,8 @@ def get_frame(video_path, frame=0):
         rgb_frame = cv2.cvtColor(still, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb_frame.shape
         bytes_per_line = ch * w
-        qimg = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+        # copy so the QImage owns its pixels instead of pointing at the numpy buffer
+        qimg = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
         return qimg
     return None
 
