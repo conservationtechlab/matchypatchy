@@ -383,6 +383,8 @@ class MatchyPatchyDB():
             if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
                 self.logger.error(f"Failed to add {relative_path}, file is a duplicate.")
                 return "duplicate_error"
+            # eg. foreign key or not null constraint
+            self.logger.error(f"Failed to add {relative_path}: {error}")
             return None
 
         except sqlite3.Error as error:

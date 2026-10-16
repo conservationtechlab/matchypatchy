@@ -4,6 +4,7 @@ Tests for matchypatchy.database.mpdb — MatchyPatchyDB class and thread safety.
 import shutil
 import threading
 import sqlite3
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -275,6 +276,16 @@ class TestCRUD:
         db.add_media(upload_id, "original.jpg", sha, ".jpg", "2024-01-01", station_id)
         result = db.add_media(upload_id, "copy.jpg", sha, ".jpg", "2024-01-01", station_id)
         assert result == "duplicate_error"
+
+    def test_add_media_other_integrity_error_is_logged(self, tmp_db):
+        """A constraint failure other than a duplicate (here a missing station) returns None and logs"""
+        db, _ = tmp_db
+        db.logger = MagicMock()
+        upload_id = db.add_upload("/img")
+        result = db.add_media(upload_id, "orphan.jpg", "ddd" * 22, ".jpg", "2024-01-01", 99999)
+        assert result is None
+        db.logger.error.assert_called_once()
+        assert "orphan.jpg" in db.logger.error.call_args[0][0]
 
     def test_add_roi(self, tmp_db):
         db, _ = tmp_db
