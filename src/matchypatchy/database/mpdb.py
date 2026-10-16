@@ -108,30 +108,6 @@ class MatchyPatchyDB():
         if hasattr(self.local, 'collection') and self.local.collection is not None:
             self.local.collection = None
 
-    def update_paths(self, DB_PATH):
-        """Update database paths, create new database if not found"""
-        filepath = Path(DB_PATH) / 'matchypatchy.db'
-        chroma_filepath = Path(DB_PATH) / 'emb.db'
-        # Close existing connection
-        self.close()
-        # check if new database exists and is valid
-        if filepath.is_file() and chroma_filepath.is_dir():
-            valid = self.validate()
-            if valid:
-                self.key = valid
-                self.filepath = filepath
-                self.chroma_filepath = chroma_filepath
-                return True
-            else:
-                return False
-        else:
-            # create new databases
-            self.filepath = filepath
-            self.chroma_filepath = chroma_filepath
-            self.key = f'{randrange(1, 10 ** 5):05}'
-            self._setup_new_databases()
-            return True
-
     def retrieve_key(self):
         """Retrieve key from both databases to confirm match"""
         cursor = self.db.cursor()
