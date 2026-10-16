@@ -393,8 +393,9 @@ class CSVImportThread(QThread):
         if not filepaths:
             return None
 
-        # Convert all to absolute paths T
-        paths = [Path(fp).resolve() for fp in filepaths]
+        # Convert all to absolute paths. Use abspath rather than resolve():
+        # on Windows resolve() expands mapped drives (H:\) to UNC paths (\\server\share)
+        paths = [Path(os.path.abspath(fp)) for fp in filepaths]
         # Then get parents and commonpath
         parents = [p.parent for p in paths]
         try:
@@ -409,8 +410,8 @@ class CSVImportThread(QThread):
         """Get the relative path of a file given its base directory"""
         # If base_dir is None, return the parent directory of the filepat
         if base_dir is None:
-            return Path(filepath).parent 
-        return str(Path(filepath).relative_to(base_dir))
+            return Path(filepath).parent
+        return str(Path(os.path.abspath(filepath)).relative_to(base_dir))
 
     def survey(self, exemplar):
         """Get or create survey"""
