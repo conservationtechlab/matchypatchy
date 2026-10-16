@@ -2,6 +2,8 @@
 Thread Class for Processing Viewpoint and Miew Embedding
 
 """
+import os
+
 import animl
 from numpy import argmax
 import pandas as pd
@@ -40,9 +42,9 @@ class ReIDThread(QThread):
             return
 
         # need only media that has corresponding ROIs
-        media = self.mpDB._command("""
+        media = self.mpDB._command(f"""
             SELECT roi.id, roi.media_id,
-                uploads.base_dir || '/' || media.relative_path AS filepath,
+                uploads.base_dir || '{os.sep}' || media.relative_path AS filepath,
                 media.external_id, media.camera_id, media.sequence_id
             FROM roi
             JOIN media ON roi.media_id = media.id
