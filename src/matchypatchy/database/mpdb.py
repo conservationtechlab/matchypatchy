@@ -2,6 +2,7 @@
 Class Definition for MatchyPatchyDB
 '''
 import datetime
+import os
 from typing import Optional
 import sqlite3
 import threading
@@ -728,7 +729,7 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            command = f"""SELECT m.*, u.base_dir || '/' || m.relative_path AS filepath
+            command = f"""SELECT m.*, u.base_dir || '{os.sep}' || m.relative_path AS filepath
                           FROM media m
                           LEFT JOIN uploads u ON m.base_dir_id = u.id
                           WHERE {row_cond};"""
@@ -744,10 +745,10 @@ class MatchyPatchyDB():
         """Return joined roi and media info for Media Table"""
         try:
             cursor = self.db.cursor()
-            columns = """roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
+            columns = f"""roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
                         roi.media_id, roi.individual_id, emb, base_dir_id, relative_path, ext, timestamp,
                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex, age,
-                        uploads.base_dir || '/' || media.relative_path AS filepath"""
+                        uploads.base_dir || '{os.sep}' || media.relative_path AS filepath"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi
                             INNER JOIN media ON roi.media_id = media.id
@@ -770,7 +771,7 @@ class MatchyPatchyDB():
     def get_full_path(self, media_id):
         """Get the full filepath for a given media id"""
         cursor = self.db.cursor()
-        cursor.execute("""SELECT u.base_dir || '/' || m.relative_path
+        cursor.execute(f"""SELECT u.base_dir || '{os.sep}' || m.relative_path
                        FROM media m
                        JOIN uploads u ON m.base_dir_id = u.id
                        WHERE m.id = ?""", (media_id,))
