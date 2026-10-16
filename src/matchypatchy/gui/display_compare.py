@@ -686,7 +686,7 @@ class DisplayCompare(QWidget):
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        table.setRowCount(7)
+        table.setRowCount(6)
         table.setColumnCount(4) 
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -695,8 +695,8 @@ class DisplayCompare(QWidget):
         table.setColumnWidth(1, 150)
         table.setColumnWidth(2, 120)
         table.setMaximumHeight(250)
-        for i in range(table.rowCount() - 1):
-            table.setRowHeight(i, 34)  # Use consistent height for all rows
+        # stretch rows evenly to fill the table height
+        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setStyleSheet("""
             QTableWidget {
                 border: 1px solid;
