@@ -108,7 +108,9 @@ class ManualQueryContainer(QObject):
         for i in range(len(self.data.index.tolist())):
             for j in range(i + 1, len(self.data.index.tolist())):  # Only j > i
                 id1, id2 = self.data.index.tolist()[i], self.data.index.tolist()[j]
-                distance = 1 - self.mpDB.calculate_similarity(id1, id2)
+                similarity = self.mpDB.calculate_similarity(id1, id2)
+                # None if either roi has no embedding
+                distance = None if similarity is None else 1 - similarity
 
                 distances_list.append({
                     'id1': id1,

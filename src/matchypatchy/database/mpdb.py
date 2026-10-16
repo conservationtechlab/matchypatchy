@@ -898,6 +898,9 @@ class MatchyPatchyDB():
         results1 = self.collection.get(ids=[str(query_id)], include=["embeddings"])
         results2 = self.collection.get(ids=[str(match_id)], include=["embeddings"])
 
+        # chroma returns an empty list for ids without an embedding
+        if len(results1['embeddings']) == 0 or len(results2['embeddings']) == 0:
+            return None
         emb1 = results1['embeddings'][0]
         emb2 = results2['embeddings'][0]
 
