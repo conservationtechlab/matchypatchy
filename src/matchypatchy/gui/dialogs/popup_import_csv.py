@@ -134,32 +134,30 @@ class ImportCSVPopup(QDialog):
                 if row >= 4:  # Move to next row after 4 columns
                     row = 0
                     col += 1
-                
+
                 field_layout = QHBoxLayout()
                 field_layout.addWidget(QLabel(f"{label_text}:"))
-                
+
                 if is_required:
                     asterisk = QLabel("*")
                     asterisk.setStyleSheet("QLabel { color : red; }")
                     field_layout.addWidget(asterisk, alignment=Qt.AlignmentFlag.AlignRight)
-                
+                # create combobox for column selection
                 combo = QComboBox()
                 combo.addItems(self.columns)
                 combo.currentIndexChanged.connect(
-                    lambda index, field=field_name, req=is_required: self._select_column(index, field, required=req)
+                    lambda index, field=field_name,
+                    req=is_required: self._select_column(index, field, required=req)
                 )
                 field_layout.addWidget(combo)
                 field_layout.addSpacing(10)
-                
                 grid_layout.addLayout(field_layout, row, col)
-
                 setattr(self, field_name, combo)
-                
+
                 row += 1
 
             layout.addLayout(grid_layout)
 
-                
         # Ok/Cancel
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
         layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -206,7 +204,6 @@ class ImportCSVPopup(QDialog):
             if index >= 0:
                 combo.setCurrentIndex(index)
 
-
     def select_survey(self):
         """Select the survey column from the CSV."""
         if self.survey.currentIndex() == 0:
@@ -215,17 +212,16 @@ class ImportCSVPopup(QDialog):
         else:
             try:
                 # remove spacer
-                self.selections['survey'] = self.survey_columns[self.survey.currentIndex() - 1 ]
+                self.selections['survey'] = self.survey_columns[self.survey.currentIndex() - 1]
                 self.check_ok_button()
                 return True
             except IndexError:
                 return False
 
-
     def _select_column(self, index, field_name, required):
         """
         Generic column selection handler.
-        
+
         Args:
             index: The index of the selected item in the combobox
             field_name: Key for self.selections (e.g., 'filepath')
@@ -238,7 +234,6 @@ class ImportCSVPopup(QDialog):
             return True
         except IndexError:
             return False
-
 
     def check_ok_button(self):
         """

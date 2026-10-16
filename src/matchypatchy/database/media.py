@@ -134,7 +134,7 @@ def fetch_roi(mpDB, media_id=None):
     return pd.DataFrame()
 
 
-def fetch_roi_media(mpDB, rids=None, sequence_ids=None,reset_index=True):
+def fetch_roi_media(mpDB, rids=None, sequence_ids=None, reset_index=True):
     """
     Fetch Combined Roi and Media Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',

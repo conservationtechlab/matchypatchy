@@ -19,7 +19,7 @@ class mpConfig():
         self.HOME_DIR = home_dir
         self.CONFIG_PATH = home_dir / '.config.yml'
         self.DB_DIR = home_dir / 'Database'
-        self.ML_DIR = home_dir /  'Models'
+        self.ML_DIR = home_dir / 'Models'
         self.THUMBNAIL_DIR = home_dir / 'Thumbnails'
         self.FRAME_DIR = home_dir / 'Frames'
         self.BATCH_SIZE = 1
@@ -63,7 +63,7 @@ class mpConfig():
                 self.VIDEO_FPS = cfg.get('VIDEO_FPS', 1)
                 self.N_FRAMES = cfg.get('N_FRAMES', 3)
                 self.SMART_FRAMES = cfg.get('SMART_FRAMES', True)
-                
+
                 self.REID_KEY = cfg.get('REID_KEY', None)
                 self.VIEWPOINT_KEY = cfg.get('VIEWPOINT_KEY', None)
                 self.DETECTOR_KEY = cfg.get('DETECTOR_KEY', None)
@@ -81,7 +81,6 @@ class mpConfig():
 
         # make sure all necessary directories exist
         self.create_folders()
-
 
     def save(self):
         """Save the current configuration to the YAML file."""
@@ -108,7 +107,7 @@ class mpConfig():
     def set_default(self):
         """Reset the configuration to default values."""
         self.DB_DIR = self.HOME_DIR / 'Database'
-        self.ML_DIR = self.HOME_DIR /  'Models'
+        self.ML_DIR = self.HOME_DIR / 'Models'
         self.THUMBNAIL_DIR = self.HOME_DIR / 'Thumbnails'
         self.FRAME_DIR = self.HOME_DIR / 'Frames'
         self.BATCH_SIZE = 1
@@ -181,8 +180,8 @@ def asset_path(relative_path):
         if 'site-packages' in current_location.parts:
             matchypatchy_dir = current_location.parents[0]  # tbd
         else:
-            matchypatchy_dir =current_location.parents[0]
-
+            matchypatchy_dir = current_location.parents[0]
+        # Assumes this function is in src/matchypatchy/
         return matchypatchy_dir / 'assets' / relative_path
 
     return os.path.abspath(relative_path)

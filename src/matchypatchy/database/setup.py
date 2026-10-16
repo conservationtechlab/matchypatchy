@@ -46,7 +46,7 @@ def setup_database(key, filepath, db=None):
         cursor.execute(
             '''CREATE TABLE IF NOT EXISTS region (
                 id INTEGER PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL, 
+                name TEXT UNIQUE NOT NULL,
                 timezone TEXT);''')
 
         # SURVEY
@@ -200,14 +200,13 @@ def get_schema_version(db):
     return db.execute("SELECT schema_version FROM metadata WHERE id=1;").fetchone()[0]
 
 
+# Migration functions
 def _migrate_1_to_2(db):
     """Add schema_version to metadata"""
-    db.execute("ALTER TABLE metadata ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0;")
+    return
 
-# MIGRATIONS[n] upgrades a database from version n to n + 1
-MIGRATIONS = {
-    1: _migrate_1_to_2,
-}
+
+MIGRATIONS = {1: _migrate_1_to_2}
 
 
 def migrate_database(db, filepath, logger):

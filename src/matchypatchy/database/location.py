@@ -36,7 +36,7 @@ def fetch_stations(mpDB, survey_id=None, reset_index=False):
         if reset_index:
             df = df.set_index("id")
         return df
-    
+
     return pd.DataFrame(columns=["id", "name", "lat", "long", "survey_id"])
 
 

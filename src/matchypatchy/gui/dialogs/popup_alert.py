@@ -9,7 +9,6 @@ from PyQt6.QtCore import Qt
 class AlertPopup(QDialog):
     """
     Popup for displaying alerts with optional progress bar and cancel-only mode.
-    
     """
     def __init__(self, parent, prompt, title="Alert", progressbar=False, cancel_only=False):
         super().__init__(parent)

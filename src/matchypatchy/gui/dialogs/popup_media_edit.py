@@ -389,8 +389,8 @@ class MetadataPanel(QWidget):
                                             is_editable=True, on_change=self.change_sex, stretch=True)
 
         self.VIEWPOINTS = load_model('VIEWPOINTS')
-        self.viewpoint = self._add_metadata_field(metadata_layout, "Viewpoint: ", QComboBox(), 
-                                                 is_editable=True, on_change=self.change_viewpoint, stretch=True)
+        self.viewpoint = self._add_metadata_field(metadata_layout, "Viewpoint: ", QComboBox(),
+                                                  is_editable=True, on_change=self.change_viewpoint, stretch=True)
         # comment
         self.comment = TextEditWithSignal()
         self.comment.setFixedHeight(60)
@@ -407,17 +407,17 @@ class MetadataPanel(QWidget):
         metadata_layout.addStretch()
         self.setLayout(metadata_layout)
 
-    def _add_metadata_field(self, layout, label_text, data_widget, 
+    def _add_metadata_field(self, layout, label_text, data_widget,
                             is_editable=False, on_change=None, stretch=False):
         """Helper to add a metadata field with label and data widget"""
         row_layout = QHBoxLayout()
         label = QLabel(label_text)
         label.setFixedWidth(self.horizontal_gap)
         row_layout.addWidget(label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        
+
         if is_editable and on_change:
             data_widget.currentIndexChanged.connect(on_change)
-        
+
         row_layout.addWidget(data_widget, 1 if stretch else 0)
         layout.addLayout(row_layout)
         layout.addSpacing(self.vertical_gap)
@@ -437,7 +437,7 @@ class MetadataPanel(QWidget):
         self.name_list = ["Unknown"] + list(self.individuals["name"])
         self.name.addItems(self.name_list)
         self.timestamp_data.setText(str(self.data.iloc[current_image_index]["timestamp"]))
-        survey_info = fetch_station_names_from_id(self.mpDB, 
+        survey_info = fetch_station_names_from_id(self.mpDB,
                                                   self.data.iloc[current_image_index]["station_id"],
                                                   self.data.iloc[current_image_index]["camera_id"])
         self.station_data.setText(str(survey_info['station_name']))
@@ -581,7 +581,7 @@ class MetadataPanel(QWidget):
         # skip updating if the selected viewpoint is 'Any'
         if selected_viewpoint == 'Any':
             return
-        
+
         if selected_viewpoint == 'None':
             selected_viewpoint = None
         else:

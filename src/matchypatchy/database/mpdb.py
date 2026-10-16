@@ -17,7 +17,6 @@ import pandas as pd
 from matchypatchy.database.setup import (setup_database, setup_chromadb, migrate_database,
                                          schema_signature, expected_schema_signature, SCHEMA_VERSION)
 from matchypatchy.database.location import TZ_CONVERT_DICT
-from matchypatchy import __version__
 
 
 class MatchyPatchyDB():
@@ -78,7 +77,7 @@ class MatchyPatchyDB():
     def chroma(self):
         """Get or create a Chroma client for the current thread"""
         if not hasattr(self.local, 'chroma') or self.local.chroma is None:
-            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath), 
+            self.local.chroma = chromadb.PersistentClient(str(self.chroma_filepath),
                                                           settings=Settings(anonymized_telemetry=False))
         return self.local.chroma
 
@@ -628,18 +627,18 @@ class MatchyPatchyDB():
             # Simple approach: execute individual UPDATEs in a transaction
             cursor = self.db.cursor()
             cursor.execute("BEGIN TRANSACTION")
-            
+
             for row_id, changes in batch_updates.items():
                 # Add the ID to the changes
                 all_columns = {id_column: row_id, **changes}
-                
+
                 columns = ', '.join(all_columns.keys())
                 placeholders = ', '.join('?' * len(all_columns))
                 values = list(all_columns.values())
-                
+
                 query = f"INSERT OR REPLACE INTO {table} ({columns}) VALUES ({placeholders})"
                 cursor.execute(query, values)
-                
+
             self.db.commit()
             self.logger.info(f"Updated {len(batch_updates)} thumbnail entries in {table}")
             return True
@@ -898,7 +897,7 @@ class MatchyPatchyDB():
         """
         query_ids_str = [str(qid) for qid in query_ids]
         queries = self.collection.get(ids=query_ids_str, include=['embeddings'])['embeddings']
-        
+
         results = {}
         for roi_id, embedding in zip(query_ids, queries):
             knn = self.collection.query(query_embeddings=[embedding], n_results=k + 1)
