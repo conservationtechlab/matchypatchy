@@ -815,7 +815,8 @@ class MatchyPatchyDB():
             cameras = self.select("camera")
             if cameras:
                 cameras = pd.DataFrame(cameras, columns=["camera_id", "camera_name", "station_id"])
-                export_data = pd.merge(export_data, cameras[["camera_id", "camera_name"]], on="camera_id")
+                # left join to keep media without a camera
+                export_data = pd.merge(export_data, cameras[["camera_id", "camera_name"]], on="camera_id", how="left")
             else:
                 # no camera, set column to blank
                 export_data['camera_name'] = None
