@@ -2,6 +2,7 @@
 Functions for Manipulating and Processing ROIs
 """
 import hashlib
+import os
 from pathlib import Path
 from dataclasses import dataclass
 import pandas as pd
@@ -61,7 +62,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
                 m.external_id, m.comment,
                 COUNT(roi.id) AS roi_count,
-                u.base_dir || '/' || m.relative_path AS filepath
+                u.base_dir || '{os.sep}' || m.relative_path AS filepath
             FROM media m
             LEFT JOIN uploads u ON m.base_dir_id = u.id
             LEFT JOIN roi ON roi.media_id = m.id
@@ -82,7 +83,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                 m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
                 m.external_id, m.comment,
-                u.base_dir || '/' || m.relative_path AS filepath
+                u.base_dir || '{os.sep}' || m.relative_path AS filepath
             FROM media m
             LEFT JOIN uploads u ON m.base_dir_id = u.id
             {row_cond if row_cond else ''}
@@ -107,11 +108,11 @@ def fetch_roi(mpDB, media_id=None):
     """
     Fetches roi table with media filepaths, converts to dataframe
     """
-    query = """
+    query = f"""
         SELECT
             r.id, r.media_id, r.frame, r.bbox_x, r.bbox_y, r.bbox_w, r.bbox_h,
             r.viewpoint, r.reviewed, r.favorite, r.individual_id, r.emb,
-            u.base_dir || '/' || m.relative_path AS filepath
+            u.base_dir || '{os.sep}' || m.relative_path AS filepath
         FROM roi r
         JOIN media m ON r.media_id = m.id
         LEFT JOIN uploads u ON m.base_dir_id = u.id

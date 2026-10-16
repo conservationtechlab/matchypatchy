@@ -23,6 +23,25 @@ class ImportCSVPopup(QDialog):
                         'filepath', 'station_name', 'lat', 'long', 'station_survey_id',
                         'survey_name', 'region_name', 'camera_name'}
 
+    # Accepted CSV column names (normalized) for each field, in order of preference
+    COLUMN_ALIASES = {
+        "survey": ["survey", "survey_name"],
+        "filepath": ["filepath", "file_path", "filename", "file_name", "path", "file"],
+        "timestamp": ["timestamp", "datetime", "date_time"],
+        "station": ["station", "station_name"],
+        "lat": ["lat", "latitude"],
+        "long": ["long", "lon", "lng", "longitude"],
+        "region": ["region", "region_name"],
+        "camera": ["camera", "camera_name"],
+        "sequence_id": ["sequence_id", "sequence"],
+        "external_id": ["external_id"],
+        "comment": ["comment", "comments"],
+        "favorite": ["favorite"],
+        "viewpoint": ["viewpoint"],
+        "individual": ["individual", "individual_name", "individual_id", "name"],
+        "sex": ["sex"],
+    }
+
     def __init__(self, parent, manifest):
         super().__init__(parent)
         self.mpDB = parent.mpDB
@@ -66,7 +85,7 @@ class ImportCSVPopup(QDialog):
                 "favorite": self.columns[0],
                 "viewpoint": self.columns[0],
                 "individual": self.columns[0],
-                "sex": self.columns[0],         
+                "sex": self.columns[0]
             }
 
             # Create a grid layout for 4 columns x 3 rows
@@ -160,7 +179,32 @@ class ImportCSVPopup(QDialog):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
         self.setLayout(layout)
+        if not self.migrate:
+            self.auto_populate_columns()
         self.check_ok_button()
+
+    @staticmethod
+    def _normalize(name):
+        """Normalize a column name for matching (case, whitespace, hyphens)."""
+        return str(name).strip().lower().replace(" ", "_").replace("-", "_")
+
+    def auto_populate_columns(self):
+        """Preselect combobox entries for CSV columns that match known field names."""
+        normalized = {}
+        for column in self.data.columns:
+            normalized.setdefault(self._normalize(column), column)
+
+        for field_name, aliases in self.COLUMN_ALIASES.items():
+            match = next((normalized[a] for a in aliases if a in normalized), None)
+            if match is None:
+                continue
+            # setting the index fires the change handler, which updates self.selections
+            combo = getattr(self, field_name)
+            # survey combo leads with the active survey and a separator; search after them
+            start = 2 if field_name == "survey" else 0
+            index = next((i for i in range(start, combo.count()) if combo.itemText(i) == str(match)), -1)
+            if index >= 0:
+                combo.setCurrentIndex(index)
 
 
     def select_survey(self):

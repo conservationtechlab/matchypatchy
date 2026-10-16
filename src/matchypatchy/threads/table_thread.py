@@ -32,6 +32,9 @@ class FetchTableThread(QThread):
         # make a copy of the thumbnail not found path
         thumbnail_notfound = QImage(str(asset_path(thumbnails.THUMBNAIL_NOTFOUND)))
         thumbnail_notfound.save(str(self.thumbnail_dir) + "/thumbnail_notfound.png", format="PNG")
+        # and the placeholder for rois without a bounding box
+        thumbnail_nobbox = QImage(str(asset_path(thumbnails.THUMBNAIL_NOBBOX)))
+        thumbnail_nobbox.save(str(self.thumbnail_dir) + "/thumbnail_nobbox.png", format="PNG")
 
 
     def run(self):
@@ -57,7 +60,7 @@ class FetchTableThread(QThread):
                 self.thumbnails = thumbnails.fetch_roi_thumbnails(self.mpDB)
                 self.data = pd.merge(self.data, self.thumbnails, on="id", how="left")
                 
-                self.data.loc[self.data['bbox_w'] == -1, "thumbnail_path"] = "thumbnail_notfound.png"
+                self.data.loc[self.data['bbox_w'] == -1, "thumbnail_path"] = "thumbnail_nobbox.png"
 
             # media
             elif self.data_type == 0:
