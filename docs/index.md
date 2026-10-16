@@ -252,8 +252,8 @@ another database or software.</td></tr>
 <tr><td>Sex</td>
 <td>"Male", "Female", or "Unknown".</td></tr>
 
-<tr><td>Age</td>
-<td>Approximate age, "juvenile", "Sub-adult", "Adult" or "Unknown".</td></tr>
+<tr><td>Birth Year</td>
+<td>The year the individual was born.</td></tr>
 
 <tr><td>Reviewed</td>
 <td>If checked, this ROI was given an ID from the Match page.</td></tr>

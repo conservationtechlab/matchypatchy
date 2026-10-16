@@ -38,7 +38,7 @@ The output of the re-identification model that describes the image as a single v
 
 # Individual <a name="individual"></a>
 A single, distinct, self-contained living entity. An individual can be given a name,
-and has attributes sex and age at a given point in time.  
+and has attributes sex and estimated birth year.  
 
 # Model <a name="model"></a>
 In machine learning, a complex algorithm that transforms data of one kind (e.g. a .png image)
