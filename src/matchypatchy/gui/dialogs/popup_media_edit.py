@@ -460,7 +460,6 @@ class MetadataPanel(QWidget):
                 self.sex.setDisabled(False)
 
             self.set_sex_combobox(current_image_index)
-            self.set_age_combobox(current_image_index)
             self.set_viewpoint_combobox(current_image_index)
 
         # media only
@@ -615,8 +614,7 @@ class MetadataPanel(QWidget):
         dialog = IndividualFillPopup(self)
         if dialog.exec():
             individual_id = self.mpDB.add_individual(dialog.get_name(),
-                                                     dialog.get_sex(),
-                                                     dialog.get_age())
+                                                     dialog.get_sex())
             for rid in self.ids:
                 self.mpDB.edit_row('roi', rid, {"individual_id": individual_id})
         # reload data
