@@ -146,8 +146,6 @@ class AnimlThread(QThread):
             batch_end = min(batch_start + self.batch_size, len(self.images))
             image_batch = self.images.iloc[batch_start:batch_end]
 
-            print(image_batch)
-
             # if no detector is selected, use the full image as the ROI
             if self.detector is None:
                 detections = pd.DataFrame([{
@@ -171,12 +169,8 @@ class AnimlThread(QThread):
                                           batch_size=self.batch_size,
                                           use_progress_bar=False)
 
-                print(detections)
-
                 detections = animl.parse_detections(detections, manifest=image_batch)
                 detections = animl.get_animals(detections)
-
-                print(detections)
 
             for _, roi in detections.iterrows():
                 frame = roi['frame'] if 'frame' in roi.index else 0
