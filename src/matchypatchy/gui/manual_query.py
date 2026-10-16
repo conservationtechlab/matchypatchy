@@ -108,7 +108,9 @@ class ManualQueryContainer(QObject):
         for i in range(len(self.data.index.tolist())):
             for j in range(i + 1, len(self.data.index.tolist())):  # Only j > i
                 id1, id2 = self.data.index.tolist()[i], self.data.index.tolist()[j]
-                distance = 1 - self.mpDB.calculate_similarity(id1, id2)
+                similarity = self.mpDB.calculate_similarity(id1, id2)
+                # None if either roi has no embedding
+                distance = None if similarity is None else 1 - similarity
 
                 distances_list.append({
                     'id1': id1,
@@ -205,7 +207,8 @@ class ManualQueryContainer(QObject):
         lower = min(self.current_query_rid, self.current_match_rid)
         upper = max(self.current_query_rid, self.current_match_rid)
         distance = self.pair_table.loc[(self.pair_table['id1'] == lower) & (self.pair_table['id2'] == upper), 'distance']
-        return distance.values[0] if not distance.empty else 0
+        # None if the pair has no stored distance, 0 would display as a perfect match
+        return distance.values[0] if not distance.empty else None
 
     def _get_roi_field(self, roi_id, field):
         """Get ROI field from DataFrame (always fresh)"""

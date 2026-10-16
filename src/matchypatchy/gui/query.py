@@ -432,8 +432,9 @@ class QueryContainer(QObject):
             batch_similarities = self.mpDB.batch_calculate_similarity(query_roi_id, uncached)
             self._similarities_cache.update(batch_similarities)
         
-        # Return cached similarities
-        filtered_neighbors = [(fid, 1 - self._similarities_cache[fid]) for fid in favorite_ids]
+        # Return cached similarities, skipping favorites without an embedding (None)
+        filtered_neighbors = [(fid, 1 - self._similarities_cache[fid]) for fid in favorite_ids
+                              if self._similarities_cache[fid] is not None]
         return filtered_neighbors
 
     def _clean_iid(self, v):
