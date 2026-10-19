@@ -239,7 +239,9 @@ class AnimlThread(QThread):
         for media_id, video in self.videos.groupby('id'):
             if not self.isInterruptionRequested():
 
-                results = self._detect(video, calculate_clarity=True)
+                # one frame at a time: MegaDetector v1000 only returns detections
+                # for the first image of a batch
+                results = self._detect(video, batch_size=self.batch_size, calculate_clarity=True)
                 if results is None:
                     self.progress_count += 1
                     self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))

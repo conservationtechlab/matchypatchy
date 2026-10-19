@@ -355,3 +355,21 @@ class TestAnimlThread:
 
         assert [call[0][0] for call in db.add_roi_calls] == [1]
         assert thread.failed == {"/base/bad.mp4"}
+
+    def test_video_frames_are_detected_one_at_a_time(self, tmp_path, monkeypatch):
+        thread, db = self._thread_with_detector(tmp_path, monkeypatch, unreadable=())
+        batch_sizes = []
+        detect = animl_thread.animl.detect
+
+        def _detect(*args, **kwargs):
+            batch_sizes.append(kwargs.get("batch_size", 8))  # animl's default
+            return detect(*args, **kwargs)
+
+        monkeypatch.setattr(animl_thread.animl, "detect", _detect)
+        thread.videos = pd.DataFrame([{"id": 1, "filepath": "/base/v.mp4", "ext": ".mp4", "frame": f}
+                                      for f in range(3)])
+        thread.to_process = 1
+
+        thread.detect_videos()
+
+        assert batch_sizes == [1]
