@@ -12,7 +12,7 @@ def viewpoint_value(label):
     Stored viewpoint value for a viewpoint label (eg. 'Left'), None if not a model class
 
     Stored values are viewpoint model classes, labelled in models.yml VIEWPOINTS
-    (eg. '0': Right, '1': Left), so filtering by side must go through the labels
+    (eg. '0': Left, '1': Right), so filtering by side must go through the labels
     """
     for value, name in load_model('VIEWPOINTS').items():
         if name == label and value.isdigit():

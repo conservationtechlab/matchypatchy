@@ -161,8 +161,8 @@ class TestMetadataPanel:
         from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
         panel = _panel(_edit_rows())
         panel.ids = [10, pd.NA]
-        panel.VIEWPOINTS = {"Any": "Any", "None": "None", "0": "Right", "1": "Left"}
-        panel.viewpoint.currentIndex.return_value = 2  # multi-row list: Mixed, None, Right, Left
+        panel.VIEWPOINTS = {"Any": "Any", "None": "None", "0": "Left", "1": "Right"}
+        panel.viewpoint.currentIndex.return_value = 2  # multi-row list: Mixed, None, Left, Right
         MetadataPanel.change_viewpoint(panel)
         assert [c.args[0].rid for c in panel.send_edit.call_args_list] == [10]
 

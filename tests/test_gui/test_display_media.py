@@ -306,12 +306,12 @@ class TestUndoEdit:
 # ---------------------------------------------------------------------------
 
 class TestViewpointFilter:
-    """models.yml labels stored viewpoints '0': Right, '1': Left"""
+    """models.yml labels stored viewpoints '0': Left, '1': Right"""
 
     @pytest.fixture(autouse=True)
     def _labels(self):
         with patch("matchypatchy.threads.match_object.load_model",
-                   return_value={"Any": "Any", "None": "None", "0": "Right", "1": "Left"}):
+                   return_value={"Any": "Any", "None": "None", "0": "Left", "1": "Right"}):
             yield
 
     def _filter(self, viewpoint):
@@ -319,7 +319,7 @@ class TestViewpointFilter:
         dm = _make_display_media()
         dm.mpDB.select.return_value = []
         dm._data_filtered = pd.DataFrame({"id": [10, 11, 12], "station_id": [1, 1, 1],
-                                          "viewpoint": [1, 0, None], "individual_id": [None] * 3,
+                                          "viewpoint": [0, 1, None], "individual_id": [None] * 3,
                                           "favorite": [0, 0, 0]})
         dm.filters = dict(dm.filters, active_viewpoint=viewpoint)
         DisplayMedia.filter_data(dm)  # the helper mocks filter_data
