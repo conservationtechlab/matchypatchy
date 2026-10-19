@@ -50,6 +50,7 @@ class DisplayCompare(QWidget):
         self.threshold = 50
         self.current_viewpoint = 1
         self.compare_type = 'default'  # whether 'default', 'qc' or 'manual'
+        self.alert_box = None  # progress popup, set by show_alert
         self.QueryContainer = QueryContainer(self)
         self.edit_stack = []  # placeholder for media edit stack
 
@@ -270,6 +271,11 @@ class DisplayCompare(QWidget):
         """Go to Media View"""
         self.parent._set_media_view()
 
+    def has_query(self):
+        """Whether a query is loaded, so navigation and match actions have something to act on"""
+        qc = getattr(self, "QueryContainer", None)
+        return qc is not None and qc.n_queries > 0 and bool(qc.current_query_rois)
+
     def warn(self, prompt):
         """Create an Alert Popup with given prompt"""
         dialog = AlertPopup(self, prompt=prompt)
@@ -424,9 +430,9 @@ class DisplayCompare(QWidget):
         if thread_success:
             self.change_query(0)
         elif not self.QueryContainer.filter_matched:
-            self.update_prompt("No matches found within filter.")
+            self.warn(prompt="No matches found within filter.")
         else:
-            self.update_prompt("No data to compare, all available data from same sequence/capture.")
+            self.warn(prompt="No data to compare, all available data from same sequence/capture.")
 
     # --------------------------------------------------------------------------
     def compare_by_individual(self):
@@ -448,9 +454,9 @@ class DisplayCompare(QWidget):
             if filtered:
                 self.change_query(0)
             else:
-                self.update_prompt("No data to compare within filter.")
+                self.warn(prompt="No data to compare within filter.")
         else:
-            self.update_prompt("No data to compare, no named individuals to analyze.")
+            self.warn(prompt="No data to compare, no named individuals to analyze.")
 
     def compare_manual(self, selected_ids=None):
         """
@@ -468,7 +474,7 @@ class DisplayCompare(QWidget):
             self.QueryContainer.calculate_neighbors()
             self.change_query(0)
         else:
-            self.update_prompt("No data to compare within filter.")
+            self.warn(prompt="No data to compare within filter.")
 
     def toggle_match_favorites_button(self):
         """
@@ -512,6 +518,8 @@ class DisplayCompare(QWidget):
     # ==========================================================================
     def press_match_button(self):
         """Handle the press event for the Match button."""
+        if not self.has_query():
+            return
         # already a match
         if self.QueryContainer.is_existing_match():
             self.unmatch()
@@ -539,6 +547,8 @@ class DisplayCompare(QWidget):
         Match button was clicked, merge query sequence and current match.
         Optimized to only update affected data.
         """
+        if not self.has_query():
+            return
         query_sequence_id = self.QueryContainer.get_query_sequence_id()
         match_sequence_id = self.QueryContainer.get_match_sequence_id()
         
@@ -568,6 +578,9 @@ class DisplayCompare(QWidget):
 
     def unmatch(self):
         """If already matched, unmatch current query from IID"""
+        # only an existing match can be unmatched (U key bypasses the button's check)
+        if not self.has_query() or not self.QueryContainer.is_existing_match():
+            return
         name = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, 'name')
         dialog = AlertPopup(self,
                             prompt=f"This will remove Match from individual '{name}'. Are you sure?",
@@ -596,6 +609,9 @@ class DisplayCompare(QWidget):
 
     def change_query(self, n):
         """Load new query to the nth sequence in the Query queue and reset match to first"""
+        qc = getattr(self, "QueryContainer", None)
+        if qc is None or qc.n_queries == 0:
+            return
         self.QueryContainer.set_query(n)
         # keep showing favorites for the new query if the toggle is on
         if self.compare_type == 'default' and self.button_match_favorites.isChecked():
@@ -618,6 +634,8 @@ class DisplayCompare(QWidget):
 
     def change_query_in_sequence(self, n):
         """Load nth image within the current sequence"""
+        if not self.has_query():
+            return
         self.QueryContainer.set_within_query_sequence(n)
         self.query_image_bar.reset()
         self.sequence_selector.set_current_number(self.QueryContainer.current_query_sn)
@@ -625,6 +643,8 @@ class DisplayCompare(QWidget):
 
     def change_match(self, n):
         """Load nth match within the current match queue"""
+        if not self.has_query():
+            return
         self.QueryContainer.set_match(n)
         self.match_image_bar.reset()
         self.match_selector.set_total(len(self.QueryContainer.current_match_rois))
@@ -668,6 +688,8 @@ class DisplayCompare(QWidget):
         Flip between viewpoints in paired images within a sequence
         """
         self.current_viewpoint = selected_viewpoint
+        if not self.has_query():
+            return
         viewpoints_available = self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
         if not viewpoints_available:
             self.warn(prompt="No images available for this viewpoint. Showing all available images.")
@@ -785,6 +807,8 @@ class DisplayCompare(QWidget):
         Open Image in MatchyPatchy Single Image Popup to Edit Metadata
         Note: Redraws query and match
         """
+        if not self.has_query():
+            return
         data = self.QueryContainer.get_info(rid).copy()
         data["id"] = rid
         data = data.to_frame().T
@@ -829,6 +853,8 @@ class DisplayCompare(QWidget):
 
         Currently only supports one image at a time
         """
+        if not self.has_query():
+            return
         filepath = self.QueryContainer.get_info(rid, "filepath")
         if Path(filepath).suffix.lower() in IMAGE_EXT:
             img = Image.open(filepath)
@@ -840,6 +866,8 @@ class DisplayCompare(QWidget):
 
     def press_visualize_button(self):
         """Open PairX Popup to visualize query and match images together"""
+        if not self.has_query():
+            return
         query = self.QueryContainer.get_info(self.QueryContainer.current_query_rid)
         match = self.QueryContainer.get_info(self.QueryContainer.current_match_rid)
         # dialog = PairXPopup(self, query, match)
@@ -851,6 +879,8 @@ class DisplayCompare(QWidget):
     # ==========================================================================
     def press_favorite_button(self, rid):
         """Toggle favorite status for given rid"""
+        if not self.has_query():
+            return
         if self.QueryContainer.get_info(rid, "favorite"):
             # set favorite to false
             self.favorite(rid, 0)

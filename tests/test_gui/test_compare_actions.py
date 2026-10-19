@@ -146,3 +146,63 @@ class TestRefreshKeepsFilter:
         dc.button_match_favorites.isChecked.return_value = True
         DisplayCompare.favorite(dc, 5, 1)
         dc.QueryContainer.set_match_favorites.assert_called_once_with(True)
+
+
+class TestNoQueryGuards:
+    """With nothing to compare, navigation and actions do nothing instead of crashing"""
+
+    def _empty(self):
+        dc = MagicMock()
+        dc.QueryContainer.n_queries = 0
+        dc.QueryContainer.current_query_rois = []
+        return dc
+
+    def test_has_query(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = self._empty()
+        assert DisplayCompare.has_query(dc) is False
+        dc.QueryContainer.n_queries = 2
+        dc.QueryContainer.current_query_rois = [10]
+        assert DisplayCompare.has_query(dc) is True
+        dc.QueryContainer = None
+        assert DisplayCompare.has_query(dc) is False
+
+    def test_actions_are_noops_without_query(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = self._empty()
+        dc.has_query.return_value = False
+        DisplayCompare.change_query(dc, 1)
+        DisplayCompare.change_match(dc, 1)
+        DisplayCompare.change_query_in_sequence(dc, 1)
+        DisplayCompare.toggle_viewpoint(dc, 0)
+        DisplayCompare.press_match_button(dc)
+        DisplayCompare.confirm_match(dc)
+        DisplayCompare.unmatch(dc)
+        DisplayCompare.press_favorite_button(dc, 10)
+        DisplayCompare.edit_image(dc, 10)
+        DisplayCompare.open_image(dc, 10)
+        dc.QueryContainer.set_query.assert_not_called()
+        dc.QueryContainer.set_match.assert_not_called()
+        dc.QueryContainer.get_info.assert_not_called()
+        dc.mpDB.edit_row.assert_not_called()
+        assert dc.current_viewpoint == 0
+
+    def test_unmatch_requires_existing_match(self):
+        """U key: don't clear the query's individual when query and match differ"""
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.has_query.return_value = True
+        dc.QueryContainer.is_existing_match.return_value = False
+        with patch(f"{DC}.AlertPopup") as popup:
+            DisplayCompare.unmatch(dc)
+        popup.assert_not_called()
+        dc.QueryContainer.unmatch.assert_not_called()
+
+    def test_failed_match_thread_warns(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc._cancelled = False
+        dc.QueryContainer.filter_matched = False
+        DisplayCompare.check_matchthread_success(dc, False)
+        dc.warn.assert_called_once_with(prompt="No matches found within filter.")
+        dc.change_query.assert_not_called()
