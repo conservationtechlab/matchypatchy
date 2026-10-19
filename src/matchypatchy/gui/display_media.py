@@ -14,6 +14,7 @@ from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButto
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 from matchypatchy.threads.table_thread import FetchTableThread
 from matchypatchy.threads.model_download_thread import load_model
+from matchypatchy.threads.match_object import viewpoint_value
 
 
 class DisplayMedia(QWidget):
@@ -144,6 +145,11 @@ class DisplayMedia(QWidget):
         self.cfg = cfg
         self.mpDB = mpDB
         self.filterbar.update_project(mpDB)
+        # the table looks up names and thumbnails in the project too
+        self.media_table.update_project(cfg, mpDB)
+        # unsaved edits belong to the previous project
+        self.edit_stack = []
+        self.check_undo_button()
 
     # ==========================================================================
     # NAVIGATION
@@ -347,9 +353,11 @@ class DisplayMedia(QWidget):
         if reload:
             self.load_table()
         else:
+            # keep ticked rows by id, their positions change when re-filtered and sorted
+            selected_ids = self.media_table.selectedIds()
             self.apply_edits()
             self.filter_data()
-            self.media_table.receiveData(self._data_filtered, selected_rows=self.selected_rows)
+            self.media_table.receiveData(self._data_filtered, selected_ids=selected_ids)
             self._apply_sort()
             self.update_count_label()
             self.update_edd_buttons()
@@ -398,7 +406,9 @@ class DisplayMedia(QWidget):
         if self.data_type == 1:
             # Viewpoint Filter
             if self.filters['active_viewpoint'][0] > 0:
-                self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'] == self.filters['active_viewpoint'][0] - 1]
+                # filter by the stored value labelled with the selected side
+                value = viewpoint_value(self.filters['active_viewpoint'][1])
+                self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'] == value]
             elif self.filters['active_viewpoint'][0] is None:
                 self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'].isna()]
             # Individual Filter
@@ -494,37 +504,58 @@ class DisplayMedia(QWidget):
         if len(self.edit_stack) > 0:
             print("Undoing last edit:", self.edit_stack[-1])
             self.edit_stack.pop()
+            self.check_undo_button()
             self.refresh_table()
 
     # EDIT POPUP ---------------------------------------------------------------
 
-    def save(self):
-        """Save changes to the media table in queue order rather than stack"""
-        #self.media_table.save_changes()
-        for edit in self.edit_stack:
-            replace_dict = {edit.reference: edit.new_value}
-            # roi view
-            if self.data_type == 1:
-                # edit media table value
-                if edit.reference in {'station_id', 'sequence_id', 'external_id', 'comment'}:
-                    self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
-                # edit individual table value
-                elif edit.reference in {'sex'}:
-                    iid = self._data_filtered.loc[self._data_filtered['id'] == edit.rid, 'individual_id'].values[0]
-                    iid = int(iid) if pd.notna(iid) else None
-                    if iid is not None:
-                        self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
-                # edit roi table value
-                else:
-                    self.mpDB.edit_row("roi", edit.rid, replace_dict, allow_none=False, quiet=False)
-            # media view
-            else:
-                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
+    # media table columns edited from the roi view
+    MEDIA_COLUMNS = {'station_id', 'sequence_id', 'external_id', 'comment'}
 
-        # reload data and refresh table
-        self.edit_stack = []
-        #self.clear_and_load_contents(self.data_type)
+    def save(self):
+        """Save changes to the database in the order they were made"""
+        failed = []
+        # individual_id edits applied so far, so a later sex edit targets the new individual
+        assigned_iids = {}
+        for edit in self.edit_stack:
+            if not self._save_edit(edit, assigned_iids):
+                failed.append(edit)
+
+        # keep unsaved edits so they are not silently lost
+        self.edit_stack = failed
         self.check_undo_button()
+        if failed:
+            dialog = AlertPopup(self, prompt=f"{len(failed)} change(s) could not be saved, see the log for details.")
+            dialog.exec()
+            del dialog
+        # reload so filters and undo work from the saved values
+        self.refresh_table(reload=True)
+
+    def _save_edit(self, edit, assigned_iids):
+        """Write one EditObject to the database, return False if it failed"""
+        replace_dict = {edit.reference: edit.new_value}
+        # media view, or media columns from the roi view
+        if self.data_type == 0 or edit.reference in self.MEDIA_COLUMNS:
+            return self.mpDB.edit_row("media", int(edit.mid), replace_dict, allow_none=True)
+        # rows without a roi id (eg. the full video row) have nothing to update
+        if edit.rid is None or pd.isna(edit.rid):
+            return True
+        rid = int(edit.rid)
+        if edit.reference == 'sex':
+            # look up in the unfiltered data, the roi may be hidden by the current filter
+            if rid in assigned_iids:
+                iid = assigned_iids[rid]
+            else:
+                rows = self._data_raw.loc[self._data_raw['id'] == rid, 'individual_id']
+                iid = rows.iloc[0] if len(rows) else None
+            if iid is None or pd.isna(iid):
+                return True  # no individual to update
+            return self.mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
+        # roi columns; individual_id and viewpoint may be cleared (Unknown / None)
+        ok = self.mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
+        if ok and edit.reference == 'individual_id':
+            assigned_iids[rid] = edit.new_value
+        return ok
 
     def edit_row(self, row):
         """Edit a single row"""
@@ -547,14 +578,16 @@ class DisplayMedia(QWidget):
                 data = pd.concat([data, video_row], ignore_index=True)  # add video row
 
         # Launch Media Edit Popup
-        roi_updated = False
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
-            roi_updated = dialog.roi_updated
             self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
-            del dialog
+        # rows deleted or rois redrawn in the popup need a reload, even after Cancel
+        roi_updated = dialog.roi_updated
+        # free the popup (and its media player), it is parented to this view
+        dialog.deleteLater()
+        del dialog
         # reload data and update buttons
         self.refresh_table(reload=roi_updated)
 
@@ -569,9 +602,13 @@ class DisplayMedia(QWidget):
             edit_stack = dialog.get_edit_stack()
             self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
-            del dialog
+        # rows deleted or rois redrawn in the popup need a reload
+        roi_updated = dialog.roi_updated
+        # free the popup (and its media player), it is parented to this view
+        dialog.deleteLater()
+        del dialog
         # reload data and update buttons
-        self.refresh_table()
+        self.refresh_table(reload=roi_updated)
 
     def duplicate(self):
         """Duplicate selected rows in the database."""

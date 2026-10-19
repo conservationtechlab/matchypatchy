@@ -13,7 +13,7 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, TextEditWithSignal
 
 from matchypatchy.threads.model_download_thread import load_model
-from matchypatchy.database.media import fetch_individual, get_roi_bbox, EditObject
+from matchypatchy.database.media import fetch_individual, fetch_roi, get_roi_bbox, EditObject
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 
@@ -127,6 +127,8 @@ class MediaEditPopup(QDialog):
 
     def save(self):
         """Save edits and close"""
+        # keep a comment typed just before pressing OK
+        self.metadatapanel.flush_comment()
         # stop video if playing
         self.image.player.stop()
         self.accept()
@@ -170,14 +172,22 @@ class MediaEditPopup(QDialog):
         self.toggle_edit_roi_button()
 
     def favorite(self):
-        """Toggle favorite status of current ROI"""
-        rid = self.data.iloc[self.current_image_index]["id"]  # roi
-        if self.button_favorite.isChecked():
+        """Toggle favorite status of current ROI, saved with the other edits on OK"""
+        row = self.data.iloc[self.current_image_index]
+        if pd.isna(row["id"]):
+            return  # full video row, no roi
+        value = 1 if self.button_favorite.isChecked() else 0
+        if value:
             self.button_favorite.setStyleSheet(""" QPushButton { background-color: #b51b32; color: white; }""")
-            self.mpDB.edit_row('roi', rid, {"favorite": 1})
         else:
             self.button_favorite.setStyleSheet("")
-            self.mpDB.edit_row('roi', rid, {"favorite": 0})
+        self.edit_stack.append(EditObject(rid=int(row["id"]),
+                                          mid=row["media_id"],
+                                          reference='favorite',
+                                          previous_value=row["favorite"],
+                                          new_value=value))
+        # keep the shown state when moving between images
+        self.data.loc[self.data.index[self.current_image_index], "favorite"] = value
 
     def check_favorite(self):
         """Check and update favorite button status"""
@@ -185,6 +195,8 @@ class MediaEditPopup(QDialog):
             # disable favorite button for media-only
             self.button_favorite.setDisabled(True)
             return
+        # the full video row has no roi to favorite
+        self.button_favorite.setDisabled(pd.isna(self.data.iloc[self.current_image_index]["id"]))
         favorite = self.data.iloc[self.current_image_index]["favorite"]
         if favorite == 1:
             self.button_favorite.setChecked(True)
@@ -214,11 +226,10 @@ class MediaEditPopup(QDialog):
 
     def toggle_edit_roi_button(self):
         """Enable or disable the edit ROI button based on whether the current image has an ROI."""
-        if pd.isna(self.data.iloc[self.current_image_index]["id"]):
-            print("video")
-            self.edit_btn.setEnabled(False)
-        else:
-            self.edit_btn.setEnabled(True)
+        has_roi = not pd.isna(self.data.iloc[self.current_image_index]["id"])
+        self.edit_btn.setEnabled(has_roi)
+        # in the roi view the full video row has no roi to delete
+        self.delete_btn.setEnabled(has_roi or self.data_type == 0)
 
     def edit_roi(self):
         """Enable drawing mode to edit the current ROI."""
@@ -255,18 +266,21 @@ class MediaEditPopup(QDialog):
                 prompt = "This will update the existing ROI. You will need to rerun step 2. Process to get new embeddings."
                 dialog = AlertPopup(self, prompt=prompt)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
-                    # delete roi, cascade to thumbnail
-                    self.mpDB.delete("roi", f"id={rid}")
-                    # add new roi
-                    new_rid = self.mpDB.add_roi(int(media_id), frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    # save thumbnail
+                    rid = int(rid)
+                    # update the box in place, keeping the roi's id, individual, viewpoint
+                    # and favorite; its embedding no longer matches, so drop it (emb=0 is
+                    # picked up by the next Process run)
+                    self.mpDB.edit_row("roi", rid, {"frame": frame,
+                                                    "bbox_x": round(bbox_x, 4), "bbox_y": round(bbox_y, 4),
+                                                    "bbox_w": round(bbox_w, 4), "bbox_h": round(bbox_h, 4),
+                                                    "emb": 0})
+                    self.mpDB.delete_emb(rid)
+                    # save thumbnail and replace the roi's thumbnail entry
                     roi_thumbnail = save_roi_thumbnail(self.cfg.THUMBNAIL_DIR,
                                                        self.data.iloc[self.current_image_index]["filepath"],
                                                        self.data.iloc[self.current_image_index]["ext"],
                                                        frame, bbox_x, bbox_y, bbox_w, bbox_h)
-
-                    # add new thumbnail
-                    self.mpDB.add_thumbnail("roi", new_rid, roi_thumbnail)
+                    self.mpDB.batch_update_thumbnails("roi_thumbnails", "fid", {rid: {"filepath": roi_thumbnail}})
                     # update internal data
                     row_label = self.data.index[self.current_image_index]
                     cols = ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]
@@ -312,27 +326,47 @@ class MediaEditPopup(QDialog):
         self.image.reset()
 
     def delete(self):
-        """Delete current ROI"""
-        dialog = AlertPopup(self, prompt="Are you sure you want to delete this ROI? This action cannot be undone.")
-        if dialog.exec():
-            rid = self.data.iloc[self.current_image_index]["id"]  # roi
-            self.mpDB.delete('roi', f"id={rid}")
-            self.mpDB.delete_emb(rid)
-
-            # update the list of IDs after deletion
-            self.data = self.data.drop(self.data.index[self.current_image_index]).reset_index(drop=True)
-            self.ids = self.data["id"].tolist()
-
-            # close if no more images left
-            if len(self.data) == 0:
-                self.parent.load_table()
-                self.close()
+        """Delete the current roi, or the current image in the Full Images view"""
+        row = self.data.iloc[self.current_image_index]
+        if self.data_type == 1:
+            # the full video row has no roi to delete
+            if pd.isna(row["id"]):
                 return
-
-            if self.current_image_index >= len(self.data):
-                self.current_image_index = len(self.data) - 1
-
+            prompt = "Are you sure you want to delete this ROI? This action cannot be undone."
+        else:
+            prompt = "Are you sure you want to delete this image and all of its ROIs? This action cannot be undone."
+        dialog = AlertPopup(self, prompt=prompt)
+        confirmed = dialog.exec()
         del dialog
+        if not confirmed:
+            return
+
+        if self.data_type == 1:
+            rid = int(row["id"])
+            self.mpDB.delete_emb(rid)
+            self.mpDB.delete('roi', f"id={rid}")
+        else:
+            # id is the media id here; its rois, thumbnails cascade with it
+            mid = int(row["id"])
+            rois = fetch_roi(self.mpDB, media_id=mid)
+            for roi_id in rois.get("roi_id", []):
+                self.mpDB.delete_emb(roi_id)
+            self.mpDB.delete('media', f"id={mid}")
+        # tell the caller to reload
+        self.roi_updated = True
+
+        # update the list of IDs after deletion
+        self.data = self.data.drop(self.data.index[self.current_image_index]).reset_index(drop=True)
+        self.ids = self.data["id"].tolist()
+
+        # close if nothing left to show (only the video row remains in the roi view)
+        if self.data.empty or (self.data_type == 1 and self.data["id"].isna().all()):
+            self.close_out()
+            return
+
+        self.current_image_index = min(self.current_image_index, len(self.data) - 1)
+        self.check_next_buttons()
+        self.refresh()
 
 
 class MetadataPanel(QWidget):
@@ -343,8 +377,6 @@ class MetadataPanel(QWidget):
         super().__init__(parent)
         self.parent = parent
         self.mpDB = parent.mpDB
-        self.data = parent.data
-        self.ids = parent.ids
         self.data_type = parent.data_type
         self.individuals = None
         self.name_list = ["Unknown"]  # List of individual names for the combobox
@@ -407,6 +439,15 @@ class MetadataPanel(QWidget):
         metadata_layout.addStretch()
         self.setLayout(metadata_layout)
 
+    @property
+    def data(self):
+        """The popup's current rows (it replaces them after a delete)"""
+        return self.parent.data
+
+    @property
+    def ids(self):
+        return self.parent.ids
+
     def _add_metadata_field(self, layout, label_text, data_widget,
                             is_editable=False, on_change=None, stretch=False):
         """Helper to add a metadata field with label and data widget"""
@@ -425,6 +466,8 @@ class MetadataPanel(QWidget):
 
     def refresh_values(self, current_image_index):
         """Refresh metadata values based on current image index"""
+        # keep a comment still being typed for the previous image
+        self.flush_comment()
         # disable comboboxes
         self.name.blockSignals(True)
         self.sex.blockSignals(True)
@@ -455,8 +498,7 @@ class MetadataPanel(QWidget):
                 self.name.setCurrentIndex(0)
                 self.sex.setDisabled(True)
             else:
-                name_index = self.name.findText(self.individuals.loc[iid, 'name'])
-                self.name.setCurrentIndex(name_index)
+                self.name.setCurrentIndex(self._name_index(iid))
                 self.sex.setDisabled(False)
 
             self.set_sex_combobox(current_image_index)
@@ -471,13 +513,23 @@ class MetadataPanel(QWidget):
             self.add_individual.setDisabled(True)
 
         # Comment
-        self.comment.setText(str(self.data.iloc[current_image_index]["comment"]))
+        comment = self.data.iloc[current_image_index]["comment"]
+        self.comment.setText("" if comment is None or pd.isna(comment) else str(comment))
 
         # renable comboboxes
         self.name.blockSignals(False)
         self.sex.blockSignals(False)
         self.viewpoint.blockSignals(False)
         self.comment.blockSignals(False)
+
+    def _name_index(self, iid):
+        """Position of an individual in the name list (by id, names may repeat), 0 Unknown"""
+        positions = list(self.individuals.index)
+        return positions.index(int(iid)) + 1 if int(iid) in positions else 0
+
+    def _roi_rows(self):
+        """Rows with a roi, skipping the full video row"""
+        return [row for row in self.data.itertuples() if not pd.isna(row.id)]
 
     def send_edit(self, edit):
         """Send edit to parent popup"""
@@ -534,8 +586,9 @@ class MetadataPanel(QWidget):
     def change_name(self):
         """Update the name for all selected ROIs."""
         if self.name.currentIndex() > 0:
-            iid = self.individuals.loc[self.individuals["name"] == self.name_list[self.name.currentIndex()]].index.item()
-            for row in self.data.itertuples():
+            # by position, names may repeat
+            iid = int(self.individuals.index[self.name.currentIndex() - 1])
+            for row in self._roi_rows():
                 edit = EditObject(rid=row.id,
                                   mid=row.media_id,
                                   reference='individual_id',
@@ -548,7 +601,7 @@ class MetadataPanel(QWidget):
         else:
             dialog = AlertPopup(self, "Are you sure you want to set the name to 'Unknown'?\nThis will remove the ID assignment from the selected ROI(s).")
             if dialog.exec():
-                for row in self.data.itertuples():
+                for row in self._roi_rows():
                     edit = EditObject(rid=row.id,
                                       mid=row.media_id,
                                       reference='individual_id',
@@ -562,7 +615,7 @@ class MetadataPanel(QWidget):
         """Update sex for all selected ROIs."""
         # updates individual table when transposed
         if self.name.currentIndex() > 0:
-            for row in self.data.itertuples():
+            for row in self._roi_rows():
                 edit = EditObject(rid=row.id,
                                   mid=row.media_id,
                                   reference='sex',
@@ -587,13 +640,19 @@ class MetadataPanel(QWidget):
         else:
             selected_viewpoint = int(selected_viewpoint)
 
-        for row in self.data.itertuples():
+        for row in self._roi_rows():
             edit = EditObject(rid=row.id,
                               mid=row.media_id,
                               reference='viewpoint',
                               previous_value=row.viewpoint,
                               new_value=selected_viewpoint)
             self.send_edit(edit)
+
+    def flush_comment(self):
+        """Emit a comment edit still waiting on the typing timer"""
+        if self.comment.timer.isActive():
+            self.comment.timer.stop()
+            self.change_comment()
 
     def change_comment(self):
         """Update comment for all selected ROIS/media"""
@@ -605,18 +664,23 @@ class MetadataPanel(QWidget):
             edit = EditObject(rid=None,
                               mid=media_id,
                               reference='comment',
-                              previous_value=str(row.comment),
+                              previous_value=row.comment,
                               new_value=self.comment.toPlainText())
             self.send_edit(edit)
 
     def new_individual(self):
         """Create a new individual and assign it to the selected ROIs."""
         dialog = IndividualFillPopup(self)
-        if dialog.exec():
-            individual_id = self.mpDB.add_individual(dialog.get_name(),
-                                                     dialog.get_sex())
-            for rid in self.ids:
-                self.mpDB.edit_row('roi', rid, {"individual_id": individual_id})
-        # reload data
+        accepted = dialog.exec()
+        if not accepted:
+            return
+        individual_id = self.mpDB.add_individual(dialog.get_name(), dialog.get_sex())
+        del dialog
+        if individual_id is None:
+            alert = AlertPopup(self, "Could not create the new individual, see the log for details.")
+            alert.exec()
+            return
+        # reload the name list, then select the new individual; change_name adds the
+        # assignment to the edit stack like any name change (saved with OK)
         self.refresh_values(self.parent.current_image_index)
-        self.name.setCurrentIndex(self.name.count() - 1)  # select new individual
+        self.name.setCurrentIndex(self._name_index(individual_id))

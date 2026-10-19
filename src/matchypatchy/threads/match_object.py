@@ -7,18 +7,22 @@ from matchypatchy.threads.model_download_thread import load_model
 VIEWPOINT_TOGGLE = {0: 'Left', 1: 'Any', 2: 'Right'}
 
 
-def toggle_viewpoint_value(selected):
+def viewpoint_value(label):
     """
-    Stored viewpoint value for a compare view toggle position, None for Any
+    Stored viewpoint value for a viewpoint label (eg. 'Left'), None if not a model class
 
     Stored values are viewpoint model classes, labelled in models.yml VIEWPOINTS
-    (eg. '0': Right, '1': Left), so the toggle must go through the labels
+    (eg. '0': Left, '1': Right), so filtering by side must go through the labels
     """
-    label = VIEWPOINT_TOGGLE.get(selected)
     for value, name in load_model('VIEWPOINTS').items():
         if name == label and value.isdigit():
             return int(value)
     return None
+
+
+def toggle_viewpoint_value(selected):
+    """Stored viewpoint value for a compare view toggle position, None for Any"""
+    return viewpoint_value(VIEWPOINT_TOGGLE.get(selected))
 
 
 class MatchObject():

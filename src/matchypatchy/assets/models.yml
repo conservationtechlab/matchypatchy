@@ -22,5 +22,5 @@ VIEWPOINT_MODELS: ["Jaguar Viewpoint"]
 VIEWPOINTS:
   'Any': "Any"
   'None': "None"
-  '0': "Right"
-  '1': "Left"
+  '0': "Left"
+  '1': "Right"

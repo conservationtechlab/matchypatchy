@@ -69,6 +69,8 @@ class MediaWidget(QWidget):
 
         # IMAGE
         if Path(self.filepath).suffix.lower() in IMAGE_EXT:
+            # stop a video still playing from a previous item
+            self.player.stop()
             self.playbackbar.setVisible(False)
             self.image_widget.load(self.filepath, bbox=bbox, frame=None, crop=crop)
             self.stacked.setCurrentWidget(self.image_widget)
@@ -78,6 +80,7 @@ class MediaWidget(QWidget):
             if frame is not None:
                 print(f"Loading video frame {frame} for {self.filepath}")
                 # display frame instead of video
+                self.player.stop()
                 self.playbackbar.setVisible(False)
                 self.image_widget.load(self.filepath, bbox=bbox, frame=frame, crop=crop)
                 self.stacked.setCurrentWidget(self.image_widget)
@@ -140,6 +143,7 @@ class ImageWidget(QLabel):
         self.bbox = None
         self.drawn_bbox = None  # The bounding box drawn by the user
         self.crop_to_bbox = False
+        self.original_image = None  # as loaded, adjustments always start from it
         self.pil_image = None
         self.qimage = None
         self.scaled_image = None
@@ -184,9 +188,9 @@ class ImageWidget(QLabel):
         self.frame = frame
 
         if self.frame is not None:
-            self.pil_image = self.load_from_video(self.frame)
+            self.original_image = self.load_from_video(self.frame)
         else:
-            self.pil_image = Image.open(self.image_path)
+            self.original_image = Image.open(self.image_path)
 
         self.drawn_bbox = None
         self.rel_bbox = bbox
@@ -204,7 +208,7 @@ class ImageWidget(QLabel):
         """
 
         self.image_path = None
-        self.pil_image = Image.fromarray(img_array)
+        self.original_image = Image.fromarray(img_array)
         self.adjust()
 
     def load_from_video(self, selected_frame):
@@ -229,9 +233,10 @@ class ImageWidget(QLabel):
         """
         Adjust image values, convert to qimage, crop, display
 
-        Connected to sliders in imageadjustmentbar widget
+        Connected to sliders in imageadjustmentbar widget. The factors are absolute,
+        so they are applied to the original image, not on top of earlier adjustments
         """
-        enhancer = ImageEnhance.Brightness(self.pil_image)
+        enhancer = ImageEnhance.Brightness(self.original_image)
         self.pil_image = enhancer.enhance(brightness)
         enhancer = ImageEnhance.Contrast(self.pil_image)
         self.pil_image = enhancer.enhance(contrast)
@@ -424,7 +429,8 @@ class ImageWidget(QLabel):
         """
         # Handle zoom mode
         if self.adjust_mode == 'zoom':
-            if hasattr(self, "drag_start_position"):
+            # only while dragging with the left button
+            if self.drag_start_position is not None:
                 drag_delta = event.position() - self.drag_start_position
                 self.image_offset += drag_delta
                 self.drag_start_position = event.position()
@@ -444,7 +450,7 @@ class ImageWidget(QLabel):
         """
         if self.adjust_mode == 'zoom':
             if event.button() == Qt.MouseButton.LeftButton:
-                del self.drag_start_position
+                self.drag_start_position = None
         # Handle bounding box drawing mode
         elif self.adjust_mode == 'bbox':
             if event.button() == Qt.MouseButton.LeftButton and self.drawing:

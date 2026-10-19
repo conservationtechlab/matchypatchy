@@ -299,3 +299,142 @@ class TestUndoEdit:
         assert len(dm.edit_stack) == 0
         # Verify refresh_table was called (it's a mock)
         dm.refresh_table.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Viewpoint filter
+# ---------------------------------------------------------------------------
+
+class TestViewpointFilter:
+    """models.yml labels stored viewpoints '0': Left, '1': Right"""
+
+    @pytest.fixture(autouse=True)
+    def _labels(self):
+        with patch("matchypatchy.threads.match_object.load_model",
+                   return_value={"Any": "Any", "None": "None", "0": "Left", "1": "Right"}):
+            yield
+
+    def _filter(self, viewpoint):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.mpDB.select.return_value = []
+        dm._data_filtered = pd.DataFrame({"id": [10, 11, 12], "station_id": [1, 1, 1],
+                                          "viewpoint": [0, 1, None], "individual_id": [None] * 3,
+                                          "favorite": [0, 0, 0]})
+        dm.filters = dict(dm.filters, active_viewpoint=viewpoint)
+        DisplayMedia.filter_data(dm)  # the helper mocks filter_data
+        return dm._data_filtered["id"].tolist()
+
+    def test_left_shows_left_labelled_rois(self):
+        assert self._filter((1, "Left")) == [10]
+
+    def test_right_shows_right_labelled_rois(self):
+        assert self._filter((2, "Right")) == [11]
+
+    def test_no_viewpoint_filter(self):
+        assert self._filter((0, "Viewpoint")) == [10, 11, 12]
+
+
+# ---------------------------------------------------------------------------
+# Selection across refresh
+# ---------------------------------------------------------------------------
+
+class TestSelectionAcrossRefresh:
+    def test_refresh_passes_selected_ids(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.media_table.selectedIds.return_value = [11]
+        dm._apply_sort = MagicMock()
+        DisplayMedia.refresh_table(dm)
+        assert dm.media_table.receiveData.call_args.kwargs["selected_ids"] == [11]
+
+
+# ---------------------------------------------------------------------------
+# Save
+# ---------------------------------------------------------------------------
+
+def _edit(rid, mid, reference, new_value):
+    from matchypatchy.database.media import EditObject
+    return EditObject(rid=rid, mid=mid, reference=reference, previous_value=None, new_value=new_value)
+
+
+class TestSave:
+    def _save(self, edits, data_type=1, edit_ok=True):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = data_type
+        dm._data_raw = _sample_roi_data()          # ids 10, 11 -> individual 100; 12 none
+        dm._data_filtered = dm._data_raw.iloc[[2]]  # 10 and 11 hidden by a filter
+        dm.edit_stack = list(edits)
+        dm.mpDB.edit_row.return_value = edit_ok
+        with patch("matchypatchy.gui.display_media.AlertPopup") as popup:
+            DisplayMedia.save(dm)
+        return dm, popup
+
+    def test_clearing_a_value_is_saved(self):
+        """Setting a name to Unknown or viewpoint to None stores NULL instead of being refused"""
+        dm, _ = self._save([_edit(10, 1, "individual_id", None), _edit(10, 1, "viewpoint", None)])
+        dm.mpDB.edit_row.assert_any_call("roi", 10, {"individual_id": None}, allow_none=True)
+        dm.mpDB.edit_row.assert_any_call("roi", 10, {"viewpoint": None}, allow_none=True)
+        assert dm.edit_stack == []
+
+    def test_media_columns_use_media_id(self):
+        dm, _ = self._save([_edit(10, 1, "comment", "")])
+        dm.mpDB.edit_row.assert_called_once_with("media", 1, {"comment": ""}, allow_none=True)
+
+    def test_media_view_edits_media(self):
+        dm, _ = self._save([_edit(None, 2, "external_id", "x")], data_type=0)
+        dm.mpDB.edit_row.assert_called_once_with("media", 2, {"external_id": "x"}, allow_none=True)
+
+    def test_sex_for_roi_hidden_by_filter(self):
+        dm, _ = self._save([_edit(10, 1, "sex", "F")])
+        dm.mpDB.edit_row.assert_called_once_with("individual", 100, {"sex": "F"}, allow_none=True)
+
+    def test_sex_follows_name_change_in_same_save(self):
+        dm, _ = self._save([_edit(12, 2, "individual_id", 7), _edit(12, 2, "sex", "M")])
+        assert dm.mpDB.edit_row.call_args_list[-1].args == ("individual", 7, {"sex": "M"})
+
+    def test_row_without_roi_id_is_skipped(self):
+        dm, _ = self._save([_edit(pd.NA, 1, "viewpoint", 1)])
+        dm.mpDB.edit_row.assert_not_called()
+
+    def test_failed_edits_are_kept_and_reported(self):
+        edit = _edit(10, 1, "viewpoint", 1)
+        dm, popup = self._save([edit], edit_ok=False)
+        assert dm.edit_stack == [edit]
+        popup.assert_called_once()
+
+    def test_reloads_after_saving(self):
+        dm, _ = self._save([_edit(10, 1, "viewpoint", 1)])
+        dm.refresh_table.assert_called_once_with(reload=True)
+
+
+class TestUndoButtonState:
+    def test_undo_last_edit_updates_buttons(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.edit_stack = [_edit(10, 1, "viewpoint", 1)]
+        DisplayMedia.undo(dm)
+        dm.button_undo.setEnabled.assert_called_with(False)
+
+
+class TestUpdateProject:
+    def test_switching_project_updates_table_and_drops_edits(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.edit_stack = [_edit(10, 1, "viewpoint", 1)]
+        cfg, db = MagicMock(), MagicMock()
+        DisplayMedia.update_project(dm, cfg, db)
+        assert dm.mpDB is db
+        dm.media_table.update_project.assert_called_once_with(cfg, db)
+        assert dm.edit_stack == []
+
+
+class TestMediaTableUpdateProject:
+    def test_uses_new_database_and_thumbnails(self):
+        from matchypatchy.gui.media_table import MediaTable
+        mt = MagicMock()
+        cfg, db = MagicMock(), MagicMock()
+        MediaTable.update_project(mt, cfg, db)
+        assert mt.mpDB is db
+        assert mt.thumbnail_dir is cfg.THUMBNAIL_DIR

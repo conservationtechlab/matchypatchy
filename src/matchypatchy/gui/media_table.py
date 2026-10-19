@@ -33,6 +33,12 @@ class MediaTable(QAbstractTableModel):
         self._columns = [x[0] for x in headers.values()]
         self._headers = [x[1] for x in headers.values()]
 
+    def update_project(self, cfg, mpDB):
+        """Point at another project's database and thumbnails"""
+        self.cfg = cfg
+        self.mpDB = mpDB
+        self.thumbnail_dir = cfg.THUMBNAIL_DIR
+
     def rowCount(self, parent=QModelIndex()):
         return len(self._data_filtered)
 
@@ -42,6 +48,12 @@ class MediaTable(QAbstractTableModel):
     def selectedRows(self):
         """Return a list of selected row indices based on the 'select' column."""
         return self._data_filtered.index[self._data_filtered['select'] == 1].tolist()
+
+    def selectedIds(self):
+        """Return the ids (roi or media) of rows ticked in the 'select' column."""
+        if self._data_filtered.empty or 'id' not in self._data_filtered.columns:
+            return []
+        return self._data_filtered.loc[self._data_filtered['select'] == 1, 'id'].tolist()
 
     def selectAll(self, select=True):
         """Select or deselect all rows based on the 'select' column."""
@@ -214,15 +226,19 @@ class MediaTable(QAbstractTableModel):
         self.dataChanged.emit(index, index, [role])
         return True
 
-    def receiveData(self, data, headers=None, selected_rows=None):
-        """Receiver of loaded data from the FetchTableThread"""
+    def receiveData(self, data, headers=None, selected_ids=None):
+        """
+        Receiver of loaded data from the FetchTableThread
+
+        selected_ids re-ticks rows by id, since row positions change when the
+        data is re-filtered or re-sorted
+        """
         self._data_filtered = data
         if headers is not None:
             self.updateHeaderDict(headers)
 
-        if selected_rows is not None:
-            self._data_filtered['select'] = 0
-            self._data_filtered.loc[selected_rows, 'select'] = 1
+        if selected_ids is not None and 'id' in self._data_filtered.columns:
+            self._data_filtered['select'] = self._data_filtered['id'].isin(selected_ids).astype(int)
 
         # Fetch and reset index for stations and individuals
         self.INDIVIDUALS = fetch_individual(self.mpDB)
