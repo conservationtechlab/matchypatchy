@@ -776,7 +776,7 @@ class MatchyPatchyDB():
             column_names = [col.replace(".", "_") for col in column_names]
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error(f"Failed all_media fetch: {error}")
+            self.logger.error(f"Failed stations fetch: {error}")
             return None, None
 
     def count(self, table):
@@ -832,7 +832,6 @@ class MatchyPatchyDB():
         try:
             cursor = self.db.cursor()
             command = f'DELETE FROM {table} WHERE {cond};'
-            print(command)
             cursor.execute(command)
             self.db.commit()
             self.logger.info(f"Deleted from {table} where {cond}")
