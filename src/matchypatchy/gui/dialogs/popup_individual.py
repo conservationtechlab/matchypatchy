@@ -69,9 +69,13 @@ class IndividualPopup(QDialog):
         self.list.clearContents()
         self.list.setRowCount(0)
         # Fetch individuals from the database
+        # group by the individual, not the roi side of the join: grouping on roi.individual_id
+        # folded every individual without rois into one NULL group
         self.individuals = self.mpDB._command("""SELECT individual.name, individual.id, COUNT(roi.individual_id) AS count
                                                  FROM individual LEFT JOIN roi ON roi.individual_id = individual.id
-                                                 GROUP BY roi.individual_id;""")
+                                                 GROUP BY individual.id;""")
+        if self.individuals is None:
+            self.individuals = []
         # get unidentified count
         self.nulls = self.mpDB.select("roi", "COUNT(*)", row_cond="individual_id IS NULL")[0][0]
         self.list.setRowCount(len(self.individuals) + 1)

@@ -10,6 +10,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail, THUMBNAIL_NOTFOUND
 from matchypatchy.database.media import get_sha256
+from matchypatchy.database.mpdb import sql_text
 
 
 # CSV MIGRATE ==================================================================
@@ -81,7 +82,9 @@ class CSVMigrateThread(QThread):
                                                comment=row.comment if not pd.isna(row.comment) else None)
 
                 if media_id == "duplicate_error":
-                    media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{row.filepath}"')[0][0]
+                    # already imported (eg. an earlier roi of the same file); media has no
+                    # filepath column, but the file's hash is unique
+                    media_id = self.mpDB.select("media", columns="id", row_cond=f"sha256='{hash}'")[0][0]
 
                 # save thumbnail for new media
                 media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
@@ -144,7 +147,7 @@ class CSVMigrateThread(QThread):
         """Get or create survey"""
         # get active survey
         try:
-            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
+            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name={sql_text(survey_name)}')[0][0]
         except IndexError:
             region_id = self.region(region_name) if not pd.isna(region_name) else None
             survey_id = self.mpDB.add_survey(str(survey_name), region_id, None, None)
@@ -153,7 +156,7 @@ class CSVMigrateThread(QThread):
     def region(self, region_name):
         """Get or create region"""
         try:
-            region_id = self.mpDB.select("region", columns="id", row_cond=f'name="{region_name}"')[0][0]
+            region_id = self.mpDB.select("region", columns="id", row_cond=f'name={sql_text(region_name)}')[0][0]
         except IndexError:
             region_id = self.mpDB.add_region(str(region_name), None)
         return region_id
@@ -164,7 +167,7 @@ class CSVMigrateThread(QThread):
             station_id = self.station_ref[old_station_id]
         except KeyError:
             try:
-                station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
+                station_id = self.mpDB.select("station", columns="id", row_cond=f'name={sql_text(station_name)}')[0][0]
             except IndexError:
                 station_id = self.mpDB.add_station(str(station_name),
                                                    lat if not pd.isna(lat) else None,
@@ -183,8 +186,7 @@ class CSVMigrateThread(QThread):
                 # get camera id from database if not in reference dictionary
                 try:
                     camera_name = str(camera_name).strip()
-                    camera_name = camera_name.replace("'", "''")
-                    row_cond = f"name = '{camera_name}'"
+                    row_cond = f"name={sql_text(camera_name)}"
                     rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
                     camera_id = rows[0][0]
                 # if not in database, add camera
@@ -206,7 +208,7 @@ class CSVMigrateThread(QThread):
             except KeyError:
                 # get individual id from database if not in reference dictionary
                 try:
-                    individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{name}"')[0][0]
+                    individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name={sql_text(name)}')[0][0]
                 # if not in database, add individual
                 except IndexError:
                     individual_id = self.mpDB.add_individual(str(name), sex if not pd.isna(sex) else None)
@@ -265,7 +267,7 @@ class CSVImportThread(QThread):
         # get common base directory for all images
         base_dir = self._get_base_dir(list(self.unique_images.groups.keys()))
         try:
-            base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir="{base_dir}"')[0][0]
+            base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir={sql_text(base_dir)}')[0][0]
         except IndexError:
             base_dir_id = self.mpDB.add_upload(base_dir)
 
@@ -440,11 +442,11 @@ class CSVImportThread(QThread):
 
         survey_id = None
         if self.selected_columns["survey"] is None:
-            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{self.active_survey}"')[0][0]
+            survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name={sql_text(self.active_survey)}')[0][0]
         else:
             survey_name = cache_key
             try:
-                survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name="{survey_name}"')[0][0]
+                survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name={sql_text(survey_name)}')[0][0]
             except IndexError:
                 region_name = exemplar.get(self.selected_columns["region"])
                 region_name = self._convert_to_str(region_name)
@@ -459,7 +461,7 @@ class CSVImportThread(QThread):
     def region(self, region_name):
         """Get or create region"""
         try:
-            region_id = self.mpDB.select("region", columns="id", row_cond=f'name="{region_name}"')[0][0]
+            region_id = self.mpDB.select("region", columns="id", row_cond=f'name={sql_text(region_name)}')[0][0]
         except IndexError:
             region_id = self.mpDB.add_region(str(region_name), None)
             if region_id is None:
@@ -474,7 +476,7 @@ class CSVImportThread(QThread):
         if station_name in self.station_ref:
             return self.station_ref[station_name]
         try:
-            station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
+            station_id = self.mpDB.select("station", columns="id", row_cond=f'name={sql_text(station_name)}')[0][0]
         except IndexError:
             lat = exemplar.get(self.selected_columns["lat"])
             lat = self._convert_to_float(lat)
@@ -497,7 +499,7 @@ class CSVImportThread(QThread):
                 return self.camera_ref[camera_name]
             camera_name = self._convert_to_str(camera_name)
             try:
-                camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name='{camera_name}'")[0][0]
+                camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name={sql_text(camera_name)}")[0][0]
             except IndexError:
                 camera_id = self.mpDB.add_camera(str(camera_name), station_id)
                 if camera_id is None:
@@ -562,7 +564,7 @@ class CSVImportThread(QThread):
             if individual_name in self.individual_ref:
                 return self.individual_ref[individual_name]
             try:
-                individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name="{individual_name}"')[0][0]
+                individual_id = self.mpDB.select("individual", columns="id", row_cond=f'name={sql_text(individual_name)}')[0][0]
             except IndexError:
                 sex = None
                 #TODO: limit sex to valid values
@@ -650,7 +652,7 @@ class FolderImportThread(QThread):
         # get base directory for the files being imported
         base_dir = self._get_base_dir(self.data['filepath'].tolist())
         try:
-            base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir="{base_dir}"')[0][0]
+            base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir={sql_text(base_dir)}')[0][0]
         except IndexError:
             base_dir_id = self.mpDB.add_upload(base_dir)
 
@@ -676,15 +678,13 @@ class FolderImportThread(QThread):
                 # get remaining information
                 if self.station_level > 0:
                     station_id = self.station(filepath, survey_id)
-                    # add camera if camera level provided, else None
-                    if self.camera_level > 0:
-                        camera_id = self.camera(filepath, station_id)
-
                 else:
                     # create default station if no station level and use for all media
                     if not self.default_station:
                         self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
                     station_id = self.default_station
+                # add camera if camera level provided (also under the default station), else None
+                camera_id = self.camera(filepath, station_id) if self.camera_level > 0 else None
 
                 # insert into table, force type
                 media_id = self.mpDB.add_media(base_dir_id,
@@ -693,7 +693,7 @@ class FolderImportThread(QThread):
                                                ext,
                                                str(timestamp),
                                                int(station_id),
-                                               camera_id=int(camera_id) if self.camera_level > 0 else None,
+                                               camera_id=int(camera_id) if camera_id is not None else None,
                                                sequence_id=None,
                                                external_id=None,
                                                comment=None)
@@ -724,7 +724,7 @@ class FolderImportThread(QThread):
         station_name = Path(filepath).parts[self.station_level]
         station_name = str(station_name)
         try:
-            station_id = self.mpDB.select("station", columns="id", row_cond=f'name="{station_name}"')[0][0]
+            station_id = self.mpDB.select("station", columns="id", row_cond=f'name={sql_text(station_name)}')[0][0]
         except IndexError:
             station_id = self.mpDB.add_station(station_name, None, None, survey_id)
         return station_id
@@ -733,7 +733,7 @@ class FolderImportThread(QThread):
         camera_name = Path(filepath).parts[self.camera_level]
         camera_name = str(camera_name)
         try:
-            camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name='{camera_name}'")[0][0]
+            camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name={sql_text(camera_name)}")[0][0]
         except IndexError:
             camera_id = self.mpDB.add_camera(camera_name, station_id)
 

@@ -19,6 +19,16 @@ from matchypatchy.database.setup import (setup_database, setup_chromadb, migrate
 from matchypatchy.database.location import TZ_CONVERT_DICT
 
 
+def sql_text(value):
+    """
+    Quote a value as an SQL string literal for row_cond strings
+
+    Escapes single quotes (O'Brien), and avoids double quotes, which SQLite
+    reads as a column name first (name="name" would match every row)
+    """
+    return "'" + str(value).replace("'", "''") + "'"
+
+
 class MatchyPatchyDB():
     """
     Class representing the MatchyPatchy database

@@ -143,8 +143,17 @@ class FilterBar(QWidget):
                 self.favorites_only = prefilter['favorites_only']
                 self.favorites.setChecked(self.favorites_only)
             if 'individual_id' in prefilter.keys():
-                self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
-                self.individual_select.setCurrentIndex(prefilter['individual_id'])
+                iid = prefilter['individual_id']
+                if iid == 0:
+                    # the "Unidentified" row in Manage Individuals
+                    self.unidentified_only = True
+                    self.unidentified.setChecked(True)
+                else:
+                    # individual_id is a database id; find its position in the list
+                    position = next((i for i, (ind_id, _) in enumerate(self.individual_list_ordered)
+                                     if ind_id == iid), 0)
+                    self.filters['active_individual'] = self.individual_list_ordered[position]
+                    self.individual_select.setCurrentIndex(position)
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
@@ -164,7 +173,13 @@ class FilterBar(QWidget):
     def select_survey(self):
         """Handle selection of a survey from the survey combobox."""
         self.filters['active_survey'] = self.survey_list_ordered[self.survey_select.currentIndex()]
-        self.filter_stations(survey_ids=[self.filters['active_survey']])
+        if self.survey_select.currentIndex() > 0:
+            self.filter_stations(survey_ids=[self.filters['active_survey']])
+        # back on the "Survey" placeholder: every survey of the active region, or all stations
+        elif self.region_select.currentIndex() > 0:
+            self.filter_stations(survey_ids=list(self.valid_surveys.items()))
+        else:
+            self.filter_stations()
 
     def select_station(self):
         """Handle selection of a station from the station combobox."""
@@ -215,16 +230,23 @@ class FilterBar(QWidget):
         self.survey_select.blockSignals(False)
 
     def filter_stations(self, survey_ids=None):
-        """Filter stations based on active survey(s)"""
+        """
+        Filter stations based on active survey(s)
+
+        survey_ids None means all stations; an empty list (a region without
+        surveys) means none
+        """
         # block signals while updating combobox
         self.station_select.blockSignals(True)
         self.station_select.clear()
-        if survey_ids:
+        if survey_ids is None:
+            self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
+        elif not survey_ids:
+            self.valid_stations = {}
+        else:
             survey_list = ",".join([str(s[0]) for s in survey_ids])
             selection = f'survey_id IN ({survey_list})'
             self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection))
-        else:
-            self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
 
         # Update station list to reflect active survey
         self.station_list_ordered = [(0, 'Station')] + list(self.valid_stations.items())

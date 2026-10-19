@@ -3,6 +3,8 @@ Popups to create or edit station
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QListWidget, QLineEdit, QLabel, QDialogButtonBox)
+from PyQt6.QtGui import QDoubleValidator
+from PyQt6.QtCore import QLocale
 from PyQt6 import QtCore, QtWidgets
 
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
@@ -30,6 +32,8 @@ class StationPopup(QDialog):
         self.button_del = QPushButton("Delete")
 
         button_new.clicked.connect(self.add)
+        # stations belong to a survey
+        button_new.setEnabled(bool(self.survey_id[0]))
         self.button_edit.clicked.connect(self.edit)
         self.button_del.clicked.connect(self.delete)
 
@@ -73,8 +77,10 @@ class StationPopup(QDialog):
         """Add new station"""
         dialog = StationFillPopup(self)
         if dialog.exec():
-            self.mpDB.add_station(dialog.get_name(), dialog.get_lat(),
-                                  dialog.get_long(), self.survey_id[0])
+            station_id = self.mpDB.add_station(dialog.get_name(), dialog.get_lat(),
+                                               dialog.get_long(), self.survey_id[0])
+            if station_id is None:
+                self._warn(f"Could not add station '{dialog.get_name()}', see the log for details.")
         del dialog
         # refresh the station list after adding a new station
         self.update()
@@ -88,10 +94,17 @@ class StationPopup(QDialog):
         dialog = StationFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
             replace_dict = {"name": dialog.get_name(), "lat": dialog.get_lat(), "long": dialog.get_long()}
-            self.mpDB.edit_row("station", station_id, replace_dict, allow_none=True)
+            if not self.mpDB.edit_row("station", station_id, replace_dict, allow_none=True):
+                self._warn(f"Could not save station '{dialog.get_name()}', see the log for details.")
         del dialog
         # refresh the station list after editing a station
         self.update()
+
+    def _warn(self, prompt):
+        """Show a single alert"""
+        dialog = AlertPopup(self, prompt)
+        dialog.exec()
+        del dialog
 
     def delete(self):
         """Delete selected station"""
@@ -109,7 +122,7 @@ class StationFillPopup(QDialog):
     """
     Popup dialog for adding or editing a station.
     """
-    def __init__(self, parent, name="", lat="", long=""):
+    def __init__(self, parent, name="", lat=None, long=None):
         super().__init__(parent)
         self.setWindowTitle("Edit station")
         layout = QVBoxLayout()
@@ -123,16 +136,17 @@ class StationFillPopup(QDialog):
         self.name.setText(name)
         layout.addWidget(self.name)
 
-        # latitude
+        # latitude / longitude: optional, stations imported from folders have none
         layout.addWidget(QLabel('Latitude'))
         self.lat = QLineEdit()
-        self.lat.setText(str(lat))
+        self.lat.setValidator(self._coordinate_validator(90))
+        self.lat.setText('' if lat is None else str(lat))
         layout.addWidget(self.lat)
 
-        # longitude
         layout.addWidget(QLabel('Longitude'))
         self.long = QLineEdit()
-        self.long.setText(str(long))
+        self.long.setValidator(self._coordinate_validator(180))
+        self.long.setText('' if long is None else str(long))
         layout.addWidget(self.long)
 
         # Ok/Cancel Buttons
@@ -155,24 +169,51 @@ class StationFillPopup(QDialog):
 
         self.setLayout(layout)
 
+    @staticmethod
+    def _coordinate_validator(limit):
+        """Validator for a coordinate within +-limit, '.' as decimal point"""
+        validator = QDoubleValidator(-limit, limit, 8)
+        validator.setNotation(QDoubleValidator.Notation.StandardNotation)
+        validator.setLocale(QLocale.c())
+        return validator
+
+    @staticmethod
+    def _coordinate(text, limit):
+        """Coordinate text to float, None when empty; ValueError if not a coordinate"""
+        text = text.strip()
+        if not text:
+            return None
+        value = float(text)
+        if not -limit <= value <= limit:
+            raise ValueError(f"{value} outside +-{limit}")
+        return value
+
+    def _valid(self):
+        """Name given and coordinates empty or valid"""
+        try:
+            self._coordinate(self.lat.text(), 90)
+            self._coordinate(self.long.text(), 180)
+        except ValueError:
+            return False
+        return bool(self.get_name())
+
     def checkInput(self):
-        """Check if all input fields have values and enable/disable the OK button accordingly"""
-        # year end not necessary
-        self.okButton.setEnabled(bool(self.get_name() and self.get_lat() and self.get_long()))
+        """Enable the OK button when a name is given and coordinates are empty or valid"""
+        self.okButton.setEnabled(self._valid())
 
     def get_name(self):
         """Get the name value"""
         return self.name.text()
 
     def get_lat(self):
-        """Get the latitude value"""
-        return self.lat.text()
+        """Latitude as float, None when empty"""
+        return self._coordinate(self.lat.text(), 90)
 
     def get_long(self):
-        """Get the longitude value"""
-        return self.long.text()
+        """Longitude as float, None when empty"""
+        return self._coordinate(self.long.text(), 180)
 
     def accept_verify(self):
-        """Verify the input fields and accept the dialog if all fields have values"""
-        if self.get_name() and self.get_lat() and self.get_long():
+        """Accept the dialog if a name is given and coordinates are valid"""
+        if self._valid():
             self.accept()
