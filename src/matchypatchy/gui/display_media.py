@@ -499,37 +499,58 @@ class DisplayMedia(QWidget):
         if len(self.edit_stack) > 0:
             print("Undoing last edit:", self.edit_stack[-1])
             self.edit_stack.pop()
+            self.check_undo_button()
             self.refresh_table()
 
     # EDIT POPUP ---------------------------------------------------------------
 
-    def save(self):
-        """Save changes to the media table in queue order rather than stack"""
-        #self.media_table.save_changes()
-        for edit in self.edit_stack:
-            replace_dict = {edit.reference: edit.new_value}
-            # roi view
-            if self.data_type == 1:
-                # edit media table value
-                if edit.reference in {'station_id', 'sequence_id', 'external_id', 'comment'}:
-                    self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
-                # edit individual table value
-                elif edit.reference in {'sex'}:
-                    iid = self._data_filtered.loc[self._data_filtered['id'] == edit.rid, 'individual_id'].values[0]
-                    iid = int(iid) if pd.notna(iid) else None
-                    if iid is not None:
-                        self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
-                # edit roi table value
-                else:
-                    self.mpDB.edit_row("roi", edit.rid, replace_dict, allow_none=False, quiet=False)
-            # media view
-            else:
-                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
+    # media table columns edited from the roi view
+    MEDIA_COLUMNS = {'station_id', 'sequence_id', 'external_id', 'comment'}
 
-        # reload data and refresh table
-        self.edit_stack = []
-        #self.clear_and_load_contents(self.data_type)
+    def save(self):
+        """Save changes to the database in the order they were made"""
+        failed = []
+        # individual_id edits applied so far, so a later sex edit targets the new individual
+        assigned_iids = {}
+        for edit in self.edit_stack:
+            if not self._save_edit(edit, assigned_iids):
+                failed.append(edit)
+
+        # keep unsaved edits so they are not silently lost
+        self.edit_stack = failed
         self.check_undo_button()
+        if failed:
+            dialog = AlertPopup(self, prompt=f"{len(failed)} change(s) could not be saved, see the log for details.")
+            dialog.exec()
+            del dialog
+        # reload so filters and undo work from the saved values
+        self.refresh_table(reload=True)
+
+    def _save_edit(self, edit, assigned_iids):
+        """Write one EditObject to the database, return False if it failed"""
+        replace_dict = {edit.reference: edit.new_value}
+        # media view, or media columns from the roi view
+        if self.data_type == 0 or edit.reference in self.MEDIA_COLUMNS:
+            return self.mpDB.edit_row("media", int(edit.mid), replace_dict, allow_none=True)
+        # rows without a roi id (eg. the full video row) have nothing to update
+        if edit.rid is None or pd.isna(edit.rid):
+            return True
+        rid = int(edit.rid)
+        if edit.reference == 'sex':
+            # look up in the unfiltered data, the roi may be hidden by the current filter
+            if rid in assigned_iids:
+                iid = assigned_iids[rid]
+            else:
+                rows = self._data_raw.loc[self._data_raw['id'] == rid, 'individual_id']
+                iid = rows.iloc[0] if len(rows) else None
+            if iid is None or pd.isna(iid):
+                return True  # no individual to update
+            return self.mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
+        # roi columns; individual_id and viewpoint may be cleared (Unknown / None)
+        ok = self.mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
+        if ok and edit.reference == 'individual_id':
+            assigned_iids[rid] = edit.new_value
+        return ok
 
     def edit_row(self, row):
         """Edit a single row"""

@@ -347,3 +347,72 @@ class TestSelectionAcrossRefresh:
         dm._apply_sort = MagicMock()
         DisplayMedia.refresh_table(dm)
         assert dm.media_table.receiveData.call_args.kwargs["selected_ids"] == [11]
+
+
+# ---------------------------------------------------------------------------
+# Save
+# ---------------------------------------------------------------------------
+
+def _edit(rid, mid, reference, new_value):
+    from matchypatchy.database.media import EditObject
+    return EditObject(rid=rid, mid=mid, reference=reference, previous_value=None, new_value=new_value)
+
+
+class TestSave:
+    def _save(self, edits, data_type=1, edit_ok=True):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = data_type
+        dm._data_raw = _sample_roi_data()          # ids 10, 11 -> individual 100; 12 none
+        dm._data_filtered = dm._data_raw.iloc[[2]]  # 10 and 11 hidden by a filter
+        dm.edit_stack = list(edits)
+        dm.mpDB.edit_row.return_value = edit_ok
+        with patch("matchypatchy.gui.display_media.AlertPopup") as popup:
+            DisplayMedia.save(dm)
+        return dm, popup
+
+    def test_clearing_a_value_is_saved(self):
+        """Setting a name to Unknown or viewpoint to None stores NULL instead of being refused"""
+        dm, _ = self._save([_edit(10, 1, "individual_id", None), _edit(10, 1, "viewpoint", None)])
+        dm.mpDB.edit_row.assert_any_call("roi", 10, {"individual_id": None}, allow_none=True)
+        dm.mpDB.edit_row.assert_any_call("roi", 10, {"viewpoint": None}, allow_none=True)
+        assert dm.edit_stack == []
+
+    def test_media_columns_use_media_id(self):
+        dm, _ = self._save([_edit(10, 1, "comment", "")])
+        dm.mpDB.edit_row.assert_called_once_with("media", 1, {"comment": ""}, allow_none=True)
+
+    def test_media_view_edits_media(self):
+        dm, _ = self._save([_edit(None, 2, "external_id", "x")], data_type=0)
+        dm.mpDB.edit_row.assert_called_once_with("media", 2, {"external_id": "x"}, allow_none=True)
+
+    def test_sex_for_roi_hidden_by_filter(self):
+        dm, _ = self._save([_edit(10, 1, "sex", "F")])
+        dm.mpDB.edit_row.assert_called_once_with("individual", 100, {"sex": "F"}, allow_none=True)
+
+    def test_sex_follows_name_change_in_same_save(self):
+        dm, _ = self._save([_edit(12, 2, "individual_id", 7), _edit(12, 2, "sex", "M")])
+        assert dm.mpDB.edit_row.call_args_list[-1].args == ("individual", 7, {"sex": "M"})
+
+    def test_row_without_roi_id_is_skipped(self):
+        dm, _ = self._save([_edit(pd.NA, 1, "viewpoint", 1)])
+        dm.mpDB.edit_row.assert_not_called()
+
+    def test_failed_edits_are_kept_and_reported(self):
+        edit = _edit(10, 1, "viewpoint", 1)
+        dm, popup = self._save([edit], edit_ok=False)
+        assert dm.edit_stack == [edit]
+        popup.assert_called_once()
+
+    def test_reloads_after_saving(self):
+        dm, _ = self._save([_edit(10, 1, "viewpoint", 1)])
+        dm.refresh_table.assert_called_once_with(reload=True)
+
+
+class TestUndoButtonState:
+    def test_undo_last_edit_updates_buttons(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.edit_stack = [_edit(10, 1, "viewpoint", 1)]
+        DisplayMedia.undo(dm)
+        dm.button_undo.setEnabled.assert_called_with(False)
