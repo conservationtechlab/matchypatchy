@@ -206,3 +206,39 @@ class TestNoQueryGuards:
         DisplayCompare.check_matchthread_success(dc, False)
         dc.warn.assert_called_once_with(prompt="No matches found within filter.")
         dc.change_query.assert_not_called()
+
+
+class TestModeSwitching:
+    def test_teardown_handles_qc_and_manual_containers(self):
+        """QC/manual containers have no thread signals or stop_calculation"""
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.QueryContainer = MagicMock(spec=["deleteLater"])
+        DisplayCompare._teardown_query_container(dc)
+        assert dc.QueryContainer is None
+
+    def test_entering_qc_tears_down_previous_container(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        with patch(f"{DC}.fetch_individual") as fetch, patch(f"{DC}.QC_QueryContainer"):
+            fetch.return_value.empty = False
+            DisplayCompare.compare_by_individual(dc)
+        dc._teardown_query_container.assert_called_once()
+
+    def test_manual_apply_filters_keeps_selection(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.compare_type = "manual"
+        dc.QueryContainer.selected_ids = [10, 11]
+        DisplayCompare.filter_neighbors(dc)
+        dc.compare_manual.assert_called_once_with(selected_ids=[10, 11])
+
+    def test_manual_filter_removing_everything_warns(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        with patch(f"{DC}.ManualQueryContainer") as cls:
+            cls.return_value.load_data.return_value = True
+            cls.return_value.filter.return_value = False
+            DisplayCompare.compare_manual(dc, selected_ids=[10, 11])
+        dc.change_query.assert_not_called()
+        dc.warn.assert_called_once()

@@ -377,13 +377,17 @@ class DisplayCompare(QWidget):
         qc = getattr(self, "QueryContainer", None)
         if qc is None:
             return
-        # stop receiving signals from the old container
-        for sig in (qc.progress_update, qc.thread_signal):
+        # stop receiving signals from the old container (QC/manual containers have none)
+        for name in ("progress_update", "thread_signal"):
+            sig = getattr(qc, name, None)
+            if sig is None:
+                continue
             try:
                 sig.disconnect()
             except (TypeError, RuntimeError):
                 pass
-        qc.stop_calculation()
+        if hasattr(qc, "stop_calculation"):
+            qc.stop_calculation()
         # block until the worker thread really finishes
         thread = getattr(qc, "match_thread", None)  # adjust to your attribute name
         if thread is not None and thread.isRunning():
@@ -446,6 +450,7 @@ class DisplayCompare(QWidget):
         if not fetch_individual(self.mpDB).empty:
             self.compare_type = 'qc'
             self.button_match_favorites.setVisible(False)  # hide favorite toggle
+            self._teardown_query_container()
             self.QueryContainer = QC_QueryContainer(self)
             self.filterbar.individual_visible(True)
             self.QueryContainer.load_data()
@@ -467,10 +472,10 @@ class DisplayCompare(QWidget):
         self.compare_type = 'manual'
         self.button_match_favorites.setVisible(False)  # hide favorite toggle
         self.filterbar.individual_visible(False)
+        self._teardown_query_container()
         self.QueryContainer = ManualQueryContainer(self, selected_ids=selected_ids)  # re-establish object
         emb_exist = self.QueryContainer.load_data()
-        if emb_exist:
-            self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations)
+        if emb_exist and self.QueryContainer.filter(filter_dict=self.filters, valid_stations=self.valid_stations):
             self.QueryContainer.calculate_neighbors()
             self.change_query(0)
         else:
@@ -509,7 +514,8 @@ class DisplayCompare(QWidget):
         if self.compare_type == 'qc':
             self.compare_by_individual()
         elif self.compare_type == 'manual':
-            self.compare_manual()
+            # keep the rois selected in the media view
+            self.compare_manual(selected_ids=self.QueryContainer.selected_ids)
         else:
             self.initialize()
 
