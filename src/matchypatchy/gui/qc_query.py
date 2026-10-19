@@ -30,6 +30,9 @@ class QC_QueryContainer(BaseQueryContainer):
 
         self.current_query_rois = []
         self.current_match_rois = []
+        # full lists for the query, before viewpoint filtering
+        self._all_query_rois = []
+        self._all_match_rois = []
         self.current_query = 0
         self.current_match = 0
         self.current_query_sn = 0
@@ -134,7 +137,8 @@ class QC_QueryContainer(BaseQueryContainer):
         self.current_query = n
         # get corresponding sequence_id and rois
         current_sequence_id = self.ranked_sequences[self.current_query][0]
-        self.current_query_rois = self.individuals[current_sequence_id]
+        self._all_query_rois = list(self.individuals[current_sequence_id])
+        self.current_query_rois = list(self._all_query_rois)
         # set view to first in sequence
         self.set_within_query_sequence(0)
         # update matches
@@ -161,7 +165,8 @@ class QC_QueryContainer(BaseQueryContainer):
         Update match list if current_query changes
         """
         # get all matches for query
-        self.current_match_rois = self.current_query_rois
+        self._all_match_rois = list(self._all_query_rois)
+        self.current_match_rois = list(self.current_query_rois)
 
         # set to top of matches, skip the first one which will be on the query side
         self.set_match(1)
@@ -170,6 +175,8 @@ class QC_QueryContainer(BaseQueryContainer):
         """
         Set the curent match index and id
         """
+        if not self.current_match_rois:
+            return
         # wrap around
         if n < 0:
             n = len(self.current_match_rois) - 1
@@ -178,29 +185,6 @@ class QC_QueryContainer(BaseQueryContainer):
 
         self.current_match = n
         self.current_match_rid = self.current_match_rois[self.current_match]
-
-    # VIEWPOINT ----------------------------------------------------------------
-
-    def toggle_viewpoint(self, selected_viewpoint):
-        """Set the selected viewpoint filter and update rois"""
-        data = self.data.loc[self.current_query_rois]
-        query_viewpoint_map = dict(zip(data.index, data['viewpoint']))
-
-        self.selected_viewpoint = selected_viewpoint
-        if self.selected_viewpoint == 1:
-            # if selected_viewpoint is all, show all rois
-            return True
-        else:
-            # adjust numbering
-            self.selected_viewpoint = 1 if self.selected_viewpoint == 2 else selected_viewpoint
-            self.current_query_rois = [rid for rid in self.current_query_rois if query_viewpoint_map[rid] == self.selected_viewpoint]
-            self.current_match_rois = [rid for rid in self.current_match_rois if query_viewpoint_map[rid] == self.selected_viewpoint]
-            if not self.current_query_rois or not self.current_match_rois:
-                return False
-            else:
-                self.set_within_query_sequence(0)
-                self.update_matches()
-                return True
 
     # RETURN INFO --------------------------------------------------------------
     def current_distance(self):

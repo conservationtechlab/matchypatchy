@@ -108,3 +108,61 @@ class TestLookupFallback:
         container.data = container.data.loc[[10]]
         assert container.get_info(12, "sequence_id") == 101
         assert container.get_info(12)["sequence_id"] == 101
+
+
+VIEWPOINTS = {"Any": "Any", "None": "None", "0": "Right", "1": "Left"}
+LEFT, ANY, RIGHT = 0, 1, 2  # compare view toggle positions
+
+
+@pytest.fixture
+def viewpoint_labels():
+    with patch("matchypatchy.threads.match_object.load_model", return_value=VIEWPOINTS):
+        yield
+
+
+class TestViewpointToggle:
+    """Stored viewpoints: 10 Left(1), 11 Right(0), 12 Left(1), 13 None, 14 Right(0)"""
+
+    def test_toggle_positions_follow_model_labels(self, viewpoint_labels):
+        from matchypatchy.threads.match_object import toggle_viewpoint_value
+        assert toggle_viewpoint_value(LEFT) == 1
+        assert toggle_viewpoint_value(RIGHT) == 0
+        assert toggle_viewpoint_value(ANY) is None
+
+    def test_match_object_left_shows_left_labelled_rois(self, viewpoint_labels):
+        from matchypatchy.threads.match_object import MatchObject
+        query = pd.DataFrame({"id": [10, 11], "viewpoint": [1, 0]})
+        matches = pd.DataFrame({"id": [12, 14], "viewpoint": [1, 0]})
+        mo = MatchObject(1, [(12, 0.1), (14, 0.2)], query, matches)
+        mo.og_ranked_query_rids, mo.og_ranked_matches = [10, 11], [(12, 0.1), (14, 0.2)]
+        assert mo.show_viewpoint(LEFT) is True
+        assert mo.ranked_query_rids == [10] and mo.ranked_matches == [(12, 0.1)]
+        assert mo.show_viewpoint(RIGHT) is True
+        assert mo.ranked_query_rids == [11] and mo.ranked_matches == [(14, 0.2)]
+
+    def test_manual_left_then_any_restores(self, viewpoint_labels):
+        container = _container("manual")
+        container.set_query(0)  # query roi 10 (Left), matches all rois
+        assert container.toggle_viewpoint(LEFT) is True
+        assert container.current_query_rois == [10]
+        assert container.current_match_rois == [10, 12]
+        assert container.toggle_viewpoint(ANY) is True
+        assert container.current_match_rois == [10, 11, 12, 13, 14]
+
+    def test_manual_unavailable_viewpoint_keeps_all(self, viewpoint_labels):
+        container = _container("manual")
+        container.set_query(0)  # roi 10 is Left, so no Right query
+        assert container.toggle_viewpoint(RIGHT) is False
+        assert container.current_query_rois == [10]
+        assert container.current_match_rois == [10, 11, 12, 13, 14]
+        # navigation still works afterwards
+        container.set_match(container.current_match + 1)
+
+    def test_qc_left_then_any_restores(self, viewpoint_labels):
+        container = _container("qc")
+        container.set_query(0)
+        all_rois = list(container.current_query_rois)
+        assert container.toggle_viewpoint(LEFT) is True
+        assert all(container.data.loc[r, "viewpoint"] == 1 for r in container.current_query_rois)
+        assert container.toggle_viewpoint(ANY) is True
+        assert container.current_query_rois == all_rois

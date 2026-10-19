@@ -6,6 +6,7 @@ from PyQt6.QtCore import QObject
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.location import fetch_station_names_from_id
+from matchypatchy.threads.match_object import toggle_viewpoint_value
 
 
 class BaseQueryContainer(QObject):
@@ -97,6 +98,33 @@ class BaseQueryContainer(QObject):
                 info_dict['Viewpoint'] = 'Unknown'
 
         return info_dict
+
+    # VIEWPOINT ----------------------------------------------------------------
+    def toggle_viewpoint(self, selected_viewpoint):
+        """
+        Show only rois of the selected viewpoint (toggle 0 Left, 1 Any, 2 Right)
+
+        Filters from the full query/match lists each time, so switching back to Any
+        restores them. Returns False and shows all rois if the viewpoint has none.
+        Subclasses set _all_query_rois and _all_match_rois when the query changes.
+        """
+        self.selected_viewpoint = selected_viewpoint
+        query_rois, match_rois = list(self._all_query_rois), list(self._all_match_rois)
+        available = True
+        if selected_viewpoint != 1:
+            value = toggle_viewpoint_value(selected_viewpoint)
+            query_vp = [r for r in query_rois if value is not None and self._get_roi_field(r, 'viewpoint') == value]
+            match_vp = [r for r in match_rois if value is not None and self._get_roi_field(r, 'viewpoint') == value]
+            if query_vp and match_vp:
+                query_rois, match_rois = query_vp, match_vp
+            else:
+                available = False
+        self.current_query_rois = query_rois
+        self.current_match_rois = match_rois
+        self.set_within_query_sequence(0)
+        # first match is shown on the query side
+        self.set_match(1)
+        return available
 
     # MATCH STATE --------------------------------------------------------------
     def is_existing_match(self):

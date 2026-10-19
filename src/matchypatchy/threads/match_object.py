@@ -1,6 +1,24 @@
 """
 Class definition for MatchObject and FavoriteMatchObject
 """
+from matchypatchy.threads.model_download_thread import load_model
+
+# Compare view viewpoint toggle positions
+VIEWPOINT_TOGGLE = {0: 'Left', 1: 'Any', 2: 'Right'}
+
+
+def toggle_viewpoint_value(selected):
+    """
+    Stored viewpoint value for a compare view toggle position, None for Any
+
+    Stored values are viewpoint model classes, labelled in models.yml VIEWPOINTS
+    (eg. '0': Right, '1': Left), so the toggle must go through the labels
+    """
+    label = VIEWPOINT_TOGGLE.get(selected)
+    for value, name in load_model('VIEWPOINTS').items():
+        if name == label and value.isdigit():
+            return int(value)
+    return None
 
 
 class MatchObject():
@@ -129,7 +147,7 @@ class MatchObject():
             self.ranked_query_rids = self.og_ranked_query_rids
             return True
         else:
-            selected_viewpoint = 1 if selected_viewpoint == 2 else selected_viewpoint  # adjust for 1:any indexing in GUI
+            selected_viewpoint = toggle_viewpoint_value(selected_viewpoint)
             available_queries = [rid for rid in self.og_ranked_query_rids if self.query_viewpoint_map[rid] == selected_viewpoint]
             available_matches = [match for match in self.og_ranked_matches if self.match_viewpoint_map[match[0]] == selected_viewpoint]
 
@@ -216,7 +234,7 @@ class FavoriteMatchObject():
             self.ranked_query_rids = self.og_ranked_query_rids
             return True
         else:
-            selected_viewpoint = 1 if selected_viewpoint == 2 else selected_viewpoint  # adjust for 1:any indexing in GUI
+            selected_viewpoint = toggle_viewpoint_value(selected_viewpoint)
             available_queries = [rid for rid in self.og_ranked_query_rids if self.query_viewpoint_map[rid] == selected_viewpoint]
             available_matches = [match for match in self.og_ranked_matches if self.match_viewpoint_map[match[0]] == selected_viewpoint]
 
