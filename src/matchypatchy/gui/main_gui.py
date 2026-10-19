@@ -257,14 +257,8 @@ class MainWindow(QMainWindow):
     # EDIT =====================================================================
 
     def load_home_dir(self):
-        """Load last selected path or use default"""
-        saved_path = self.settings.value("home_dir", None)  # None is default
-        if saved_path and Path(saved_path).exists():
-            return saved_path
-        else:
-            path = str(Path.cwd()) + "/MatchyPatchy-Share"  # Fallback to current working directory
-            self.settings.setValue("home_dir", str(path))
-            return path
+        """Last selected project path, None if none was saved"""
+        return self.settings.value("home_dir", None)  # None is default
 
     def _open_project(self, home_dir):
         """Load config and database for a project folder, raise if either is unusable"""
@@ -278,11 +272,19 @@ class MainWindow(QMainWindow):
     def _startup_project(self):
         """Open the saved project, or fall back to a default project so the app can still launch"""
         saved_dir = self.load_home_dir()
-        candidates = [saved_dir,
-                      Path.cwd() / "MatchyPatchy-Share",
+        candidates = [Path.cwd() / "MatchyPatchy-Share",
                       Path.home() / "MatchyPatchy-Share"]
 
         failed = []
+        if saved_dir:
+            if Path(saved_dir).exists():
+                candidates.insert(0, saved_dir)
+            else:
+                # eg. an unmounted drive: opening it would create an empty project there,
+                # and the setting is kept so the project opens again once it's back
+                self.logger.error(f"Saved project folder {saved_dir} not found")
+                failed.append(str(saved_dir))
+
         for home_dir in candidates:
             if str(home_dir) in failed:
                 continue
@@ -294,6 +296,9 @@ class MainWindow(QMainWindow):
                 continue
             self.logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
             self.logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
+            # first launch: remember the default project
+            if not saved_dir:
+                self.settings.setValue("home_dir", str(home_dir))
             break
         else:
             raise RuntimeError(f"Could not load or create a project at any of: {failed}")
