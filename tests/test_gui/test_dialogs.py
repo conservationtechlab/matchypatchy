@@ -248,3 +248,56 @@ class TestAlertPopup:
         """AlertPopup should be importable (not raise ImportError)."""
         from matchypatchy.gui.dialogs.popup_alert import AlertPopup
         assert AlertPopup is not None
+
+
+# ---------------------------------------------------------------------------
+# ImportCSVPopup
+# ---------------------------------------------------------------------------
+
+def _csv_popup(tmp_path):
+    import pandas as pd
+    from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+    manifest = tmp_path / "manifest.csv"
+    pd.DataFrame({"filepath": ["a.jpg"], "timestamp": ["2024-01-01"], "station": ["S1"]}).to_csv(manifest, index=False)
+    parent = MagicMock()
+    parent.active_survey = (1, "Default Survey")
+    # the shared widget stub runs out of side effects when built repeatedly
+    with patch("matchypatchy.gui.dialogs.popup_import_csv.ComboBoxSeparator"):
+        return ImportCSVPopup(parent, str(manifest))
+
+
+class TestImportCSVSurvey:
+    def test_defaults_to_the_active_survey_not_a_column(self, tmp_path):
+        """The thread reads a non-None survey selection as a CSV column name"""
+        popup = _csv_popup(tmp_path)
+        assert popup.selections["survey"] is None
+
+    def test_switching_back_to_active_survey_rechecks_ok(self, tmp_path):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = MagicMock()
+        popup.selections = {"survey": "None"}
+        popup.survey.currentIndex.return_value = 0
+        ImportCSVPopup.select_survey(popup)
+        assert popup.selections["survey"] is None
+        popup.check_ok_button.assert_called_once()
+
+    def test_thread_uses_active_survey_for_none_selection(self):
+        """With the active survey selected, no survey named 'None' is created"""
+        from matchypatchy.threads.import_thread import CSVImportThread
+        thread = MagicMock()
+        thread.selected_columns = {"survey": None}
+        thread.active_survey = "Default Survey"
+        thread.survey_ref = {}
+        thread.mpDB.select.return_value = [(1,)]
+        assert CSVImportThread.survey(thread, {"filepath": "a.jpg"}) == 1
+        thread.mpDB.add_survey.assert_not_called()
+
+
+class TestImportCSVOkButton:
+    def test_ok_disabled_while_importing(self, tmp_path):
+        popup = _csv_popup(tmp_path)
+        popup.okButton = MagicMock()
+        popup.selections.update(filepath="filepath", timestamp="timestamp", station="station")
+        with patch("matchypatchy.gui.dialogs.popup_import_csv.CSVImportThread"):
+            popup.import_manifest()
+        popup.okButton.setEnabled.assert_called_with(False)

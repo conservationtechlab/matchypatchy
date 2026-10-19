@@ -71,7 +71,8 @@ class ImportCSVPopup(QDialog):
             self.columns = ["None"] + list(self.data.columns)
             self.survey_columns = [str(self.active_survey)] + self.columns
             self.selections = {
-                "survey": self.survey_columns[0],
+                # None = import into the active survey (first entry); otherwise a CSV column
+                "survey": None,
                 "filepath": self.columns[0],
                 "timestamp": self.columns[0],
                 "station": self.columns[0],
@@ -208,6 +209,7 @@ class ImportCSVPopup(QDialog):
         """Select the survey column from the CSV."""
         if self.survey.currentIndex() == 0:
             self.selections['survey'] = None
+            self.check_ok_button()
             return True
         else:
             try:
@@ -254,6 +256,8 @@ class ImportCSVPopup(QDialog):
         """
         Media entry (id, filepath, ext, timestamp, comment, station_id)
         """
+        # one import at a time; re-enabled when it reports back
+        self.okButton.setEnabled(False)
         # assert bbox in manifest.columns
         self.progress_bar.show()
         self.progress_bar.setTextVisible(True)
@@ -295,6 +299,7 @@ class ImportCSVPopup(QDialog):
         # Disconnect the import_manifest slot and connect the close slot to the accepted signal
         self.buttonBox.accepted.disconnect(self.import_manifest)
         self.buttonBox.accepted.connect(self.close)
+        self.okButton.setEnabled(True)
 
     def show_errors(self, errors):
         """
@@ -311,6 +316,7 @@ class ImportCSVPopup(QDialog):
         # Disconnect the import_manifest slot and connect the close slot to the accepted signal
         self.buttonBox.accepted.disconnect(self.import_manifest)
         self.buttonBox.accepted.connect(self.close)
+        self.okButton.setEnabled(True)
 
     def show_message(self, message):
         """Show progress messages from the import thread."""
