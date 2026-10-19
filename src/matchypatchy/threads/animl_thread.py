@@ -117,6 +117,9 @@ class AnimlThread(QThread):
             self.detector = animl.load_detector(self.md_filepath, device=self.device)
 
     def run(self):
+        # imported ROIs without a box stay as they are when there's no detector to find one
+        if self.detector is None:
+            self.rois = self.rois.iloc[0:0]
         # pull out images and videos from media
         self.prompt_update.emit("Extracting frames...")
         self.images = animl.get_images(self.media)
@@ -239,18 +242,22 @@ class AnimlThread(QThread):
         for media_id, video in self.videos.groupby('id'):
             if not self.isInterruptionRequested():
 
-                # one frame at a time: MegaDetector v1000 only returns detections
-                # for the first image of a batch
-                results = self._detect(video, batch_size=self.batch_size, calculate_clarity=True)
-                if results is None:
-                    self.progress_count += 1
-                    self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
-                    continue
-                results = animl.parse_detections(results, manifest=video, score=True)
-                detections = animl.get_animals(results)
+                # if no detector is selected, use the whole first frame as the ROI, as for images
+                if self.detector is None:
+                    top_frames = video.iloc[[0]].assign(bbox_x=0, bbox_y=0, bbox_w=1, bbox_h=1)
+                else:
+                    # one frame at a time: MegaDetector v1000 only returns detections
+                    # for the first image of a batch
+                    results = self._detect(video, batch_size=self.batch_size, calculate_clarity=True)
+                    if results is None:
+                        self.progress_count += 1
+                        self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+                        continue
+                    results = animl.parse_detections(results, manifest=video, score=True)
+                    detections = animl.get_animals(results)
 
-                # get best frames based on score, if there are fewer than n_frames, take all
-                top_frames = detections.nlargest(self.n_frames, 'score')
+                    # get best frames based on score, if there are fewer than n_frames, take all
+                    top_frames = detections.nlargest(self.n_frames, 'score')
 
                 for _, roi in top_frames.iterrows():
                     frame = roi['frame'] if 'frame' in roi.index else 0

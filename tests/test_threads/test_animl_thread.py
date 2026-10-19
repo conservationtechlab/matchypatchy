@@ -373,3 +373,50 @@ class TestAnimlThread:
         thread.detect_videos()
 
         assert batch_sizes == [1]
+
+    def test_detect_videos_uses_full_first_frame_when_detector_none(self, tmp_path, monkeypatch):
+        db = FakeDB()
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: None)
+        monkeypatch.setattr(animl_thread, "fetch_roi_media", lambda *_a, **_k: _empty_roi_media())
+        monkeypatch.setattr(animl_thread, "save_roi_thumbnail", lambda *_a, **_k: "thumb.jpg")
+
+        def _detect(detector, *_args, **_kwargs):
+            raise AssertionError("detect called without a detector")
+
+        monkeypatch.setattr(animl_thread.animl, "detect", _detect)
+        thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY=None)
+        thread.videos = pd.DataFrame([{"id": 5, "filepath": "/base/v.mp4", "ext": ".mp4", "frame": f}
+                                      for f in (3, 7)])
+        thread.to_process = 1
+        thread.progress_update = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.detect_videos()
+
+        assert db.add_roi_calls == [
+            ((5, 3, 0, 0, 1, 1), {"viewpoint": None, "individual_id": None, "emb": 0})
+        ]
+
+    def test_rois_without_box_are_left_when_detector_none(self, tmp_path, monkeypatch):
+        db = FakeDB()
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            animl_thread, "fetch_roi_media",
+            lambda *_a, **_k: pd.DataFrame([{"id": 10, "media_id": 1, "frame": 0, "bbox_x": -1, "bbox_y": -1,
+                                             "bbox_w": -1, "bbox_h": -1, "filepath": "/base/a.jpg", "ext": ".jpg"}]))
+
+        def _detect(detector, *_args, **_kwargs):
+            raise AssertionError("detect called without a detector")
+
+        monkeypatch.setattr(animl_thread.animl, "detect", _detect)
+        monkeypatch.setattr(animl_thread.animl, "get_images", lambda media: media)
+        monkeypatch.setattr(animl_thread.animl, "get_videos", lambda media: media)
+        monkeypatch.setattr(animl_thread.animl, "extract_frames", lambda videos, **_k: videos)
+        thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY=None)
+        thread.prompt_update = SignalSpy()
+        thread.progress_update = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert db.edit_row_calls == []
