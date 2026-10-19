@@ -558,3 +558,82 @@ class TestThresholdInput:
         SliderWithLabel.value_edit_changed(slider, "0.35")
         slider.slider.setValue.assert_called_once_with(35)
         slider.slider_value_changed.emit.assert_called_once_with(35)
+
+
+# ---------------------------------------------------------------------------
+# SurveyPopup
+# ---------------------------------------------------------------------------
+
+SURVEY = "matchypatchy.gui.dialogs.popup_survey"
+
+
+def _survey_popup(db):
+    from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+    popup = MagicMock()
+    popup.mpDB = db
+    popup._year = SurveyPopup._year
+    popup._region_id = lambda name, tz: SurveyPopup._region_id(popup, name, tz)
+    return popup
+
+
+def _fill(name, region, start="", end=""):
+    fill = MagicMock()
+    fill.exec.return_value = True
+    fill.get_name.return_value = name
+    fill.get_region.return_value = region
+    fill.get_timezone.return_value = "UTC"
+    fill.get_year_start.return_value = start
+    fill.get_year_end.return_value = end
+    return fill
+
+
+class TestSurveyPopup:
+    def _add(self, db, name, region, **years):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        popup = _survey_popup(db)
+        with patch(f"{SURVEY}.SurveyFillPopup", return_value=_fill(name, region, **years)):
+            SurveyPopup.add(popup)
+        return popup
+
+    def test_region_name_with_quote_is_reused(self, tmp_db):
+        db, _ = tmp_db
+        self._add(db, "A", "O'Brien")
+        popup = self._add(db, "B", "O'Brien")
+        regions = {r for (r,) in db.select("survey", "region_id", "name IN ('A', 'B')")}
+        assert len(regions) == 1 and None not in regions
+        popup._warn.assert_not_called()
+
+    def test_duplicate_survey_name_warns(self, tmp_db):
+        db, _ = tmp_db
+        self._add(db, "A", "R")
+        popup = self._add(db, "A", "R")
+        popup._warn.assert_called_once()
+
+    def test_empty_years_are_null(self, tmp_db):
+        db, _ = tmp_db
+        self._add(db, "A", "R", start="2020", end="")
+        assert db.select("survey", "year_start, year_end", "name='A'") == [(2020, None)]
+
+    def test_edit_survey_without_region(self, tmp_db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        db, _ = tmp_db
+        sid = db.add_survey("No Region", None, None, None)
+        popup = _survey_popup(db)
+        popup.survey_list_ordered = [(sid, "No Region")]
+        popup.list.currentRow.return_value = 0
+        with patch(f"{SURVEY}.SurveyFillPopup", return_value=_fill("No Region", "R")) as fill_cls:
+            SurveyPopup.edit(popup)
+        assert fill_cls.call_args.kwargs["region_name"] == ""
+        assert db.select("survey", "region_id", f"id={sid}")[0][0] is not None
+
+    def test_rename_to_existing_name_warns(self, tmp_db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        db, _ = tmp_db
+        sid = db.add_survey("A", 1, None, None)
+        db.add_survey("B", 1, None, None)
+        popup = _survey_popup(db)
+        popup.survey_list_ordered = [(sid, "A")]
+        popup.list.currentRow.return_value = 0
+        with patch(f"{SURVEY}.SurveyFillPopup", return_value=_fill("B", "Default Region")):
+            SurveyPopup.edit(popup)
+        popup._warn.assert_called_once()

@@ -12,6 +12,7 @@ from PyQt6.QtGui import QIntValidator
 from matchypatchy.database.location import TZ_CONVERT_DICT
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.database.media import media_count
+from matchypatchy.database.mpdb import sql_text
 
 
 class SurveyPopup(QDialog):
@@ -74,19 +75,38 @@ class SurveyPopup(QDialog):
             self.list.addItems([el[1] for el in self.survey_list_ordered])
         self.set_editdel()
 
+    def _warn(self, prompt):
+        """Show a single alert"""
+        dialog = AlertPopup(self, prompt)
+        dialog.exec()
+        del dialog
+
+    @staticmethod
+    def _year(text):
+        """Year field text to int, None when empty"""
+        return int(text) if text else None
+
+    def _region_id(self, name, timezone):
+        """Id of the region with this name, adding it if new; None if it couldn't be added"""
+        rows = self.mpDB.select("region", columns="id", row_cond=f"name={sql_text(name)}")
+        if rows:
+            return rows[0][0]
+        return self.mpDB.add_region(name, str(timezone))
+
     def add(self):
         """Add a new survey"""
         dialog = SurveyFillPopup(self)
         if dialog.exec():
-            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'")
-            if not region_id:
-                region_id = self.mpDB.add_region(dialog.get_region(), str(dialog.get_timezone()))
+            name = dialog.get_name()
+            region_id = self._region_id(dialog.get_region(), dialog.get_timezone())
+            if region_id is None:
+                self._warn(f"Could not add region '{dialog.get_region()}', see the log for details.")
             else:
-                region_id = region_id[0][0]
-            self.mpDB.add_survey(dialog.get_name(),
-                                 region_id,
-                                 dialog.get_year_start(),
-                                 dialog.get_year_end())
+                survey_id = self.mpDB.add_survey(name, region_id,
+                                                 self._year(dialog.get_year_start()),
+                                                 self._year(dialog.get_year_end()))
+                if survey_id is None:
+                    self._warn(f"Could not add survey '{name}', a survey with that name may already exist.")
         del dialog
         # refresh the survey list after adding a new survey
         self.update()
@@ -95,29 +115,28 @@ class SurveyPopup(QDialog):
         """Edit selected survey"""
         selected_survey = self.list.currentRow()
         survey_id = self.survey_list_ordered[selected_survey][0]
-        cond = f'survey.id={survey_id}'
-        row = self.mpDB.select_join('survey', 'region', 'survey.region_id=region.id',
-                                    columns='survey.id, survey.name, region.name, year_start, year_end',
-                                    row_cond=cond, quiet=False)[0]
-        name = row[0][1]
-        region_name = '' if row[0][2] is None else row[0][2]
-        year_start = '' if row[0][3] is None else row[0][3]
-        year_end = '' if row[0][4] is None else row[0][4]
+        # read the region separately, the survey may have none (region_id NULL)
+        name, region_id, year_start, year_end = self.mpDB.select(
+            'survey', columns='name, region_id, year_start, year_end', row_cond=f'id={survey_id}')[0]
+        region = self.mpDB.select('region', columns='name', row_cond=f'id={region_id}') if region_id is not None else []
+        region_name = region[0][0] if region else ''
 
-        dialog = SurveyFillPopup(self, name=name, region_name=region_name, year_start=year_start, year_end=year_end)
+        dialog = SurveyFillPopup(self, name=name, region_name=region_name,
+                                 year_start='' if year_start is None else year_start,
+                                 year_end='' if year_end is None else year_end)
 
-        if dialog.exec() and dialog.accepted:
-            region_id = self.mpDB.select("region", columns="id", row_cond=f"name='{dialog.get_region()}'")
-            if not region_id:
-                region_id = self.mpDB.add_region(dialog.get_region(), dialog.get_timezone())
+        if dialog.exec():
+            region_id = self._region_id(dialog.get_region(), dialog.get_timezone())
+            if region_id is None:
+                self._warn(f"Could not add region '{dialog.get_region()}', see the log for details.")
             else:
-                region_id = region_id[0][0]
-
-            replace_dict = {"name": dialog.get_name(),
-                            "region_id": region_id,
-                            "year_start": dialog.get_year_start(),
-                            "year_end": dialog.get_year_end()}
-            self.mpDB.edit_row("survey", survey_id, replace_dict, allow_none=True)
+                replace_dict = {"name": dialog.get_name(),
+                                "region_id": region_id,
+                                "year_start": self._year(dialog.get_year_start()),
+                                "year_end": self._year(dialog.get_year_end())}
+                if not self.mpDB.edit_row("survey", survey_id, replace_dict, allow_none=True):
+                    self._warn(f"Could not rename the survey to '{dialog.get_name()}', "
+                               "a survey with that name may already exist.")
         del dialog
         # refresh the survey list after editing a survey
         self.update()
