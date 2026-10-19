@@ -299,3 +299,37 @@ class TestUndoEdit:
         assert len(dm.edit_stack) == 0
         # Verify refresh_table was called (it's a mock)
         dm.refresh_table.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Viewpoint filter
+# ---------------------------------------------------------------------------
+
+class TestViewpointFilter:
+    """models.yml labels stored viewpoints '0': Right, '1': Left"""
+
+    @pytest.fixture(autouse=True)
+    def _labels(self):
+        with patch("matchypatchy.threads.match_object.load_model",
+                   return_value={"Any": "Any", "None": "None", "0": "Right", "1": "Left"}):
+            yield
+
+    def _filter(self, viewpoint):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.mpDB.select.return_value = []
+        dm._data_filtered = pd.DataFrame({"id": [10, 11, 12], "station_id": [1, 1, 1],
+                                          "viewpoint": [1, 0, None], "individual_id": [None] * 3,
+                                          "favorite": [0, 0, 0]})
+        dm.filters = dict(dm.filters, active_viewpoint=viewpoint)
+        DisplayMedia.filter_data(dm)  # the helper mocks filter_data
+        return dm._data_filtered["id"].tolist()
+
+    def test_left_shows_left_labelled_rois(self):
+        assert self._filter((1, "Left")) == [10]
+
+    def test_right_shows_right_labelled_rois(self):
+        assert self._filter((2, "Right")) == [11]
+
+    def test_no_viewpoint_filter(self):
+        assert self._filter((0, "Viewpoint")) == [10, 11, 12]

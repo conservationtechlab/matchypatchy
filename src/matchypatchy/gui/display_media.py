@@ -14,6 +14,7 @@ from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButto
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 from matchypatchy.threads.table_thread import FetchTableThread
 from matchypatchy.threads.model_download_thread import load_model
+from matchypatchy.threads.match_object import viewpoint_value
 
 
 class DisplayMedia(QWidget):
@@ -398,7 +399,9 @@ class DisplayMedia(QWidget):
         if self.data_type == 1:
             # Viewpoint Filter
             if self.filters['active_viewpoint'][0] > 0:
-                self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'] == self.filters['active_viewpoint'][0] - 1]
+                # filter by the stored value labelled with the selected side
+                value = viewpoint_value(self.filters['active_viewpoint'][1])
+                self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'] == value]
             elif self.filters['active_viewpoint'][0] is None:
                 self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'].isna()]
             # Individual Filter
