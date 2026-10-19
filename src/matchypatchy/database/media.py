@@ -191,32 +191,30 @@ def get_sequence(rid, roi_media):
     return sequence.index.to_list()
 
 
-def sequence_roi_dict(roi_media):
+def _group_roi_ids(roi_media, column):
     """
-    Return two lists of roi.ids
+    Map each value of column to the list of roi.ids (index) with that value
 
-    Group by capture, order by frame number
+    Keys keep first-appearance order. Null values map to an empty list.
+    Uses one groupby instead of filtering the whole frame once per row.
     """
-    sequence_dict = {}
-    sequence_ids = roi_media["sequence_id"].to_list()
-    for s in sequence_ids:
-        sequence = roi_media[roi_media['sequence_id'] == s]
-        sequence_dict[s] = sequence.index.to_list()
-    return sequence_dict
+    groups = roi_media.groupby(column, sort=False).indices
+    ids = roi_media.index
+    roi_dict = {}
+    for key in dict.fromkeys(roi_media[column].to_list()):
+        positions = groups.get(key)
+        roi_dict[key] = ids[positions].to_list() if positions is not None else []
+    return roi_dict
+
+
+def sequence_roi_dict(roi_media):
+    """Return dict of sequence_id: [roi.ids]"""
+    return _group_roi_ids(roi_media, "sequence_id")
 
 
 def individual_roi_dict(roi_media):
-    """
-    Return two lists of roi.ids
-
-    Group by capture, order by frame number
-    """
-    individual_dict = {}
-    individual_ids = roi_media["individual_id"].to_list()
-    for iid in individual_ids:
-        individual = roi_media[roi_media['individual_id'] == iid]
-        individual_dict[iid] = individual.index.to_list()
-    return individual_dict
+    """Return dict of individual_id: [roi.ids]"""
+    return _group_roi_ids(roi_media, "individual_id")
 
 
 def media_count(mpDB, survey_id):

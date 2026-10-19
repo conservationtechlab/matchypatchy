@@ -356,3 +356,12 @@ class TestSequenceHelpers:
         assert 10 in d[1]
         assert 11 in d[1]
         assert 12 in d[2]
+
+    def test_unassigned_rois_map_to_empty_list(self):
+        """ROIs without an individual are not grouped; the None key maps to an empty list"""
+        # fetch_roi_media returns nulls as None
+        roi_media = self._build_roi_media(ind_id=None).replace({float("nan"): None})
+        d = individual_roi_dict(roi_media)
+        assert list(d) == [None, 2]
+        assert d[None] == []
+        assert d[2] == [12]

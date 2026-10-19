@@ -131,7 +131,7 @@ class TestFetchStationNamesFromId:
     def test_returns_expected_keys(self, populated_db):
         db, _, ids = populated_db
         result = fetch_station_names_from_id(db, ids["station_id"])
-        for key in ["station_name", "suvery_id", "survey_name", "region_id", "region_name"]:
+        for key in ["station_name", "survey_id", "survey_name", "region_id", "region_name"]:
             assert key in result
 
     def test_station_name_correct(self, populated_db):

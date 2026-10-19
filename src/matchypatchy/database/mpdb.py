@@ -541,6 +541,9 @@ class MatchyPatchyDB():
             - allow_none (bool): if True, allows replacing with None
             - quiet (bool): if False, prints the executed command
         """
+        # nothing to change, an empty SET clause is invalid SQL
+        if not replace:
+            return True
         try:
             cursor = self.db.cursor()
             set_clauses = []
@@ -586,6 +589,9 @@ class MatchyPatchyDB():
         # so an illegal value can't leave a partially applied batch
         statements = []
         for row_id, replace in updates.items():
+            # nothing to change for this row, an empty SET clause is invalid SQL
+            if not replace:
+                continue
             set_clauses = []
             params = []
             for key, value in replace.items():
@@ -723,8 +729,10 @@ class MatchyPatchyDB():
             cursor = self.db.cursor()
             command = f"""SELECT m.*, u.base_dir || '{os.sep}' || m.relative_path AS filepath
                           FROM media m
-                          LEFT JOIN uploads u ON m.base_dir_id = u.id
-                          WHERE {row_cond};"""
+                          LEFT JOIN uploads u ON m.base_dir_id = u.id"""
+            if row_cond is not None:
+                command += f" WHERE {row_cond}"
+            command += ";"
             cursor.execute(command)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
@@ -801,7 +809,7 @@ class MatchyPatchyDB():
             column_names = [col.replace(".", "_") for col in column_names]
             return rows, column_names
         except sqlite3.Error as error:
-            self.logger.error(f"Failed all_media fetch: {error}")
+            self.logger.error(f"Failed stations fetch: {error}")
             return None, None
 
     def count(self, table):
@@ -857,7 +865,6 @@ class MatchyPatchyDB():
         try:
             cursor = self.db.cursor()
             command = f'DELETE FROM {table} WHERE {cond};'
-            print(command)
             cursor.execute(command)
             self.db.commit()
             self.logger.info(f"Deleted from {table} where {cond}")
