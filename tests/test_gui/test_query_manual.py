@@ -1,5 +1,5 @@
 """
-Unit tests for matchypatchy.gui.manual_query.ManualQueryContainer distances
+Unit tests for matchypatchy.gui.query_manual.ManualQueryContainer distances
 """
 import math
 from unittest.mock import MagicMock, patch
@@ -9,12 +9,12 @@ import pandas as pd
 
 def _make_mqc(similarities=None):
     """ManualQueryContainer with a mocked parent; similarities maps (id1, id2) -> similarity"""
-    from matchypatchy.gui.manual_query import ManualQueryContainer
+    from matchypatchy.gui.query_manual import ManualQueryContainer
 
     parent = MagicMock()
     similarities = similarities or {}
     parent.mpDB.calculate_similarity.side_effect = lambda a, b: similarities.get((a, b))
-    with patch("matchypatchy.gui.manual_query.load_model", return_value={}):
+    with patch("matchypatchy.gui.query_manual.load_model", return_value={}):
         mqc = ManualQueryContainer(parent, selected_ids=[])
     return mqc
 

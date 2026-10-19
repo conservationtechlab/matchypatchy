@@ -23,9 +23,9 @@ from matchypatchy.gui.dialogs.popup_pairx import PairXPopup
 from matchypatchy.gui.widgets.gui_assets import SequenceSelector, SliderWithLabel, VerticalSeparator, StandardButton, ThreePointSlider
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
-from matchypatchy.gui.query import QueryContainer
-from matchypatchy.gui.qc_query import QC_QueryContainer
-from matchypatchy.gui.manual_query import ManualQueryContainer
+from matchypatchy.gui.query_base import QueryContainer
+from matchypatchy.gui.query_qc import QC_QueryContainer
+from matchypatchy.gui.query_manual import ManualQueryContainer
 from matchypatchy.gui.widgets.gui_assets import NoHoverDelegate
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual

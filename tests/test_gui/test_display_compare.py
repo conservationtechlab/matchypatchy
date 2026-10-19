@@ -1,5 +1,5 @@
 """
-Unit tests for matchypatchy.gui.query.QueryContainer
+Unit tests for matchypatchy.gui.query_base.QueryContainer
 
 QueryContainer holds query/match navigation state and exposes pure-Python
 helper methods that can be exercised without a real Qt display server.
@@ -28,10 +28,10 @@ def _make_parent(db=None):
 
 def _make_qc(db=None):
     """Instantiate QueryContainer with a mocked parent."""
-    from matchypatchy.gui.query import QueryContainer
+    from matchypatchy.gui.query_base import QueryContainer
     parent = _make_parent(db)
-    with patch("matchypatchy.gui.query.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
-        with patch("matchypatchy.gui.query.MatchEmbeddingThread"):
+    with patch("matchypatchy.gui.query_base.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
+        with patch("matchypatchy.gui.query_base.MatchEmbeddingThread"):
             qc = QueryContainer(parent)
     return qc
 

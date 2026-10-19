@@ -1,11 +1,11 @@
 """
-Class Definition for Query Object
+Query container for QC mode (review the rois of each individual)
 """
 import pandas as pd
 from PyQt6.QtCore import pyqtSignal
 
 import matchypatchy.database.media as db_roi
-from matchypatchy.gui.query import BaseQueryContainer
+from matchypatchy.gui.query_base import BaseQueryContainer
 from matchypatchy.threads.model_download_thread import load_model
 
 

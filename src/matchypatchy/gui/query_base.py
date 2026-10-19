@@ -2,7 +2,7 @@
 Query containers for the compare view
 
 BaseQueryContainer holds what every mode shares; QueryContainer is the
-default (KNN) mode. QC and manual mode subclass BaseQueryContainer.
+default (KNN) mode. QC and manual mode live in query_qc.py and query_manual.py.
 """
 import json
 from pathlib import Path

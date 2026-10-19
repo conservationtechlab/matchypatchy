@@ -32,12 +32,12 @@ def _roi_media():
 def _container(kind):
     parent = MagicMock()
     if kind == "qc":
-        from matchypatchy.gui.qc_query import QC_QueryContainer as cls
-        module = "matchypatchy.gui.qc_query"
+        from matchypatchy.gui.query_qc import QC_QueryContainer as cls
+        module = "matchypatchy.gui.query_qc"
         args = ()
     else:
-        from matchypatchy.gui.manual_query import ManualQueryContainer as cls
-        module = "matchypatchy.gui.manual_query"
+        from matchypatchy.gui.query_manual import ManualQueryContainer as cls
+        module = "matchypatchy.gui.query_manual"
         args = ([10, 11, 12, 13, 14],)
     with patch(f"{module}.load_model", return_value={}):
         container = cls(parent, *args)
@@ -96,7 +96,7 @@ class TestRefreshData:
     def test_keeps_the_filtered_rows(self):
         container = _container("manual")
         container.data = container.data.loc[[10, 12]]
-        with patch("matchypatchy.gui.manual_query.db_roi.fetch_roi_media",
+        with patch("matchypatchy.gui.query_manual.db_roi.fetch_roi_media",
                    side_effect=lambda *a, **k: _roi_media()):
             container.refresh_data()
         assert sorted(container.data.index) == [10, 12]
