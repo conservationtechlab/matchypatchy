@@ -296,6 +296,25 @@ class TestSelectEditDeleteCount:
         row = db.select("individual", row_cond=f"id={ids['individual_id']}")[0]
         assert row[2] == "F"
 
+    def test_edit_row_empty_update_is_noop(self, populated_db):
+        db, _, ids = populated_db
+        before = db.select("individual", row_cond=f"id={ids['individual_id']}")
+        assert db.edit_row("individual", ids["individual_id"], {}) is True
+        assert db.select("individual", row_cond=f"id={ids['individual_id']}") == before
+
+    def test_batch_edit_skips_empty_updates(self, populated_db):
+        db, _, ids = populated_db
+        result = db.batch_edit("individual", {ids["individual_id"]: {"sex": "F"}, 99999: {}})
+        assert result is True
+        row = db.select("individual", row_cond=f"id={ids['individual_id']}")[0]
+        assert row[2] == "F"
+
+    def test_get_media_with_filepath_without_condition(self, populated_db):
+        db, _, ids = populated_db
+        rows, columns = db.get_media_with_filepath()
+        assert len(rows) == 1
+        assert "filepath" in columns
+
     def test_edit_row_sets_null(self, populated_db):
         db, _, ids = populated_db
         result = db.edit_row("individual", ids["individual_id"], {"sex": None}, allow_none=True)
