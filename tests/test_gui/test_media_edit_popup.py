@@ -205,3 +205,27 @@ class TestPopupFavorite:
         MediaEditPopup.favorite(dialog)
         assert dialog.edit_stack == []
         dialog.mpDB.edit_row.assert_not_called()
+
+
+class TestComment:
+    def test_pending_comment_is_emitted_before_switching_image(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = MagicMock()
+        panel.comment.timer.isActive.return_value = True
+        MetadataPanel.flush_comment(panel)
+        panel.comment.timer.stop.assert_called_once()
+        panel.change_comment.assert_called_once()
+
+    def test_nothing_pending(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = MagicMock()
+        panel.comment.timer.isActive.return_value = False
+        MetadataPanel.flush_comment(panel)
+        panel.change_comment.assert_not_called()
+
+    def test_ok_flushes_pending_comment(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+        dialog = MagicMock()
+        MediaEditPopup.save(dialog)
+        dialog.metadatapanel.flush_comment.assert_called_once()
+        dialog.accept.assert_called_once()

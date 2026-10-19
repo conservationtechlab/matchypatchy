@@ -127,6 +127,8 @@ class MediaEditPopup(QDialog):
 
     def save(self):
         """Save edits and close"""
+        # keep a comment typed just before pressing OK
+        self.metadatapanel.flush_comment()
         # stop video if playing
         self.image.player.stop()
         self.accept()
@@ -464,6 +466,8 @@ class MetadataPanel(QWidget):
 
     def refresh_values(self, current_image_index):
         """Refresh metadata values based on current image index"""
+        # keep a comment still being typed for the previous image
+        self.flush_comment()
         # disable comboboxes
         self.name.blockSignals(True)
         self.sex.blockSignals(True)
@@ -509,7 +513,8 @@ class MetadataPanel(QWidget):
             self.add_individual.setDisabled(True)
 
         # Comment
-        self.comment.setText(str(self.data.iloc[current_image_index]["comment"]))
+        comment = self.data.iloc[current_image_index]["comment"]
+        self.comment.setText("" if comment is None or pd.isna(comment) else str(comment))
 
         # renable comboboxes
         self.name.blockSignals(False)
@@ -643,6 +648,12 @@ class MetadataPanel(QWidget):
                               new_value=selected_viewpoint)
             self.send_edit(edit)
 
+    def flush_comment(self):
+        """Emit a comment edit still waiting on the typing timer"""
+        if self.comment.timer.isActive():
+            self.comment.timer.stop()
+            self.change_comment()
+
     def change_comment(self):
         """Update comment for all selected ROIS/media"""
         for row in self.data.itertuples():
@@ -653,7 +664,7 @@ class MetadataPanel(QWidget):
             edit = EditObject(rid=None,
                               mid=media_id,
                               reference='comment',
-                              previous_value=str(row.comment),
+                              previous_value=row.comment,
                               new_value=self.comment.toPlainText())
             self.send_edit(edit)
 
