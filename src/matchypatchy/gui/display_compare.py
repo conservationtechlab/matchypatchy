@@ -646,6 +646,9 @@ class DisplayCompare(QWidget):
         self.query_image_bar.reset()
         self.sequence_selector.set_current_number(self.QueryContainer.current_query_sn)
         self.load_query()
+        # in QC / manual the match moves on if it was the new query roi
+        if self.compare_type != 'default':
+            self.change_match(self.QueryContainer.current_match)
 
     def change_match(self, n):
         """Load nth match within the current match queue"""

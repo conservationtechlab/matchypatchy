@@ -144,37 +144,6 @@ class ManualQueryContainer(BaseQueryContainer):
         # update matches
         # self.update_matches()  not necessary
 
-    def set_within_query_sequence(self, n):
-        """
-        If the query sequence contains more than one image,
-        set the display to the nth element in the sequence
-        """
-        # wrap around
-        if n < 0:
-            n = len(self.current_query_rois) - 1
-        if n > len(self.current_query_rois) - 1:
-            n = 0
-
-        if self.current_query_rois:
-            self.current_query_sn = n  # number within sequence
-            self.current_query_rid = self.current_query_rois[self.current_query_sn]
-
-    # refresh match list
-    def set_match(self, n):
-        """
-        Set the curent match index and id
-        """
-        if not self.current_match_rois:
-            return
-        # wrap around
-        if n < 0:
-            n = len(self.current_match_rois) - 1
-        if n > len(self.current_match_rois) - 1:
-            n = 0
-
-        self.current_match = n
-        self.current_match_rid = self.current_match_rois[self.current_match]
-
     # RETURN INFO --------------------------------------------------------------
     def current_distance(self):
         """Return distance between current sequence and matchs"""

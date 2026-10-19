@@ -166,3 +166,35 @@ class TestViewpointToggle:
         assert all(container.data.loc[r, "viewpoint"] == 1 for r in container.current_query_rois)
         assert container.toggle_viewpoint(ANY) is True
         assert container.current_query_rois == all_rois
+
+
+class TestNoSelfComparison:
+    def test_manual_match_is_never_the_query(self):
+        container = _container("manual")
+        for n in range(container.n_queries):
+            container.set_query(n)
+            for _ in range(len(container.current_match_rois)):
+                assert container.current_match_rid != container.current_query_rid
+                container.set_match(container.current_match + 1)
+
+    def test_backwards_navigation_skips_query_too(self):
+        container = _container("manual")
+        container.set_query(2)  # query roi 12
+        for _ in range(len(container.current_match_rois)):
+            container.set_match(container.current_match - 1)
+            assert container.current_match_rid != 12
+
+    def test_qc_moving_query_moves_match_off_it(self):
+        container = _container("qc")
+        container.set_query(0)  # individual with two rois
+        container.set_within_query_sequence(1)
+        assert container.current_match_rid != container.current_query_rid
+
+    def test_qc_distance_is_query_match_similarity(self):
+        container = _container("qc")
+        container.current_query_rid, container.current_match_rid = 10, 11
+        container.mpDB.calculate_similarity.return_value = 0.75
+        assert container.current_distance() == pytest.approx(0.25)
+        container.mpDB.calculate_similarity.assert_called_with(10, 11)
+        container.mpDB.calculate_similarity.return_value = None
+        assert container.current_distance() is None

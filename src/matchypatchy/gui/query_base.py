@@ -99,6 +99,30 @@ class BaseQueryContainer(QObject):
 
         return info_dict
 
+    # NAVIGATION (QC and manual; the default container has its own) -------------
+    def set_within_query_sequence(self, n):
+        """Set the query side to the nth roi of the current query"""
+        if not self.current_query_rois:
+            return
+        n = n % len(self.current_query_rois)
+        self.current_query_sn = n  # number within sequence
+        self.current_query_rid = self.current_query_rois[self.current_query_sn]
+        # the match list can contain the query roi; don't show it on both sides
+        if self.current_match_rois and self.current_match_rid == self.current_query_rid:
+            self.set_match(self.current_match + 1)
+
+    def set_match(self, n):
+        """Set the current match index and id, skipping the query roi itself"""
+        if not self.current_match_rois:
+            return
+        size = len(self.current_match_rois)
+        step = -1 if n < self.current_match else 1
+        n = n % size
+        if self.current_match_rois[n] == self.current_query_rid and size > 1:
+            n = (n + step) % size
+        self.current_match = n
+        self.current_match_rid = self.current_match_rois[self.current_match]
+
     # VIEWPOINT ----------------------------------------------------------------
     def toggle_viewpoint(self, selected_viewpoint):
         """
