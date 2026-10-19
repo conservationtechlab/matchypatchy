@@ -8,7 +8,6 @@ import tempfile
 import httpx
 import yaml
 import logging
-logger = logging.getLogger(__name__)
 import urllib.request
 from pathlib import Path
 from queue import Queue, Empty
@@ -17,6 +16,8 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.config import asset_path
 
+
+logger = logging.getLogger(__name__)
 
 MODELS_YML_URL = "https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml"
 

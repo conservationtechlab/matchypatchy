@@ -3,8 +3,10 @@ QThreads for Importing Data
 
 """
 import os
+import logging
 from collections import Counter
 import pandas as pd
+
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -12,6 +14,8 @@ from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thum
 from matchypatchy.database.media import get_sha256
 from matchypatchy.database.mpdb import sql_text
 
+
+logger = logging.getLogger(__name__)
 
 # CSV MIGRATE ==================================================================
 class CSVMigrateThread(QThread):
@@ -28,7 +32,6 @@ class CSVMigrateThread(QThread):
     def __init__(self, parent, data):
         super().__init__()
         self.mpDB = parent.mpDB
-        self.logger = parent.logger
         self.cfg = parent.cfg
         self.data = data
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
@@ -62,7 +65,7 @@ class CSVMigrateThread(QThread):
                 # hash
                 hash = get_sha256(row.filepath)
                 if hash is None:
-                    self.logger.warning(f"File {row.filepath} does not exist, skipping import...")
+                    logger.warning(f"File {row.filepath} does not exist, skipping import...")
                     self.errors.append(row.filepath)
                     continue
 
@@ -245,7 +248,6 @@ class CSVImportThread(QThread):
 
     def __init__(self, parent, unique_images, selected_columns, active_survey):
         super().__init__()
-        self.logger = parent.logger
         self.mpDB = parent.mpDB
         self.cfg = parent.cfg
         self.unique_images = unique_images
@@ -278,7 +280,7 @@ class CSVImportThread(QThread):
 
                 # check to see if file exists
                 if not Path(filepath).exists():
-                    self.logger.warning(f"File {filepath} does not exist, skipping import...")
+                    logger.warning(f"File {filepath} does not exist, skipping import...")
                     continue
 
                 # get the relative path of the file with respect to the base directory
@@ -391,7 +393,7 @@ class CSVImportThread(QThread):
         except Exception as error:
             # an unhandled exception in a QThread aborts the whole app, report it instead
             self.mpDB.db.rollback()
-            self.logger.exception("Import failed")
+            logger.exception("Import failed")
             self.import_failed.emit(str(error))
             return
 
@@ -418,7 +420,7 @@ class CSVImportThread(QThread):
             return str(base_dir)
         except ValueError:
             # If the paths are on different drives, commonpath will raise a ValueError.
-            self.logger.error("Filepaths are on different drives, cannot determine a common base directory.")
+            logger.error("Filepaths are on different drives, cannot determine a common base directory.")
             return None
 
     def _get_relative_path(self, filepath, base_dir):
@@ -639,7 +641,6 @@ class FolderImportThread(QThread):
     def __init__(self, parent, active_survey, data, station_level, camera_level):
         super().__init__()
         self.mpDB = parent.mpDB
-        self.logger = parent.logger
         self.active_survey = active_survey
         self.data = data
         self.station_level = station_level
@@ -662,7 +663,7 @@ class FolderImportThread(QThread):
                 filepath = file['filepath']
                 # check to see if file exists
                 if not Path(filepath).exists():
-                    self.logger.warning(f"File {filepath} does not exist")
+                    logger.warning(f"File {filepath} does not exist")
                     continue
 
                 # get the relative path of the file with respect to the base directory
