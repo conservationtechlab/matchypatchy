@@ -110,6 +110,36 @@ class TestCSVMigrateThread:
         assert thread.error_update.calls == [([],)]
         assert len(thread.finished.calls) == 1
 
+    def test_two_rois_on_one_image(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        """The second roi of an image reuses the media added for the first"""
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        image = tmp_path / "import" / "s1" / "a.jpg"
+        image.parent.mkdir(parents=True)
+        image.write_bytes(b"a")
+        row = {"frame": 0, "bbox_x": 0.1, "bbox_y": 0.2, "bbox_w": 0.3, "bbox_h": 0.4, "viewpoint": 1,
+               "reviewed": 1, "media_id": 1, "individual_id": None, "emb": 1, "base_dir_id": 7, "ext": ".jpg",
+               "timestamp": "2024-01-01 12:00:00", "station_id": 10, "sequence_id": 11, "camera_id": None,
+               "external_id": None, "comment": None, "favorite": 0, "name": None, "sex": None,
+               "station_name": "station-a", "lat": None, "long": None, "station_survey_id": 1,
+               "survey_name": "survey-a", "region_name": "region-a", "camera_name": None,
+               "filepath": str(image), "relative_path": "s1/a.jpg"}
+        data = pd.DataFrame([{"id": 1, **row}, {"id": 2, **row, "bbox_x": 0.5}])
+
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        thread = import_thread.CSVMigrateThread(parent, data)
+        thread.progress_update = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert db.count("media") == 1
+        assert db.count("roi") == 2
+        assert {r[0] for r in db.select("roi", "media_id")} == {db.select("media", "id")[0][0]}
+
     def test_missing_file_is_skipped_and_added_to_errors(self, tmp_db, null_logger, tmp_path, monkeypatch):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")

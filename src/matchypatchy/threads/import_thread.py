@@ -82,7 +82,9 @@ class CSVMigrateThread(QThread):
                                                comment=row.comment if not pd.isna(row.comment) else None)
 
                 if media_id == "duplicate_error":
-                    media_id = self.mpDB.select("media", columns="id", row_cond=f'filepath="{row.filepath}"')[0][0]
+                    # already imported (eg. an earlier roi of the same file); media has no
+                    # filepath column, but the file's hash is unique
+                    media_id = self.mpDB.select("media", columns="id", row_cond=f"sha256='{hash}'")[0][0]
 
                 # save thumbnail for new media
                 media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
