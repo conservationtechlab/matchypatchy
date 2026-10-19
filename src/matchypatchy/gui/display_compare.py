@@ -597,6 +597,9 @@ class DisplayCompare(QWidget):
     def change_query(self, n):
         """Load new query to the nth sequence in the Query queue and reset match to first"""
         self.QueryContainer.set_query(n)
+        # keep showing favorites for the new query if the toggle is on
+        if self.compare_type == 'default' and self.button_match_favorites.isChecked():
+            self.QueryContainer.set_match_favorites(True)
         # update text
         self.query_selector.set_total(self.QueryContainer.n_queries)
         self.query_selector.set_current_number(self.QueryContainer.current_query)

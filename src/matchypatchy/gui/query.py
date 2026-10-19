@@ -93,6 +93,8 @@ class QueryContainer(BaseQueryContainer):
         """
         self._stop_requested = False
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
+        # favorites may have changed
+        self._favorites_cache = None
         self.loaded_data.emit(self.data_raw)
         if self.data_raw.empty:
             self.logger.warning("No ROI media found in the database.")
@@ -262,6 +264,9 @@ class QueryContainer(BaseQueryContainer):
 
         # set current query
         self.current_query = n
+        # previous query's knn / favorites match objects no longer apply
+        self.knn_match_object = None
+        self.favorite_match_object = None
         # get corresponding sequence_id and rois
         self.current_match_object = self.ranked_sequences[self.current_query]
         self.current_query_rois = self.current_match_object.get_ranked_query_rids()
@@ -380,8 +385,10 @@ class QueryContainer(BaseQueryContainer):
     def set_match_favorites(self, active):
         """Set the match favorites active state"""
         if active:
-            # store the current match object before switching to favorites
-            self.knn_match_object = self.current_match_object
+            # store the knn match object before switching to favorites (once, so
+            # re-applying favorites doesn't store the favorites object instead)
+            if self.knn_match_object is None:
+                self.knn_match_object = self.current_match_object
             
             # Use cached favorites if available, otherwise fetch once
             if self._favorites_cache is None:
@@ -390,8 +397,8 @@ class QueryContainer(BaseQueryContainer):
             if self._favorites_cache.empty:
                 return
 
-            query_roi_id = self.knn_match_object.query_data.iloc[0]['id']
-            filtered_neighbors = self._calculate_favorites_similarities(query_roi_id)
+            # similarity to the query roi on screen
+            filtered_neighbors = self._calculate_favorites_similarities(self.current_query_rid)
 
             # Create favorite match object
             self.favorite_match_object = FavoriteMatchObject(
@@ -403,7 +410,8 @@ class QueryContainer(BaseQueryContainer):
             self.current_match_object = self.favorite_match_object
         else:
             # restore the original match object when deactivating favorites
-            self.current_match_object = self.knn_match_object
+            if self.knn_match_object is not None:
+                self.current_match_object = self.knn_match_object
             self.knn_match_object = None
             self.favorite_match_object = None
             self._similarities_cache.clear()
@@ -417,17 +425,17 @@ class QueryContainer(BaseQueryContainer):
         Batch query all similarities at once instead of loop.
         """
         favorite_ids = self._favorites_cache.index.tolist()
-        # Check cache first
-        uncached = [fid for fid in favorite_ids if fid not in self._similarities_cache]
+        # Check cache first, keyed by (query, favorite) since the query changes
+        uncached = [fid for fid in favorite_ids if (query_roi_id, fid) not in self._similarities_cache]
 
         if uncached:
             # Batch calculate similarities for uncached favorites
             batch_similarities = self.mpDB.batch_calculate_similarity(query_roi_id, uncached)
-            self._similarities_cache.update(batch_similarities)
-        
+            self._similarities_cache.update({(query_roi_id, fid): sim for fid, sim in batch_similarities.items()})
+
         # Return cached similarities, skipping favorites without an embedding (None)
-        filtered_neighbors = [(fid, 1 - self._similarities_cache[fid]) for fid in favorite_ids
-                              if self._similarities_cache[fid] is not None]
+        similarities = [(fid, self._similarities_cache[(query_roi_id, fid)]) for fid in favorite_ids]
+        filtered_neighbors = [(fid, 1 - sim) for fid, sim in similarities if sim is not None]
         return filtered_neighbors
 
     def current_distance(self):

@@ -103,3 +103,26 @@ class TestSaveChanges:
         import pandas as pd
         dc = self._save([self._edit(pd.NA, 2, "viewpoint", 1)])
         dc.mpDB.edit_row.assert_not_called()
+
+
+class TestChangeQueryFavorites:
+    def _change(self, compare_type, favorites_on):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.compare_type = compare_type
+        dc.button_match_favorites.isChecked.return_value = favorites_on
+        DisplayCompare.change_query(dc, 1)
+        return dc
+
+    def test_favorites_reapplied_for_new_query(self):
+        dc = self._change("default", True)
+        dc.QueryContainer.set_query.assert_called_once_with(1)
+        dc.QueryContainer.set_match_favorites.assert_called_once_with(True)
+
+    def test_favorites_off(self):
+        dc = self._change("default", False)
+        dc.QueryContainer.set_match_favorites.assert_not_called()
+
+    def test_not_in_qc_mode(self):
+        dc = self._change("qc", True)
+        dc.QueryContainer.set_match_favorites.assert_not_called()

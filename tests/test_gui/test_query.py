@@ -1084,6 +1084,7 @@ class TestFavorites:
         self.knn.query_data = pd.DataFrame({"id": [10]})
         self.knn.get_ranked_matches.return_value = [(12, 0.1)]
         qc.current_match_object = self.knn
+        qc.current_query_rid = 10  # query roi on screen
 
     def test_toggle_on_and_off(self):
         qc = self.qc
@@ -1106,6 +1107,47 @@ class TestFavorites:
             assert qc.knn_match_object is None
             assert qc._similarities_cache == {}
             assert qc.current_match_rois == [12]
+
+    def test_similarity_uses_query_on_screen_and_is_cached_per_query(self):
+        qc = self.qc
+        qc.mpDB.batch_calculate_similarity.side_effect = lambda q, ids: {i: 0.5 for i in ids}
+        with patch(f"{QUERY}.FavoriteMatchObject"):
+            qc.set_match_favorites(True)
+            qc.current_query_rid = 12  # another query, same favorites
+            qc.set_match_favorites(True)
+        queries = [c.args[0] for c in qc.mpDB.batch_calculate_similarity.call_args_list]
+        assert queries == [10, 12]
+
+    def test_reapplying_keeps_the_knn_object(self):
+        """Turning favorites on again must not store the favorites object as the knn one"""
+        qc = self.qc
+        qc.mpDB.batch_calculate_similarity.return_value = {11: 0.8}
+        with patch(f"{QUERY}.FavoriteMatchObject"):
+            qc.set_match_favorites(True)
+            qc.set_match_favorites(True)
+        qc.set_match_favorites(False)
+        assert qc.current_match_object is self.knn
+
+    def test_new_query_drops_previous_favorites_state(self):
+        qc = self.qc
+        qc.mpDB.batch_calculate_similarity.return_value = {11: 0.8}
+        with patch(f"{QUERY}.FavoriteMatchObject"):
+            qc.set_match_favorites(True)
+        other = MagicMock()
+        other.get_ranked_query_rids.return_value = [12]
+        other.get_ranked_matches.return_value = [(10, 0.3)]
+        qc.ranked_sequences, qc.n_queries = [other], 1
+        qc.set_query(0)
+        # "Show KNN" now must keep the new query's matches, not restore the old query's
+        qc.set_match_favorites(False)
+        assert qc.current_match_object is other
+
+    def test_reload_refreshes_favorites(self):
+        qc = self.qc
+        qc._favorites_cache = qc.data_raw[qc.data_raw["favorite"] == 1]
+        with patch(f"{QUERY}.db_roi.fetch_roi_media", return_value=_sample_roi_df()):
+            qc.load_data()
+        assert qc._favorites_cache is None
 
     def test_no_favorites_leaves_match_object_alone(self):
         qc = self.qc
