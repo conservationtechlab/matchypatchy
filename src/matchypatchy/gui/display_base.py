@@ -24,6 +24,7 @@ from matchypatchy.gui.dialogs.popup_ml import MLOptionsPopup
 from matchypatchy.threads.sequence_thread import SequenceThread
 from matchypatchy.threads.animl_thread import AnimlThread
 from matchypatchy.threads.reid_thread import ReIDThread
+from matchypatchy.threads.model_download_thread import get_path
 
 from matchypatchy import config
 
@@ -273,7 +274,13 @@ class DisplayBase(QWidget):
 
     def process_images(self, mloptions):
         """Process images using selected machine learning options"""
-        if self.mpDB.count("media") > 0:
+        # a chosen model's files can be deleted before processing starts
+        missing = [key for key in (mloptions['DETECTOR_KEY'], mloptions['REID_KEY'], mloptions['VIEWPOINT_KEY'])
+                   if key is not None and get_path(self.cfg.ML_DIR, key) is None]
+        if missing:
+            dialog = AlertPopup(self, f"Model(s) not downloaded: {', '.join(missing)}")
+            dialog.show()
+        elif self.mpDB.count("media") > 0:
             self.cfg.update(mloptions)
             dialog = AlertPopup(self, "Processing Images...",
                                 title="Processing Images",
