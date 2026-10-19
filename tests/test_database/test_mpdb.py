@@ -174,7 +174,7 @@ class TestCRUD:
 
     def test_add_individual(self, tmp_db):
         db, _ = tmp_db
-        iid = db.add_individual("Lion-42", "F", "Juvenile")
+        iid = db.add_individual("Lion-42", "F")
         assert isinstance(iid, int)
         rows = db.select("individual", row_cond=f"id={iid}")
         assert len(rows) == 1
@@ -331,7 +331,7 @@ class TestSelectEditDeleteCount:
 
     def test_clear(self, populated_db):
         db, _, ids = populated_db
-        db.add_individual("ToBeCleared", None, None)
+        db.add_individual("ToBeCleared")
         result = db.clear("individual")
         assert result is True
         assert db.count("individual") == 0
