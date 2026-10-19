@@ -284,34 +284,51 @@ class DisplayBase(QWidget):
             dialog.set_max(0)
             self.sequence_thread = SequenceThread(self.mpDB, self.cfg, mloptions['sequence_checked'])
             self.sequence_thread.prompt_update.connect(dialog.update_prompt)
-            self.sequence_thread.start()
             # 2. ANIML (BBOX)
-            dialog.set_max(100)
-            dialog.set_counter(0)
             self.animl_thread = AnimlThread(self.mpDB, self.cfg, mloptions['DETECTOR_KEY'])
             self.animl_thread.prompt_update.connect(dialog.update_prompt)
             self.animl_thread.progress_update.connect(dialog.set_value)
             # 3. REID AND VIEWPOINT
-            dialog.set_max(100)
-            dialog.set_counter(0)
             self.miew_thread = ReIDThread(self.mpDB, self.cfg, mloptions)
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)
-            # chain threads
-            self.animl_thread.finished.connect(self.miew_thread.start)
-            self.animl_thread.finished.connect(dialog.reset_counter)
             self.miew_thread.done.connect(dialog.accept)
-            self.animl_thread.start()
+            # run one step after the other, so only one thread writes to the database at a time
+            self._process_dialog = dialog
+            self._process_cancelled = False
+            self.sequence_thread.finished.connect(self._start_animl)
+            self.animl_thread.finished.connect(self._start_reid)
             # allow cancellation
-            dialog.rejected.connect(self.sequence_thread.requestInterruption)
-            dialog.rejected.connect(self.animl_thread.requestInterruption)
-            dialog.rejected.connect(self.miew_thread.requestInterruption)
+            dialog.rejected.connect(self._cancel_processing)
+            self.sequence_thread.start()
         else:
             dialog = AlertPopup(self, "No images to process.")
             dialog.show()
 
         if dialog.exec():
             del dialog
+
+    def _start_animl(self):
+        """Step 2 once sequencing is done, unless processing was cancelled"""
+        if self._process_cancelled:
+            return
+        self._process_dialog.set_max(100)
+        self._process_dialog.set_counter(0)
+        self.animl_thread.start()
+
+    def _start_reid(self):
+        """Step 3 once detection is done, unless processing was cancelled"""
+        # QThread.start() clears an earlier interruption request, so check before starting
+        if self._process_cancelled:
+            return
+        self._process_dialog.reset_counter()
+        self.miew_thread.start()
+
+    def _cancel_processing(self):
+        """Stop the running step and don't start the ones after it"""
+        self._process_cancelled = True
+        for thread in (self.sequence_thread, self.animl_thread, self.miew_thread):
+            thread.requestInterruption()
 
     # STEP 3: Validate/Manage Media Button
     def validate(self):

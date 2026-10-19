@@ -752,3 +752,30 @@ class TestConfigRefresh:
         popup.device.setCurrentText.assert_called_once_with("CUDA-enabled GPU")
         # filling the fields doesn't re-save the config through their handlers
         popup.video_fps.blockSignals.assert_any_call(True)
+
+
+# ---------------------------------------------------------------------------
+# Processing steps (DisplayBase)
+# ---------------------------------------------------------------------------
+
+class TestProcessingSteps:
+    def test_cancel_stops_later_steps(self):
+        """QThread.start() clears an earlier interruption request, so later steps check a flag"""
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        DisplayBase._cancel_processing(base)
+        assert base._process_cancelled is True
+        base.animl_thread.requestInterruption.assert_called_once()
+        DisplayBase._start_animl(base)
+        DisplayBase._start_reid(base)
+        base.animl_thread.start.assert_not_called()
+        base.miew_thread.start.assert_not_called()
+
+    def test_steps_start_in_turn(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base._process_cancelled = False
+        DisplayBase._start_animl(base)
+        base.animl_thread.start.assert_called_once()
+        DisplayBase._start_reid(base)
+        base.miew_thread.start.assert_called_once()
