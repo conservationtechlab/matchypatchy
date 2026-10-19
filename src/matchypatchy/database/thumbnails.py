@@ -73,19 +73,36 @@ def save_media_thumbnail(thumbnail_dir, filepath, ext):
     return save_thumbnail(thumbnail_dir, filepath, original)
 
 
+def _crop_roi(original, bbox_x, bbox_y, bbox_w, bbox_h):
+    """Crop a QImage to a relative bbox"""
+    left = original.width() * bbox_x
+    top = original.height() * bbox_y
+    width = original.width() * bbox_w
+    height = original.height() * bbox_h
+    return original.copy(QRect(int(left), int(top), int(width), int(height)))
+
+
 def save_roi_thumbnail(thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox_w, bbox_h):
     """Save thumbnail for ROI given bbox coordinates"""
     original = load_media(filepath, ext, frame=frame)
     if original is None:
         return str(asset_path(THUMBNAIL_NOTFOUND))
+    return save_thumbnail(thumbnail_dir, filepath, _crop_roi(original, bbox_x, bbox_y, bbox_w, bbox_h))
 
-    # crop for rois
-    left = original.width() * bbox_x
-    top = original.height() * bbox_y
-    width = original.width() * bbox_w
-    height = original.height() * bbox_h
-    image = original.copy(QRect(int(left), int(top), int(width), int(height)))
-    return save_thumbnail(thumbnail_dir, filepath, image)
+
+def qimage_from_pil(image):
+    """QImage copy of an RGB PIL image"""
+    image = image.convert("RGB")
+    width, height = image.size
+    data = image.tobytes("raw", "RGB")
+    # copy so the QImage owns its pixels instead of pointing at the bytes
+    return QImage(data, width, height, 3 * width, QImage.Format.Format_RGB888).copy()
+
+
+def save_roi_thumbnail_from_image(thumbnail_dir, filepath, image, bbox_x, bbox_y, bbox_w, bbox_h):
+    """Save thumbnail for ROI cropped from an RGB PIL image already in memory"""
+    original = qimage_from_pil(image)
+    return save_thumbnail(thumbnail_dir, filepath, _crop_roi(original, bbox_x, bbox_y, bbox_w, bbox_h))
 
 
 def get_frame(video_path, frame=0):
