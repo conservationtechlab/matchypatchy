@@ -7,11 +7,11 @@ import time
 
 import numpy as np
 import pandas as pd
-from PyQt6.QtCore import QObject, QTimer, pyqtSignal
+from PyQt6.QtCore import QTimer, pyqtSignal
 
 import matchypatchy.database.media as db_roi
+from matchypatchy.gui.query_base import BaseQueryContainer
 from matchypatchy.threads.match_object import MatchObject
-from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
 from matchypatchy.threads.match_object import FavoriteMatchObject
@@ -21,7 +21,7 @@ from matchypatchy.threads.match_object import FavoriteMatchObject
 KNN_OVERFETCH = 3
 
 
-class QueryContainer(QObject):
+class QueryContainer(BaseQueryContainer):
     """Container class for managing query and match data within the MatchyPatchy GUI."""
     thread_signal = pyqtSignal(bool)
     progress_update = pyqtSignal(int)
@@ -301,16 +301,9 @@ class QueryContainer(QObject):
         self.current_match_rid = self.current_match_rois[self.current_match]
 
     def get_query_sequence_id(self):
-        """Get current query sequence ID"""
+        """Get current query sequence ID from its match object"""
         if self.current_match_object:
             return self.current_match_object.sequence_id
-        return None
-
-    def get_match_sequence_id(self):
-        """Get current match sequence ID"""
-        if self.current_match_object and self.current_match_rois:
-            # Get sequence ID of current match ROI
-            return self._get_roi_field(self.current_match_rid, 'sequence_id')
         return None
 
     def update_sequences_in_place(self, query_seq_id, match_seq_id):
@@ -437,146 +430,17 @@ class QueryContainer(QObject):
                               if self._similarities_cache[fid] is not None]
         return filtered_neighbors
 
-    def _clean_iid(self, v):
-        """None/NaN -> None, otherwise int"""
-        return None if v is None or pd.isna(v) else int(v)
-
-    def is_existing_match(self):
-        """Return whether current query and match have same individual_id"""
-        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
-        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
-        return query_iid is not None and query_iid == match_iid
-
-    def both_unnamed(self):
-        """Return whether both current query and match are unnamed"""
-        return (self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id')) is None and
-                self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id')) is None)
-
     def current_distance(self):
         """Return distance between current sequence and match"""
         matches = self.current_match_object.get_ranked_matches()
         return matches[self.current_match][1] if self.current_match < len(matches) else float('inf')
 
-    def _get_roi_field(self, roi_id, field):
-        """Get ROI field from DataFrame (always fresh)"""
-        if roi_id in self.data.index:
-            return self.data.loc[roi_id, field]
-        return None
-
-    def _get_roi_full_record(self, roi_id):
-        """Get full ROI record from index"""
-        if roi_id in self.data.index:
-            return self.data.loc[roi_id].to_dict()
-        return None
-
-    def _update_roi_index(self, updates_dict):
-        """Apply changes to both the filtered and raw frames (existing ids only)"""
-        for df in (self.data, self.data_raw):
-            for roi_id, changes in updates_dict.items():
-                if roi_id in df.index:
-                    for key, value in changes.items():
-                        df.loc[roi_id, key] = value
-
-    def get_info(self, rid, column=None):
-        """Get info from data table for given rid and column"""
-        if column is None:
-            # Return whole row from index or DataFrame
-            return self.data.loc[rid]
-        elif column == 'bbox':
-            return db_roi.get_roi_bbox(self.data.loc[[rid]])
-        elif column == 'metadata':
-            return self.roi_metadata(self.data.loc[rid])
-        else:
-            return self._get_roi_field(rid, column)
-
-    def roi_metadata(self, roi):
-        """Display relevant metadata in comparison label box"""
-        location = fetch_station_names_from_id(self.mpDB, roi['station_id'], roi['camera_id'])
-
-        roi_renamed = roi.rename(index={"name": "Name",
-                                        "sex": "Sex",
-                                        "filepath": "Filepath",
-                                        "comment": "Comment",
-                                        "timestamp": "Timestamp",
-                                        "station_id": "Station",
-                                        "camera_id": "Camera",
-                                        "sequence_id": "Sequence ID",
-                                        "external_id": "External ID",
-                                        "viewpoint": "Viewpoint"})
-
-        info_dict = roi_renamed[['Name', 'Sex', 'Filepath', 'Timestamp', 'Station', 'Camera',
-                                 'External ID', 'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
-
-        info_dict['Station'] = location['station_name']
-        info_dict['Survey'] = location['survey_name']
-        info_dict['Region'] = location['region_name']
-        info_dict['Camera'] = location['camera_name']
-
-        # Convert viewpoint to human-readable
-        viewpoint_val = info_dict['Viewpoint']
-        if viewpoint_val is None or pd.isna(viewpoint_val):
-            info_dict['Viewpoint'] = 'None'
-        else:
-            try:
-                info_dict['Viewpoint'] = self.VIEWPOINT_DICT[str(int(viewpoint_val))]
-            except (KeyError, ValueError, TypeError):
-                info_dict['Viewpoint'] = 'Unknown'
-
-        return info_dict
-
     # MATCH FUNCTIONS ----------------------------------------------------------
-    # Batch database updates
-    def new_iid(self, individual_id):
-        """Update records for roi after confirming a match (batched)"""
-        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1}
-                       for roi in self.current_query_rois}
-        roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
-
-        # Update local index
-        self._update_roi_index(roi_updates)
-
-        # Then batch update the database
-        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
-
-    def merge(self):
-        """Merge two individuals after a match"""
-        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
-        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
-
-        if query_iid is None and match_iid is None:
-            return
-
-        # keep the older (lower) id
-        ids = [i for i in (query_iid, match_iid) if i is not None]
-        keep_id = min(ids)
-
-        # find all ROIs associated with the query and match sequences
+    def _merge_rois(self):
+        """All ROIs of the query and match sequences"""
         query_seq = self.current_match_object.sequence_id
         match_seq = self._get_roi_field(self.current_match_rid, 'sequence_id')
-        rois = set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, []))
-        for iid in set(ids) - {keep_id}:
-            rois.update(self.data_raw.index[self.data_raw['individual_id'] == iid])
-
-        if not rois:
-            self.logger.warning("merge: no ROIs to update")
-            return
-
-        roi_updates = {int(r): {"individual_id": keep_id, "reviewed": 1}
-                       for r in rois}
-        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
-        
-        # Update local index
-        self._update_roi_index(roi_updates)
-
-    def unmatch(self):
-        """Unmatch the current query ROI from the matched ROI"""
-        # Update local index
-        self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
-
-        # update database
-        self.mpDB.edit_row('roi', self.current_query_rid,
-                           {'individual_id': None, "reviewed": 0},
-                           allow_none=True, quiet=True)
+        return set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, []))
 
     # ==========================================================================
     # KNN CACHE MANAGEMENT

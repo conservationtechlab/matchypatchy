@@ -18,6 +18,7 @@ import pandas as pd
 import pytest
 
 QUERY = "matchypatchy.gui.query"
+QUERY_BASE = "matchypatchy.gui.query_base"
 
 
 # ---------------------------------------------------------------------------
@@ -529,10 +530,10 @@ class TestQueryStateHelpers:
     def test_get_info_unknown_rid_is_none(self):
         assert self.qc.get_info(999, "station_id") is None
 
-    def test_get_info_bbox(self, mock_db_roi):
-        mock_db_roi.get_roi_bbox.return_value = "BBOX"
-        assert self.qc.get_info(10, "bbox") == "BBOX"
-        assert list(mock_db_roi.get_roi_bbox.call_args.args[0].index) == [10]
+    def test_get_info_bbox(self):
+        with patch(f"{QUERY_BASE}.db_roi.get_roi_bbox", return_value="BBOX") as get_roi_bbox:
+            assert self.qc.get_info(10, "bbox") == "BBOX"
+        assert list(get_roi_bbox.call_args.args[0].index) == [10]
 
     def test_get_info_metadata_delegates(self):
         with patch.object(self.qc, "roi_metadata", return_value={"k": 1}) as meta:
@@ -558,7 +559,7 @@ class TestRoiMetadata:
     def _loc(self):
         loc = {"station_name": "Stn", "survey_name": "Srv",
                "region_name": "Reg", "camera_name": "Cam"}
-        with patch(f"{QUERY}.fetch_station_names_from_id", return_value=loc):
+        with patch(f"{QUERY_BASE}.fetch_station_names_from_id", return_value=loc):
             yield
 
     def test_location_fields_resolved(self, qc):

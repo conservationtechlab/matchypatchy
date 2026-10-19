@@ -2,14 +2,14 @@
 Class Definition for Query Object
 """
 import pandas as pd
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import pyqtSignal
 
 import matchypatchy.database.media as db_roi
-from matchypatchy.database.location import fetch_station_names_from_id
+from matchypatchy.gui.query_base import BaseQueryContainer
 from matchypatchy.threads.model_download_thread import load_model
 
 
-class QC_QueryContainer(QObject):
+class QC_QueryContainer(BaseQueryContainer):
     """
     Alternate Query Container for QC Only
     """
@@ -19,6 +19,7 @@ class QC_QueryContainer(QObject):
         super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
+        self.logger = parent.logger
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
         self.individuals_raw = {}
@@ -202,106 +203,6 @@ class QC_QueryContainer(QObject):
                 return True
 
     # RETURN INFO --------------------------------------------------------------
-    def is_existing_match(self):
-        """Check if the current query and match are for the same individual."""
-        query_iid = self._get_roi_field(self.current_query_rid, 'individual_id')
-        match_iid = self._get_roi_field(self.current_match_rid, 'individual_id')
-        return query_iid == match_iid and query_iid is not None
-
     def current_distance(self):
         """Return distance between current sequence and matchs"""
         return 0
-
-    def _get_roi_field(self, roi_id, field):
-        """Get ROI field from DataFrame (always fresh)"""
-        if roi_id in self.data.index:
-            return self.data.loc[roi_id, field]
-        return None
-
-    def _get_roi_full_record(self, roi_id):
-        """Get full ROI record from index"""
-        if roi_id in self.data.index:
-            return self.data.loc[roi_id].to_dict()
-        return None
-
-    def _update_roi_index(self, updates_dict):
-        """Update local index with batch changes"""
-        for roi_id, changes in updates_dict.items():
-            # Update DataFrame
-            for key, value in changes.items():
-                self.data.loc[roi_id, key] = value
-
-    def get_info(self, rid, column=None):
-        """Get info from data table for given rid and column"""
-        if column is None:  # return whole row
-            return self.data.loc[rid]
-        elif column == 'bbox':
-            # Return the bbox coordinates for current query
-            return db_roi.get_roi_bbox(self.data.loc[[rid]])
-        elif column == 'metadata':
-            return self.roi_metadata(self.data.loc[rid])
-        else:
-            return self.data.loc[rid, column]
-
-    def roi_metadata(self, roi):
-        """
-        Display relevant metadata in comparison label box
-        """
-        location = fetch_station_names_from_id(self.mpDB, roi['station_id'], roi['camera_id'])
-
-        roi = roi.rename(index={"name": "Name",
-                                "sex": "Sex",
-                                "filepath": "Filepath",
-                                "comment": "Comment",
-                                "timestamp": "Timestamp",
-                                "station_id": "Station",
-                                "camera_id": "Camera",
-                                "sequence_id": "Sequence ID",
-                                "external_id": "External ID",
-                                "viewpoint": "Viewpoint"})
-
-        info_dict = roi[['Name', 'Sex', 'Filepath', 'Timestamp', 'Station', 'Camera',
-                         'External ID', 'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
-
-        info_dict['Station'] = location['station_name']
-        info_dict['Survey'] = location['survey_name']
-        info_dict['Region'] = location['region_name']
-        info_dict['Camera'] = location['camera_name']
-
-        # Convert viewpoint to human-readable
-        viewpoint_val = info_dict['Viewpoint']
-        if viewpoint_val is None or pd.isna(viewpoint_val):
-            info_dict['Viewpoint'] = 'None'
-        else:
-            try:
-                info_dict['Viewpoint'] = self.VIEWPOINT_DICT[str(int(viewpoint_val))]
-            except (KeyError, ValueError, TypeError):
-                info_dict['Viewpoint'] = 'Unknown'
-
-        return info_dict
-
-    # MATCH FUNCTIONS ----------------------------------------------------------
-    def new_iid(self, individual_id):
-        """
-        Update records for roi after confirming a match
-        """
-        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1} 
-                       for roi in self.current_query_rois}
-        roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
-
-        # Update local index
-        self._update_roi_index(roi_updates)
-
-        # Then batch update the database
-        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
-
-    def unmatch(self):
-        """Unmatch the current query ROI from the matched ROI"""
-        # Update local index
-        self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
-
-        # Update the database
-        self.mpDB.edit_row('roi', self.current_query_rid,
-                           {'individual_id': None, "reviewed": 0},
-                           allow_none=True,
-                           quiet=False)
