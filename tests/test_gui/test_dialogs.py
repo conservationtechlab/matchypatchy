@@ -455,3 +455,48 @@ class TestUploadManagerSave:
         with patch(f"{UPLOADS}.QFileDialog.getExistingDirectory", return_value="/new"):
             UploadManagerPopup.edit(popup)
         assert popup.verified is False
+
+
+class TestIndividualPopupList:
+    def test_individuals_without_rois_are_listed(self, tmp_db):
+        """Grouping on the roi side folded every individual without rois into one row"""
+        from matchypatchy.gui.dialogs.popup_individual import IndividualPopup
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        up = db.add_upload("/a")
+        mid = db.add_media(up, "x.jpg", "h1", ".jpg", "2024", station)
+        a, b, c = db.add_individual("A"), db.add_individual("B"), db.add_individual("C")
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1, individual_id=a)
+        popup = MagicMock()
+        popup.mpDB = db
+        IndividualPopup.update(popup)
+        assert sorted((name, count) for name, _, count in popup.individuals) == [("A", 1), ("B", 0), ("C", 0)]
+
+
+class TestViewIndividualPrefilter:
+    """Manage Individuals > View sends the individual's database id"""
+
+    def _refresh(self, individual_id):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = MagicMock()
+        tables = {"region": [], "survey": [], "individual": [(4, "Spot"), (9, "Dot")]}
+        bar.mpDB.select.side_effect = lambda table, columns=None, row_cond=None: tables.get(table, [])
+        bar.region_select.currentIndex.return_value = 0
+        bar.survey_select.currentIndex.return_value = 0
+        bar.station_select.currentIndex.return_value = 0
+        bar.viewpoint_select.currentIndex.return_value = 0
+        bar.individual_select.currentIndex.return_value = 0
+        bar.station_list_ordered = [(0, "Station")]
+        bar.viewpoint_list_ordered = [(0, "Viewpoint")]
+        FilterBar.refresh_filters(bar, prefilter={"individual_id": individual_id})
+        return bar
+
+    def test_selects_individual_by_id(self):
+        bar = self._refresh(9)
+        assert bar.filters["active_individual"] == (9, "Dot")
+        bar.individual_select.setCurrentIndex.assert_called_with(2)
+
+    def test_unidentified_row_filters_unidentified(self):
+        bar = self._refresh(0)
+        assert bar.unidentified_only is True
+        bar.unidentified.setChecked.assert_called_with(True)

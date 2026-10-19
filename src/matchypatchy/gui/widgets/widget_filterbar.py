@@ -143,8 +143,17 @@ class FilterBar(QWidget):
                 self.favorites_only = prefilter['favorites_only']
                 self.favorites.setChecked(self.favorites_only)
             if 'individual_id' in prefilter.keys():
-                self.filters['active_individual'] = self.individual_list_ordered[prefilter['individual_id']]
-                self.individual_select.setCurrentIndex(prefilter['individual_id'])
+                iid = prefilter['individual_id']
+                if iid == 0:
+                    # the "Unidentified" row in Manage Individuals
+                    self.unidentified_only = True
+                    self.unidentified.setChecked(True)
+                else:
+                    # individual_id is a database id; find its position in the list
+                    position = next((i for i, (ind_id, _) in enumerate(self.individual_list_ordered)
+                                     if ind_id == iid), 0)
+                    self.filters['active_individual'] = self.individual_list_ordered[position]
+                    self.individual_select.setCurrentIndex(position)
 
         self.region_select.blockSignals(False)
         self.survey_select.blockSignals(False)
