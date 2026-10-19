@@ -292,7 +292,7 @@ class DisplayBase(QWidget):
             self.miew_thread = ReIDThread(self.mpDB, self.cfg, mloptions)
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)
-            self.miew_thread.done.connect(dialog.accept)
+            self.miew_thread.done.connect(self._finish_processing)
             # run one step after the other, so only one thread writes to the database at a time
             self._process_dialog = dialog
             self._process_cancelled = False
@@ -323,6 +323,15 @@ class DisplayBase(QWidget):
             return
         self._process_dialog.reset_counter()
         self.miew_thread.start()
+
+    def _finish_processing(self):
+        """Close the popup, or keep it open to say how many files couldn't be read"""
+        failed = self.miew_thread.failed
+        if failed:
+            self._process_dialog.update_prompt(f"Processing finished, but {len(failed)} file(s) "
+                                               "could not be read. See the log for which.")
+        else:
+            self._process_dialog.accept()
 
     def _cancel_processing(self):
         """Stop the running step and don't start the ones after it"""

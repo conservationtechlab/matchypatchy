@@ -2,6 +2,7 @@
 Thread Class for Processing Viewpoint and Miew Embedding
 
 """
+import logging
 import os
 
 import animl
@@ -15,6 +16,8 @@ from matchypatchy.database.media import fetch_roi
 
 # from matchypatchy.pairx.core import explain
 # from matchypatchy.pairx import xai_dataset
+
+logger = logging.getLogger(__name__)
 
 
 class ReIDThread(QThread):
@@ -30,7 +33,8 @@ class ReIDThread(QThread):
         self.batch_size = 1  # set to 1 for now
         self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
         self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
-        
+        self.failed = set()  # files that couldn't be read
+
     def run(self):
         """Process viewpoint and embeddings for ROIs"""
         # ROIS must be fetched after start() to chain with animl
@@ -95,6 +99,7 @@ class ReIDThread(QThread):
                                                       num_workers=0)
                 batch = next(iter(dataloader), None)
                 if batch is None:
+                    self._file_failed(filtered_rois.at[i, 'filepath'])
                     continue
                 output = model.run(None, {model.get_inputs()[0].name: batch[0]})[0]
                 value = argmax(animl.softmax(output), axis=1)[0]
@@ -124,12 +129,23 @@ class ReIDThread(QThread):
                     if row.at[i, 'bbox_x'] == -1:
                         continue
                     roi_id = row.at[i, 'roi_id']
-                    emb = animl.extract_miew_embeddings(model, row)[0]
+                    try:
+                        emb = animl.extract_miew_embeddings(model, row)[0]
+                    except ValueError:
+                        # nothing to stack: the file couldn't be loaded
+                        self._file_failed(row.at[i, 'filepath'])
+                        continue
 
                     self.mpDB.add_emb(roi_id, emb)
                     self.mpDB.edit_row("roi", roi_id, {"emb": 1})
 
                     self.progress_update.emit(round(100 * i / len(filtered_rois)))
+
+    def _file_failed(self, filepath):
+        """Log a file that couldn't be read and carry on with the rest"""
+        if filepath not in self.failed:
+            logger.warning("Could not read %s, skipping it", filepath)
+            self.failed.add(filepath)
 
 
 """

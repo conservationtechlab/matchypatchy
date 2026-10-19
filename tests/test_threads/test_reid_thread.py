@@ -81,6 +81,7 @@ def _make_thread(monkeypatch, n_rois, unreadable=()):
     thread.reid_filepath = None
     thread.isInterruptionRequested = lambda: False
     thread.progress_update = SignalSpy()
+    thread.failed = set()
 
     thread.rois = pd.DataFrame({
         "roi_id": list(range(n_rois)),
@@ -111,6 +112,7 @@ class TestGetViewpointBatching:
         thread.get_viewpoint()
 
         assert [(call[1], call[2]["viewpoint"]) for call in db.edit_row_calls] == [(0, 0), (2, 2), (3, 3)]
+        assert thread.failed == {"/img_1.jpg"}
 
     def test_roi_without_box_is_skipped(self, monkeypatch):
         thread, db = _make_thread(monkeypatch, n_rois=3)
@@ -127,3 +129,25 @@ class TestGetViewpointBatching:
         thread.get_viewpoint()
 
         assert db.edit_row_calls == []
+
+
+class TestGetEmbeddings:
+    def test_unreadable_file_is_skipped(self, monkeypatch):
+        thread, db = _make_thread(monkeypatch, n_rois=3, unreadable={"/img_1.jpg"})
+        thread.reid_filepath = "/fake/miew.onnx"
+        thread.rois["emb"] = 0
+        db.add_emb_calls = []
+        db.add_emb = lambda roi_id, emb: db.add_emb_calls.append(roi_id)
+        monkeypatch.setattr(reid_thread.animl, "load_miew", lambda *_a, **_k: None, raising=False)
+
+        def _extract(_model, manifest):
+            # like animl: stacking no results raises
+            images = [batch[0] for batch in FakeManifestGenerator(manifest)]
+            return np.vstack(images)
+
+        monkeypatch.setattr(reid_thread.animl, "extract_miew_embeddings", _extract, raising=False)
+
+        thread.get_embeddings()
+
+        assert db.add_emb_calls == [0, 2]
+        assert thread.failed == {"/img_1.jpg"}
