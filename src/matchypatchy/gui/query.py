@@ -252,6 +252,12 @@ class QueryContainer(BaseQueryContainer):
         self.logger.info(f"Filtered data contains {len(self.data)} entries.")
         return True
 
+    def refresh_data(self):
+        """Reload the shown rows, keeping the filter, then rebuild sequence lookups"""
+        super().refresh_data()
+        self._build_seq_indices()
+        self.sequences = db_roi.sequence_roi_dict(self.data)
+
     def _build_seq_indices(self):
         """Build sequence indices for fast lookups"""
         self._seq_index = self.data_raw.reset_index().groupby('sequence_id')['id'].apply(list).to_dict()

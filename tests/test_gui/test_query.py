@@ -1074,6 +1074,18 @@ class TestMatchActions:
 # Favorites
 # ---------------------------------------------------------------------------
 
+class TestRefreshData:
+    def test_keeps_filtered_rows_and_rebuilds_sequences(self, qc, mock_db_roi):
+        qc.data_raw = _sample_roi_df()
+        qc.data = qc.data_raw.loc[[10, 11]].copy()
+        mock_db_roi.fetch_roi_media.return_value = _sample_roi_df()
+        mock_db_roi.sequence_roi_dict.return_value = {"seq": [10, 11]}
+        qc.refresh_data()
+        assert sorted(qc.data.index) == [10, 11]
+        assert len(qc.data_raw) == len(_sample_roi_df())
+        assert qc.sequences == {"seq": [10, 11]}
+
+
 class TestFavorites:
     @pytest.fixture(autouse=True)
     def _setup(self, qc):

@@ -126,3 +126,23 @@ class TestChangeQueryFavorites:
     def test_not_in_qc_mode(self):
         dc = self._change("qc", True)
         dc.QueryContainer.set_match_favorites.assert_not_called()
+
+
+class TestRefreshKeepsFilter:
+    def test_favorite_refreshes_without_dropping_filter(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.compare_type = "default"
+        dc.button_match_favorites.isChecked.return_value = False
+        DisplayCompare.favorite(dc, 5, 1)
+        dc.mpDB.edit_row.assert_called_once_with("roi", 5, {"favorite": 1})
+        dc.QueryContainer.refresh_data.assert_called_once()
+        dc.QueryContainer.filter.assert_not_called()
+
+    def test_favorite_rebuilds_favorites_when_showing(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.compare_type = "default"
+        dc.button_match_favorites.isChecked.return_value = True
+        DisplayCompare.favorite(dc, 5, 1)
+        dc.QueryContainer.set_match_favorites.assert_called_once_with(True)

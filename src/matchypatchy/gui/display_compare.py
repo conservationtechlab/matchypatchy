@@ -792,10 +792,8 @@ class DisplayCompare(QWidget):
         if dialog.exec():
             self.edit_stack = dialog.get_edit_stack()
             self.save_changes()
-            # reload data
-            # TODO: only reload the affected sequences instead of full reload
-            self.QueryContainer.load_data()
-            self.QueryContainer.filter()
+            # reload the shown rows, keeping the active filter
+            self.QueryContainer.refresh_data()
             self.load_query()
             self.load_match()
         del dialog
@@ -863,10 +861,14 @@ class DisplayCompare(QWidget):
     def favorite(self, rid, value):
         """Set favorite status for given rid"""
         self.mpDB.edit_row('roi', rid, {"favorite": value})
-        # reload database
-        # TODO: update only the affected sequences in the QueryContainer instead of full reload
-        self.QueryContainer.load_data()
-        self.QueryContainer.filter()
+        # reload the shown rows, keeping the active filter
+        self.QueryContainer.refresh_data()
+        # rebuild the favorites list if it is showing
+        if self.compare_type == 'default' and self.button_match_favorites.isChecked():
+            self.QueryContainer.set_match_favorites(True)
+            self.change_match(0)
+            self.load_query()
+            return
         self.load_query()
         self.load_match()
 
