@@ -33,17 +33,31 @@ class MatchyPatchyDB():
         self.logger = logger
         self.local = threading.local()  # Thread-local storage
 
+        db_exists = self.filepath.is_file()
+        chroma_exists = self.chroma_filepath.is_dir()
+
         # load existing databases if they exist
-        if self.filepath.is_file() and self.chroma_filepath.is_dir():
-            # initialize
-            self.db  # Trigger property initialization
-            self.chroma  # Trigger property initialization
-            self.collection  # Trigger property initialization
-            # upgrade outdated schemas, then check key
-            if self.migrate():
-                self.key = self.validate()
-            else:
+        if db_exists and chroma_exists:
+            try:
+                # initialize
+                self.db  # Trigger property initialization
+                self.chroma  # Trigger property initialization
+                self.collection  # Trigger property initialization
+                # upgrade outdated schemas, then check key
+                if self.migrate():
+                    self.key = self.validate()
+                else:
+                    self.key = False
+            # not a MatchyPatchy database, eg. no embedding collection or not an sqlite file
+            except Exception as e:
+                self.logger.error(f"Could not open database at {DB_PATH}: {e}", exc_info=True)
+                self.close()
                 self.key = False
+        # only one of the pair exists, creating the other would pair existing data with a new key
+        elif db_exists or chroma_exists:
+            missing = self.chroma_filepath if db_exists else self.filepath
+            self.logger.error(f"Incomplete database at {DB_PATH}, {missing} is missing.")
+            self.key = False
         # initialize new databases
         else:
             self.key = f'{randrange(1, 10 ** 5):05}'
@@ -153,8 +167,14 @@ class MatchyPatchyDB():
 
         # Check that the database build version and key match
         cursor = self.db.cursor()
-        cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
-        db_build_version, mpkey = cursor.fetchone()
+        try:
+            metadata = cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;").fetchone()
+        except sqlite3.OperationalError:
+            metadata = None  # no metadata table
+        if metadata is None:
+            self.logger.error("Selected DB is not a MatchyPatchy database, metadata is missing.")
+            return False
+        db_build_version, mpkey = metadata
         chroma_key = self.collection.metadata['key']
 
         if match_schema:
@@ -363,6 +383,8 @@ class MatchyPatchyDB():
             if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
                 self.logger.error(f"Failed to add {relative_path}, file is a duplicate.")
                 return "duplicate_error"
+            # eg. foreign key or not null constraint
+            self.logger.error(f"Failed to add {relative_path}: {error}")
             return None
 
         except sqlite3.Error as error:

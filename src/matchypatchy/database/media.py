@@ -47,8 +47,8 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     Fetches all media info with full paths, converts to dataframe
     """
-    # select ids
-    if ids:
+    # select ids, an empty list selects nothing (not everything)
+    if ids is not None:
         ids_str = ', '.join(map(str, ids))
         row_cond = f"WHERE m.id IN ({ids_str})"
     else:
@@ -142,10 +142,11 @@ def fetch_roi_media(mpDB, rids=None, sequence_ids=None, reset_index=True):
                 'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
                 'comment', 'name', 'sex']
     """
-    if rids:
+    # an empty list selects nothing (not everything)
+    if rids is not None:
         ids_str = ', '.join(map(str, rids))
         media, column_names = mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
-    elif sequence_ids:
+    elif sequence_ids is not None:
         sequence_ids_str = ', '.join(map(str, sequence_ids))
         media, column_names = mpDB.all_media(row_cond=f"media.sequence_id IN ({sequence_ids_str})")
     else:

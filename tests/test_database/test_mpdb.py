@@ -1,11 +1,14 @@
 """
 Tests for matchypatchy.database.mpdb — MatchyPatchyDB class and thread safety.
 """
+import shutil
 import threading
 import sqlite3
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+from chromadb.api.client import SharedSystemClient
 
 from matchypatchy.database.mpdb import MatchyPatchyDB
 
@@ -50,6 +53,68 @@ class TestInitialisation:
 
         db2 = MatchyPatchyDB(str(tmp_path), null_logger)
         assert db2.key == original_key
+        db2.close()
+
+
+class TestOpenInvalidDatabase:
+    """Opening a folder that holds an incomplete or foreign database is rejected without changing it"""
+
+    def test_sqlite_without_embeddings_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        shutil.rmtree(tmp_path / "emb.db")
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
+        db2.close()
+        # no second metadata row and no new embedding database
+        conn = sqlite3.connect(tmp_path / "matchypatchy.db")
+        assert conn.execute("SELECT COUNT(*) FROM metadata").fetchone()[0] == 1
+        conn.close()
+        assert not (tmp_path / "emb.db").exists()
+
+    def test_embeddings_without_sqlite_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        (tmp_path / "matchypatchy.db").unlink()
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
+        db2.close()
+        assert not (tmp_path / "matchypatchy.db").exists()
+
+    def test_sqlite_without_metadata_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        (tmp_path / "matchypatchy.db").unlink()
+        conn = sqlite3.connect(tmp_path / "matchypatchy.db")
+        conn.execute("CREATE TABLE other (id INTEGER PRIMARY KEY)")
+        conn.commit()
+        conn.close()
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
+        db2.close()
+
+    def test_non_sqlite_file_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        (tmp_path / "matchypatchy.db").write_bytes(b"not a database" * 100)
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
+        db2.close()
+
+    def test_embedding_folder_without_collection_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1.close()
+        shutil.rmtree(tmp_path / "emb.db")
+        (tmp_path / "emb.db").mkdir()
+        # chroma caches clients per path in-process, clear it to behave like a fresh launch
+        SharedSystemClient.clear_system_cache()
+
+        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        assert db2.key is False
         db2.close()
 
 
@@ -211,6 +276,16 @@ class TestCRUD:
         db.add_media(upload_id, "original.jpg", sha, ".jpg", "2024-01-01", station_id)
         result = db.add_media(upload_id, "copy.jpg", sha, ".jpg", "2024-01-01", station_id)
         assert result == "duplicate_error"
+
+    def test_add_media_other_integrity_error_is_logged(self, tmp_db):
+        """A constraint failure other than a duplicate (here a missing station) returns None and logs"""
+        db, _ = tmp_db
+        db.logger = MagicMock()
+        upload_id = db.add_upload("/img")
+        result = db.add_media(upload_id, "orphan.jpg", "ddd" * 22, ".jpg", "2024-01-01", 99999)
+        assert result is None
+        db.logger.error.assert_called_once()
+        assert "orphan.jpg" in db.logger.error.call_args[0][0]
 
     def test_add_roi(self, tmp_db):
         db, _ = tmp_db

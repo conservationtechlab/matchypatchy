@@ -124,13 +124,14 @@ def check_missing_thumbnails(mpDB, thumbnail_dir, data_type):
     missing = mpDB._command(f"""SELECT {source_table}.id FROM {source_table}
                             LEFT JOIN {table} ON {source_table}.id = {table}.{fid_col}
                             WHERE {table}.{fid_col} IS NULL;""", quiet=True)
-    missing_ids = [row[0] for row in missing]
+    # _command returns None if the query failed (already logged)
+    missing_ids = [row[0] for row in missing] if missing else []
 
-    # Also check for files that are listed but the file is missing
+    # Also check for files that are listed but the file is missing, or that are the not-found placeholder
     for _, row in thumbnails.iterrows():
-        if not (Path(thumbnail_dir) / Path(row['thumbnail_path'])).is_file():
-            missing_ids.append(row['id'])
-        if row['thumbnail_path'] == str(asset_path(THUMBNAIL_NOTFOUND)):
+        file_missing = not (Path(thumbnail_dir) / Path(row['thumbnail_path'])).is_file()
+        is_placeholder = row['thumbnail_path'] == str(asset_path(THUMBNAIL_NOTFOUND))
+        if file_missing or is_placeholder:
             missing_ids.append(row['id'])
 
     return missing_ids
