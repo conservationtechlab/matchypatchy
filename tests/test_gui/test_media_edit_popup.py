@@ -102,3 +102,30 @@ class TestCallersReloadAfterPopupChanges:
             DisplayCompare.edit_image(dc, 10)
         dc.filter_neighbors.assert_called_once()
         dc.QueryContainer.refresh_data.assert_not_called()
+
+
+class TestSaveRoi:
+    def test_redrawn_box_updates_the_roi_in_place(self):
+        """Keeps the roi id (and so its individual, viewpoint, favorite); drops the stale embedding"""
+        from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+        data = pd.DataFrame({"id": [10], "media_id": [1], "filepath": ["a.jpg"], "ext": [".jpg"],
+                             "bbox_x": [0.1], "bbox_y": [0.1], "bbox_w": [0.2], "bbox_h": [0.2],
+                             "thumbnail_path": ["old.jpg"]})
+        dialog = _popup(data, data_type=1)
+        dialog.new_bbox = {"bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "frame": 0}
+        confirm = MagicMock()
+        with patch(f"{POPUP}.QDialog") as qdialog, \
+                patch(f"{POPUP}.AlertPopup", return_value=confirm), \
+                patch(f"{POPUP}.save_roi_thumbnail", return_value="new.jpg"):
+            confirm.exec.return_value = qdialog.DialogCode.Accepted
+            MediaEditPopup.save_roi(dialog)
+        dialog.mpDB.edit_row.assert_called_once_with(
+            "roi", 10, {"frame": 0, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "emb": 0})
+        dialog.mpDB.delete_emb.assert_called_once_with(10)
+        dialog.mpDB.batch_update_thumbnails.assert_called_once_with(
+            "roi_thumbnails", "fid", {10: {"filepath": "new.jpg"}})
+        dialog.mpDB.delete.assert_not_called()
+        dialog.mpDB.add_roi.assert_not_called()
+        assert dialog.data.loc[0, "id"] == 10
+        assert dialog.data.loc[0, "bbox_x"] == 0.3
+        assert dialog.roi_updated is True

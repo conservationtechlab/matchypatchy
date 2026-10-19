@@ -254,18 +254,21 @@ class MediaEditPopup(QDialog):
                 prompt = "This will update the existing ROI. You will need to rerun step 2. Process to get new embeddings."
                 dialog = AlertPopup(self, prompt=prompt)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
-                    # delete roi, cascade to thumbnail
-                    self.mpDB.delete("roi", f"id={rid}")
-                    # add new roi
-                    new_rid = self.mpDB.add_roi(int(media_id), frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    # save thumbnail
+                    rid = int(rid)
+                    # update the box in place, keeping the roi's id, individual, viewpoint
+                    # and favorite; its embedding no longer matches, so drop it (emb=0 is
+                    # picked up by the next Process run)
+                    self.mpDB.edit_row("roi", rid, {"frame": frame,
+                                                    "bbox_x": round(bbox_x, 4), "bbox_y": round(bbox_y, 4),
+                                                    "bbox_w": round(bbox_w, 4), "bbox_h": round(bbox_h, 4),
+                                                    "emb": 0})
+                    self.mpDB.delete_emb(rid)
+                    # save thumbnail and replace the roi's thumbnail entry
                     roi_thumbnail = save_roi_thumbnail(self.cfg.THUMBNAIL_DIR,
                                                        self.data.iloc[self.current_image_index]["filepath"],
                                                        self.data.iloc[self.current_image_index]["ext"],
                                                        frame, bbox_x, bbox_y, bbox_w, bbox_h)
-
-                    # add new thumbnail
-                    self.mpDB.add_thumbnail("roi", new_rid, roi_thumbnail)
+                    self.mpDB.batch_update_thumbnails("roi_thumbnails", "fid", {rid: {"filepath": roi_thumbnail}})
                     # update internal data
                     row_label = self.data.index[self.current_image_index]
                     cols = ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]
