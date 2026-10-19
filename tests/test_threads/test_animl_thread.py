@@ -197,6 +197,7 @@ class TestAnimlThread:
         monkeypatch.setattr(animl_thread, "save_roi_thumbnail", lambda *_args, **_kwargs: "roi-thumb.jpg")
 
         thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY="md")
+        thread.detector = "det"
         thread.images = pd.DataFrame([{"id": 3, "filepath": "/base/new.jpg", "ext": ".jpg"}])
         thread.rois = pd.DataFrame([{"id": 20, "media_id": 4, "filepath": "/base/old.jpg", "ext": ".jpg"}])
         thread.to_process = 2
@@ -280,6 +281,7 @@ class TestAnimlThread:
         monkeypatch.setattr(animl_thread, "save_roi_thumbnail", lambda *_args, **_kwargs: "roi-thumb.jpg")
 
         thread = animl_thread.AnimlThread(db, _cfg(tmp_path, n_frames=1), DETECTOR_KEY="md")
+        thread.detector = "det"
         thread.videos = pd.DataFrame(
             [
                 {"id": 5, "filepath": "/base/v.mp4", "ext": ".mp4", "frame": 1},
@@ -328,6 +330,7 @@ class TestAnimlThread:
         monkeypatch.setattr(animl_thread.animl, "get_animals", lambda detections: detections)
 
         thread = animl_thread.AnimlThread(db, _cfg(tmp_path, n_frames=1), DETECTOR_KEY="md")
+        thread.detector = "det"
         thread.rois = pd.DataFrame()
         thread.progress_count = 0
         thread.progress_update = SignalSpy()
@@ -438,3 +441,21 @@ class TestAnimlThread:
 
         assert len(db.edit_row_calls) == 1
         assert db.edit_row_calls[0][0][2]["bbox_x"] == 0.5
+
+    def test_detector_is_loaded_in_run_not_on_the_gui_thread(self, tmp_path, monkeypatch):
+        db = FakeDB()
+        loads = []
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: Path("/fake.pt"))
+        monkeypatch.setattr(animl_thread.animl, "load_detector", lambda *_a, **_k: loads.append(1) or "det")
+        monkeypatch.setattr(animl_thread, "fetch_roi_media", lambda *_a, **_k: _empty_roi_media())
+        monkeypatch.setattr(animl_thread.animl, "get_images", lambda media: media)
+        monkeypatch.setattr(animl_thread.animl, "get_videos", lambda media: media)
+        monkeypatch.setattr(animl_thread.animl, "extract_frames", lambda videos, **_k: videos)
+
+        thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY="md")
+        assert loads == []
+        thread.prompt_update = SignalSpy()
+        thread.run()
+
+        assert loads == [1]
+        assert thread.detector == "det"

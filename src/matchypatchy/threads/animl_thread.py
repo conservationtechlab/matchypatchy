@@ -110,13 +110,12 @@ class AnimlThread(QThread):
         self.to_process = 0
         self.progress_count = 0
         self.failed = set()  # files that couldn't be read
-
-        if self.DETECTOR_KEY is None:
-            self.detector = None
-        else:
-            self.detector = animl.load_detector(self.md_filepath, device=self.device)
+        self.detector = None  # loaded in run(), off the GUI thread
 
     def run(self):
+        if self.DETECTOR_KEY is not None:
+            self.prompt_update.emit("Loading detector...")
+            self.detector = animl.load_detector(self.md_filepath, device=self.device)
         # imported ROIs without a box stay as they are when there's no detector to find one
         if self.detector is None:
             self.rois = self.rois.iloc[0:0]
