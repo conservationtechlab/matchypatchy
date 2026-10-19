@@ -544,15 +544,15 @@ class DisplayCompare(QWidget):
         if self.QueryContainer.both_unnamed():
             # make new individual
             dialog = IndividualFillPopup(self)
-            if dialog.exec():
-                individual_id = self.mpDB.add_individual(dialog.get_name(),
-                                                         dialog.get_sex(),
-                                                         dialog.get_age())
-                # update query and match
-                self.QueryContainer.new_iid(individual_id)
-                del dialog
-            else:
+            if not dialog.exec():
                 return  # User cancelled - don't proceed
+            individual_id = self.mpDB.add_individual(dialog.get_name(), dialog.get_sex())
+            del dialog
+            if individual_id is None:
+                self.warn(prompt="Could not create the new individual, see the log for details.")
+                return
+            # update query and match
+            self.QueryContainer.new_iid(individual_id)
         else:
             # Match has a name - merge sequences
             self.QueryContainer.merge()
