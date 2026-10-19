@@ -231,6 +231,7 @@ class TestAnimlThread:
                     {
                         "id": 20,  # roi id for existing rois
                         "frame": 0,
+                        "conf": 0.9,
                         "bbox_x": 0.5,
                         "bbox_y": 0.6,
                         "bbox_w": 0.7,
@@ -420,3 +421,20 @@ class TestAnimlThread:
         thread.run()
 
         assert db.edit_row_calls == []
+
+    def test_roi_without_box_takes_most_confident_detection(self, tmp_path, monkeypatch):
+        thread, db = self._thread_with_detector(tmp_path, monkeypatch, unreadable=())
+        thread.images = pd.DataFrame(columns=["id", "filepath", "ext"])
+        thread.rois = pd.DataFrame([{"id": 20, "media_id": 4, "frame": 0, "filepath": "/base/old.jpg", "ext": ".jpg"}])
+        thread.to_process = 1
+        # detections come sorted most confident first
+        monkeypatch.setattr(
+            animl_thread.animl, "parse_detections",
+            lambda _detections, manifest=None, **_k: pd.DataFrame([
+                {"id": 20, "frame": 0, "conf": conf, "bbox_x": x, "bbox_y": 0.1, "bbox_w": 0.2, "bbox_h": 0.2}
+                for conf, x in ((0.9, 0.5), (0.4, 0.1), (0.2, 0.3))]))
+
+        thread.detect_images()
+
+        assert len(db.edit_row_calls) == 1
+        assert db.edit_row_calls[0][0][2]["bbox_x"] == 0.5

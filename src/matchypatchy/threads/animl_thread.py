@@ -217,6 +217,8 @@ class AnimlThread(QThread):
                 continue
             detections = animl.parse_detections(detections, manifest=roi_batch)
             detections = animl.get_animals(detections)
+            # each ROI takes its most confident detection (writing them all left the last one)
+            detections = detections.sort_values('conf', ascending=False).drop_duplicates('id')
 
             for _, roi in detections.iterrows():
                 frame = roi['frame'] if 'frame' in roi.index else 0
