@@ -129,3 +129,79 @@ class TestSaveRoi:
         assert dialog.data.loc[0, "id"] == 10
         assert dialog.data.loc[0, "bbox_x"] == 0.3
         assert dialog.roi_updated is True
+
+
+def _panel(data):
+    """MagicMock standing in for a MetadataPanel over the given rows"""
+    from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+    panel = MagicMock()
+    panel.data = data
+    panel.individuals = pd.DataFrame({"name": ["Spot", "Spot"], "sex": ["F", "M"]}, index=[3, 4])
+    panel._roi_rows = lambda: MetadataPanel._roi_rows(panel)
+    panel._name_index = lambda iid: MetadataPanel._name_index(panel, iid)
+    return panel
+
+
+def _edit_rows():
+    return pd.DataFrame({"id": [10, pd.NA], "media_id": [1, 1], "individual_id": [None, None],
+                         "sex": [None, None], "viewpoint": [None, None]})
+
+
+class TestMetadataPanel:
+    def test_name_with_duplicate_names_uses_position(self):
+        """Two individuals named Spot: picking the second assigns id 4"""
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = _panel(_edit_rows())
+        panel.name.currentIndex.return_value = 2
+        MetadataPanel.change_name(panel)
+        edits = [c.args[0] for c in panel.send_edit.call_args_list]
+        assert [(e.rid, e.new_value) for e in edits] == [(10, 4)]  # video row skipped
+
+    def test_viewpoint_edits_skip_video_row(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = _panel(_edit_rows())
+        panel.ids = [10, pd.NA]
+        panel.VIEWPOINTS = {"Any": "Any", "None": "None", "0": "Right", "1": "Left"}
+        panel.viewpoint.currentIndex.return_value = 2  # multi-row list: Mixed, None, Right, Left
+        MetadataPanel.change_viewpoint(panel)
+        assert [c.args[0].rid for c in panel.send_edit.call_args_list] == [10]
+
+    def test_new_individual_cancel_assigns_nothing(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = _panel(_edit_rows())
+        with patch(f"{POPUP}.IndividualFillPopup") as fill:
+            fill.return_value.exec.return_value = False
+            MetadataPanel.new_individual(panel)
+        panel.mpDB.add_individual.assert_not_called()
+        panel.name.setCurrentIndex.assert_not_called()
+
+    def test_new_individual_is_selected_not_written_directly(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = _panel(_edit_rows())
+        panel.mpDB.add_individual.return_value = 4
+        with patch(f"{POPUP}.IndividualFillPopup") as fill:
+            fill.return_value.exec.return_value = True
+            MetadataPanel.new_individual(panel)
+        panel.mpDB.edit_row.assert_not_called()   # assignment goes through the edit stack
+        panel.name.setCurrentIndex.assert_called_once_with(2)
+
+
+class TestPopupFavorite:
+    def test_favorite_goes_through_the_edit_stack(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+        dialog = _popup(pd.DataFrame({"id": [10], "media_id": [1], "favorite": [0]}), data_type=1)
+        dialog.edit_stack = []
+        dialog.button_favorite.isChecked.return_value = True
+        MediaEditPopup.favorite(dialog)
+        dialog.mpDB.edit_row.assert_not_called()
+        assert [(e.rid, e.reference, e.new_value) for e in dialog.edit_stack] == [(10, "favorite", 1)]
+        assert dialog.data.loc[0, "favorite"] == 1
+
+    def test_video_row_cannot_be_favorited(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+        dialog = _popup(pd.DataFrame({"id": [pd.NA], "media_id": [1], "favorite": [0]}), data_type=1)
+        dialog.edit_stack = []
+        dialog.button_favorite.isChecked.return_value = True
+        MediaEditPopup.favorite(dialog)
+        assert dialog.edit_stack == []
+        dialog.mpDB.edit_row.assert_not_called()

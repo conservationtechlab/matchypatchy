@@ -170,14 +170,22 @@ class MediaEditPopup(QDialog):
         self.toggle_edit_roi_button()
 
     def favorite(self):
-        """Toggle favorite status of current ROI"""
-        rid = self.data.iloc[self.current_image_index]["id"]  # roi
-        if self.button_favorite.isChecked():
+        """Toggle favorite status of current ROI, saved with the other edits on OK"""
+        row = self.data.iloc[self.current_image_index]
+        if pd.isna(row["id"]):
+            return  # full video row, no roi
+        value = 1 if self.button_favorite.isChecked() else 0
+        if value:
             self.button_favorite.setStyleSheet(""" QPushButton { background-color: #b51b32; color: white; }""")
-            self.mpDB.edit_row('roi', rid, {"favorite": 1})
         else:
             self.button_favorite.setStyleSheet("")
-            self.mpDB.edit_row('roi', rid, {"favorite": 0})
+        self.edit_stack.append(EditObject(rid=int(row["id"]),
+                                          mid=row["media_id"],
+                                          reference='favorite',
+                                          previous_value=row["favorite"],
+                                          new_value=value))
+        # keep the shown state when moving between images
+        self.data.loc[self.data.index[self.current_image_index], "favorite"] = value
 
     def check_favorite(self):
         """Check and update favorite button status"""
@@ -185,6 +193,8 @@ class MediaEditPopup(QDialog):
             # disable favorite button for media-only
             self.button_favorite.setDisabled(True)
             return
+        # the full video row has no roi to favorite
+        self.button_favorite.setDisabled(pd.isna(self.data.iloc[self.current_image_index]["id"]))
         favorite = self.data.iloc[self.current_image_index]["favorite"]
         if favorite == 1:
             self.button_favorite.setChecked(True)
@@ -484,8 +494,7 @@ class MetadataPanel(QWidget):
                 self.name.setCurrentIndex(0)
                 self.sex.setDisabled(True)
             else:
-                name_index = self.name.findText(self.individuals.loc[iid, 'name'])
-                self.name.setCurrentIndex(name_index)
+                self.name.setCurrentIndex(self._name_index(iid))
                 self.sex.setDisabled(False)
 
             self.set_sex_combobox(current_image_index)
@@ -507,6 +516,15 @@ class MetadataPanel(QWidget):
         self.sex.blockSignals(False)
         self.viewpoint.blockSignals(False)
         self.comment.blockSignals(False)
+
+    def _name_index(self, iid):
+        """Position of an individual in the name list (by id, names may repeat), 0 Unknown"""
+        positions = list(self.individuals.index)
+        return positions.index(int(iid)) + 1 if int(iid) in positions else 0
+
+    def _roi_rows(self):
+        """Rows with a roi, skipping the full video row"""
+        return [row for row in self.data.itertuples() if not pd.isna(row.id)]
 
     def send_edit(self, edit):
         """Send edit to parent popup"""
@@ -563,8 +581,9 @@ class MetadataPanel(QWidget):
     def change_name(self):
         """Update the name for all selected ROIs."""
         if self.name.currentIndex() > 0:
-            iid = self.individuals.loc[self.individuals["name"] == self.name_list[self.name.currentIndex()]].index.item()
-            for row in self.data.itertuples():
+            # by position, names may repeat
+            iid = int(self.individuals.index[self.name.currentIndex() - 1])
+            for row in self._roi_rows():
                 edit = EditObject(rid=row.id,
                                   mid=row.media_id,
                                   reference='individual_id',
@@ -577,7 +596,7 @@ class MetadataPanel(QWidget):
         else:
             dialog = AlertPopup(self, "Are you sure you want to set the name to 'Unknown'?\nThis will remove the ID assignment from the selected ROI(s).")
             if dialog.exec():
-                for row in self.data.itertuples():
+                for row in self._roi_rows():
                     edit = EditObject(rid=row.id,
                                       mid=row.media_id,
                                       reference='individual_id',
@@ -591,7 +610,7 @@ class MetadataPanel(QWidget):
         """Update sex for all selected ROIs."""
         # updates individual table when transposed
         if self.name.currentIndex() > 0:
-            for row in self.data.itertuples():
+            for row in self._roi_rows():
                 edit = EditObject(rid=row.id,
                                   mid=row.media_id,
                                   reference='sex',
@@ -616,7 +635,7 @@ class MetadataPanel(QWidget):
         else:
             selected_viewpoint = int(selected_viewpoint)
 
-        for row in self.data.itertuples():
+        for row in self._roi_rows():
             edit = EditObject(rid=row.id,
                               mid=row.media_id,
                               reference='viewpoint',
@@ -641,11 +660,16 @@ class MetadataPanel(QWidget):
     def new_individual(self):
         """Create a new individual and assign it to the selected ROIs."""
         dialog = IndividualFillPopup(self)
-        if dialog.exec():
-            individual_id = self.mpDB.add_individual(dialog.get_name(),
-                                                     dialog.get_sex())
-            for rid in self.ids:
-                self.mpDB.edit_row('roi', rid, {"individual_id": individual_id})
-        # reload data
+        accepted = dialog.exec()
+        if not accepted:
+            return
+        individual_id = self.mpDB.add_individual(dialog.get_name(), dialog.get_sex())
+        del dialog
+        if individual_id is None:
+            alert = AlertPopup(self, "Could not create the new individual, see the log for details.")
+            alert.exec()
+            return
+        # reload the name list, then select the new individual; change_name adds the
+        # assignment to the edit stack like any name change (saved with OK)
         self.refresh_values(self.parent.current_image_index)
-        self.name.setCurrentIndex(self.name.count() - 1)  # select new individual
+        self.name.setCurrentIndex(self._name_index(individual_id))
