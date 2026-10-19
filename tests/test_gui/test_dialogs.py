@@ -500,3 +500,61 @@ class TestViewIndividualPrefilter:
         bar = self._refresh(0)
         assert bar.unidentified_only is True
         bar.unidentified.setChecked.assert_called_with(True)
+
+
+# ---------------------------------------------------------------------------
+# FilterBar survey / region station lists
+# ---------------------------------------------------------------------------
+
+class TestFilterBarStations:
+    def _bar(self):
+        bar = MagicMock()
+        bar.mpDB.select.return_value = [(1, "S1"), (2, "S2")]
+        return bar
+
+    def test_survey_placeholder_without_region_shows_all_stations(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = self._bar()
+        bar.survey_list_ordered = [(0, "Survey"), (5, "A")]
+        bar.survey_select.currentIndex.return_value = 0
+        bar.region_select.currentIndex.return_value = 0
+        FilterBar.select_survey(bar)
+        bar.filter_stations.assert_called_once_with()
+
+    def test_survey_placeholder_with_region_shows_region_stations(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = self._bar()
+        bar.survey_list_ordered = [(0, "Survey"), (5, "A")]
+        bar.valid_surveys = {5: "A", 6: "B"}
+        bar.survey_select.currentIndex.return_value = 0
+        bar.region_select.currentIndex.return_value = 1
+        FilterBar.select_survey(bar)
+        bar.filter_stations.assert_called_once_with(survey_ids=[(5, "A"), (6, "B")])
+
+    def test_region_without_surveys_has_no_stations(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = self._bar()
+        FilterBar.filter_stations(bar, survey_ids=[])
+        assert bar.valid_stations == {}
+
+    def test_no_survey_filter_has_all_stations(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = self._bar()
+        FilterBar.filter_stations(bar)
+        assert bar.valid_stations == {1: "S1", 2: "S2"}
+
+
+class TestThresholdInput:
+    @pytest.mark.parametrize("text", ["", ".", "-", "abc"])
+    def test_partial_input_is_ignored(self, text):
+        from matchypatchy.gui.widgets.gui_assets import SliderWithLabel
+        slider = MagicMock()
+        SliderWithLabel.value_edit_changed(slider, text)
+        slider.slider_value_changed.emit.assert_not_called()
+
+    def test_value_sets_slider_once(self):
+        from matchypatchy.gui.widgets.gui_assets import SliderWithLabel
+        slider = MagicMock()
+        SliderWithLabel.value_edit_changed(slider, "0.35")
+        slider.slider.setValue.assert_called_once_with(35)
+        slider.slider_value_changed.emit.assert_called_once_with(35)

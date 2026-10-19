@@ -305,10 +305,17 @@ class SliderWithLabel(QWidget):
         self.slider_value_changed.emit(value)
 
     def value_edit_changed(self, text):
-        val = float(text)
+        try:
+            val = float(text)
+        except ValueError:
+            return  # partial input while typing, eg. '' '.' '-'
         if 0.0 <= val <= 1.0:
-            self.slider.setValue(int(val * 100))
-            self.slider_value_changed.emit(int(val * 100))
+            value = int(round(val * 100))
+            # move the slider without update_text rewriting the text being typed
+            self.slider.blockSignals(True)
+            self.slider.setValue(value)
+            self.slider.blockSignals(False)
+            self.slider_value_changed.emit(value)
 
 
 class NoHoverDelegate(QStyledItemDelegate):
