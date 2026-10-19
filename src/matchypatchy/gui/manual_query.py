@@ -207,7 +207,8 @@ class ManualQueryContainer(QObject):
         lower = min(self.current_query_rid, self.current_match_rid)
         upper = max(self.current_query_rid, self.current_match_rid)
         distance = self.pair_table.loc[(self.pair_table['id1'] == lower) & (self.pair_table['id2'] == upper), 'distance']
-        return distance.values[0] if not distance.empty else 0
+        # None if the pair has no stored distance, 0 would display as a perfect match
+        return distance.values[0] if not distance.empty else None
 
     def _get_roi_field(self, roi_id, field):
         """Get ROI field from DataFrame (always fresh)"""

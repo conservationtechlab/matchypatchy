@@ -492,6 +492,9 @@ class MatchyPatchyDB():
 
     def copy(self, table, row_id: int):
         """Copy a row from a table by id"""
+        # TODO: broken, always fails. SELECT * copies the id column (primary key conflict), and media
+        # also has UNIQUE relative_path and sha256. Only caller is DisplayMedia.duplicate, whose button
+        # is currently never enabled. Decide what duplicating media should mean before fixing.
         try:
             cursor = self.db.cursor()
             row_id = int(row_id)
