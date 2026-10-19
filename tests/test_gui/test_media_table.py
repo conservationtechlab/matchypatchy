@@ -180,9 +180,10 @@ class TestReceiveData:
                     mt.receiveData(df)
         assert len(mt._data_filtered) == 3
 
-    def test_receive_data_with_selected_rows(self):
+    def test_receive_data_with_selected_ids(self):
         mt = _make_media_table()
         df = _sample_df()
+        df["id"] = [100, 101, 102]
         df["select"] = 0
         with patch("matchypatchy.gui.media_table.fetch_individual",
                    return_value=pd.DataFrame(columns=["id", "name"])):
@@ -190,10 +191,38 @@ class TestReceiveData:
                        return_value=pd.DataFrame(columns=["id", "name"])):
                 with patch("matchypatchy.gui.media_table.fetch_cameras",
                            return_value=pd.DataFrame(columns=["id", "name"])):
-                    mt.receiveData(df, selected_rows=[0, 2])
+                    mt.receiveData(df, selected_ids=[100, 102])
         assert mt._data_filtered.loc[0, "select"] == 1
         assert mt._data_filtered.loc[1, "select"] == 0
         assert mt._data_filtered.loc[2, "select"] == 1
+
+    def _receive(self, mt, df, ids):
+        with patch("matchypatchy.gui.media_table.fetch_individual",
+                   return_value=pd.DataFrame(columns=["id", "name"])):
+            with patch("matchypatchy.gui.media_table.fetch_stations",
+                       return_value=pd.DataFrame(columns=["id", "name"])):
+                with patch("matchypatchy.gui.media_table.fetch_cameras",
+                           return_value=pd.DataFrame(columns=["id", "name"])):
+                    mt.receiveData(df, selected_ids=ids)
+
+    def test_selection_follows_ids_when_rows_reorder(self):
+        """A tick on id 102 stays on 102 after the data comes back in another order"""
+        mt = _make_media_table()
+        df = _sample_df()
+        df["id"] = [102, 100, 101]   # re-filtered/unsorted order differs from the view
+        df["select"] = 0
+        self._receive(mt, df, [102])
+        assert mt.selectedIds() == [102]
+        assert mt._data_filtered.loc[0, "select"] == 1
+
+    def test_selected_ids_missing_after_filter_is_fine(self):
+        """Ticked rows filtered out of the data are dropped, not a KeyError"""
+        mt = _make_media_table()
+        df = _sample_df().iloc[:1].copy()
+        df["id"] = [100]
+        df["select"] = 0
+        self._receive(mt, df, [100, 105])
+        assert mt.selectedIds() == [100]
 
     def test_receive_data_updates_headers(self):
         mt = _make_media_table()

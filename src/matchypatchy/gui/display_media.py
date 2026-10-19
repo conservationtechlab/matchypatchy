@@ -348,9 +348,11 @@ class DisplayMedia(QWidget):
         if reload:
             self.load_table()
         else:
+            # keep ticked rows by id, their positions change when re-filtered and sorted
+            selected_ids = self.media_table.selectedIds()
             self.apply_edits()
             self.filter_data()
-            self.media_table.receiveData(self._data_filtered, selected_rows=self.selected_rows)
+            self.media_table.receiveData(self._data_filtered, selected_ids=selected_ids)
             self._apply_sort()
             self.update_count_label()
             self.update_edd_buttons()

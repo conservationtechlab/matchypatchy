@@ -333,3 +333,17 @@ class TestViewpointFilter:
 
     def test_no_viewpoint_filter(self):
         assert self._filter((0, "Viewpoint")) == [10, 11, 12]
+
+
+# ---------------------------------------------------------------------------
+# Selection across refresh
+# ---------------------------------------------------------------------------
+
+class TestSelectionAcrossRefresh:
+    def test_refresh_passes_selected_ids(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.media_table.selectedIds.return_value = [11]
+        dm._apply_sort = MagicMock()
+        DisplayMedia.refresh_table(dm)
+        assert dm.media_table.receiveData.call_args.kwargs["selected_ids"] == [11]
