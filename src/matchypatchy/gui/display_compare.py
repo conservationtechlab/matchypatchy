@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from PIL import Image
 
+import pandas as pd
+
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QHeaderView, QTableWidget, QTableWidgetItem)
 from PyQt6.QtCore import Qt, QTimer
@@ -796,19 +798,29 @@ class DisplayCompare(QWidget):
         del dialog
 
     def save_changes(self):
-        # commit all changes in self.edit_stack to database
-        while len(self.edit_stack) > 0:
-            edit = self.edit_stack.pop()
-            id = edit['rid']
-            replace_dict = {edit['reference']: edit['new_value']}
-            # determine table to edit based on reference column
-            if edit['reference'] in {'sex'}:
-                iid = self.QueryContainer.get_info(id, "individual_id")
-                self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
-            elif edit['reference'] in {'comment'}:
-                self.mpDB.edit_row("media", id, replace_dict, allow_none=True, quiet=False)
+        """Commit all EditObjects in self.edit_stack to the database, oldest first"""
+        # individual_id edits applied so far, so a later sex edit targets the new individual
+        assigned_iids = {}
+        for edit in self.edit_stack:
+            replace_dict = {edit.reference: edit.new_value}
+            # comment edits belong to the media and carry no roi id
+            if edit.reference == 'comment':
+                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=True)
+                continue
+            # rows without a roi id (eg. the full video row) have nothing to update
+            if edit.rid is None or pd.isna(edit.rid):
+                continue
+            rid = int(edit.rid)
+            if edit.reference == 'sex':
+                iid = assigned_iids.get(rid, self.QueryContainer.get_info(rid, "individual_id"))
+                if iid is not None and not pd.isna(iid):
+                    self.mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
             else:
-                self.mpDB.edit_row("roi", id, replace_dict, allow_none=False, quiet=False)
+                # individual_id and viewpoint may be cleared (Unknown / None)
+                self.mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
+                if edit.reference == 'individual_id':
+                    assigned_iids[rid] = edit.new_value
+        self.edit_stack = []
 
     def open_image(self, rid):
         """

@@ -50,3 +50,56 @@ class TestConfirmMatchNewIndividual:
             DisplayCompare.confirm_match(dc)
         dc.warn.assert_called_once()
         dc.QueryContainer.new_iid.assert_not_called()
+
+
+class TestSaveChanges:
+    def _save(self, edits, individual_ids=None):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        individual_ids = individual_ids or {}
+        dc = MagicMock()
+        dc.edit_stack = list(edits)
+        dc.QueryContainer.get_info.side_effect = lambda rid, col: individual_ids.get(rid)
+        DisplayCompare.save_changes(dc)
+        return dc
+
+    def _edit(self, rid, mid, reference, new_value, previous_value=None):
+        from matchypatchy.database.media import EditObject
+        return EditObject(rid=rid, mid=mid, reference=reference,
+                          previous_value=previous_value, new_value=new_value)
+
+    def test_roi_edit(self):
+        dc = self._save([self._edit(5, 2, "viewpoint", 1)])
+        dc.mpDB.edit_row.assert_called_once_with("roi", 5, {"viewpoint": 1}, allow_none=True)
+        assert dc.edit_stack == []
+
+    def test_clearing_a_value_is_allowed(self):
+        """Setting a name to Unknown stores NULL"""
+        dc = self._save([self._edit(5, 2, "individual_id", None)])
+        dc.mpDB.edit_row.assert_called_once_with("roi", 5, {"individual_id": None}, allow_none=True)
+
+    def test_comment_goes_to_media_by_media_id(self):
+        dc = self._save([self._edit(None, 2, "comment", "hi")])
+        dc.mpDB.edit_row.assert_called_once_with("media", 2, {"comment": "hi"}, allow_none=True)
+
+    def test_edits_applied_oldest_first(self):
+        dc = self._save([self._edit(5, 2, "viewpoint", 0), self._edit(5, 2, "viewpoint", 1)])
+        values = [c.args[2]["viewpoint"] for c in dc.mpDB.edit_row.call_args_list]
+        assert values == [0, 1]
+
+    def test_sex_edits_the_rois_individual(self):
+        dc = self._save([self._edit(5, 2, "sex", "M")], individual_ids={5: 3.0})
+        dc.mpDB.edit_row.assert_called_once_with("individual", 3, {"sex": "M"}, allow_none=True)
+
+    def test_sex_follows_a_name_change_in_the_same_edit(self):
+        dc = self._save([self._edit(5, 2, "individual_id", 8), self._edit(5, 2, "sex", "M")],
+                        individual_ids={5: 3.0})
+        assert dc.mpDB.edit_row.call_args_list[-1].args == ("individual", 8, {"sex": "M"})
+
+    def test_sex_without_individual_is_skipped(self):
+        dc = self._save([self._edit(5, 2, "sex", "M")], individual_ids={5: None})
+        dc.mpDB.edit_row.assert_not_called()
+
+    def test_row_without_roi_id_is_skipped(self):
+        import pandas as pd
+        dc = self._save([self._edit(pd.NA, 2, "viewpoint", 1)])
+        dc.mpDB.edit_row.assert_not_called()
