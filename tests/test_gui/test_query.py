@@ -740,6 +740,15 @@ class TestRestrictToData:
         assert mo.filtered_neighbors == [(11, 0.1), (12, 0.2)]
         assert len(mo.ranked_matches) == 2
 
+    def test_truncation_keeps_matches_and_match_data_consistent(self):
+        """og_ranked_matches is viewpoint order, not distance order; both must hold the same k rois"""
+        self.qc.k = 2
+        raw = _raw(1, [10], [(11, 0.1), (12, 0.2), (13, 0.3)])
+        raw["og_ranked_matches"] = [(13, 0.3), (12, 0.2), (11, 0.1)]
+        mo = self.qc._restrict_to_data([raw], strict=False)[0]
+        assert set(mo.match_data["id"]) == {11, 12}
+        assert mo.ranked_matches == [(12, 0.2), (11, 0.1)]
+
     def test_drops_sequence_with_no_neighbors_left(self):
         self.qc.data = self.qc.data.loc[[10, 11]]
         out = self.qc._restrict_to_data([_raw(1, [10], [(12, 0.1)])], strict=False)

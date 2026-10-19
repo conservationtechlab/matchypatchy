@@ -534,7 +534,10 @@ class QueryContainer(BaseQueryContainer):
             if not neighbors:
                 continue
 
-            ranked_matches = [tuple(m) for m in s['og_ranked_matches'] if m[0] in keep][:self.k]
+            # og_ranked_matches is the same rois in viewpoint order; keep exactly the
+            # rois chosen above so every ranked match is in match_data
+            neighbor_ids = {rid for rid, _ in neighbors}
+            ranked_matches = [tuple(m) for m in s['og_ranked_matches'] if m[0] in neighbor_ids]
 
             mo = MatchObject(sequence_id=s['sequence_id'],
                              filtered_neighbors=neighbors,
