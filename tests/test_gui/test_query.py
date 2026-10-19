@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 QUERY = "matchypatchy.gui.query"
-QUERY_BASE = "matchypatchy.gui.query_base"
+QUERY_BASE = QUERY
 
 
 # ---------------------------------------------------------------------------
