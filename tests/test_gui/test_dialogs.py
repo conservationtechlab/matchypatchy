@@ -700,3 +700,28 @@ class TestStationPopup:
             fill_cls.return_value.exec.return_value = True
             StationPopup.add(popup)
         popup._warn.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Export
+# ---------------------------------------------------------------------------
+
+class TestExport:
+    def test_export_can_be_migrated_back(self, tmp_db, tmp_path):
+        """The CSV has exactly the migrate columns (no index column) and UTF-8 names"""
+        import pandas as pd
+        from matchypatchy.gui.display_base import DisplayBase
+        from matchypatchy.threads.import_thread import CSVMigrateThread
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        db, _ = tmp_db
+        station = db.add_station("Estación Ñ", 1.0, 2.0, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h1", ".jpg", "2024-01-01 10:00:00", station)
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        base = MagicMock()
+        base.mpDB = db
+        out = tmp_path / "export"
+        with patch("matchypatchy.gui.display_base.QFileDialog.getSaveFileName", return_value=(str(out), "")):
+            DisplayBase.export(base)
+        data = pd.read_csv(f"{out}.csv")
+        assert set(data.columns) == ImportCSVPopup.EXPECTED_COLUMNS == CSVMigrateThread.EXPECTED_COLUMNS
+        assert data.loc[0, "station_name"] == "Estación Ñ"

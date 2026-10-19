@@ -334,8 +334,9 @@ class DisplayBase(QWidget):
                 if not file_path.endswith(".csv"):
                     file_path += ".csv"
 
-                with open(file_path, 'w') as file:
-                    data.to_csv(file, index=False)
+                # without the index, so the file can be imported (migrated) again; pandas
+                # handles line endings (text mode on Windows added blank lines)
+                data.to_csv(file_path, index=False, encoding="utf-8")
                 self.logger.info(f"Data exported to: {file_path}")
         else:
             dialog = AlertPopup(self, prompt="No data to export.")

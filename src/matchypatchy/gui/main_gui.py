@@ -233,21 +233,8 @@ class MainWindow(QMainWindow):
                     self.import_folder()
 
     def export(self):
-        data = self.mpDB.export_data()
-        if data is not None:
-            file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
-            if file_path:
-                # add csv if user didnt enter
-                if not file_path.endswith(".csv"):
-                    file_path += ".csv"
-
-                with open(file_path, 'w') as file:
-                    data.to_csv(file)
-                self.logger.info(f"Data exported to: {file_path}")
-        else:
-            dialog = AlertPopup(self, prompt="No data to export.")
-            dialog.exec()
-            del dialog
+        """Export database to CSV (same export as the Home screen's)"""
+        self.Base.export()
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)
