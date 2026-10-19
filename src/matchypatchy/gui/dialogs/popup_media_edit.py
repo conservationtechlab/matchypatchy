@@ -13,7 +13,7 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, TextEditWithSignal
 
 from matchypatchy.threads.model_download_thread import load_model
-from matchypatchy.database.media import fetch_individual, get_roi_bbox, EditObject
+from matchypatchy.database.media import fetch_individual, fetch_roi, get_roi_bbox, EditObject
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 
@@ -214,11 +214,10 @@ class MediaEditPopup(QDialog):
 
     def toggle_edit_roi_button(self):
         """Enable or disable the edit ROI button based on whether the current image has an ROI."""
-        if pd.isna(self.data.iloc[self.current_image_index]["id"]):
-            print("video")
-            self.edit_btn.setEnabled(False)
-        else:
-            self.edit_btn.setEnabled(True)
+        has_roi = not pd.isna(self.data.iloc[self.current_image_index]["id"])
+        self.edit_btn.setEnabled(has_roi)
+        # in the roi view the full video row has no roi to delete
+        self.delete_btn.setEnabled(has_roi or self.data_type == 0)
 
     def edit_roi(self):
         """Enable drawing mode to edit the current ROI."""
@@ -312,27 +311,47 @@ class MediaEditPopup(QDialog):
         self.image.reset()
 
     def delete(self):
-        """Delete current ROI"""
-        dialog = AlertPopup(self, prompt="Are you sure you want to delete this ROI? This action cannot be undone.")
-        if dialog.exec():
-            rid = self.data.iloc[self.current_image_index]["id"]  # roi
-            self.mpDB.delete('roi', f"id={rid}")
-            self.mpDB.delete_emb(rid)
-
-            # update the list of IDs after deletion
-            self.data = self.data.drop(self.data.index[self.current_image_index]).reset_index(drop=True)
-            self.ids = self.data["id"].tolist()
-
-            # close if no more images left
-            if len(self.data) == 0:
-                self.parent.load_table()
-                self.close()
+        """Delete the current roi, or the current image in the Full Images view"""
+        row = self.data.iloc[self.current_image_index]
+        if self.data_type == 1:
+            # the full video row has no roi to delete
+            if pd.isna(row["id"]):
                 return
-
-            if self.current_image_index >= len(self.data):
-                self.current_image_index = len(self.data) - 1
-
+            prompt = "Are you sure you want to delete this ROI? This action cannot be undone."
+        else:
+            prompt = "Are you sure you want to delete this image and all of its ROIs? This action cannot be undone."
+        dialog = AlertPopup(self, prompt=prompt)
+        confirmed = dialog.exec()
         del dialog
+        if not confirmed:
+            return
+
+        if self.data_type == 1:
+            rid = int(row["id"])
+            self.mpDB.delete_emb(rid)
+            self.mpDB.delete('roi', f"id={rid}")
+        else:
+            # id is the media id here; its rois, thumbnails cascade with it
+            mid = int(row["id"])
+            rois = fetch_roi(self.mpDB, media_id=mid)
+            for roi_id in rois.get("roi_id", []):
+                self.mpDB.delete_emb(roi_id)
+            self.mpDB.delete('media', f"id={mid}")
+        # tell the caller to reload
+        self.roi_updated = True
+
+        # update the list of IDs after deletion
+        self.data = self.data.drop(self.data.index[self.current_image_index]).reset_index(drop=True)
+        self.ids = self.data["id"].tolist()
+
+        # close if nothing left to show (only the video row remains in the roi view)
+        if self.data.empty or (self.data_type == 1 and self.data["id"].isna().all()):
+            self.close_out()
+            return
+
+        self.current_image_index = min(self.current_image_index, len(self.data) - 1)
+        self.check_next_buttons()
+        self.refresh()
 
 
 class MetadataPanel(QWidget):
@@ -343,8 +362,6 @@ class MetadataPanel(QWidget):
         super().__init__(parent)
         self.parent = parent
         self.mpDB = parent.mpDB
-        self.data = parent.data
-        self.ids = parent.ids
         self.data_type = parent.data_type
         self.individuals = None
         self.name_list = ["Unknown"]  # List of individual names for the combobox
@@ -406,6 +423,15 @@ class MetadataPanel(QWidget):
 
         metadata_layout.addStretch()
         self.setLayout(metadata_layout)
+
+    @property
+    def data(self):
+        """The popup's current rows (it replaces them after a delete)"""
+        return self.parent.data
+
+    @property
+    def ids(self):
+        return self.parent.ids
 
     def _add_metadata_field(self, layout, label_text, data_widget,
                             is_editable=False, on_change=None, stretch=False):

@@ -573,14 +573,14 @@ class DisplayMedia(QWidget):
                 data = pd.concat([data, video_row], ignore_index=True)  # add video row
 
         # Launch Media Edit Popup
-        roi_updated = False
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
-            roi_updated = dialog.roi_updated
             self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
-            del dialog
+        # rows deleted or rois redrawn in the popup need a reload, even after Cancel
+        roi_updated = dialog.roi_updated
+        del dialog
         # reload data and update buttons
         self.refresh_table(reload=roi_updated)
 
@@ -595,9 +595,11 @@ class DisplayMedia(QWidget):
             edit_stack = dialog.get_edit_stack()
             self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
-            del dialog
+        # rows deleted or rois redrawn in the popup need a reload
+        roi_updated = dialog.roi_updated
+        del dialog
         # reload data and update buttons
-        self.refresh_table()
+        self.refresh_table(reload=roi_updated)
 
     def duplicate(self):
         """Duplicate selected rows in the database."""
