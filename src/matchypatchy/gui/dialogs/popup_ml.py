@@ -26,6 +26,9 @@ class MLDownloadPopup(QDialog):
         self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
         self.available_models = self.discover_models()
+        # models queued or downloading
+        self.pending = set()
+        self._closing = False
         self.setWindowTitle("Select Models")
 
         # Create layout for the checkboxes and add it to the dialog
@@ -66,17 +69,12 @@ class MLDownloadPopup(QDialog):
         self.set_checkboxes()
 
     def discover_models(self):
-        """Check which models are already downloaded"""
+        """Models whose files are all downloaded, {key: path}"""
         models_dict = {}
-        for m in self.models.keys():
-            names = self.models[m][0]
-            if len(names) > 0:
-                path = self.ml_dir / names[0]
-            else:
-                path = self.ml_dir / names
-            if path.exists():
+        for m in self.models:
+            path = model_download_thread.get_path(self.ml_dir, m)
+            if path is not None:
                 models_dict[m] = path
-        # if looking for a particular model, give back path
         return models_dict
 
     def set_checkboxes(self):
@@ -93,8 +91,8 @@ class MLDownloadPopup(QDialog):
             if checkbox.isChecked():
                 all_available.add(m)
 
-        # See if any are newly checked
-        newly_checked = all_available - set(self.available_models.keys())
+        # See if any are newly checked (not downloaded or already queued)
+        newly_checked = all_available - set(self.available_models.keys()) - self.pending
         if newly_checked:
             self.download_ml(newly_checked)
 
@@ -116,22 +114,48 @@ class MLDownloadPopup(QDialog):
 
         # Queue each model (thread-safe)
         for model_key in checked_models:
+            self.pending.add(model_key)
             self.build_thread.queue_download(model_key)
 
-    def on_download_result(self, ok: bool, message: str):
-        """Handle download completion"""
-        self.progress_bar.hide()
-        self.enable_close()
+    def on_download_result(self, key: str, ok: bool, message: str):
+        """Handle one model's download result"""
+        self.pending.discard(key)
+        self.available_models = self.discover_models()
         if not ok:
-            self.warning_label.setText(message)
+            self.warning_label.setText(f"{key}: {message}")
             self.warning_label.show()
+            # untick so it can be ticked again to retry
+            checkbox = self.checkbox_layout.itemAtPosition(self.models.index(key), 0).widget()
+            checkbox.blockSignals(True)
+            checkbox.setChecked(False)
+            checkbox.blockSignals(False)
+        # done once nothing is left in the queue
+        if not self.pending:
+            self.progress_bar.hide()
+            self.enable_close()
 
-    def reject(self):
-        """Handle the rejection of the dialog, interrupting any ongoing downloads."""
-        # interrupt download if in progress, otherwise just close
+    def _stop_thread(self):
+        """Stop the download thread (it otherwise keeps polling its queue)"""
         if getattr(self, "build_thread", None) is not None and self.build_thread.isRunning():
             self.build_thread.requestInterruption()
-            # optional: don't close immediately; wait for thread to finish
+            return True
+        return False
+
+    def accept(self):
+        """OK is only enabled when nothing is downloading; stop the idle thread and close"""
+        if self._stop_thread():
+            self.build_thread.wait()
+        super().accept()
+
+    def reject(self):
+        """Cancel downloads, then close once the thread has stopped"""
+        if self._closing:
+            return
+        if self._stop_thread():
+            # closes when a running download has cleaned up its partial file
+            self._closing = True
+            self.buttonBox.setEnabled(False)
+            self.build_thread.finished.connect(lambda: QDialog.reject(self))
             return
         super().reject()
 
@@ -194,14 +218,12 @@ class MLOptionsPopup(QDialog):
         self.setLayout(layout)
 
     def discover_models(self):
-        """Check which models are already downloaded"""
+        """Models whose files are all downloaded, {key: path to the main file}"""
         models_dict = {}
-        for m in self.ml_cfg['MODELS'].keys():
-            for name in self.ml_cfg['MODELS'][m][0]:
-                path = self.ml_dir / name
-            if path.exists():
+        for m in self.ml_cfg['MODELS']:
+            path = model_download_thread.get_path(self.ml_dir, m)
+            if path is not None:
                 models_dict[m] = path
-        # if looking for a particular model, give back path
         return models_dict
 
     def get_subset(self, subset):

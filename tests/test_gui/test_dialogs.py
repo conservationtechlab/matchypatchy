@@ -700,3 +700,121 @@ class TestStationPopup:
             fill_cls.return_value.exec.return_value = True
             StationPopup.add(popup)
         popup._warn.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Export
+# ---------------------------------------------------------------------------
+
+class TestExport:
+    def test_export_can_be_migrated_back(self, tmp_db, tmp_path):
+        """The CSV has exactly the migrate columns (no index column) and UTF-8 names"""
+        import pandas as pd
+        from matchypatchy.gui.display_base import DisplayBase
+        from matchypatchy.threads.import_thread import CSVMigrateThread
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        db, _ = tmp_db
+        station = db.add_station("Estación Ñ", 1.0, 2.0, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h1", ".jpg", "2024-01-01 10:00:00", station)
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        base = MagicMock()
+        base.mpDB = db
+        out = tmp_path / "export"
+        with patch("matchypatchy.gui.display_base.QFileDialog.getSaveFileName", return_value=(str(out), "")):
+            DisplayBase.export(base)
+        data = pd.read_csv(f"{out}.csv")
+        assert set(data.columns) == ImportCSVPopup.EXPECTED_COLUMNS == CSVMigrateThread.EXPECTED_COLUMNS
+        assert data.loc[0, "station_name"] == "Estación Ñ"
+
+
+# ---------------------------------------------------------------------------
+# ConfigPopup
+# ---------------------------------------------------------------------------
+
+class TestConfigRefresh:
+    def test_shows_every_value_of_the_new_project(self, tmp_path):
+        """After switching project, video/device fields and the models folder came from the old one"""
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = MagicMock()
+        popup.DEVICE_OPTIONS = ConfigPopup.DEVICE_OPTIONS
+        popup.cfg.ML_DIR = tmp_path / "new" / "Models"
+        popup.cfg.SMART_FRAMES = False
+        popup.cfg.VIDEO_FPS = 5
+        popup.cfg.N_FRAMES = 7
+        popup.cfg.DEVICE = "CUDAExecutionProvider"
+        with patch("matchypatchy.gui.dialogs.popup_config.get_path", return_value=None) as get_path:
+            ConfigPopup.refresh(popup)
+        assert popup.ml_dir == tmp_path / "new" / "Models"
+        get_path.assert_called_once_with(tmp_path / "new" / "Models", popup.cfg.REID_KEY)
+        popup.smart_frames.setCurrentIndex.assert_called_once_with(1)
+        popup.video_fps.setText.assert_called_once_with("5")
+        popup.n_frames.setText.assert_called_once_with("7")
+        popup.device.setCurrentText.assert_called_once_with("CUDA-enabled GPU")
+        # filling the fields doesn't re-save the config through their handlers
+        popup.video_fps.blockSignals.assert_any_call(True)
+
+
+# ---------------------------------------------------------------------------
+# Processing steps (DisplayBase)
+# ---------------------------------------------------------------------------
+
+class TestProcessingSteps:
+    def test_cancel_stops_later_steps(self):
+        """QThread.start() clears an earlier interruption request, so later steps check a flag"""
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        DisplayBase._cancel_processing(base)
+        assert base._process_cancelled is True
+        base.animl_thread.requestInterruption.assert_called_once()
+        DisplayBase._start_animl(base)
+        DisplayBase._start_reid(base)
+        base.animl_thread.start.assert_not_called()
+        base.miew_thread.start.assert_not_called()
+
+    def test_steps_start_in_turn(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base._process_cancelled = False
+        DisplayBase._start_animl(base)
+        base.animl_thread.start.assert_called_once()
+        DisplayBase._start_reid(base)
+        base.miew_thread.start.assert_called_once()
+
+
+class TestConfigSaveCancel:
+    def _popup(self):
+        from types import SimpleNamespace
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        # a real instance (accept/reject call super()), without building the widgets
+        popup = ConfigPopup.__new__(ConfigPopup)
+        popup.logger = MagicMock()
+        popup.nummatches = MagicMock()
+        popup.cfg = SimpleNamespace(**{name: f"old-{name}" for name in ConfigPopup.SETTINGS}, save=MagicMock())
+        popup._original = popup._settings()
+        return popup
+
+    def test_editing_doesnt_save(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        popup.nummatches.text.return_value = "7"
+        ConfigPopup.update_nummatches(popup)
+        assert popup.cfg.KNN == 7
+        popup.cfg.save.assert_not_called()
+
+    def test_cancel_restores_settings(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        popup.cfg.KNN = 7
+        popup.cfg.DEVICE = "CUDAExecutionProvider"
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.reject", create=True):
+            ConfigPopup.reject(popup)
+        assert popup.cfg.KNN == "old-KNN"
+        assert popup.cfg.DEVICE == "old-DEVICE"
+        popup.cfg.save.assert_not_called()
+
+    def test_save_writes_config(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
+            ConfigPopup.accept(popup)
+        popup.cfg.save.assert_called_once()
