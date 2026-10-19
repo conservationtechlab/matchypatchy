@@ -585,6 +585,8 @@ class DisplayMedia(QWidget):
             self.check_undo_button()
         # rows deleted or rois redrawn in the popup need a reload, even after Cancel
         roi_updated = dialog.roi_updated
+        # free the popup (and its media player), it is parented to this view
+        dialog.deleteLater()
         del dialog
         # reload data and update buttons
         self.refresh_table(reload=roi_updated)
@@ -602,6 +604,8 @@ class DisplayMedia(QWidget):
             self.check_undo_button()
         # rows deleted or rois redrawn in the popup need a reload
         roi_updated = dialog.roi_updated
+        # free the popup (and its media player), it is parented to this view
+        dialog.deleteLater()
         del dialog
         # reload data and update buttons
         self.refresh_table(reload=roi_updated)

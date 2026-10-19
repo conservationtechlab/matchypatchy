@@ -843,12 +843,14 @@ class DisplayCompare(QWidget):
         if accepted:
             self.edit_stack = dialog.get_edit_stack()
             self.save_changes()
+        roi_updated = dialog.roi_updated
+        # free the popup (and its media player), it is parented to this view
+        dialog.deleteLater()
+        del dialog
         # rois deleted or redrawn in the popup (even if then cancelled): rebuild matches
-        if dialog.roi_updated:
-            del dialog
+        if roi_updated:
             self.filter_neighbors()
             return
-        del dialog
         if accepted:
             # reload the shown rows, keeping the active filter
             self.QueryContainer.refresh_data()

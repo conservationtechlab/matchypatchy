@@ -229,3 +229,26 @@ class TestComment:
         MediaEditPopup.save(dialog)
         dialog.metadatapanel.flush_comment.assert_called_once()
         dialog.accept.assert_called_once()
+
+
+class TestPopupFreed:
+    def test_media_view_frees_popup(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = MagicMock()
+        dm.data_type = 0
+        dm.media_table._data_filtered = pd.DataFrame({"id": [5], "ext": [".jpg"]})
+        with patch("matchypatchy.gui.display_media.MediaEditPopup") as popup_cls:
+            popup_cls.return_value.exec.return_value = False
+            popup_cls.return_value.roi_updated = False
+            DisplayMedia.edit_row(dm, 0)
+        popup_cls.return_value.deleteLater.assert_called_once()
+
+    def test_compare_view_frees_popup(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.has_query.return_value = True
+        with patch("matchypatchy.gui.display_compare.MediaEditPopup") as popup_cls:
+            popup_cls.return_value.exec.return_value = False
+            popup_cls.return_value.roi_updated = False
+            DisplayCompare.edit_image(dc, 10)
+        popup_cls.return_value.deleteLater.assert_called_once()
