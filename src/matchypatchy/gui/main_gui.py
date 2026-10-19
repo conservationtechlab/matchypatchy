@@ -392,7 +392,11 @@ class MainWindow(QMainWindow):
 
     def manage_station(self):
         """Open the station management popup."""
-        self.Base.select_survey()
+        if not self.Base.select_survey():
+            dialog = AlertPopup(self, "Please select a survey before managing stations.")
+            dialog.exec()
+            del dialog
+            return
         dialog = StationPopup(self, active_survey=self.Base.active_survey)
         dialog.exec()
         del dialog

@@ -637,3 +637,66 @@ class TestSurveyPopup:
         with patch(f"{SURVEY}.SurveyFillPopup", return_value=_fill("B", "Default Region")):
             SurveyPopup.edit(popup)
         popup._warn.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# StationPopup / StationFillPopup
+# ---------------------------------------------------------------------------
+
+STATION = "matchypatchy.gui.dialogs.popup_station"
+
+
+def _station_fill(name="S1", lat="", long=""):
+    from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+    fill = MagicMock()
+    fill.name.text.return_value = name
+    fill.lat.text.return_value = lat
+    fill.long.text.return_value = long
+    fill.get_name = lambda: name
+    fill._coordinate = StationFillPopup._coordinate
+    fill._valid = lambda: StationFillPopup._valid(fill)
+    return fill
+
+
+class TestStationCoordinates:
+    def test_empty_coordinates_are_none(self):
+        from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+        fill = _station_fill()
+        assert StationFillPopup.get_lat(fill) is None
+        assert StationFillPopup.get_long(fill) is None
+
+    def test_coordinates_are_floats(self):
+        from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+        fill = _station_fill(lat="32.7", long="-117.1")
+        assert StationFillPopup.get_lat(fill) == 32.7
+        assert StationFillPopup.get_long(fill) == -117.1
+
+    @pytest.mark.parametrize("lat,long,ok", [("", "", True), ("32.7", "-117.1", True),
+                                             ("abc", "", False), ("95", "", False), ("", "-181", False)])
+    def test_ok_button(self, lat, long, ok):
+        from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+        fill = _station_fill(lat=lat, long=long)
+        StationFillPopup.checkInput(fill)
+        fill.okButton.setEnabled.assert_called_once_with(ok)
+
+    def test_missing_coordinates_shown_empty_not_none(self):
+        """Folder import creates stations without coordinates; they were shown (and saved) as 'None'"""
+        from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+        parent = MagicMock()
+        parent.survey_id = (1, "Survey")
+        with patch(f"{STATION}.QLineEdit") as line_edit:
+            StationFillPopup(parent, name="S", lat=None, long=None)
+        texts = [c.args[0] for c in line_edit.return_value.setText.call_args_list]
+        assert texts == ["S", "", ""]
+
+
+class TestStationPopup:
+    def test_failed_add_warns(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = MagicMock()
+        popup.survey_id = (1, "Survey")
+        popup.mpDB.add_station.return_value = None
+        with patch(f"{STATION}.StationFillPopup") as fill_cls:
+            fill_cls.return_value.exec.return_value = True
+            StationPopup.add(popup)
+        popup._warn.assert_called_once()
