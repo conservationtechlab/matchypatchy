@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog, QDialog,
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction, QGuiApplication
 from PyQt6.QtCore import QSettings, QTimer
@@ -225,9 +225,12 @@ class MainWindow(QMainWindow):
             if directory:
                 dialog = ImportFolderPopup(self, directory)
                 self.logger.info(f"Importing from directory: {directory}")
-                if dialog.exec() == QDialog.DialogCode.Rejected:
-                    self.import_folder()
+                dialog.exec()
+                # ask for another directory only if this one had no images, not on Cancel
+                no_images = dialog.no_images
                 del dialog
+                if no_images:
+                    self.import_folder()
 
     def export(self):
         data = self.mpDB.export_data()

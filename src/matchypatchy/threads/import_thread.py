@@ -676,15 +676,13 @@ class FolderImportThread(QThread):
                 # get remaining information
                 if self.station_level > 0:
                     station_id = self.station(filepath, survey_id)
-                    # add camera if camera level provided, else None
-                    if self.camera_level > 0:
-                        camera_id = self.camera(filepath, station_id)
-
                 else:
                     # create default station if no station level and use for all media
                     if not self.default_station:
                         self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
                     station_id = self.default_station
+                # add camera if camera level provided (also under the default station), else None
+                camera_id = self.camera(filepath, station_id) if self.camera_level > 0 else None
 
                 # insert into table, force type
                 media_id = self.mpDB.add_media(base_dir_id,
@@ -693,7 +691,7 @@ class FolderImportThread(QThread):
                                                ext,
                                                str(timestamp),
                                                int(station_id),
-                                               camera_id=int(camera_id) if self.camera_level > 0 else None,
+                                               camera_id=int(camera_id) if camera_id is not None else None,
                                                sequence_id=None,
                                                external_id=None,
                                                comment=None)

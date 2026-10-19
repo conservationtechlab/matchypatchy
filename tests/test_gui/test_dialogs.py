@@ -301,3 +301,94 @@ class TestImportCSVOkButton:
         with patch("matchypatchy.gui.dialogs.popup_import_csv.CSVImportThread"):
             popup.import_manifest()
         popup.okButton.setEnabled.assert_called_with(False)
+
+
+# ---------------------------------------------------------------------------
+# ImportFolderPopup / FolderImportThread
+# ---------------------------------------------------------------------------
+
+FOLDER = "matchypatchy.gui.dialogs.popup_import_folder"
+
+
+class TestImportFolderTimezone:
+    def _timezone(self, select_results):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        popup = MagicMock()
+        popup.mpDB.select.side_effect = select_results
+        return ImportFolderPopup._survey_timezone(popup, 5)
+
+    def test_survey_without_region_uses_local_time(self):
+        assert self._timezone([[(None,)]]) is None
+
+    def test_region_timezone(self):
+        assert self._timezone([[(2,)], [("America/Los_Angeles",)]]) == "America/Los_Angeles"
+
+
+class TestImportFolderCancel:
+    def test_cancel_during_import_stops_it_and_waits(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        popup = MagicMock()
+        popup.import_thread.isRunning.return_value = True
+        ImportFolderPopup.reject(popup)
+        popup.import_thread.requestInterruption.assert_called_once()
+
+    def test_manifest_after_cancel_is_ignored(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        import pandas as pd
+        popup = MagicMock()
+        popup._closed = True
+        ImportFolderPopup.get_manifest(popup, pd.DataFrame({"filepath": ["a.jpg"]}))
+        popup.get_options.assert_not_called()
+
+    def test_no_images_flags_for_another_directory(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        import pandas as pd
+        popup = MagicMock()
+        popup._closed = False
+        popup.no_images = False
+        with patch(f"{FOLDER}.AlertPopup"):
+            ImportFolderPopup.get_manifest(popup, pd.DataFrame())
+        assert popup.no_images is True
+        popup.reject.assert_called_once()
+
+    def _import_folder(self, no_images):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.select_survey.return_value = True
+        with patch("matchypatchy.gui.display_base.QFileDialog.getExistingDirectory", return_value="/data"), \
+                patch("matchypatchy.gui.display_base.ImportFolderPopup") as popup_cls:
+            popup_cls.return_value.no_images = no_images
+            DisplayBase.import_folder(base)
+        return base
+
+    def test_user_cancel_does_not_reopen_picker(self):
+        base = self._import_folder(no_images=False)
+        base.import_folder.assert_not_called()
+
+    def test_no_images_reopens_picker(self):
+        base = self._import_folder(no_images=True)
+        base.import_folder.assert_called_once()
+
+
+class TestFolderImportCamera:
+    def test_camera_level_without_station_level(self, tmp_path):
+        """Camera under the default station instead of UnboundLocalError"""
+        import pandas as pd
+        from matchypatchy.threads.import_thread import FolderImportThread
+        image = tmp_path / "cam1" / "a.jpg"
+        image.parent.mkdir()
+        image.write_bytes(b"x")
+        thread = MagicMock()
+        thread.data = pd.DataFrame({"filepath": [str(image)], "datetime": ["2024-01-01 10:00:00"]})
+        thread.station_level, thread.camera_level = 0, 2
+        thread.default_station = None
+        thread.active_survey = (1, "S")
+        thread.isInterruptionRequested.return_value = False
+        thread.mpDB.select.return_value = [(1,)]
+        thread.mpDB.add_station.return_value = 3
+        thread.camera.return_value = 7
+        with patch("matchypatchy.threads.import_thread.get_sha256", return_value="h"), \
+                patch("matchypatchy.threads.import_thread.save_media_thumbnail", return_value="t.jpg"):
+            FolderImportThread.run(thread)
+        thread.camera.assert_called_once_with(str(image), 3)
+        assert thread.mpDB.add_media.call_args.kwargs["camera_id"] == 7

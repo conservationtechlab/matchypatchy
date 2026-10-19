@@ -250,9 +250,12 @@ class DisplayBase(QWidget):
             if directory:
                 dialog = ImportFolderPopup(self, directory)
                 self.logger.info(f"Importing from directory: {directory}")
-                if dialog.exec() == QDialog.DialogCode.Rejected:
-                    self.import_folder()
+                dialog.exec()
+                # ask for another directory only if this one had no images, not on Cancel
+                no_images = dialog.no_images
                 del dialog
+                if no_images:
+                    self.import_folder()
 
     # STEP 2: Process Button
     def select_models(self):
