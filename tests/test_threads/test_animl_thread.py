@@ -30,6 +30,14 @@ class SignalSpy:
         self.calls.append(args)
 
 
+def _detect_reads(unreadable=()):
+    """Stand-in for animl.detect: one result per readable file, unreadable ones left out"""
+    def _detect(_detector, manifest, *_args, **_kwargs):
+        return [{"filepath": f, "frame": 0, "detections": []}
+                for f in manifest["filepath"].unique() if f not in unreadable]
+    return _detect
+
+
 def _empty_roi_media():
     return pd.DataFrame(columns=["id", "media_id", "bbox_x", "bbox_y", "bbox_w", "bbox_h", "filepath", "ext"])
 
@@ -196,7 +204,7 @@ class TestAnimlThread:
         thread.progress_update = SignalSpy()
         thread.isInterruptionRequested = lambda: False
 
-        monkeypatch.setattr(animl_thread.animl, "detect", lambda *_args, **_kwargs: pd.DataFrame())
+        monkeypatch.setattr(animl_thread.animl, "detect", _detect_reads())
         monkeypatch.setattr(animl_thread.animl, "parse_detections", lambda detections, **_kwargs: detections)
         
         # Track which batch is being processed
@@ -282,7 +290,7 @@ class TestAnimlThread:
         thread.progress_update = SignalSpy()
         thread.isInterruptionRequested = lambda: False
 
-        monkeypatch.setattr(animl_thread.animl, "detect", lambda *_args, **_kwargs: pd.DataFrame())
+        monkeypatch.setattr(animl_thread.animl, "detect", _detect_reads())
         monkeypatch.setattr(animl_thread.animl, "parse_detections", lambda detections, **_kwargs: detections)
         monkeypatch.setattr(
             animl_thread.animl,
@@ -301,3 +309,49 @@ class TestAnimlThread:
         assert db.add_roi_calls[0][0][1] == 2
         assert len(db.add_thumbnail_calls) == 1
         assert thread.progress_update.calls == [(100,)]
+
+    def _thread_with_detector(self, tmp_path, monkeypatch, unreadable):
+        db = FakeDB()
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: Path("/fake.pt"))
+        monkeypatch.setattr(animl_thread.animl, "load_detector", lambda *_a, **_k: "det")
+        monkeypatch.setattr(animl_thread, "fetch_roi_media", lambda *_a, **_k: _empty_roi_media())
+        monkeypatch.setattr(animl_thread, "save_roi_thumbnail", lambda *_a, **_k: "thumb.jpg")
+        monkeypatch.setattr(animl_thread.animl, "detect", _detect_reads(unreadable))
+
+        def _parse_detections(detections, manifest=None, **_kwargs):
+            if len(detections) == 0:
+                raise AssertionError("'detections' contains no detections")
+            return manifest.assign(bbox_x=0.1, bbox_y=0.2, bbox_w=0.3, bbox_h=0.4, score=1.0)
+
+        monkeypatch.setattr(animl_thread.animl, "parse_detections", _parse_detections)
+        monkeypatch.setattr(animl_thread.animl, "get_animals", lambda detections: detections)
+
+        thread = animl_thread.AnimlThread(db, _cfg(tmp_path, n_frames=1), DETECTOR_KEY="md")
+        thread.rois = pd.DataFrame()
+        thread.progress_count = 0
+        thread.progress_update = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        return thread, db
+
+    def test_unreadable_image_is_skipped(self, tmp_path, monkeypatch):
+        thread, db = self._thread_with_detector(tmp_path, monkeypatch, unreadable={"/base/bad.jpg"})
+        thread.images = pd.DataFrame([{"id": i, "filepath": f"/base/{name}.jpg", "ext": ".jpg"}
+                                      for i, name in enumerate(["a", "bad", "c"])])
+        thread.to_process = 3
+
+        thread.detect_images()
+
+        assert [call[0][0] for call in db.add_roi_calls] == [0, 2]
+        assert thread.failed == {"/base/bad.jpg"}
+        assert thread.progress_update.calls[-1] == (100,)
+
+    def test_unreadable_video_is_skipped(self, tmp_path, monkeypatch):
+        thread, db = self._thread_with_detector(tmp_path, monkeypatch, unreadable={"/base/bad.mp4"})
+        thread.videos = pd.DataFrame([{"id": i, "filepath": f"/base/{name}.mp4", "ext": ".mp4", "frame": 0}
+                                      for i, name in enumerate(["bad", "b"])])
+        thread.to_process = 2
+
+        thread.detect_videos()
+
+        assert [call[0][0] for call in db.add_roi_calls] == [1]
+        assert thread.failed == {"/base/bad.mp4"}

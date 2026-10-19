@@ -783,6 +783,7 @@ class TestProcessingSteps:
     def test_popup_closes_when_every_file_was_read(self):
         from matchypatchy.gui.display_base import DisplayBase
         base = MagicMock()
+        base.animl_thread.failed = set()
         base.miew_thread.failed = set()
         DisplayBase._finish_processing(base)
         base._process_dialog.accept.assert_called_once()
@@ -790,7 +791,8 @@ class TestProcessingSteps:
     def test_popup_stays_open_to_report_unreadable_files(self):
         from matchypatchy.gui.display_base import DisplayBase
         base = MagicMock()
-        base.miew_thread.failed = {"/a.jpg", "/b.jpg"}
+        base.animl_thread.failed = {"/a.jpg"}
+        base.miew_thread.failed = {"/b.jpg"}
         DisplayBase._finish_processing(base)
         base._process_dialog.accept.assert_not_called()
         assert "2 file(s)" in base._process_dialog.update_prompt.call_args[0][0]

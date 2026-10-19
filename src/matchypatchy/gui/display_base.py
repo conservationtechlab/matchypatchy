@@ -326,7 +326,7 @@ class DisplayBase(QWidget):
 
     def _finish_processing(self):
         """Close the popup, or keep it open to say how many files couldn't be read"""
-        failed = self.miew_thread.failed
+        failed = self.animl_thread.failed | self.miew_thread.failed
         if failed:
             self._process_dialog.update_prompt(f"Processing finished, but {len(failed)} file(s) "
                                                "could not be read. See the log for which.")

@@ -2,6 +2,7 @@
 QThread Class for Processing BBox, Frames, BuildFileManifest with ANIML
 
 """
+import logging
 from pathlib import Path
 import animl
 import pandas as pd
@@ -14,6 +15,8 @@ from matchypatchy.threads.model_download_thread import get_path
 
 
 MEGADETECTORv1000_SIZE = 960
+
+logger = logging.getLogger(__name__)
 
 
 class BuildManifestThread(QThread):
@@ -106,6 +109,7 @@ class AnimlThread(QThread):
         self.video = None
         self.to_process = 0
         self.progress_count = 0
+        self.failed = set()  # files that couldn't be read
 
         if self.DETECTOR_KEY is None:
             self.detector = None
@@ -161,14 +165,11 @@ class AnimlThread(QThread):
 
             # run detector
             else:
-                detections = animl.detect(self.detector,
-                                          image_batch,
-                                          MEGADETECTORv1000_SIZE,
-                                          MEGADETECTORv1000_SIZE,
-                                          confidence_threshold=self.confidence_threshold,
-                                          batch_size=self.batch_size,
-                                          use_progress_bar=False)
-
+                detections = self._detect(image_batch, batch_size=self.batch_size)
+                if detections is None:
+                    self.progress_count += len(image_batch)
+                    self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+                    continue
                 detections = animl.parse_detections(detections, manifest=image_batch)
                 detections = animl.get_animals(detections)
 
@@ -206,14 +207,11 @@ class AnimlThread(QThread):
             batch_end = min(batch_start + self.batch_size, len(self.rois))
             roi_batch = self.rois.iloc[batch_start:batch_end]
 
-            detections = animl.detect(self.detector,
-                                      roi_batch,
-                                      MEGADETECTORv1000_SIZE,
-                                      MEGADETECTORv1000_SIZE,
-                                      confidence_threshold=self.confidence_threshold,
-                                      batch_size=self.batch_size,
-                                      use_progress_bar=False)
-
+            detections = self._detect(roi_batch, batch_size=self.batch_size)
+            if detections is None:
+                self.progress_count += len(roi_batch)
+                self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+                continue
             detections = animl.parse_detections(detections, manifest=roi_batch)
             detections = animl.get_animals(detections)
 
@@ -241,12 +239,11 @@ class AnimlThread(QThread):
         for media_id, video in self.videos.groupby('id'):
             if not self.isInterruptionRequested():
 
-                results = animl.detect(self.detector,
-                                       video,
-                                       MEGADETECTORv1000_SIZE,
-                                       MEGADETECTORv1000_SIZE,
-                                       confidence_threshold=self.confidence_threshold,
-                                       calculate_clarity=True)
+                results = self._detect(video, calculate_clarity=True)
+                if results is None:
+                    self.progress_count += 1
+                    self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+                    continue
                 results = animl.parse_detections(results, manifest=video, score=True)
                 detections = animl.get_animals(results)
 
@@ -273,3 +270,19 @@ class AnimlThread(QThread):
                     self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
             self.progress_count += 1
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+
+    def _detect(self, manifest, **kwargs):
+        """Run the detector on the manifest's files, None if none of them could be read"""
+        results = animl.detect(self.detector,
+                               manifest,
+                               MEGADETECTORv1000_SIZE,
+                               MEGADETECTORv1000_SIZE,
+                               confidence_threshold=self.confidence_threshold,
+                               use_progress_bar=False,
+                               **kwargs)
+        # animl.detect silently leaves out files it can't load
+        read = {result['filepath'] for result in results}
+        for filepath in set(manifest['filepath']) - read:
+            logger.warning("Could not read %s, skipping it", filepath)
+            self.failed.add(filepath)
+        return results if results else None
