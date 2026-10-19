@@ -1,5 +1,5 @@
 """
-Unit tests for matchypatchy.gui.query.QueryContainer
+Unit tests for matchypatchy.gui.query_base.QueryContainer
 
 QueryContainer holds query/match navigation state, the KNN cache, and the
 filter-after-cache pipeline:
@@ -17,7 +17,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-QUERY = "matchypatchy.gui.query"
+QUERY = "matchypatchy.gui.query_base"
+QUERY_BASE = QUERY
 
 
 # ---------------------------------------------------------------------------
@@ -39,7 +40,7 @@ def _make_parent(db=None, cache_dir=None):
 
 def _make_qc(cache_dir, db=None):
     """Instantiate QueryContainer with a mocked parent and a temp cache dir."""
-    from matchypatchy.gui.query import QueryContainer
+    from matchypatchy.gui.query_base import QueryContainer
     parent = _make_parent(db, cache_dir)
     with patch(f"{QUERY}.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
         qc = QueryContainer(parent)
@@ -159,7 +160,7 @@ class TestQueryContainerInit:
         assert qc.threshold == 75
 
     def test_k_cache_is_overfetched(self, qc):
-        from matchypatchy.gui.query import KNN_OVERFETCH
+        from matchypatchy.gui.query_base import KNN_OVERFETCH
         assert qc.k == 3
         assert qc.k_cache == qc.k * KNN_OVERFETCH
 
@@ -529,10 +530,10 @@ class TestQueryStateHelpers:
     def test_get_info_unknown_rid_is_none(self):
         assert self.qc.get_info(999, "station_id") is None
 
-    def test_get_info_bbox(self, mock_db_roi):
-        mock_db_roi.get_roi_bbox.return_value = "BBOX"
-        assert self.qc.get_info(10, "bbox") == "BBOX"
-        assert list(mock_db_roi.get_roi_bbox.call_args.args[0].index) == [10]
+    def test_get_info_bbox(self):
+        with patch(f"{QUERY_BASE}.db_roi.get_roi_bbox", return_value="BBOX") as get_roi_bbox:
+            assert self.qc.get_info(10, "bbox") == "BBOX"
+        assert list(get_roi_bbox.call_args.args[0].index) == [10]
 
     def test_get_info_metadata_delegates(self):
         with patch.object(self.qc, "roi_metadata", return_value={"k": 1}) as meta:
@@ -558,7 +559,7 @@ class TestRoiMetadata:
     def _loc(self):
         loc = {"station_name": "Stn", "survey_name": "Srv",
                "region_name": "Reg", "camera_name": "Cam"}
-        with patch(f"{QUERY}.fetch_station_names_from_id", return_value=loc):
+        with patch(f"{QUERY_BASE}.fetch_station_names_from_id", return_value=loc):
             yield
 
     def test_location_fields_resolved(self, qc):
@@ -738,6 +739,15 @@ class TestRestrictToData:
         mo = self.qc._restrict_to_data([_raw(1, [10], neighbors)], strict=False)[0]
         assert mo.filtered_neighbors == [(11, 0.1), (12, 0.2)]
         assert len(mo.ranked_matches) == 2
+
+    def test_truncation_keeps_matches_and_match_data_consistent(self):
+        """og_ranked_matches is viewpoint order, not distance order; both must hold the same k rois"""
+        self.qc.k = 2
+        raw = _raw(1, [10], [(11, 0.1), (12, 0.2), (13, 0.3)])
+        raw["og_ranked_matches"] = [(13, 0.3), (12, 0.2), (11, 0.1)]
+        mo = self.qc._restrict_to_data([raw], strict=False)[0]
+        assert set(mo.match_data["id"]) == {11, 12}
+        assert mo.ranked_matches == [(12, 0.2), (11, 0.1)]
 
     def test_drops_sequence_with_no_neighbors_left(self):
         self.qc.data = self.qc.data.loc[[10, 11]]
@@ -1064,6 +1074,18 @@ class TestMatchActions:
 # Favorites
 # ---------------------------------------------------------------------------
 
+class TestRefreshData:
+    def test_keeps_filtered_rows_and_rebuilds_sequences(self, qc, mock_db_roi):
+        qc.data_raw = _sample_roi_df()
+        qc.data = qc.data_raw.loc[[10, 11]].copy()
+        mock_db_roi.fetch_roi_media.return_value = _sample_roi_df()
+        mock_db_roi.sequence_roi_dict.return_value = {"seq": [10, 11]}
+        qc.refresh_data()
+        assert sorted(qc.data.index) == [10, 11]
+        assert len(qc.data_raw) == len(_sample_roi_df())
+        assert qc.sequences == {"seq": [10, 11]}
+
+
 class TestFavorites:
     @pytest.fixture(autouse=True)
     def _setup(self, qc):
@@ -1074,6 +1096,7 @@ class TestFavorites:
         self.knn.query_data = pd.DataFrame({"id": [10]})
         self.knn.get_ranked_matches.return_value = [(12, 0.1)]
         qc.current_match_object = self.knn
+        qc.current_query_rid = 10  # query roi on screen
 
     def test_toggle_on_and_off(self):
         qc = self.qc
@@ -1096,6 +1119,47 @@ class TestFavorites:
             assert qc.knn_match_object is None
             assert qc._similarities_cache == {}
             assert qc.current_match_rois == [12]
+
+    def test_similarity_uses_query_on_screen_and_is_cached_per_query(self):
+        qc = self.qc
+        qc.mpDB.batch_calculate_similarity.side_effect = lambda q, ids: {i: 0.5 for i in ids}
+        with patch(f"{QUERY}.FavoriteMatchObject"):
+            qc.set_match_favorites(True)
+            qc.current_query_rid = 12  # another query, same favorites
+            qc.set_match_favorites(True)
+        queries = [c.args[0] for c in qc.mpDB.batch_calculate_similarity.call_args_list]
+        assert queries == [10, 12]
+
+    def test_reapplying_keeps_the_knn_object(self):
+        """Turning favorites on again must not store the favorites object as the knn one"""
+        qc = self.qc
+        qc.mpDB.batch_calculate_similarity.return_value = {11: 0.8}
+        with patch(f"{QUERY}.FavoriteMatchObject"):
+            qc.set_match_favorites(True)
+            qc.set_match_favorites(True)
+        qc.set_match_favorites(False)
+        assert qc.current_match_object is self.knn
+
+    def test_new_query_drops_previous_favorites_state(self):
+        qc = self.qc
+        qc.mpDB.batch_calculate_similarity.return_value = {11: 0.8}
+        with patch(f"{QUERY}.FavoriteMatchObject"):
+            qc.set_match_favorites(True)
+        other = MagicMock()
+        other.get_ranked_query_rids.return_value = [12]
+        other.get_ranked_matches.return_value = [(10, 0.3)]
+        qc.ranked_sequences, qc.n_queries = [other], 1
+        qc.set_query(0)
+        # "Show KNN" now must keep the new query's matches, not restore the old query's
+        qc.set_match_favorites(False)
+        assert qc.current_match_object is other
+
+    def test_reload_refreshes_favorites(self):
+        qc = self.qc
+        qc._favorites_cache = qc.data_raw[qc.data_raw["favorite"] == 1]
+        with patch(f"{QUERY}.db_roi.fetch_roi_media", return_value=_sample_roi_df()):
+            qc.load_data()
+        assert qc._favorites_cache is None
 
     def test_no_favorites_leaves_match_object_alone(self):
         qc = self.qc
