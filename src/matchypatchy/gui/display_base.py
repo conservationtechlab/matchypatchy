@@ -22,8 +22,7 @@ from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.dialogs.popup_ml import MLOptionsPopup
 
 from matchypatchy.threads.sequence_thread import SequenceThread
-from matchypatchy.threads.animl_thread import AnimlThread
-from matchypatchy.threads.reid_thread import ReIDThread
+from matchypatchy.threads.process_thread import ProcessThread
 
 from matchypatchy import config
 
@@ -40,11 +39,10 @@ class DisplayBase(QWidget):
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         padding = 120
-        # Initialize threads for sequence, animl, and reid processing
+        # Initialize threads for sequencing and processing
         self.active_survey = None
         self.sequence_thread = None
-        self.animl_thread = None
-        self.reid_thread = None
+        self.process_thread = None
 
         container = QWidget()
         container.setObjectName("mainBorderWidget")
@@ -284,20 +282,15 @@ class DisplayBase(QWidget):
             dialog.set_max(0)
             self.sequence_thread = SequenceThread(self.mpDB, self.cfg, mloptions['sequence_checked'])
             self.sequence_thread.prompt_update.connect(dialog.update_prompt)
-            # 2. ANIML (BBOX)
-            self.animl_thread = AnimlThread(self.mpDB, self.cfg, mloptions['DETECTOR_KEY'])
-            self.animl_thread.prompt_update.connect(dialog.update_prompt)
-            self.animl_thread.progress_update.connect(dialog.set_value)
-            # 3. REID AND VIEWPOINT
-            self.miew_thread = ReIDThread(self.mpDB, self.cfg, mloptions)
-            self.miew_thread.prompt_update.connect(dialog.update_prompt)
-            self.miew_thread.progress_update.connect(dialog.set_value)
-            self.miew_thread.done.connect(dialog.accept)
+            # 2. DETECTION, VIEWPOINT AND RE-ID, one pass over each media file
+            self.process_thread = ProcessThread(self.mpDB, self.cfg, mloptions)
+            self.process_thread.prompt_update.connect(dialog.update_prompt)
+            self.process_thread.progress_update.connect(dialog.set_value)
+            self.process_thread.done.connect(dialog.accept)
             # run one step after the other, so only one thread writes to the database at a time
             self._process_dialog = dialog
             self._process_cancelled = False
-            self.sequence_thread.finished.connect(self._start_animl)
-            self.animl_thread.finished.connect(self._start_reid)
+            self.sequence_thread.finished.connect(self._start_processing)
             # allow cancellation
             dialog.rejected.connect(self._cancel_processing)
             self.sequence_thread.start()
@@ -308,26 +301,19 @@ class DisplayBase(QWidget):
         if dialog.exec():
             del dialog
 
-    def _start_animl(self):
+    def _start_processing(self):
         """Step 2 once sequencing is done, unless processing was cancelled"""
-        if self._process_cancelled:
-            return
-        self._process_dialog.set_max(100)
-        self._process_dialog.set_counter(0)
-        self.animl_thread.start()
-
-    def _start_reid(self):
-        """Step 3 once detection is done, unless processing was cancelled"""
         # QThread.start() clears an earlier interruption request, so check before starting
         if self._process_cancelled:
             return
-        self._process_dialog.reset_counter()
-        self.miew_thread.start()
+        self._process_dialog.set_max(100)
+        self._process_dialog.set_value(0)
+        self.process_thread.start()
 
     def _cancel_processing(self):
         """Stop the running step and don't start the ones after it"""
         self._process_cancelled = True
-        for thread in (self.sequence_thread, self.animl_thread, self.miew_thread):
+        for thread in (self.sequence_thread, self.process_thread):
             thread.requestInterruption()
 
     # STEP 3: Validate/Manage Media Button

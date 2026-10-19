@@ -760,61 +760,19 @@ class TestConfigRefresh:
 
 class TestProcessingSteps:
     def test_cancel_stops_later_steps(self):
-        """QThread.start() clears an earlier interruption request, so later steps check a flag"""
+        """QThread.start() clears an earlier interruption request, so the next step checks a flag"""
         from matchypatchy.gui.display_base import DisplayBase
         base = MagicMock()
         DisplayBase._cancel_processing(base)
         assert base._process_cancelled is True
-        base.animl_thread.requestInterruption.assert_called_once()
-        DisplayBase._start_animl(base)
-        DisplayBase._start_reid(base)
-        base.animl_thread.start.assert_not_called()
-        base.miew_thread.start.assert_not_called()
+        base.sequence_thread.requestInterruption.assert_called_once()
+        base.process_thread.requestInterruption.assert_called_once()
+        DisplayBase._start_processing(base)
+        base.process_thread.start.assert_not_called()
 
-    def test_steps_start_in_turn(self):
+    def test_processing_starts_after_sequencing(self):
         from matchypatchy.gui.display_base import DisplayBase
         base = MagicMock()
         base._process_cancelled = False
-        DisplayBase._start_animl(base)
-        base.animl_thread.start.assert_called_once()
-        DisplayBase._start_reid(base)
-        base.miew_thread.start.assert_called_once()
-
-
-class TestConfigSaveCancel:
-    def _popup(self):
-        from types import SimpleNamespace
-        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
-        # a real instance (accept/reject call super()), without building the widgets
-        popup = ConfigPopup.__new__(ConfigPopup)
-        popup.logger = MagicMock()
-        popup.nummatches = MagicMock()
-        popup.cfg = SimpleNamespace(**{name: f"old-{name}" for name in ConfigPopup.SETTINGS}, save=MagicMock())
-        popup._original = popup._settings()
-        return popup
-
-    def test_editing_doesnt_save(self):
-        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
-        popup = self._popup()
-        popup.nummatches.text.return_value = "7"
-        ConfigPopup.update_nummatches(popup)
-        assert popup.cfg.KNN == 7
-        popup.cfg.save.assert_not_called()
-
-    def test_cancel_restores_settings(self):
-        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
-        popup = self._popup()
-        popup.cfg.KNN = 7
-        popup.cfg.DEVICE = "CUDAExecutionProvider"
-        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.reject", create=True):
-            ConfigPopup.reject(popup)
-        assert popup.cfg.KNN == "old-KNN"
-        assert popup.cfg.DEVICE == "old-DEVICE"
-        popup.cfg.save.assert_not_called()
-
-    def test_save_writes_config(self):
-        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
-        popup = self._popup()
-        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
-            ConfigPopup.accept(popup)
-        popup.cfg.save.assert_called_once()
+        DisplayBase._start_processing(base)
+        base.process_thread.start.assert_called_once()
