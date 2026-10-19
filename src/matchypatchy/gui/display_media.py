@@ -145,6 +145,11 @@ class DisplayMedia(QWidget):
         self.cfg = cfg
         self.mpDB = mpDB
         self.filterbar.update_project(mpDB)
+        # the table looks up names and thumbnails in the project too
+        self.media_table.update_project(cfg, mpDB)
+        # unsaved edits belong to the previous project
+        self.edit_stack = []
+        self.check_undo_button()
 
     # ==========================================================================
     # NAVIGATION

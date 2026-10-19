@@ -33,6 +33,12 @@ class MediaTable(QAbstractTableModel):
         self._columns = [x[0] for x in headers.values()]
         self._headers = [x[1] for x in headers.values()]
 
+    def update_project(self, cfg, mpDB):
+        """Point at another project's database and thumbnails"""
+        self.cfg = cfg
+        self.mpDB = mpDB
+        self.thumbnail_dir = cfg.THUMBNAIL_DIR
+
     def rowCount(self, parent=QModelIndex()):
         return len(self._data_filtered)
 

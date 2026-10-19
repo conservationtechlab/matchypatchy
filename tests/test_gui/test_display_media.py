@@ -416,3 +416,25 @@ class TestUndoButtonState:
         dm.edit_stack = [_edit(10, 1, "viewpoint", 1)]
         DisplayMedia.undo(dm)
         dm.button_undo.setEnabled.assert_called_with(False)
+
+
+class TestUpdateProject:
+    def test_switching_project_updates_table_and_drops_edits(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.edit_stack = [_edit(10, 1, "viewpoint", 1)]
+        cfg, db = MagicMock(), MagicMock()
+        DisplayMedia.update_project(dm, cfg, db)
+        assert dm.mpDB is db
+        dm.media_table.update_project.assert_called_once_with(cfg, db)
+        assert dm.edit_stack == []
+
+
+class TestMediaTableUpdateProject:
+    def test_uses_new_database_and_thumbnails(self):
+        from matchypatchy.gui.media_table import MediaTable
+        mt = MagicMock()
+        cfg, db = MagicMock(), MagicMock()
+        MediaTable.update_project(mt, cfg, db)
+        assert mt.mpDB is db
+        assert mt.thumbnail_dir is cfg.THUMBNAIL_DIR
