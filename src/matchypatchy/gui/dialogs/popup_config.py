@@ -251,14 +251,30 @@ class ConfigPopup(QDialog):
         self.mpDB._command(new_cmd, quiet=False)
 
     def refresh(self):
-        """Refresh the config popup with updated values."""
+        """Show the current project's values, eg. after switching project"""
+        self.ml_dir = Path(self.cfg.ML_DIR)
+        fields = (self.home_dir, self.visualizer_model, self.nummatches, self.sequence_duration,
+                  self.sequence_n, self.smart_frames, self.video_fps, self.n_frames, self.device)
+        # filling the fields must not trigger their save handlers
+        for field in fields:
+            field.blockSignals(True)
         self.home_dir.setText(str(self.cfg.HOME_DIR))
         reid_path = get_path(self.ml_dir, self.cfg.REID_KEY)
         self.visualizer_model.setText(str(reid_path))
         self.nummatches.setText(str(self.cfg.KNN))
         self.sequence_duration.setText(str(self.cfg.SEQUENCE_DURATION))
         self.sequence_n.setText(str(self.cfg.SEQUENCE_N))
-        self.mpdbkey_valid.setText(f"{self.mpDB.validate()}")
+        self.smart_frames.setCurrentIndex(0 if self.cfg.SMART_FRAMES else 1)
+        self.video_fps.setText(str(self.cfg.VIDEO_FPS))
+        self.n_frames.setText(str(self.cfg.N_FRAMES))
+        self.device.setCurrentText(self.DEVICE_OPTIONS.get(self.cfg.DEVICE, "CPU"))
+        for field in fields:
+            field.blockSignals(False)
+        self.video_fps_label.setVisible(self.cfg.SMART_FRAMES)
+        self.video_fps.setVisible(self.cfg.SMART_FRAMES)
+        mpdbkey = self.mpDB.validate()
+        self.mpdbkey_valid.setText(f"{mpdbkey}")
+        self.mpdbkey_valid.setStyleSheet("color: red;" if not mpdbkey else "")
 
     def set_home_dir(self):
         """Change Home directory"""

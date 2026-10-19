@@ -725,3 +725,30 @@ class TestExport:
         data = pd.read_csv(f"{out}.csv")
         assert set(data.columns) == ImportCSVPopup.EXPECTED_COLUMNS == CSVMigrateThread.EXPECTED_COLUMNS
         assert data.loc[0, "station_name"] == "Estación Ñ"
+
+
+# ---------------------------------------------------------------------------
+# ConfigPopup
+# ---------------------------------------------------------------------------
+
+class TestConfigRefresh:
+    def test_shows_every_value_of_the_new_project(self, tmp_path):
+        """After switching project, video/device fields and the models folder came from the old one"""
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = MagicMock()
+        popup.DEVICE_OPTIONS = ConfigPopup.DEVICE_OPTIONS
+        popup.cfg.ML_DIR = tmp_path / "new" / "Models"
+        popup.cfg.SMART_FRAMES = False
+        popup.cfg.VIDEO_FPS = 5
+        popup.cfg.N_FRAMES = 7
+        popup.cfg.DEVICE = "CUDAExecutionProvider"
+        with patch("matchypatchy.gui.dialogs.popup_config.get_path", return_value=None) as get_path:
+            ConfigPopup.refresh(popup)
+        assert popup.ml_dir == tmp_path / "new" / "Models"
+        get_path.assert_called_once_with(tmp_path / "new" / "Models", popup.cfg.REID_KEY)
+        popup.smart_frames.setCurrentIndex.assert_called_once_with(1)
+        popup.video_fps.setText.assert_called_once_with("5")
+        popup.n_frames.setText.assert_called_once_with("7")
+        popup.device.setCurrentText.assert_called_once_with("CUDA-enabled GPU")
+        # filling the fields doesn't re-save the config through their handlers
+        popup.video_fps.blockSignals.assert_any_call(True)
