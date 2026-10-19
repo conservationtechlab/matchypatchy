@@ -228,14 +228,36 @@ class ConfigPopup(QDialog):
         button_advanced = QPushButton("Advanced")
         button_advanced.clicked.connect(self.show_advanced)
         button_layout.addWidget(button_advanced)
-        # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        # Save/Cancel Buttons: settings are only written on Save
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
+        # values to restore on Cancel; fields edit the shared config in memory, OK saves it
+        self._original = self._settings()
+
+    # settings this dialog edits
+    SETTINGS = ("KNN", "SEQUENCE_DURATION", "SEQUENCE_N", "SMART_FRAMES",
+                "VIDEO_FPS", "N_FRAMES", "DEVICE", "REID_KEY")
+
+    def _settings(self):
+        """Current values of the settings this dialog edits"""
+        return {name: getattr(self.cfg, name) for name in self.SETTINGS}
+
+    def accept(self):
+        """Save: write the settings to the project's config file"""
+        self.cfg.save()
+        self.logger.info("Configuration saved")
+        super().accept()
+
+    def reject(self):
+        """Cancel: put back the settings as they were when the dialog opened"""
+        for name, value in self._original.items():
+            setattr(self.cfg, name, value)
+        super().reject()
 
     def show_advanced(self):
         """Show/hide advanced options."""
@@ -287,6 +309,7 @@ class ConfigPopup(QDialog):
             # Update local references to the new project's database and config
             self.mpDB = self.parent.mpDB
             self.cfg = self.parent.cfg
+            self._original = self._settings()
             self.refresh()
 
     def new_project(self):
@@ -308,6 +331,7 @@ class ConfigPopup(QDialog):
             # Update local references to the new project's database and config
             self.mpDB = self.parent.mpDB
             self.cfg = self.parent.cfg
+            self._original = self._settings()
             self.refresh()
 
     def set_visualizer_model(self):
@@ -322,9 +346,7 @@ class ConfigPopup(QDialog):
                 # Update config
                 self.visualizer_model.setText(new_model[0])
                 self.cfg.REID_KEY = str(Path(new_model[0]).stem)
-                # save changes to yml
                 self.logger.info(f"Re-ID model updated to {self.cfg.REID_KEY}")
-                self.cfg.save()
             else:
                 dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
                 dialog.exec()
@@ -337,7 +359,6 @@ class ConfigPopup(QDialog):
             if nummatches > 0:
                 self.cfg.KNN = nummatches
                 self.logger.info(f"Max number of matches updated to {nummatches}")
-                self.cfg.save()
         except ValueError:
             pass
 
@@ -350,7 +371,6 @@ class ConfigPopup(QDialog):
                 self.cfg.SEQUENCE_DURATION = duration
                 self.cfg.SEQUENCE_N = n
                 self.logger.info(f"Sequence settings updated: duration={duration}, n={n}")
-                self.cfg.save()
         except ValueError:
             pass
 
@@ -359,7 +379,6 @@ class ConfigPopup(QDialog):
         self.cfg.SMART_FRAMES = True if self.smart_frames.currentText() == "Enabled" else False
         self.video_fps_label.setVisible(self.cfg.SMART_FRAMES)
         self.video_fps.setVisible(self.cfg.SMART_FRAMES)
-        self.cfg.save()
 
     def update_video_fps(self):
         """Update video fps setting"""
@@ -367,7 +386,6 @@ class ConfigPopup(QDialog):
             fps = int(self.video_fps.text())
             if fps > 0:
                 self.cfg.VIDEO_FPS = fps
-                self.cfg.save()
         except ValueError:
             pass
 
@@ -377,7 +395,6 @@ class ConfigPopup(QDialog):
             n_frames = int(self.n_frames.text())
             if n_frames > 0:
                 self.cfg.N_FRAMES = n_frames
-                self.cfg.save()
         except ValueError:
             pass
 
@@ -391,7 +408,6 @@ class ConfigPopup(QDialog):
         elif selected_device == "CUDA-enabled GPU":
             self.cfg.DEVICE = "CUDAExecutionProvider"
         self.logger.info(f"Device changed to {self.cfg.DEVICE}")
-        self.cfg.save()
 
     def edit_uploads(self):
         """Open the upload directories manager popup."""
