@@ -90,7 +90,7 @@ class UploadManagerPopup(QDialog):
         self.list.clearContents()
         self.base_dirs = self.mpDB._command("""SELECT u.id, u.base_dir, u.created_at, COUNT(media.id) AS count
                                                  FROM uploads u LEFT JOIN media ON media.base_dir_id = u.id
-                                                 GROUP BY media.base_dir_id;""")
+                                                 GROUP BY u.id;""")
         if self.base_dirs is None:
             self.base_dirs = []
 
@@ -110,6 +110,8 @@ class UploadManagerPopup(QDialog):
             self.updates.append((self.base_dirs[self.list.currentRow()][0], new_directory))
             # Update the table with the new directory path
             self.list.setItem(self.list.currentRow(), 0, QTableWidgetItem(str(new_directory)))
+            # the new directory hasn't been verified yet
+            self.verified = False
             self.button_save.setEnabled(True)
             self.button_verify.setEnabled(True)
 
@@ -117,7 +119,7 @@ class UploadManagerPopup(QDialog):
         """Verify the new directory path"""
         if self.updates == []:
             # No updates to verify, good to go
-            self.colorize(self.updates)
+            self.colorize()
             return
 
         # Reset verification status and lists
@@ -180,6 +182,9 @@ class UploadManagerPopup(QDialog):
 
                 else:
                     self.errors.append([])
+            else:
+                # keep errors aligned with updates
+                self.errors.append([])
 
         # make the colors visible
         self.list.clearSelection()
@@ -208,9 +213,10 @@ class UploadManagerPopup(QDialog):
             dialog = AlertPopup(self,
                                 prompt=("Verification not completed. Saving without verification may cause "
                                         "inconsistencies in the database. Would you like to proceed?"))
-            if dialog.exec() == QDialog.rejected:
-                return
+            proceed = dialog.exec()
             del dialog
+            if not proceed:
+                return
 
         # if there are errors, warn the user
         # TODO: Choose what will happen
@@ -218,13 +224,15 @@ class UploadManagerPopup(QDialog):
             dialog = AlertPopup(self,
                                 prompt=("There are missing files in the new directories. This will only update "
                                         "chosen paths with all available files. Would you like to proceed?"))
-            if dialog.exec() == QDialog.rejected:
-                return
+            proceed = dialog.exec()
             del dialog
+            if not proceed:
+                return
 
         # proceed with saving changes to the database
         for u, update in enumerate(self.updates):
-            missing = self.errors[u]
+            # no verification results when saving unverified
+            missing = self.errors[u] if u < len(self.errors) else []
             # Only update if there are no errors
             if len(missing) == 0:
                 self.mpDB.update_base_dir(update[0], update[1])
@@ -232,5 +240,11 @@ class UploadManagerPopup(QDialog):
             else:
                 self.logger.warning(f"Skipping update for {update} due to missing files: {missing}")
 
+        # saved, start over so the same updates aren't applied again
+        self.updates = []
+        self.errors = []
+        self.verified = False
+        self.contains_errors = False
         self.update()
         self.button_save.setEnabled(False)
+        self.button_verify.setEnabled(False)

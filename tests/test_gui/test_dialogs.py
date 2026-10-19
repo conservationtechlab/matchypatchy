@@ -392,3 +392,66 @@ class TestFolderImportCamera:
             FolderImportThread.run(thread)
         thread.camera.assert_called_once_with(str(image), 3)
         assert thread.mpDB.add_media.call_args.kwargs["camera_id"] == 7
+
+
+# ---------------------------------------------------------------------------
+# UploadManagerPopup
+# ---------------------------------------------------------------------------
+
+UPLOADS = "matchypatchy.gui.dialogs.popup_uploads"
+
+
+def _uploads_popup(updates=(), errors=(), verified=True, contains_errors=False):
+    popup = MagicMock()
+    popup.updates = list(updates)
+    popup.errors = list(errors)
+    popup.verified = verified
+    popup.contains_errors = contains_errors
+    return popup
+
+
+class TestUploadManagerList:
+    def test_uploads_without_media_are_listed(self, tmp_db):
+        """Grouping on the media side folded every empty upload into one row"""
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        a, b, c = db.add_upload("/a"), db.add_upload("/b"), db.add_upload("/c")
+        db.add_media(a, "x.jpg", "h1", ".jpg", "2024", station)
+        popup = MagicMock()
+        popup.mpDB = db
+        UploadManagerPopup.update(popup)
+        assert sorted((row[1], row[3]) for row in popup.base_dirs) == [("/a", 1), ("/b", 0), ("/c", 0)]
+
+
+class TestUploadManagerSave:
+    def _save(self, popup, confirm):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.AlertPopup") as alert:
+            alert.return_value.exec.return_value = confirm
+            UploadManagerPopup.save(popup)
+
+    def test_cancel_on_unverified_warning_saves_nothing(self):
+        popup = _uploads_popup(updates=[(1, "/new")], verified=False)
+        self._save(popup, confirm=0)
+        popup.mpDB.update_base_dir.assert_not_called()
+
+    def test_cancel_on_missing_files_warning_saves_nothing(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg"]], contains_errors=True)
+        self._save(popup, confirm=0)
+        popup.mpDB.update_base_dir.assert_not_called()
+
+    def test_save_without_verify(self):
+        popup = _uploads_popup(updates=[(1, "/new")], verified=False)
+        self._save(popup, confirm=1)
+        popup.mpDB.update_base_dir.assert_called_once_with(1, "/new")
+        assert popup.updates == []
+
+    def test_choosing_another_directory_needs_verifying_again(self):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = _uploads_popup(verified=True)
+        popup.base_dirs = [(1, "/old", "2024", 0)]
+        popup.list.currentRow.return_value = 0
+        with patch(f"{UPLOADS}.QFileDialog.getExistingDirectory", return_value="/new"):
+            UploadManagerPopup.edit(popup)
+        assert popup.verified is False
