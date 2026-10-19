@@ -301,6 +301,22 @@ class DisplayCompare(QWidget):
             self.alert_box.update_prompt(prompt)
             self.alert_box.show()
 
+    def notify(self, prompt):
+        """
+        Show a result message in the open progress popup, replacing its text, so the
+        user dismisses one popup. Without a progress popup, show a single alert.
+        """
+        box = self.alert_box
+        if box is None:
+            self.warn(prompt=prompt)
+            return
+        box.update_prompt(prompt)
+        # stop the busy indicator
+        box.set_max(1)
+        box.set_value(1)
+        box.finished.connect(lambda _result: self.close_progress())
+        box.show()
+
     def update_progress(self, progress):
         """Update the progress bar in the progress popup"""
         if hasattr(self, 'alert_box') and self.alert_box is not None:
@@ -427,16 +443,17 @@ class DisplayCompare(QWidget):
             QTimer.singleShot(100, self.QueryContainer.calculate_neighbors)
 
     def check_matchthread_success(self, thread_success):
-        cancelled = self._cancelled
-        self.close_progress()
-        if cancelled:
+        if self._cancelled:
+            self.close_progress()
             return
         if thread_success:
+            self.close_progress()
             self.change_query(0)
+        # on failure keep the progress popup open and show the result in it
         elif not self.QueryContainer.filter_matched:
-            self.warn(prompt="No matches found within filter.")
+            self.notify("No matches found within filter.")
         else:
-            self.warn(prompt="No data to compare, all available data from same sequence/capture.")
+            self.notify("No data to compare, all available data from same sequence/capture.")
 
     # --------------------------------------------------------------------------
     def compare_by_individual(self):
@@ -459,9 +476,9 @@ class DisplayCompare(QWidget):
             if filtered:
                 self.change_query(0)
             else:
-                self.warn(prompt="No data to compare within filter.")
+                self.notify("No data to compare within filter.")
         else:
-            self.warn(prompt="No data to compare, no named individuals to analyze.")
+            self.notify("No data to compare, no named individuals to analyze.")
 
     def compare_manual(self, selected_ids=None):
         """
@@ -479,7 +496,7 @@ class DisplayCompare(QWidget):
             self.QueryContainer.calculate_neighbors()
             self.change_query(0)
         else:
-            self.warn(prompt="No data to compare within filter.")
+            self.notify("No data to compare within filter.")
 
     def toggle_match_favorites_button(self):
         """

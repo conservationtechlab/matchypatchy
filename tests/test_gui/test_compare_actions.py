@@ -198,14 +198,48 @@ class TestNoQueryGuards:
         popup.assert_not_called()
         dc.QueryContainer.unmatch.assert_not_called()
 
-    def test_failed_match_thread_warns(self):
+    def test_failed_match_thread_shows_result_in_progress_popup(self):
         from matchypatchy.gui.display_compare import DisplayCompare
         dc = MagicMock()
         dc._cancelled = False
         dc.QueryContainer.filter_matched = False
         DisplayCompare.check_matchthread_success(dc, False)
-        dc.warn.assert_called_once_with(prompt="No matches found within filter.")
+        dc.notify.assert_called_once_with("No matches found within filter.")
+        dc.close_progress.assert_not_called()
         dc.change_query.assert_not_called()
+
+    def test_successful_match_thread_closes_progress(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc._cancelled = False
+        DisplayCompare.check_matchthread_success(dc, True)
+        dc.close_progress.assert_called_once()
+        dc.change_query.assert_called_once_with(0)
+
+
+class TestNotify:
+    def test_replaces_text_of_open_progress_popup(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        DisplayCompare.notify(dc, "No matches found within filter.")
+        dc.alert_box.update_prompt.assert_called_once_with("No matches found within filter.")
+        dc.alert_box.show.assert_called_once()
+        dc.warn.assert_not_called()
+
+    def test_dismissing_the_popup_clears_it(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        DisplayCompare.notify(dc, "msg")
+        on_finished = dc.alert_box.finished.connect.call_args.args[0]
+        on_finished(1)
+        dc.close_progress.assert_called_once()
+
+    def test_single_alert_without_progress_popup(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.alert_box = None
+        DisplayCompare.notify(dc, "msg")
+        dc.warn.assert_called_once_with(prompt="msg")
 
 
 class TestModeSwitching:
@@ -241,4 +275,4 @@ class TestModeSwitching:
             cls.return_value.filter.return_value = False
             DisplayCompare.compare_manual(dc, selected_ids=[10, 11])
         dc.change_query.assert_not_called()
-        dc.warn.assert_called_once()
+        dc.notify.assert_called_once()
