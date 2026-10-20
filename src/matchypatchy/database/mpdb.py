@@ -29,6 +29,21 @@ def sql_text(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
+# rois removed by a delete from each table, given the delete's condition
+# their embeddings live in chroma, which the sqlite cascade doesn't reach
+_MEDIA_OF = {
+    "media": "{cond}",
+    "station": "station_id IN (SELECT id FROM station WHERE {cond})",
+    "survey": "station_id IN (SELECT id FROM station WHERE survey_id IN (SELECT id FROM survey WHERE {cond}))",
+    "uploads": "base_dir_id IN (SELECT id FROM uploads WHERE {cond})",
+}
+CASCADING_ROIS = {
+    "roi": "SELECT id FROM roi WHERE {cond}",
+    **{table: f"SELECT id FROM roi WHERE media_id IN (SELECT id FROM media WHERE {media_cond})"
+       for table, media_cond in _MEDIA_OF.items()},
+}
+
+
 class MatchyPatchyDB():
     """
     Class representing the MatchyPatchy database
@@ -874,14 +889,19 @@ class MatchyPatchyDB():
         """Delete Entries From table Given condition"""
         try:
             cursor = self.db.cursor()
+            # find the rois this delete removes before they are gone
+            roi_query = CASCADING_ROIS.get(table)
+            roi_ids = [row[0] for row in cursor.execute(roi_query.format(cond=cond))] if roi_query else []
             command = f'DELETE FROM {table} WHERE {cond};'
             cursor.execute(command)
             self.db.commit()
             self.logger.info(f"Deleted from {table} where {cond}")
-            return True
         except sqlite3.Error as error:
             self.logger.error(f"Failed delete: {error}")
             return False
+        # after the commit, so a failed delete keeps its embeddings
+        self.delete_embs(roi_ids)
+        return True
 
     def clear(self, table):
         """Clear a table without dropping it"""
@@ -904,6 +924,17 @@ class MatchyPatchyDB():
     def delete_emb(self, emb_id):
         """Delete embedding from chroma vector database"""
         self.collection.delete(ids=[str(emb_id)])
+
+    def delete_embs(self, emb_ids):
+        """Delete embeddings from chroma vector database, ids without an embedding are ignored"""
+        # chroma rejects an empty list
+        if not emb_ids:
+            return
+        try:
+            self.collection.delete(ids=[str(emb_id) for emb_id in emb_ids])
+        except Exception as error:
+            # the rois are already gone, matching skips embeddings without a roi
+            self.logger.error(f"Failed to delete {len(emb_ids)} embeddings: {error}")
 
     def knn(self, query_id, k=3):
         """Get k nearest neighbors of a query ROI from chroma vector database"""
