@@ -669,3 +669,25 @@ class TestFolderImportLookups:
         stations = db.select("station", columns="id, survey_id")
         assert sorted(survey_id for _, survey_id in stations) == sorted([survey_1, survey_2])
         assert db.count("camera") == 2
+
+    def test_reimport_does_not_regenerate_thumbnails(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        file_path = tmp_path / "2023" / "Site01" / "Cam1" / "a.jpg"
+        file_path.parent.mkdir(parents=True)
+        file_path.write_bytes(b"a")
+        self._import(db, parent, file_path, 1, monkeypatch)
+
+        saved = []
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *a: saved.append(a) or "t.jpg")
+        data = pd.DataFrame([{"filepath": str(file_path), "datetime": "2024-01-01 12:00:00"}])
+        parts = file_path.parts
+        thread = import_thread.FolderImportThread(parent, (1,), data,
+                                                  station_level=parts.index("Site01"),
+                                                  camera_level=parts.index("Cam1"))
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+
+        assert saved == []
+        assert db.count("media") == 1

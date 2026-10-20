@@ -707,9 +707,10 @@ class FolderImportThread(QThread):
                                                sequence_id=None,
                                                external_id=None,
                                                comment=None)
-                # save thumbnail
-                thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
-                self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
+                # save thumbnail, unless the file was already imported or failed to add
+                if media_id not in ("duplicate_error", None):
+                    thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
+                    self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
 
                 self.progress_update.emit(i)
 
