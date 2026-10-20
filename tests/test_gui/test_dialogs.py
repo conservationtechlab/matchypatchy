@@ -780,6 +780,34 @@ class TestProcessingSteps:
         DisplayBase._start_reid(base)
         base.miew_thread.start.assert_called_once()
 
+    def test_model_not_downloaded_stops_before_processing(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        mloptions = {"sequence_checked": True, "DETECTOR_KEY": "md", "REID_KEY": "miew", "VIEWPOINT_KEY": None}
+        with patch("matchypatchy.gui.display_base.get_path", side_effect=lambda _d, key: None if key == "md" else "/m"), \
+             patch("matchypatchy.gui.display_base.AlertPopup") as popup, \
+             patch("matchypatchy.gui.display_base.SequenceThread") as sequence_thread:
+            DisplayBase.process_images(base, mloptions)
+        assert popup.call_args[0][1] == "Model(s) not downloaded: md"
+        sequence_thread.assert_not_called()
+
+    def test_popup_closes_when_every_file_was_read(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = set()
+        base.miew_thread.failed = set()
+        DisplayBase._finish_processing(base)
+        base._process_dialog.accept.assert_called_once()
+
+    def test_popup_stays_open_to_report_unreadable_files(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = {"/a.jpg"}
+        base.miew_thread.failed = {"/b.jpg"}
+        DisplayBase._finish_processing(base)
+        base._process_dialog.accept.assert_not_called()
+        assert "2 file(s)" in base._process_dialog.update_prompt.call_args[0][0]
+
 
 class TestConfigSaveCancel:
     def _popup(self):

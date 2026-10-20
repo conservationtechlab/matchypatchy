@@ -1,6 +1,7 @@
 """
 QThread for saving thumbnails to temp dir for media table
 """
+import logging
 import pandas as pd
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtGui import QImage
@@ -8,6 +9,9 @@ from PyQt6.QtGui import QImage
 from matchypatchy.database.media import fetch_media, fetch_roi_media, fetch_individual
 from matchypatchy.database import thumbnails
 from matchypatchy.config import asset_path
+
+
+logger = logging.getLogger(__name__)
 
 
 class FetchTableThread(QThread):
@@ -21,7 +25,6 @@ class FetchTableThread(QThread):
         super().__init__()
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
-        self.logger = parent.logger
         self.data_type = parent.data_type
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.individual_list = fetch_individual(self.mpDB)
@@ -85,7 +88,7 @@ class FetchTableThread(QThread):
             self.data['select'] = 0
             self.loaded_data.emit(self.data)
         except Exception as e:
-            self.logger.error(f"Error loading thumbnails: {str(e)}")
+            logger.error(f"Error loading thumbnails: {str(e)}")
         finally:
             self.done.emit()
 
@@ -123,7 +126,7 @@ class FetchTableThread(QThread):
                 batch_updates[roi_id] = {'filepath': str(thumbnail_path)}
 
             except Exception as e:
-                self.logger.error(f"Error generating thumbnail for ROI {roi_id}: {e}")
+                logger.error(f"Error generating thumbnail for ROI {roi_id}: {e}")
                 continue
 
             # Update progress
@@ -163,7 +166,7 @@ class FetchTableThread(QThread):
                 batch_updates[media_id] = {'filepath': str(thumbnail_path)}
 
             except Exception as e:
-                self.logger.error(f"Error generating thumbnail for media {media_id}: {e}")
+                logger.error(f"Error generating thumbnail for media {media_id}: {e}")
                 continue
 
             # Update progress

@@ -24,6 +24,7 @@ from matchypatchy.gui.dialogs.popup_ml import MLOptionsPopup
 from matchypatchy.threads.sequence_thread import SequenceThread
 from matchypatchy.threads.animl_thread import AnimlThread
 from matchypatchy.threads.reid_thread import ReIDThread
+from matchypatchy.threads.model_download_thread import get_path
 
 from matchypatchy import config
 
@@ -273,7 +274,13 @@ class DisplayBase(QWidget):
 
     def process_images(self, mloptions):
         """Process images using selected machine learning options"""
-        if self.mpDB.count("media") > 0:
+        # a chosen model's files can be deleted before processing starts
+        missing = [key for key in (mloptions['DETECTOR_KEY'], mloptions['REID_KEY'], mloptions['VIEWPOINT_KEY'])
+                   if key is not None and get_path(self.cfg.ML_DIR, key) is None]
+        if missing:
+            dialog = AlertPopup(self, f"Model(s) not downloaded: {', '.join(missing)}")
+            dialog.show()
+        elif self.mpDB.count("media") > 0:
             self.cfg.update(mloptions)
             dialog = AlertPopup(self, "Processing Images...",
                                 title="Processing Images",
@@ -292,7 +299,7 @@ class DisplayBase(QWidget):
             self.miew_thread = ReIDThread(self.mpDB, self.cfg, mloptions)
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)
-            self.miew_thread.done.connect(dialog.accept)
+            self.miew_thread.done.connect(self._finish_processing)
             # run one step after the other, so only one thread writes to the database at a time
             self._process_dialog = dialog
             self._process_cancelled = False
@@ -323,6 +330,15 @@ class DisplayBase(QWidget):
             return
         self._process_dialog.reset_counter()
         self.miew_thread.start()
+
+    def _finish_processing(self):
+        """Close the popup, or keep it open to say how many files couldn't be read"""
+        failed = self.animl_thread.failed | self.miew_thread.failed
+        if failed:
+            self._process_dialog.update_prompt(f"Processing finished, but {len(failed)} file(s) "
+                                               "could not be read. See the log for which.")
+        else:
+            self._process_dialog.accept()
 
     def _cancel_processing(self):
         """Stop the running step and don't start the ones after it"""
