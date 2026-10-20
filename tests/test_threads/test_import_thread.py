@@ -560,3 +560,39 @@ class TestBasePathUpdateThread:
         assert updated == "/old/path"
         assert thread.progress_update.calls == []
         assert len(thread.finished.calls) == 1
+
+
+def _csv_import(db, parent, rows, selected_columns, monkeypatch):
+    """Run a CSVImportThread over rows as they would read from a csv (blank cells are NaN)"""
+    monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+    monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+    df = pd.DataFrame(rows)
+    thread = import_thread.CSVImportThread(parent, df.groupby("filepath", sort=False),
+                                           selected_columns, "Default Survey")
+    thread.finished = SignalSpy()
+    thread.import_failed = SignalSpy()
+    thread.isInterruptionRequested = lambda: False
+    thread.run()
+    return thread
+
+
+class TestCSVImportBlankCells:
+    def _selected_columns(self):
+        return TestCSVImportThread._selected_columns(None)
+
+    def _image(self, tmp_path, name):
+        path = tmp_path / "imgs" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(name.encode())
+        return str(path)
+
+    def test_blank_camera_adds_no_camera(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        rows = [{"filepath": self._image(tmp_path, "a.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "station": "Station A", "camera": float("nan")}]
+
+        _csv_import(db, parent, rows, self._selected_columns(), monkeypatch)
+
+        assert db.count("camera") == 0
+        assert db.select("media", columns="camera_id") == [(None,)]

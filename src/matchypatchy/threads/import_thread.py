@@ -494,12 +494,12 @@ class CSVImportThread(QThread):
     def camera(self, exemplar, station_id):
         """Get or create camera"""
         camera_id = None
-        camera_name = exemplar.get(self.selected_columns["camera"])
+        # a blank cell reads as NaN, convert before checking for a camera
+        camera_name = self._convert_to_str(exemplar.get(self.selected_columns["camera"]))
         if camera_name is not None:
             # check reference dictionary first
             if camera_name in self.camera_ref:
                 return self.camera_ref[camera_name]
-            camera_name = self._convert_to_str(camera_name)
             try:
                 camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name={sql_text(camera_name)}")[0][0]
             except IndexError:
