@@ -30,19 +30,21 @@ def _thread(monkeypatch, rows, flag=True):
     return SequenceThread(FakeDB(), cfg, flag)
 
 
-def test_images_without_a_camera_share_a_sequence(monkeypatch):
+def test_images_without_a_camera_get_their_own_sequence(monkeypatch):
     # null camera_id comes back from the database as NaN in a float column
     thread = _thread(monkeypatch, [
         (1, 1, float("nan"), "2024-01-01 00:00:00", None),
         (2, 1, float("nan"), "2024-01-01 00:00:10", None),
-        (3, 1, float("nan"), "2024-01-01 00:00:20", None),
-        (4, 2, 7.0, "2024-01-01 00:00:00", None),
+        (3, 1, 7.0, "2024-01-01 00:00:00", None),
+        (4, 1, 7.0, "2024-01-01 00:00:10", None),
     ])
     thread.run()
 
     sequence_of = thread.mpDB.sequence_of
-    assert sequence_of[1] == sequence_of[2] == sequence_of[3]
-    assert sequence_of[4] != sequence_of[1]
+    # can't tell which camera took them, so they can't be compared
+    assert sequence_of[1] != sequence_of[2]
+    assert sequence_of[3] == sequence_of[4]
+    assert len(set(sequence_of.values())) == 3
 
 
 def test_cancel_stops_writing_sequences(monkeypatch):
