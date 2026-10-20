@@ -343,6 +343,11 @@ class CSVImportThread(QThread):
                         bbox_y = -1
                         bbox_w = -1
                         bbox_h = -1
+                    # blank cells (eg. images without a detection) are box-less rois, not a failed import
+                    if any(pd.isna(b) for b in (bbox_x, bbox_y, bbox_w, bbox_h)):
+                        bbox_x = bbox_y = bbox_w = bbox_h = -1
+                    if pd.isna(frame):
+                        frame = 0
 
                     # skip rois already imported (eg. resuming an interrupted import)
                     # each existing roi accounts for one row, so repeated keys (eg. -1 bboxes) are counted

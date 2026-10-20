@@ -610,3 +610,18 @@ class TestCSVImportBlankCells:
         assert db.select("camera", columns="name") == [("Cam 'B'",)]
         assert db.select("individual", columns="name") == [("D'Artagnan",)]
         assert db.select("media", columns="comment") == [("don't",)]
+
+    def test_blank_bbox_and_frame_import_as_boxless_roi(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        nan = float("nan")
+        rows = [{"filepath": self._image(tmp_path, "a.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "station": "Station A", "frame": 3, "bbox_x": 0.1, "bbox_y": 0.2, "bbox_w": 0.3, "bbox_h": 0.4},
+                {"filepath": self._image(tmp_path, "b.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "station": "Station A", "frame": nan, "bbox_x": nan, "bbox_y": nan, "bbox_w": nan, "bbox_h": nan}]
+
+        thread = _csv_import(db, parent, rows, self._selected_columns(), monkeypatch)
+
+        assert thread.import_failed.calls == []
+        assert db.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h") == [
+            (3, 0.1, 0.2, 0.3, 0.4), (0, -1, -1, -1, -1)]
