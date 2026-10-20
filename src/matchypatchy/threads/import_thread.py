@@ -170,7 +170,8 @@ class CSVMigrateThread(QThread):
             station_id = self.station_ref[old_station_id]
         except KeyError:
             try:
-                station_id = self.mpDB.select("station", columns="id", row_cond=f'name={sql_text(station_name)}')[0][0]
+                row_cond = f'name={sql_text(station_name)} AND survey_id={int(survey_id)}'
+                station_id = self.mpDB.select("station", columns="id", row_cond=row_cond)[0][0]
             except IndexError:
                 station_id = self.mpDB.add_station(str(station_name),
                                                    lat if not pd.isna(lat) else None,
@@ -189,7 +190,7 @@ class CSVMigrateThread(QThread):
                 # get camera id from database if not in reference dictionary
                 try:
                     camera_name = str(camera_name).strip()
-                    row_cond = f"name={sql_text(camera_name)}"
+                    row_cond = f"name={sql_text(camera_name)} AND station_id={int(station_id)}"
                     rows = self.mpDB.select("camera", columns="id", row_cond=row_cond)
                     camera_id = rows[0][0]
                 # if not in database, add camera
@@ -479,11 +480,13 @@ class CSVImportThread(QThread):
         """Get or create station"""
         station_name = exemplar.get(self.selected_columns["station"])
         station_name = self._convert_to_str(station_name)
-        # check reference dictionary first
-        if station_name in self.station_ref:
-            return self.station_ref[station_name]
+        # check reference dictionary first, station names are only unique within a survey
+        station_key = (station_name, survey_id)
+        if station_key in self.station_ref:
+            return self.station_ref[station_key]
         try:
-            station_id = self.mpDB.select("station", columns="id", row_cond=f'name={sql_text(station_name)}')[0][0]
+            row_cond = f'name={sql_text(station_name)} AND survey_id={int(survey_id)}'
+            station_id = self.mpDB.select("station", columns="id", row_cond=row_cond)[0][0]
         except IndexError:
             lat = exemplar.get(self.selected_columns["lat"])
             lat = self._convert_to_float(lat)
@@ -492,7 +495,7 @@ class CSVImportThread(QThread):
             station_id = self.mpDB.add_station(str(station_name), lat, long, survey_id)
             if station_id is None:
                 raise RuntimeError(f"Failed to add station '{station_name}' (survey_id: {survey_id}), see log for database error")
-        self.station_ref[station_name] = station_id
+        self.station_ref[station_key] = station_id
         return station_id
 
     # OPTIONAL -----------------------------------------------------------------
@@ -502,16 +505,18 @@ class CSVImportThread(QThread):
         # a blank cell reads as NaN, convert before checking for a camera
         camera_name = self._convert_to_str(exemplar.get(self.selected_columns["camera"]))
         if camera_name is not None:
-            # check reference dictionary first
-            if camera_name in self.camera_ref:
-                return self.camera_ref[camera_name]
+            # check reference dictionary first, camera names are only unique within a station
+            camera_key = (camera_name, station_id)
+            if camera_key in self.camera_ref:
+                return self.camera_ref[camera_key]
             try:
-                camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name={sql_text(camera_name)}")[0][0]
+                row_cond = f"name={sql_text(camera_name)} AND station_id={int(station_id)}"
+                camera_id = self.mpDB.select("camera", columns="id", row_cond=row_cond)[0][0]
             except IndexError:
                 camera_id = self.mpDB.add_camera(str(camera_name), station_id)
                 if camera_id is None:
                     raise RuntimeError(f"Failed to add camera '{camera_name}' (station_id: {station_id}), see log for database error")
-            self.camera_ref[camera_name] = camera_id
+            self.camera_ref[camera_key] = camera_id
         return camera_id
 
     def sequence(self, exemplar):
@@ -729,7 +734,8 @@ class FolderImportThread(QThread):
         station_name = Path(filepath).parts[self.station_level]
         station_name = str(station_name)
         try:
-            station_id = self.mpDB.select("station", columns="id", row_cond=f'name={sql_text(station_name)}')[0][0]
+            row_cond = f'name={sql_text(station_name)} AND survey_id={int(survey_id)}'
+            station_id = self.mpDB.select("station", columns="id", row_cond=row_cond)[0][0]
         except IndexError:
             station_id = self.mpDB.add_station(station_name, None, None, survey_id)
         return station_id
@@ -738,7 +744,8 @@ class FolderImportThread(QThread):
         camera_name = Path(filepath).parts[self.camera_level]
         camera_name = str(camera_name)
         try:
-            camera_id = self.mpDB.select("camera", columns="id", row_cond=f"name={sql_text(camera_name)}")[0][0]
+            row_cond = f"name={sql_text(camera_name)} AND station_id={int(station_id)}"
+            camera_id = self.mpDB.select("camera", columns="id", row_cond=row_cond)[0][0]
         except IndexError:
             camera_id = self.mpDB.add_camera(camera_name, station_id)
 

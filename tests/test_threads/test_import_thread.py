@@ -625,3 +625,47 @@ class TestCSVImportBlankCells:
         assert thread.import_failed.calls == []
         assert db.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h") == [
             (3, 0.1, 0.2, 0.3, 0.4), (0, -1, -1, -1, -1)]
+
+    def test_same_station_and_camera_names_in_two_surveys_stay_separate(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        selected = {**self._selected_columns(), "survey": "survey"}
+        rows = [{"filepath": self._image(tmp_path, f"{survey}.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "survey": survey, "station": "Site01", "camera": "Cam1"}
+                for survey in ("Survey 2023", "Survey 2024")]
+
+        _csv_import(db, parent, rows, selected, monkeypatch)
+
+        stations = db.select("station", columns="id, survey_id")
+        cameras = db.select("camera", columns="station_id")
+        assert len(stations) == 2
+        assert len({survey_id for _, survey_id in stations}) == 2
+        assert sorted(c[0] for c in cameras) == sorted(s[0] for s in stations)
+
+
+class TestFolderImportLookups:
+    def _import(self, db, parent, file_path, survey_id, monkeypatch):
+        parts = file_path.parts
+        data = pd.DataFrame([{"filepath": str(file_path), "datetime": "2024-01-01 12:00:00"}])
+        thread = import_thread.FolderImportThread(parent, (survey_id,), data,
+                                                  station_level=parts.index("Site01"),
+                                                  camera_level=parts.index("Cam1"))
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+
+    def test_same_station_name_in_a_second_survey_gets_its_own_station(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        survey_1 = db.add_survey("Survey 2023", None, None, None)
+        survey_2 = db.add_survey("Survey 2024", None, None, None)
+        for year, survey_id in (("2023", survey_1), ("2024", survey_2)):
+            file_path = tmp_path / year / "Site01" / "Cam1" / f"{year}.jpg"
+            file_path.parent.mkdir(parents=True)
+            file_path.write_bytes(year.encode())
+            self._import(db, parent, file_path, survey_id, monkeypatch)
+
+        stations = db.select("station", columns="id, survey_id")
+        assert sorted(survey_id for _, survey_id in stations) == sorted([survey_1, survey_2])
+        assert db.count("camera") == 2
