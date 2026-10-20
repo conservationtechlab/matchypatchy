@@ -111,7 +111,7 @@ def _old_database(path, schema_version=None):
     """
     Write a populated database as an older version built it, with its embedding database
 
-    schema_version None is a released version, 1 an unreleased build that versioned the schema
+    schema_version None is a released version, 1 and 2 unreleased builds that versioned the schema
     """
     conn = sqlite3.connect(path / "matchypatchy.db")
     conn.executescript(RELEASED_SCHEMA)
@@ -130,7 +130,7 @@ def _old_database(path, schema_version=None):
     setup_chromadb(KEY, path / "emb.db")
 
 
-@pytest.fixture(params=[None, 1], ids=["released", "unreleased-v1"])
+@pytest.fixture(params=[None, 1, 2], ids=["released", "unreleased-v1", "unreleased-v2"])
 def migrated_db(request, tmp_path, null_logger):
     _old_database(tmp_path, schema_version=request.param)
     db = MatchyPatchyDB(str(tmp_path), null_logger)
@@ -169,3 +169,37 @@ class TestMigrateToCurrent:
         assert db.count("roi") == 0
         assert db.count("media_thumbnails") == 0
         assert db.count("roi_thumbnails") == 0
+
+    def test_same_relative_path_under_another_base_dir_is_added(self, migrated_db):
+        db, _ = migrated_db
+        base_dir_id = db.add_upload("D:/2024")
+        media_id = db.add_media(base_dir_id, "Site01/IMG_0001.JPG", "hash2", ".jpg",
+                                "2024-01-01 00:00:00", 1)
+        assert media_id not in ("duplicate_error", None)
+        assert db.count("media") == 2
+
+
+class TestRelativePathUniqueness:
+    def test_same_relative_path_in_two_base_dirs(self, tmp_db):
+        db, _ = tmp_db
+        station_id = db.add_station("Site01", None, None, 1)
+        dir_2023 = db.add_upload("D:/2023")
+        dir_2024 = db.add_upload("D:/2024")
+
+        first = db.add_media(dir_2023, "Site01/IMG_0001.JPG", "hash1", ".jpg", "2023-01-01", station_id)
+        second = db.add_media(dir_2024, "Site01/IMG_0001.JPG", "hash2", ".jpg", "2024-01-01", station_id)
+
+        assert first not in ("duplicate_error", None)
+        assert second not in ("duplicate_error", None)
+        assert first != second
+
+    def test_same_relative_path_in_one_base_dir_is_a_duplicate(self, tmp_db):
+        db, _ = tmp_db
+        station_id = db.add_station("Site01", None, None, 1)
+        base_dir_id = db.add_upload("D:/2023")
+
+        db.add_media(base_dir_id, "Site01/IMG_0001.JPG", "hash1", ".jpg", "2023-01-01", station_id)
+        again = db.add_media(base_dir_id, "Site01/IMG_0001.JPG", "hash2", ".jpg", "2023-01-01", station_id)
+
+        assert again == "duplicate_error"
+        assert db.count("media") == 1

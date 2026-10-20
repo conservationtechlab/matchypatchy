@@ -349,7 +349,7 @@ class MatchyPatchyDB():
         Media has 10 attributes not including id:
             id INTEGER PRIMARY KEY,
             base_dir_id INTEGER NOT NULL,
-            relative_path TEXT UNIQUE NOT NULL,
+            relative_path TEXT NOT NULL, (unique within base_dir_id)
             sha256 TEXT UNIQUE NOT NULL,
             ext TEXT NOT NULL,
             timestamp TEXT NOT NULL,
@@ -387,7 +387,8 @@ class MatchyPatchyDB():
         except sqlite3.IntegrityError as error:
             if not quiet:
                 print(f"DEBUG: IntegrityError caught: {error}")
-            if 'UNIQUE constraint failed: media.relative_path' in error.args[0]:
+            # unique (base_dir_id, relative_path)
+            if 'UNIQUE constraint failed: media.base_dir_id, media.relative_path' in error.args[0]:
                 self.logger.error(f"Failed to add {relative_path}, already exists in database.")
                 return "duplicate_error"
             if 'UNIQUE constraint failed: media.sha256' in error.args[0]:

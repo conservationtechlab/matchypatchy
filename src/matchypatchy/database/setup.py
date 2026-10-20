@@ -12,9 +12,29 @@ from matchypatchy import __version__
 
 # Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
 # Databases created before schema versioning have no schema_version column and are treated as version 1.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
-# Tables rebuilt by a migration, {name} lets the migration create them under a temporary name
+# Tables rebuilt by a migration, {name} lets the migration create them under a temporary name.
+# A relative path is only unique within its base directory: D:/2023/Site01/IMG_0001.JPG and
+# D:/2024/Site01/IMG_0001.JPG are both Site01/IMG_0001.JPG
+MEDIA_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
+                id INTEGER PRIMARY KEY,
+                base_dir_id INTEGER NOT NULL,
+                relative_path TEXT NOT NULL,
+                sha256 TEXT UNIQUE NOT NULL,
+                ext TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                station_id INTEGER NOT NULL,
+                camera_id INTEGER,
+                sequence_id INTEGER,
+                external_id INTEGER,
+                comment TEXT,
+                UNIQUE (base_dir_id, relative_path),
+                FOREIGN KEY (base_dir_id) REFERENCES uploads (id) ON DELETE CASCADE,
+                FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
+                FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
+                FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);'''
+
 INDIVIDUAL_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 id INTEGER PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -92,23 +112,7 @@ def setup_database(key, filepath, db=None):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
 
         # MEDIA
-        cursor.execute(
-            '''CREATE TABLE IF NOT EXISTS media (
-                id INTEGER PRIMARY KEY,
-                base_dir_id INTEGER NOT NULL,
-                relative_path TEXT UNIQUE NOT NULL,
-                sha256 TEXT UNIQUE NOT NULL,
-                ext TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                station_id INTEGER NOT NULL,
-                camera_id INTEGER,
-                sequence_id INTEGER,
-                external_id INTEGER,
-                comment TEXT,
-                FOREIGN KEY (base_dir_id) REFERENCES uploads (id) ON DELETE CASCADE,
-                FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
-                FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
-                FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);''')
+        cursor.execute(MEDIA_TABLE.format(name="media"))
 
         # ROI
         cursor.execute(
@@ -252,7 +256,13 @@ def _migrate_1_to_2(db):
         _rebuild_table(db, "individual", INDIVIDUAL_TABLE)
 
 
-MIGRATIONS = {1: _migrate_1_to_2}
+def _migrate_2_to_3(db):
+    """Make media.relative_path unique within its base directory instead of across all of them"""
+    with _schema_change(db):
+        _rebuild_table(db, "media", MEDIA_TABLE)
+
+
+MIGRATIONS = {1: _migrate_1_to_2, 2: _migrate_2_to_3}
 
 
 def migrate_database(db, filepath, logger):
