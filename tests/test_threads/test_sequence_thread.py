@@ -11,6 +11,7 @@ class FakeDB:
     def __init__(self):
         self.next_sequence = 0
         self.sequence_of = {}
+        self.on_edit = None
 
     def add_sequence(self):
         self.next_sequence += 1
@@ -18,6 +19,8 @@ class FakeDB:
 
     def edit_row(self, table, row_id, changes):
         self.sequence_of[row_id] = changes["sequence_id"]
+        if self.on_edit:
+            self.on_edit()
 
 
 def _thread(monkeypatch, rows, flag=True):
@@ -40,3 +43,19 @@ def test_images_without_a_camera_share_a_sequence(monkeypatch):
     sequence_of = thread.mpDB.sequence_of
     assert sequence_of[1] == sequence_of[2] == sequence_of[3]
     assert sequence_of[4] != sequence_of[1]
+
+
+def test_cancel_stops_writing_sequences(monkeypatch):
+    # two sequences, an hour apart
+    thread = _thread(monkeypatch, [
+        (1, 1, 1, "2024-01-01 00:00:00", 5),
+        (2, 1, 1, "2024-01-01 01:00:00", 5),
+    ])
+    done = []
+    thread.done.connect(lambda: done.append(True))
+    # cancel while the first sequence is being written
+    thread.mpDB.on_edit = thread.requestInterruption
+    thread.run()
+
+    assert list(thread.mpDB.sequence_of) == [1]
+    assert done == []
