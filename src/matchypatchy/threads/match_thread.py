@@ -110,8 +110,9 @@ class MatchEmbeddingThread(QThread):
         sequence_rois_set = set(sequence_rois)
         neighbors_df = pd.DataFrame(neighbors, columns=['id', 'distance'])
         
-        # merge neighbor distance with ROI metadata
-        neighbors_df = neighbors_df.merge(self.rois[roi_info], on='id', how='left')
+        # merge neighbor distance with ROI metadata, dropping embeddings whose roi
+        # is gone (deleting a station or survey cascades to rois, not to chroma)
+        neighbors_df = neighbors_df.merge(self.rois[roi_info], on='id', how='inner')
         
         # Vectorized lookup for query ROI data
         query_rois_data = self.rois[self.rois['id'].isin(sequence_rois_set)][roi_info].rename(columns={
