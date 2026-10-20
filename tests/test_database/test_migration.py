@@ -111,7 +111,7 @@ def _old_database(path, schema_version=None):
     """
     Write a populated database as an older version built it, with its embedding database
 
-    schema_version None is a released version, 1 and 2 unreleased builds that versioned the schema
+    schema_version None is a released version, 1 an unreleased build that versioned the schema
     """
     conn = sqlite3.connect(path / "matchypatchy.db")
     conn.executescript(RELEASED_SCHEMA)
@@ -130,7 +130,7 @@ def _old_database(path, schema_version=None):
     setup_chromadb(KEY, path / "emb.db")
 
 
-@pytest.fixture(params=[None, 1, 2], ids=["released", "unreleased-v1", "unreleased-v2"])
+@pytest.fixture(params=[None, 1], ids=["released", "unreleased-v1"])
 def migrated_db(request, tmp_path, null_logger):
     _old_database(tmp_path, schema_version=request.param)
     db = MatchyPatchyDB(str(tmp_path), null_logger)

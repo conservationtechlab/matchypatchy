@@ -12,7 +12,7 @@ from matchypatchy import __version__
 
 # Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
 # Databases created before schema versioning have no schema_version column and are treated as version 1.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 2
 
 # Tables rebuilt by a migration, {name} lets the migration create them under a temporary name.
 # A relative path is only unique within its base directory: D:/2023/Site01/IMG_0001.JPG and
@@ -248,21 +248,21 @@ def _schema_change(db):
 
 
 def _migrate_1_to_2(db):
-    """Bring a database from before schema versioning up to date: add schema_version, drop individual.age"""
+    """
+    Bring a database from before schema versioning up to date
+
+    Adds metadata.schema_version, drops the unused individual.age, and makes
+    media.relative_path unique within its base directory instead of across all of them
+    """
     with _schema_change(db):
         metadata_columns = [c[1] for c in db.execute("PRAGMA table_info(metadata)").fetchall()]
         if "schema_version" not in metadata_columns:
             db.execute("ALTER TABLE metadata ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0;")
         _rebuild_table(db, "individual", INDIVIDUAL_TABLE)
-
-
-def _migrate_2_to_3(db):
-    """Make media.relative_path unique within its base directory instead of across all of them"""
-    with _schema_change(db):
         _rebuild_table(db, "media", MEDIA_TABLE)
 
 
-MIGRATIONS = {1: _migrate_1_to_2, 2: _migrate_2_to_3}
+MIGRATIONS = {1: _migrate_1_to_2}
 
 
 def migrate_database(db, filepath, logger):
