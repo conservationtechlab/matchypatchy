@@ -154,5 +154,20 @@ class ImportFolderPopup(QDialog):
 
         self.import_thread = FolderImportThread(self, self.active_survey, self.data, station_level, camera_level)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
+        self.import_thread.import_failed.connect(self.show_import_failed)
         self.import_thread.finished.connect(self.accept)
         self.import_thread.start()
+
+    def show_import_failed(self, message):
+        """Show a fatal import error in the popup instead of closing it"""
+        # QThread.finished still fires when run() returns, keep the popup open
+        self.import_thread.finished.disconnect(self.accept)
+        self.progress_bar.hide()
+        self.station.hide()
+        self.camera.hide()
+        self.camera_label.hide()
+        self.station_label.setText(f"Import failed, some files may have been partially imported. "
+                                   f"View the log for details.\n{message}")
+        self.buttonBox.accepted.disconnect(self.import_manifest)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.setDisabled(False)
