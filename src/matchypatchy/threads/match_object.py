@@ -94,7 +94,8 @@ class MatchObject():
         distances = {}
         for i, match in enumerate(matched_rois):
             match_sequence_id = rois.loc[rois['id'] == match, 'sequence_id'].values[0]
-            match_sequence_rois[match] = sequences[match_sequence_id]
+            # a roi without a sequence (null sequence_id) stands alone
+            match_sequence_rois[match] = sequences.get(match_sequence_id) or [match]
             distances[match] = self.neighbors[i][1]
             for roi in match_sequence_rois[match]:
                 # check if match sequence appears later in match stack

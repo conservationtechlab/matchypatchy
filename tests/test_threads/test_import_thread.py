@@ -443,7 +443,7 @@ class TestCSVImportThread:
 
         assert thread._convert_to_str(None) is None
         assert thread._convert_to_str(pd.NA) is None
-        assert thread._convert_to_str(" a'b ") == "a''b"
+        assert thread._convert_to_str(" a'b ") == "a'b"
         assert thread._convert_to_int("7") == 7
         assert thread._convert_to_int("abc") is None
         assert thread._convert_to_float("1.5") == pytest.approx(1.5)
@@ -560,3 +560,174 @@ class TestBasePathUpdateThread:
         assert updated == "/old/path"
         assert thread.progress_update.calls == []
         assert len(thread.finished.calls) == 1
+
+
+def _csv_import(db, parent, rows, selected_columns, monkeypatch):
+    """Run a CSVImportThread over rows as they would read from a csv (blank cells are NaN)"""
+    monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+    monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+    df = pd.DataFrame(rows)
+    thread = import_thread.CSVImportThread(parent, df.groupby("filepath", sort=False),
+                                           selected_columns, "Default Survey")
+    thread.finished = SignalSpy()
+    thread.import_failed = SignalSpy()
+    thread.isInterruptionRequested = lambda: False
+    thread.run()
+    return thread
+
+
+class TestCSVImportBlankCells:
+    def _selected_columns(self):
+        return TestCSVImportThread._selected_columns(None)
+
+    def _image(self, tmp_path, name):
+        path = tmp_path / "imgs" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(name.encode())
+        return str(path)
+
+    def test_blank_camera_adds_no_camera(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        rows = [{"filepath": self._image(tmp_path, "a.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "station": "Station A", "camera": float("nan")}]
+
+        _csv_import(db, parent, rows, self._selected_columns(), monkeypatch)
+
+        assert db.count("camera") == 0
+        assert db.select("media", columns="camera_id") == [(None,)]
+
+    def test_apostrophes_are_stored_as_typed(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        rows = [{"filepath": self._image(tmp_path, "a.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "station": "O'Brien Creek", "camera": "Cam 'B'", "individual": "D'Artagnan",
+                 "comment": "don't"}]
+
+        _csv_import(db, parent, rows, self._selected_columns(), monkeypatch)
+
+        assert db.select("station", columns="name") == [("O'Brien Creek",)]
+        assert db.select("camera", columns="name") == [("Cam 'B'",)]
+        assert db.select("individual", columns="name") == [("D'Artagnan",)]
+        assert db.select("media", columns="comment") == [("don't",)]
+
+    def test_blank_bbox_and_frame_import_as_boxless_roi(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        nan = float("nan")
+        rows = [{"filepath": self._image(tmp_path, "a.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "station": "Station A", "frame": 3, "bbox_x": 0.1, "bbox_y": 0.2, "bbox_w": 0.3, "bbox_h": 0.4},
+                {"filepath": self._image(tmp_path, "b.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "station": "Station A", "frame": nan, "bbox_x": nan, "bbox_y": nan, "bbox_w": nan, "bbox_h": nan}]
+
+        thread = _csv_import(db, parent, rows, self._selected_columns(), monkeypatch)
+
+        assert thread.import_failed.calls == []
+        assert db.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h") == [
+            (3, 0.1, 0.2, 0.3, 0.4), (0, -1, -1, -1, -1)]
+
+    def test_same_station_and_camera_names_in_two_surveys_stay_separate(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        selected = {**self._selected_columns(), "survey": "survey"}
+        rows = [{"filepath": self._image(tmp_path, f"{survey}.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "survey": survey, "station": "Site01", "camera": "Cam1"}
+                for survey in ("Survey 2023", "Survey 2024")]
+
+        _csv_import(db, parent, rows, selected, monkeypatch)
+
+        stations = db.select("station", columns="id, survey_id")
+        cameras = db.select("camera", columns="station_id")
+        assert len(stations) == 2
+        assert len({survey_id for _, survey_id in stations}) == 2
+        assert sorted(c[0] for c in cameras) == sorted(s[0] for s in stations)
+
+
+class TestFolderImportLookups:
+    def _import(self, db, parent, file_path, survey_id, monkeypatch):
+        parts = file_path.parts
+        data = pd.DataFrame([{"filepath": str(file_path), "datetime": "2024-01-01 12:00:00"}])
+        thread = import_thread.FolderImportThread(parent, (survey_id,), data,
+                                                  station_level=parts.index("Site01"),
+                                                  camera_level=parts.index("Cam1"))
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+
+    def test_same_station_name_in_a_second_survey_gets_its_own_station(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        survey_1 = db.add_survey("Survey 2023", None, None, None)
+        survey_2 = db.add_survey("Survey 2024", None, None, None)
+        for year, survey_id in (("2023", survey_1), ("2024", survey_2)):
+            file_path = tmp_path / year / "Site01" / "Cam1" / f"{year}.jpg"
+            file_path.parent.mkdir(parents=True)
+            file_path.write_bytes(year.encode())
+            self._import(db, parent, file_path, survey_id, monkeypatch)
+
+        stations = db.select("station", columns="id, survey_id")
+        assert sorted(survey_id for _, survey_id in stations) == sorted([survey_1, survey_2])
+        assert db.count("camera") == 2
+
+    def test_reimport_does_not_regenerate_thumbnails(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        file_path = tmp_path / "2023" / "Site01" / "Cam1" / "a.jpg"
+        file_path.parent.mkdir(parents=True)
+        file_path.write_bytes(b"a")
+        self._import(db, parent, file_path, 1, monkeypatch)
+
+        saved = []
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *a: saved.append(a) or "t.jpg")
+        data = pd.DataFrame([{"filepath": str(file_path), "datetime": "2024-01-01 12:00:00"}])
+        parts = file_path.parts
+        thread = import_thread.FolderImportThread(parent, (1,), data,
+                                                  station_level=parts.index("Site01"),
+                                                  camera_level=parts.index("Cam1"))
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+
+        assert saved == []
+        assert db.count("media") == 1
+
+
+class TestImportFailuresAreReported:
+    """An exception escaping QThread.run aborts the app, so it must be reported instead"""
+
+    def _boom(self, *args, **kwargs):
+        raise RuntimeError("boom")
+
+    def test_folder_import(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        file_path = tmp_path / "a.jpg"
+        file_path.write_bytes(b"a")
+        data = pd.DataFrame([{"filepath": str(file_path), "datetime": "2024-01-01 12:00:00"}])
+        thread = import_thread.FolderImportThread(parent, (1,), data, station_level=0, camera_level=0)
+        monkeypatch.setattr(import_thread, "get_sha256", self._boom)
+        thread.import_failed = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert thread.import_failed.calls == [("boom",)]
+        assert thread.finished.calls == []
+
+    def test_csv_migrate(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        row = {column: None for column in import_thread.CSVMigrateThread.EXPECTED_COLUMNS}
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame([row]))
+        monkeypatch.setattr(thread, "survey", self._boom)
+        thread.import_failed = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert thread.import_failed.calls == [("boom",)]
+        assert thread.error_update.calls == []
