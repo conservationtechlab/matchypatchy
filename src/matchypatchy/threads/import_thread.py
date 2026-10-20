@@ -605,9 +605,8 @@ class CSVImportThread(QThread):
         if pd.isna(value):
             return None
         try:
-            value = str(value).strip()
-            value = value.replace("'", "''")
-            return value
+            # no quote escaping here, sql_text and query parameters do that
+            return str(value).strip()
         except (ValueError, TypeError):
             return None
 

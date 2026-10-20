@@ -443,7 +443,7 @@ class TestCSVImportThread:
 
         assert thread._convert_to_str(None) is None
         assert thread._convert_to_str(pd.NA) is None
-        assert thread._convert_to_str(" a'b ") == "a''b"
+        assert thread._convert_to_str(" a'b ") == "a'b"
         assert thread._convert_to_int("7") == 7
         assert thread._convert_to_int("abc") is None
         assert thread._convert_to_float("1.5") == pytest.approx(1.5)
@@ -596,3 +596,17 @@ class TestCSVImportBlankCells:
 
         assert db.count("camera") == 0
         assert db.select("media", columns="camera_id") == [(None,)]
+
+    def test_apostrophes_are_stored_as_typed(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        rows = [{"filepath": self._image(tmp_path, "a.jpg"), "timestamp": "2024-01-01 10:00:00",
+                 "station": "O'Brien Creek", "camera": "Cam 'B'", "individual": "D'Artagnan",
+                 "comment": "don't"}]
+
+        _csv_import(db, parent, rows, self._selected_columns(), monkeypatch)
+
+        assert db.select("station", columns="name") == [("O'Brien Creek",)]
+        assert db.select("camera", columns="name") == [("Cam 'B'",)]
+        assert db.select("individual", columns="name") == [("D'Artagnan",)]
+        assert db.select("media", columns="comment") == [("don't",)]
