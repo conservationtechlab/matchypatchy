@@ -13,6 +13,11 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.database.media import fetch_media
 
 
+def same_value(a, b):
+    """Equality that treats two nulls as the same, eg. two images without a camera"""
+    return (pd.isna(a) and pd.isna(b)) or a == b
+
+
 class SequenceThread(QThread):
     """Thread for processing media sequences based on station, camera, and timestamp."""
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
@@ -40,8 +45,8 @@ class SequenceThread(QThread):
                 if not self.isInterruptionRequested():
                     if current_sequence:
                         # station is the same, timestamp under threshold, n under threshold
-                        if (image['station_id'] == current_sequence[0]['station_id']) and \
-                            (image['camera_id'] == current_sequence[0]['camera_id']) and \
+                        if same_value(image['station_id'], current_sequence[0]['station_id']) and \
+                            same_value(image['camera_id'], current_sequence[0]['camera_id']) and \
                             (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
                             (len(current_sequence) < self.max_n):
                             current_sequence.append(image)
