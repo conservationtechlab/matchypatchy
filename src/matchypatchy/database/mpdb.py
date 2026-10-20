@@ -73,6 +73,8 @@ class MatchyPatchyDB():
                     self.key = self.validate()
                 else:
                     self.key = False
+                if self.key:
+                    self.prune_orphan_embeddings()
             # not a MatchyPatchy database, eg. no embedding collection or not an sqlite file
             except Exception as e:
                 self.logger.error(f"Could not open database at {DB_PATH}: {e}", exc_info=True)
@@ -924,6 +926,24 @@ class MatchyPatchyDB():
     def delete_emb(self, emb_id):
         """Delete embedding from chroma vector database"""
         self.collection.delete(ids=[str(emb_id)])
+
+    def prune_orphan_embeddings(self):
+        """
+        Delete embeddings whose roi no longer exists
+
+        Deleting a station or survey used to leave its rois' embeddings behind,
+        where they take up nearest-neighbour slots. Never stops a database opening.
+        """
+        try:
+            emb_ids = {int(i) for i in self.collection.get(include=[])["ids"]}
+            roi_ids = {row[0] for row in self.db.execute("SELECT id FROM roi;")}
+            orphans = sorted(emb_ids - roi_ids)
+        except Exception as error:
+            self.logger.error(f"Failed to check for orphaned embeddings: {error}")
+            return
+        if orphans:
+            self.logger.info(f"Deleting {len(orphans)} embeddings whose roi no longer exists")
+            self.delete_embs(orphans)
 
     def delete_embs(self, emb_ids):
         """Delete embeddings from chroma vector database, ids without an embedding are ignored"""

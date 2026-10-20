@@ -1,6 +1,8 @@
 """Deleting rows that cascade to rois also deletes the rois' embeddings from chroma."""
 import pytest
 
+from matchypatchy.database.mpdb import MatchyPatchyDB
+
 
 def _embedded_ids(db):
     return sorted(int(i) for i in db.collection.get(include=[])["ids"])
@@ -76,3 +78,21 @@ def test_delete_from_other_tables_leaves_embeddings(two_surveys):
     assert db.delete("individual", f"id={individual_id}")
 
     assert _embedded_ids(db) == before
+
+
+def test_orphaned_embeddings_are_pruned_on_open(tmp_path, null_logger):
+    db = MatchyPatchyDB(str(tmp_path), null_logger)
+    station_id = db.add_station("Site01", None, None, 1)
+    upload_id = db.add_upload("D:/2023")
+    media_id = db.add_media(upload_id, "a.jpg", "hash", ".jpg", "2023-01-01", station_id)
+    roi_id = db.add_roi(media_id, 0, 0.1, 0.1, 0.2, 0.2, emb=1)
+    db.add_emb(roi_id, [1.0, 0.0, 0.0])
+    # left behind by a station delete before embeddings were cleaned up with their rois
+    db.add_emb(999, [0.0, 1.0, 0.0])
+    db.close()
+
+    db = MatchyPatchyDB(str(tmp_path), null_logger)
+
+    assert db.key
+    assert _embedded_ids(db) == [roi_id]
+    db.close()
