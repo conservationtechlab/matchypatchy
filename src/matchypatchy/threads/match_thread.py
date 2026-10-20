@@ -50,6 +50,9 @@ class MatchEmbeddingThread(QThread):
         for i, s in enumerate(self.sequences):
             if not self.isInterruptionRequested():
                 sequence_rois = self.sequences[s]
+                # rois without a sequence group under a null key with no ids
+                if not sequence_rois:
+                    continue
 
                 # get all neighbors for sequence
                 all_neighbors = self.batch_roi_knn(sequence_rois)

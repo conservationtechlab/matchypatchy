@@ -43,3 +43,14 @@ def test_neighbors_without_a_roi_are_dropped():
     matched = {roi for pair in pairs for roi, _ in pair.neighbors}
     assert 99 not in matched
     assert matched == {1, 2}
+
+
+def test_match_without_a_sequence_stands_alone():
+    rois = _rois([(1, 10, None, None), (2, None, None, None)])
+    sequences = {10: [1], float("nan"): []}
+    neighbors = {1: [(1, 0.0), (2, 0.1)]}
+
+    pairs = _run(rois, sequences, neighbors)
+
+    assert len(pairs) == 1
+    assert pairs[0].neighbors == [(2, 0.1)]
