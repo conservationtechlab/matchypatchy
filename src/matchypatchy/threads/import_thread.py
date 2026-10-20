@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 class CSVMigrateThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     error_update = pyqtSignal(list)  # Signal to update the error log
+    import_failed = pyqtSignal(str)  # Signal to report a fatal import error
 
     EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                         'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
@@ -48,6 +49,14 @@ class CSVMigrateThread(QThread):
             raise ValueError(f"Data cannot be imported as it is missing the following required columns: {missing_columns}")
 
     def run(self):
+        try:
+            self._run()
+        except Exception as error:
+            # an unhandled exception in a QThread aborts the whole app, report it instead
+            logger.exception("Import failed")
+            self.import_failed.emit(str(error))
+
+    def _run(self):
         roi_counter = 0  # progressbar counter
 
         for row in self.data.itertuples(index=False):
@@ -646,6 +655,7 @@ class CSVImportThread(QThread):
 # FOLDER IMPORT ================================================================
 class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
+    import_failed = pyqtSignal(str)  # Signal to report a fatal import error
 
     def __init__(self, parent, active_survey, data, station_level, camera_level):
         super().__init__()
@@ -659,6 +669,14 @@ class FolderImportThread(QThread):
         # get timezone for timestamp parsing
 
     def run(self):
+        try:
+            self._run()
+        except Exception as error:
+            # an unhandled exception in a QThread aborts the whole app, report it instead
+            logger.exception("Import failed")
+            self.import_failed.emit(str(error))
+
+    def _run(self):
         # get base directory for the files being imported
         base_dir = self._get_base_dir(self.data['filepath'].tolist())
         try:

@@ -691,3 +691,43 @@ class TestFolderImportLookups:
 
         assert saved == []
         assert db.count("media") == 1
+
+
+class TestImportFailuresAreReported:
+    """An exception escaping QThread.run aborts the app, so it must be reported instead"""
+
+    def _boom(self, *args, **kwargs):
+        raise RuntimeError("boom")
+
+    def test_folder_import(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        file_path = tmp_path / "a.jpg"
+        file_path.write_bytes(b"a")
+        data = pd.DataFrame([{"filepath": str(file_path), "datetime": "2024-01-01 12:00:00"}])
+        thread = import_thread.FolderImportThread(parent, (1,), data, station_level=0, camera_level=0)
+        monkeypatch.setattr(import_thread, "get_sha256", self._boom)
+        thread.import_failed = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert thread.import_failed.calls == [("boom",)]
+        assert thread.finished.calls == []
+
+    def test_csv_migrate(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        row = {column: None for column in import_thread.CSVMigrateThread.EXPECTED_COLUMNS}
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame([row]))
+        monkeypatch.setattr(thread, "survey", self._boom)
+        thread.import_failed = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert thread.import_failed.calls == [("boom",)]
+        assert thread.error_update.calls == []

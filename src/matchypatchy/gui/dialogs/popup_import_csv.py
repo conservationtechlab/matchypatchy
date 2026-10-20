@@ -269,6 +269,7 @@ class ImportCSVPopup(QDialog):
             self.import_thread = CSVMigrateThread(self, self.data)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.error_update.connect(self.show_errors)  # Connect error signal
+            self.import_thread.import_failed.connect(self.show_import_failed)
             self.import_thread.start()
             return
 
@@ -291,7 +292,11 @@ class ImportCSVPopup(QDialog):
         This method is connected to the import_failed signal of the CSVImportThread.
         """
         # QThread.finished still fires when run() returns, keep the popup open
-        self.import_thread.finished.disconnect(self.close)
+        # (only the csv import closes on finished, not migrate)
+        try:
+            self.import_thread.finished.disconnect(self.close)
+        except TypeError:
+            pass
         self.progress_bar.hide()
         self.progress_label.hide()
         self.label.setText(f"Import failed, some files may have been partially imported. View the log for details.\n{message}")
