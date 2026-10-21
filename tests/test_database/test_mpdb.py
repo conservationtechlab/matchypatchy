@@ -590,6 +590,20 @@ class TestExportHelpers:
         assert [str(t) if t is not None else None for t in df.sort_values("relative_path")["timestamp"]] == [
             "2024-01-01 10:00:00", "2024-01-02 03:04:05", "dawn", None]
 
+    def test_export_data_no_media_has_a_camera(self, tmp_db):
+        """Cameras exist, but every media.camera_id is NULL"""
+        db, _ = tmp_db
+        station_id = db.add_station("S", 0, 0, 1)
+        db.add_camera("Cam1", station_id)
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "a.jpg", "nocam_sha" * 7, ".jpg", "2024-01-01 10:00:00", station_id)
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+
+        df = db.export_data()
+
+        assert df["camera_id"].tolist() == [None]
+        assert df["camera_name"].tolist() == [None]
+
     def test_retrieve_key(self, tmp_db):
         db, _ = tmp_db
         version, mpkey, chromakey = db.retrieve_key()
