@@ -276,3 +276,36 @@ class TestModeSwitching:
             DisplayCompare.compare_manual(dc, selected_ids=[10, 11])
         dc.change_query.assert_not_called()
         dc.notify.assert_called_once()
+
+
+class TestMatchCounter:
+    def _dc(self, n_matches, current_match_after_toggle):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        dc.compare_type = "qc"
+        dc.button_match_favorites.isChecked.return_value = False
+        dc.QueryContainer.n_queries = 2
+        dc.QueryContainer.current_match = 0
+        dc.QueryContainer.current_match_rois = list(range(5))
+
+        def toggle(viewpoint):
+            # viewpoint filter shrinks the match list and moves current_match
+            dc.QueryContainer.current_match_rois = list(range(n_matches))
+            dc.QueryContainer.current_match = current_match_after_toggle
+            return True
+        dc.QueryContainer.toggle_viewpoint.side_effect = toggle
+        dc.toggle_viewpoint = lambda v: DisplayCompare.toggle_viewpoint(dc, v)
+        return dc
+
+    def test_counter_follows_current_match_after_change_query(self):
+        """QC/manual start at match index 1, so the counter must show 2/N"""
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = self._dc(n_matches=5, current_match_after_toggle=1)
+        DisplayCompare.change_query(dc, 0)
+        dc.match_counter.setText.assert_called_with("2/5")
+
+    def test_counter_uses_filtered_total_after_viewpoint_toggle(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = self._dc(n_matches=3, current_match_after_toggle=0)
+        DisplayCompare.toggle_viewpoint(dc, 0)
+        dc.match_counter.setText.assert_called_with("1/3")
