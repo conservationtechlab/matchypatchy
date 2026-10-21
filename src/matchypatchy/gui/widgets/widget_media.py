@@ -177,6 +177,11 @@ class ImageWidget(QLabel):
             frame (int, optional): Frame number to load from video
             crop (bool, optional): Whether to crop to bbox
         """
+        # a different image or video frame opens unzoomed and centered
+        if (image_path is not None and image_path != self.image_path) or frame != self.frame:
+            self.zoom_factor = 1.0
+            self.image_offset = QPointF(0, 0)
+
         # load new image if path is different
         if image_path is not None:
             self.image_path = image_path
@@ -236,6 +241,10 @@ class ImageWidget(QLabel):
         Connected to sliders in imageadjustmentbar widget. The factors are absolute,
         so they are applied to the original image, not on top of earlier adjustments
         """
+        # kept so reset() can redraw with them
+        self.brightness_factor = brightness
+        self.contrast_factor = contrast
+        self.sharpness_factor = sharpness
         enhancer = ImageEnhance.Brightness(self.original_image)
         self.pil_image = enhancer.enhance(brightness)
         enhancer = ImageEnhance.Contrast(self.pil_image)
@@ -317,12 +326,22 @@ class ImageWidget(QLabel):
 
     # IMAGE ADJUSTMENTS ========================================================
     def reset(self):
-        """Reset image adjustments and reload"""
+        """
+        Reset zoom, pan and drawn box
+
+        Brightness, contrast and sharpness stay as set, they belong to the
+        adjustment bar sliders (its reset sets them back to 1 first)
+        """
         self.zoom_factor = 1.0
         self.image_offset = QPointF(0, 0)
         self.rel_bbox = self.loaded_bbox  # reset to original bbox
-        # reload image
-        self.load(image_path=self.image_path, bbox=self.rel_bbox, frame=self.frame, crop=self.crop_to_bbox)
+        self.drawn_bbox = None
+        # nothing loaded yet
+        if self.original_image is None:
+            return
+        self.adjust(brightness=self.brightness_factor,
+                    contrast=self.contrast_factor,
+                    sharpness=self.sharpness_factor)
 
     def enable_drawing_mode(self, enable):
         """Enable or disable drawing mode for the image widget."""
@@ -576,7 +595,8 @@ class VideoPlayerBar(QWidget):
 
     def get_frame(self):
         """Get current frame number based on position"""
-        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate))
+        # None before the metadata loads, or when the video has no frame rate
+        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate) or 0)
         if fps <= 0:
             fps = 30
         return int(self.player.position() / 1000 * fps)
