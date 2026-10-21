@@ -614,6 +614,9 @@ class MetadataPanel(QWidget):
     def change_sex(self):
         """Update sex for all selected ROIs."""
         # updates individual table when transposed
+        # '— Mixed —' only shows the selection differs, it is not a value
+        if self.sex.currentText() == '— Mixed —':
+            return
         if self.name.currentIndex() > 0:
             for row in self._roi_rows():
                 edit = EditObject(rid=row.id,

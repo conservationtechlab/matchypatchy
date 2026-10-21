@@ -166,6 +166,33 @@ class TestMetadataPanel:
         MetadataPanel.change_viewpoint(panel)
         assert [c.args[0].rid for c in panel.send_edit.call_args_list] == [10]
 
+    def test_mixed_sex_is_not_saved(self):
+        """Multi-row selection with differing sexes: the Mixed placeholder is not a value"""
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = _panel(_edit_rows())
+        panel.name.currentIndex.return_value = 1
+        panel.sex.currentText.return_value = '— Mixed —'
+        MetadataPanel.change_sex(panel)
+        panel.send_edit.assert_not_called()
+
+    def test_sex_edit_is_sent(self):
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = _panel(_edit_rows())
+        panel.name.currentIndex.return_value = 1
+        panel.sex.currentText.return_value = 'Male'
+        MetadataPanel.change_sex(panel)
+        assert [(c.args[0].rid, c.args[0].new_value) for c in panel.send_edit.call_args_list] == [(10, 'Male')]
+
+    def test_mixed_viewpoint_is_not_saved(self):
+        """Index 0 of the multi-row viewpoint list is the Mixed placeholder"""
+        from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
+        panel = _panel(_edit_rows())
+        panel.ids = [10, 11]
+        panel.VIEWPOINTS = {"Any": "Any", "None": "None", "0": "Left", "1": "Right"}
+        panel.viewpoint.currentIndex.return_value = 0
+        MetadataPanel.change_viewpoint(panel)
+        panel.send_edit.assert_not_called()
+
     def test_new_individual_cancel_assigns_nothing(self):
         from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
         panel = _panel(_edit_rows())
