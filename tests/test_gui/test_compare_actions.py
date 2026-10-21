@@ -104,6 +104,23 @@ class TestSaveChanges:
         dc = self._save([self._edit(pd.NA, 2, "viewpoint", 1)])
         dc.mpDB.edit_row.assert_not_called()
 
+    def test_failed_edits_are_kept_and_reported(self):
+        """Like the media view, a change that couldn't be saved is not silently dropped"""
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = MagicMock()
+        ok, bad = self._edit(5, 2, "viewpoint", 1), self._edit(6, 2, "viewpoint", 0)
+        dc.edit_stack = [ok, bad]
+        dc.mpDB.edit_row.side_effect = lambda table, rid, *a, **k: rid != 6
+        DisplayCompare.save_changes(dc)
+        assert dc.edit_stack == [bad]
+        dc.warn.assert_called_once()
+        assert "1 change(s)" in dc.warn.call_args[0][0]
+
+    def test_media_columns_go_to_the_media(self):
+        dc = self._save([self._edit(5, 2, "station_id", 7)])
+        dc.mpDB.edit_row.assert_called_once_with("media", 2, {"station_id": 7}, allow_none=True)
+        dc.warn.assert_not_called()
+
 
 class TestChangeQueryFavorites:
     def _change(self, compare_type, favorites_on):

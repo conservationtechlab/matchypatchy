@@ -14,6 +14,8 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
 
+from matchypatchy.database.location import survey_names
+from matchypatchy.database.media import clear_project_data
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy.gui.dialogs.popup_individual import IndividualPopup
@@ -174,11 +176,11 @@ class DisplayBase(UsesProject, QWidget):
     def update_survey(self):
         """Update survey dropdown list"""
         self.survey_select.clear()
-        survey_names = self.mpDB.select('survey', columns='id, name')
-        self.survey_list = dict(survey_names)
-        self.survey_list_ordered = list(survey_names)
+        surveys = survey_names(self.mpDB)
+        self.survey_list = dict(surveys)
+        self.survey_list_ordered = list(surveys)
         if self.survey_list_ordered:
-            self.survey_select.addItems([el[1] for el in survey_names])
+            self.survey_select.addItems([el[1] for el in surveys])
 
     def manage_survey(self):
         """Launch Survey Management Popup"""
@@ -389,11 +391,5 @@ class DisplayBase(UsesProject, QWidget):
         if dialog.exec():
             self.mpDB.info()
             logger.warning("DELETING DATA")
-            self.mpDB.clear("media")
-            self.mpDB.clear("media_thumbnails")
-            self.mpDB.clear("roi")
-            self.mpDB.clear("roi_thumbnails")
-            self.mpDB.clear("sequence")
-            self.mpDB.clear("individual")
-            self.mpDB.clear_emb()
+            clear_project_data(self.mpDB)
         del dialog

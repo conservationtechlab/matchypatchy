@@ -221,10 +221,139 @@ def media_count(mpDB, survey_id):
     """
     Get number of media files associated with a given survey_id
     """
-    station_rows = mpDB.select("station", columns="id", row_cond=f'survey_id={survey_id}')
-    if not station_rows:
-        return [], 0
-    valid_stations = [row[0] for row in station_rows]
-    survey_list = ",".join([str(s) for s in valid_stations])
-    media = mpDB.select("media", columns="id", row_cond=f'station_id IN ({survey_list})')
+    media = mpDB.query("""SELECT media.id FROM media
+                         JOIN station ON station.id = media.station_id
+                         WHERE station.survey_id=?;""", (survey_id,)) or []
     return media, len(media)
+
+
+# EDITS AND DELETES ============================================================
+def _in_ids(ids):
+    """ids as ints, with the placeholders for an IN (...) of them"""
+    ids = [int(i) for i in ids]
+    return ids, ", ".join("?" * len(ids))
+
+
+def delete_rois(mpDB, roi_ids):
+    """Delete rois with their thumbnails and embeddings, False if it failed"""
+    roi_ids, placeholders = _in_ids(roi_ids)
+    if not roi_ids:
+        return True
+    return mpDB.delete("roi", f"id IN ({placeholders})", roi_ids)
+
+
+def delete_media(mpDB, media_ids):
+    """Delete media with their rois, thumbnails and embeddings, False if it failed"""
+    media_ids, placeholders = _in_ids(media_ids)
+    if not media_ids:
+        return True
+    return mpDB.delete("media", f"id IN ({placeholders})", media_ids)
+
+
+def update_roi_box(mpDB, roi_id, frame, bbox_x, bbox_y, bbox_w, bbox_h):
+    """
+    Move a roi's box, keeping its id, individual, viewpoint and favorite
+
+    Its embedding no longer matches the box, so it is dropped and emb set to 0,
+    which the next Process run picks up. False if the box couldn't be saved.
+    """
+    saved = mpDB.edit_row("roi", roi_id, {"frame": frame,
+                                          "bbox_x": round(bbox_x, 4), "bbox_y": round(bbox_y, 4),
+                                          "bbox_w": round(bbox_w, 4), "bbox_h": round(bbox_h, 4),
+                                          "emb": 0})
+    if saved:
+        mpDB.delete_emb(roi_id)
+    return saved
+
+
+def set_favorite(mpDB, roi_id, favorite):
+    """Mark a roi as a favorite (1) or not (0), False if it couldn't be saved"""
+    return mpDB.edit_row("roi", roi_id, {"favorite": int(favorite)})
+
+
+def clear_project_data(mpDB):
+    """
+    Delete every media, roi, sequence and individual, their thumbnails and all embeddings
+
+    Regions, surveys, stations and uploads are kept. False if any table couldn't be cleared.
+    """
+    cleared = all([mpDB.clear(table) for table in
+                   ("media", "media_thumbnails", "roi", "roi_thumbnails", "sequence", "individual")])
+    mpDB.clear_emb()
+    return cleared
+
+
+# media columns, the rest of an EditObject's references are roi columns or sex
+MEDIA_COLUMNS = {'station_id', 'sequence_id', 'external_id', 'comment'}
+
+
+def save_edits(mpDB, edits, individual_of, media_only=False):
+    """
+    Save EditObjects in the order they were made, return the ones that failed
+
+    individual_of(rid) gives a roi's individual from before these edits. A sex
+    edit changes the individual of its roi, using an individual_id edit earlier
+    in the same save when there is one. media_only (the media view) saves
+    every edit to the media, by mid.
+    """
+    failed = []
+    # individual_id edits applied so far, so a later sex edit targets the new individual
+    assigned_iids = {}
+    for edit in edits:
+        if not _save_edit(mpDB, edit, individual_of, assigned_iids, media_only):
+            failed.append(edit)
+    return failed
+
+
+def _save_edit(mpDB, edit, individual_of, assigned_iids, media_only):
+    """
+    Write one EditObject, return False if it failed
+
+    Called only by save_edits, which keeps assigned_iids across the edits of one save.
+    """
+    replace_dict = {edit.reference: edit.new_value}
+    if media_only or edit.reference in MEDIA_COLUMNS:
+        return mpDB.edit_row("media", int(edit.mid), replace_dict, allow_none=True)
+    # rows without a roi id (eg. the full video row) have nothing to update
+    if edit.rid is None or pd.isna(edit.rid):
+        return True
+    rid = int(edit.rid)
+    if edit.reference == 'sex':
+        iid = assigned_iids[rid] if rid in assigned_iids else individual_of(rid)
+        if iid is None or pd.isna(iid):
+            return True  # no individual to update
+        return mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
+    # roi columns; individual_id and viewpoint may be cleared (Unknown / None)
+    saved = mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
+    if saved and edit.reference == 'individual_id':
+        assigned_iids[rid] = edit.new_value
+    return saved
+
+
+# MATCHING =====================================================================
+def assign_individual(mpDB, roi_ids, individual_id):
+    """Give rois an individual and mark them reviewed, False if it couldn't be saved"""
+    updates = {int(r): {"individual_id": individual_id, "reviewed": 1} for r in roi_ids}
+    return mpDB.batch_edit("roi", updates, quiet=True)
+
+
+def clear_individual(mpDB, roi_ids):
+    """Remove the individual from rois and mark them unreviewed, False if it couldn't be saved"""
+    updates = {int(r): {"individual_id": None, "reviewed": 0} for r in roi_ids}
+    return mpDB.batch_edit("roi", updates, allow_none=True, quiet=True)
+
+
+# LOOKUPS ======================================================================
+def media_without_rois(mpDB):
+    """Ids of media that have no rois"""
+    rows = mpDB.query("""SELECT media.id FROM media
+                         LEFT JOIN roi ON roi.media_id = media.id
+                         WHERE roi.media_id IS NULL;""")
+    return [row[0] for row in rows or []]
+
+
+def uploads_with_media_counts(mpDB):
+    """(id, base_dir, created_at, number of media) of every upload directory"""
+    return mpDB.query("""SELECT uploads.id, uploads.base_dir, uploads.created_at, COUNT(media.id)
+                         FROM uploads LEFT JOIN media ON media.base_dir_id = uploads.id
+                         GROUP BY uploads.id;""") or []

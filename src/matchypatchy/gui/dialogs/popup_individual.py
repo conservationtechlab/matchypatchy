@@ -9,6 +9,8 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QTabl
                              QLabel, QLineEdit, QDialogButtonBox, QPushButton)
 from PyQt6 import QtWidgets
 
+from matchypatchy.database.individual import (individual_roi_counts, unidentified_roi_count, get_individual,
+                                              individual_name_exists, update_individual)
 from matchypatchy.project import UsesProject
 
 
@@ -71,23 +73,17 @@ class IndividualPopup(UsesProject, QDialog):
         self.list.clearContents()
         self.list.setRowCount(0)
         # Fetch individuals from the database
-        # group by the individual, not the roi side of the join: grouping on roi.individual_id
-        # folded every individual without rois into one NULL group
-        self.individuals = self.mpDB._command("""SELECT individual.name, individual.id, COUNT(roi.individual_id) AS count
-                                                 FROM individual LEFT JOIN roi ON roi.individual_id = individual.id
-                                                 GROUP BY individual.id;""")
-        if self.individuals is None:
-            self.individuals = []
+        self.individuals = individual_roi_counts(self.mpDB)
         # get unidentified count
-        self.nulls = self.mpDB.select("roi", "COUNT(*)", row_cond="individual_id IS NULL")[0][0]
+        self.nulls = unidentified_roi_count(self.mpDB)
         self.list.setRowCount(len(self.individuals) + 1)
         # Add unidentified row
         self.list.setItem(0, 0, QTableWidgetItem("Unidentified"))
         self.list.setItem(0, 1, QTableWidgetItem(str(self.nulls)))
         # Add data to rows
-        for row, individual in enumerate(self.individuals):
-            self.list.setItem(row + 1, 0, QTableWidgetItem(individual[0]))
-            self.list.setItem(row + 1, 1, QTableWidgetItem(str(individual[2])))
+        for row, (_, name, count) in enumerate(self.individuals):
+            self.list.setItem(row + 1, 0, QTableWidgetItem(name))
+            self.list.setItem(row + 1, 1, QTableWidgetItem(str(count)))
 
     def edit(self):
         """Edit selected individual"""
@@ -96,14 +92,12 @@ class IndividualPopup(UsesProject, QDialog):
             return
 
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
-        iid, name, sex = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
+        iid = self.selected_ind[0]
+        name, sex = get_individual(self.mpDB, iid)
         # open edit dialog with current values
         dialog = IndividualFillPopup(self, name=name, sex=sex)
         if dialog.exec():
-            replace_dict = {"name": dialog.get_name(),
-                            "sex": dialog.get_sex()}
-            # update database
-            self.mpDB.edit_row("individual", iid, replace_dict, allow_none=True)
+            update_individual(self.mpDB, iid, dialog.get_name(), dialog.get_sex())
         del dialog
         # refetch data
         self.update()
@@ -114,7 +108,7 @@ class IndividualPopup(UsesProject, QDialog):
             filters = {"individual_id": 0}
         else:
             self.selected_ind = self.individuals[self.list.currentRow() - 1]
-            filters = {"individual_id": self.selected_ind[1]}
+            filters = {"individual_id": self.selected_ind[0]}
         self.parent.set_filtered_view(filters)
         self.accept()
 
@@ -187,8 +181,7 @@ class IndividualFillPopup(UsesProject, QDialog):
         if self.get_name() == self.existing_name:  # if name is same as current name, allow it
             self.secret_text.hide()
             return True
-        existing_names = [ind[0] for ind in self.mpDB.select('individual', 'name')]
-        if self.get_name() in existing_names:
+        if individual_name_exists(self.mpDB, self.get_name()):
             self.secret_text.setText("Name already exists.\nPlease choose a different name.")
             self.secret_text.show()
             return False

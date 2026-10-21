@@ -142,7 +142,7 @@ def _old_database(path, schema_version=None):
 @pytest.fixture(params=[None, 1], ids=["released", "unreleased-v1"])
 def migrated_db(request, tmp_path, null_logger):
     _old_database(tmp_path, schema_version=request.param)
-    db = MatchyPatchyDB(str(tmp_path), null_logger)
+    db = MatchyPatchyDB(str(tmp_path))
     yield db, tmp_path
     db.close()
 
@@ -208,11 +208,11 @@ class TestInterruptedMigration:
         monkeypatch.setitem(setup.MIGRATIONS, 1, crash_after_step)
         conn = sqlite3.connect(tmp_path / "matchypatchy.db")
         with pytest.raises(RuntimeError):
-            setup.migrate_database(conn, tmp_path / "matchypatchy.db", null_logger)
+            setup.migrate_database(conn, tmp_path / "matchypatchy.db")
         conn.close()
         monkeypatch.setitem(setup.MIGRATIONS, 1, migrate_1_to_2)
 
-        db = MatchyPatchyDB(str(tmp_path), null_logger)
+        db = MatchyPatchyDB(str(tmp_path))
         try:
             assert db.key == KEY
             assert db.db.execute("SELECT schema_version FROM metadata").fetchone()[0] == SCHEMA_VERSION

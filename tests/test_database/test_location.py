@@ -4,6 +4,7 @@ Tests for matchypatchy.database.location — region, survey, and station helpers
 import pandas as pd
 import pytest
 
+from matchypatchy.database import location
 from matchypatchy.database.location import (
     fetch_surveys,
     fetch_regions,
@@ -216,3 +217,74 @@ class TestCascadeDeletes:
         rows = db.select("roi", row_cond=f"id={rid}")
         # individual_id (index 10) should be NULL after ON DELETE SET NULL
         assert rows[0][10] is None
+
+
+class TestNames:
+    def test_region_and_survey_names(self, tmp_db):
+        db, _ = tmp_db
+        west = db.add_region("West", "America/Los_Angeles")
+        a = db.add_survey("A", west, None, None)
+        db.add_survey("B", None, None, None)
+        assert ("West" in dict(location.region_names(db)).values())
+        assert dict(location.survey_names(db, region_id=west)) == {a: "A"}
+        assert {"A", "B"} <= set(dict(location.survey_names(db)).values())
+
+    def test_station_names_by_survey(self, tmp_db):
+        db, _ = tmp_db
+        s1 = db.add_survey("S1", None, None, None)
+        s2 = db.add_survey("S2", None, None, None)
+        a = db.add_station("A", None, None, s1)
+        b = db.add_station("B", None, None, s2)
+        assert dict(location.station_names(db)) == {a: "A", b: "B"}
+        assert dict(location.station_names(db, survey_ids=[s2])) == {b: "B"}
+        assert location.station_names(db, survey_ids=[]) == []
+
+    def test_camera_names(self, tmp_db):
+        db, _ = tmp_db
+        cam = db.add_camera("Cam1", db.add_station("A", None, None, 1))
+        assert location.camera_names(db) == [(cam, "Cam1")]
+
+
+class TestRegionsAndSurveys:
+    def test_region_lookup_and_timezone(self, tmp_db):
+        db, _ = tmp_db
+        rid = db.add_region("Côte d'Ivoire", "Africa/Abidjan")
+        assert location.region_by_name(db, "Côte d'Ivoire") == (rid, "Africa/Abidjan")
+        assert location.region_by_name(db, "Nowhere") is None
+        assert location.set_region_timezone(db, rid, "UTC") is True
+        assert location.get_region(db, rid) == ("Côte d'Ivoire", "UTC")
+
+    def test_survey_fields_and_timezone(self, tmp_db):
+        db, _ = tmp_db
+        rid = db.add_region("West", "America/Los_Angeles")
+        sid = db.add_survey("O'Hara 2024", rid, 2024, None)
+        assert location.get_survey(db, sid) == ("O'Hara 2024", rid, 2024, None)
+        assert location.survey_timezone(db, sid) == "America/Los_Angeles"
+        assert location.update_survey(db, sid, "Renamed", None, None, 2025) is True
+        assert location.get_survey(db, sid) == ("Renamed", None, None, 2025)
+        assert location.survey_timezone(db, sid) is None
+
+    def test_update_survey_to_taken_name_fails(self, tmp_db):
+        db, _ = tmp_db
+        db.add_survey("Taken", None, None, None)
+        sid = db.add_survey("Other", None, None, None)
+        assert location.update_survey(db, sid, "Taken", None, None, None) is False
+
+    def test_delete_survey_removes_its_stations(self, tmp_db):
+        db, _ = tmp_db
+        sid = db.add_survey("Gone", None, None, None)
+        db.add_station("A", None, None, sid)
+        assert location.delete_survey(db, sid) is True
+        assert location.get_survey(db, sid) is None
+        assert location.station_names(db, survey_ids=[sid]) == []
+
+
+class TestStations:
+    def test_get_update_delete(self, tmp_db):
+        db, _ = tmp_db
+        st = db.add_station("St. Mary's", 1.5, 2.5, 1)
+        assert location.get_station(db, st) == ("St. Mary's", 1.5, 2.5)
+        assert location.update_station(db, st, "Renamed", None, None) is True
+        assert location.get_station(db, st) == ("Renamed", None, None)
+        assert location.delete_station(db, st) is True
+        assert location.get_station(db, st) is None

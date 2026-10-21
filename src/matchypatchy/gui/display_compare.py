@@ -8,8 +8,6 @@ import os
 from pathlib import Path
 from PIL import Image
 
-import pandas as pd
-
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QHeaderView, QTableWidget, QTableWidgetItem)
 from PyQt6.QtCore import Qt, QTimer
@@ -29,7 +27,7 @@ from matchypatchy.gui.query_qc import QC_QueryContainer
 from matchypatchy.gui.query_manual import ManualQueryContainer
 from matchypatchy.gui.widgets.gui_assets import NoHoverDelegate
 
-from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
+from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual, set_favorite, save_edits
 from matchypatchy.project import UsesProject
 
 
@@ -868,28 +866,12 @@ class DisplayCompare(UsesProject, QWidget):
 
     def save_changes(self):
         """Commit all EditObjects in self.edit_stack to the database, oldest first"""
-        # individual_id edits applied so far, so a later sex edit targets the new individual
-        assigned_iids = {}
-        for edit in self.edit_stack:
-            replace_dict = {edit.reference: edit.new_value}
-            # comment edits belong to the media and carry no roi id
-            if edit.reference == 'comment':
-                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=True)
-                continue
-            # rows without a roi id (eg. the full video row) have nothing to update
-            if edit.rid is None or pd.isna(edit.rid):
-                continue
-            rid = int(edit.rid)
-            if edit.reference == 'sex':
-                iid = assigned_iids.get(rid, self.QueryContainer.get_info(rid, "individual_id"))
-                if iid is not None and not pd.isna(iid):
-                    self.mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
-            else:
-                # individual_id and viewpoint may be cleared (Unknown / None)
-                self.mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
-                if edit.reference == 'individual_id':
-                    assigned_iids[rid] = edit.new_value
-        self.edit_stack = []
+        failed = save_edits(self.mpDB, self.edit_stack,
+                            lambda rid: self.QueryContainer.get_info(rid, "individual_id"))
+        # keep unsaved edits so they are not silently lost, like the media view
+        self.edit_stack = failed
+        if failed:
+            self.warn(f"{len(failed)} change(s) could not be saved, see the log for details.")
 
     def open_image(self, rid):
         """
@@ -934,7 +916,7 @@ class DisplayCompare(UsesProject, QWidget):
 
     def favorite(self, rid, value):
         """Set favorite status for given rid"""
-        self.mpDB.edit_row('roi', rid, {"favorite": value})
+        set_favorite(self.mpDB, rid, value)
         # reload the shown rows, keeping the active filter
         self.QueryContainer.refresh_data()
         # rebuild the favorites list if it is showing

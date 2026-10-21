@@ -7,7 +7,8 @@ from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBo
                              QHBoxLayout, QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.database.media import IMAGE_EXT, fetch_roi, fetch_individual
+from matchypatchy.database.media import IMAGE_EXT, fetch_individual, delete_media, delete_rois, save_edits
+from matchypatchy.database.location import camera_names
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
@@ -439,7 +440,7 @@ class DisplayMedia(UsesProject, QWidget):
         if self._data_filtered.empty:
             return
         # self.valid_cameras =  # select all cameras for now
-        self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
+        self.valid_cameras = dict(camera_names(self.mpDB))
         # Location Filter (depends on prefilterd stations from MediaDisplay)
         if self.valid_stations:
             self._data_filtered = self._data_filtered[self._data_filtered['station_id'].isin(list(self.valid_stations.keys()))]
@@ -558,17 +559,9 @@ class DisplayMedia(UsesProject, QWidget):
 
     # EDIT POPUP ---------------------------------------------------------------
 
-    # media table columns edited from the roi view
-    MEDIA_COLUMNS = {'station_id', 'sequence_id', 'external_id', 'comment'}
-
     def save(self):
         """Save changes to the database in the order they were made"""
-        failed = []
-        # individual_id edits applied so far, so a later sex edit targets the new individual
-        assigned_iids = {}
-        for edit in self.edit_stack:
-            if not self._save_edit(edit, assigned_iids):
-                failed.append(edit)
+        failed = save_edits(self.mpDB, self.edit_stack, self._individual_of, media_only=self.data_type == 0)
 
         # keep unsaved edits so they are not silently lost
         self.edit_stack = failed
@@ -580,31 +573,14 @@ class DisplayMedia(UsesProject, QWidget):
         # reload so filters and undo work from the saved values
         self.refresh_table(reload=True)
 
-    def _save_edit(self, edit, assigned_iids):
-        """Write one EditObject to the database, return False if it failed"""
-        replace_dict = {edit.reference: edit.new_value}
-        # media view, or media columns from the roi view
-        if self.data_type == 0 or edit.reference in self.MEDIA_COLUMNS:
-            return self.mpDB.edit_row("media", int(edit.mid), replace_dict, allow_none=True)
-        # rows without a roi id (eg. the full video row) have nothing to update
-        if edit.rid is None or pd.isna(edit.rid):
-            return True
-        rid = int(edit.rid)
-        if edit.reference == 'sex':
-            # look up in the unfiltered data, the roi may be hidden by the current filter
-            if rid in assigned_iids:
-                iid = assigned_iids[rid]
-            else:
-                rows = self._data_raw.loc[self._data_raw['id'] == rid, 'individual_id']
-                iid = rows.iloc[0] if len(rows) else None
-            if iid is None or pd.isna(iid):
-                return True  # no individual to update
-            return self.mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
-        # roi columns; individual_id and viewpoint may be cleared (Unknown / None)
-        ok = self.mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
-        if ok and edit.reference == 'individual_id':
-            assigned_iids[rid] = edit.new_value
-        return ok
+    def _individual_of(self, rid):
+        """
+        A roi's individual as loaded, for save_edits to apply sex edits to
+
+        Looks in the unfiltered data, the roi may be hidden by the current filter.
+        """
+        rows = self._data_raw.loc[self._data_raw['id'] == rid, 'individual_id']
+        return rows.iloc[0] if len(rows) else None
 
     def edit_row(self, row):
         """Edit a single row"""
@@ -680,20 +656,12 @@ class DisplayMedia(UsesProject, QWidget):
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"""Are you sure you want to delete {len(self.selected_rows)} files? This cannot be undone.""", title="Warning")
             if dialog.exec():
-                for row in self.selected_rows:
-                    if self.data_type == 0:
-                        id = int(self.media_table._data_filtered.at[row, "id"])
-                        # delete all rois associated with this media
-                        rois = fetch_roi(self.mpDB, media_id=id)
-                        if len(rois) > 0:
-                            for roi in rois['roi_id']:
-                                self.mpDB.delete_emb(roi)
-                        # cascade delete will handle associated roi_thumbnails and roi entries
-                        self.mpDB.delete('media', f'id={id}')
-                    else:
-                        id = int(self.media_table._data_filtered.at[row, "id"])
-                        self.mpDB.delete_emb(id)
-                        self.mpDB.delete('roi', f'id={id}')
+                ids = self.media_table._data_filtered.loc[self.selected_rows, "id"].tolist()
+                # media take their rois, thumbnails and embeddings with them
+                if self.data_type == 0:
+                    delete_media(self.mpDB, ids)
+                else:
+                    delete_rois(self.mpDB, ids)
                 # Reload updated data
                 self.load_table()
             del dialog

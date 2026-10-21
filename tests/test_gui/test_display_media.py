@@ -546,3 +546,20 @@ class TestSelectAllAfterReload:
         dm._set_delegates = MagicMock()
         DisplayMedia.handle_data_loaded(dm, pd.DataFrame({"id": [10], "select": [0]}))
         dm.button_select.setChecked.assert_called_with(False)
+
+
+class TestDelete:
+    @pytest.mark.parametrize("data_type, table", [(0, "media"), (1, "roi")])
+    def test_deletes_the_selected_rows_at_once(self, data_type, table):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = data_type
+        dm.load_table = MagicMock()
+        dm.media_table._data_filtered = pd.DataFrame({"id": [10, 11, 12]})
+        dm.media_table.selectedRows.return_value = [0, 2]
+        with patch("matchypatchy.gui.display_media.AlertPopup") as alert:
+            alert.return_value.exec.return_value = True
+            DisplayMedia.delete(dm)
+        dm.mpDB.delete.assert_called_once_with(table, "id IN (?, ?)", [10, 12])
+        dm.mpDB.delete_emb.assert_not_called()
+        dm.load_table.assert_called_once()

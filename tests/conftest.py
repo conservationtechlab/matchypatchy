@@ -165,7 +165,7 @@ def null_logger():
 
 
 @pytest.fixture
-def tmp_db(tmp_path, null_logger):
+def tmp_db(tmp_path):
     """
     Create a fresh MatchyPatchyDB in a temporary directory.
 
@@ -173,7 +173,7 @@ def tmp_db(tmp_path, null_logger):
     The database is closed and the temporary directory is cleaned up
     automatically when the test finishes.
     """
-    db = MatchyPatchyDB(str(tmp_path), null_logger)
+    db = MatchyPatchyDB(str(tmp_path))
     yield db, tmp_path
     db.close()
 

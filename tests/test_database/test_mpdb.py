@@ -47,11 +47,11 @@ class TestInitialisation:
 
     def test_reopen_existing_database(self, tmp_path, null_logger):
         """Opening the same directory a second time should reuse the existing DB."""
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         original_key = db1.key
         db1.close()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key == original_key
         db2.close()
 
@@ -60,11 +60,11 @@ class TestOpenInvalidDatabase:
     """Opening a folder that holds an incomplete or foreign database is rejected without changing it"""
 
     def test_sqlite_without_embeddings_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         shutil.rmtree(tmp_path / "emb.db")
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
         # no second metadata row and no new embedding database
@@ -74,17 +74,17 @@ class TestOpenInvalidDatabase:
         assert not (tmp_path / "emb.db").exists()
 
     def test_embeddings_without_sqlite_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         (tmp_path / "matchypatchy.db").unlink()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
         assert not (tmp_path / "matchypatchy.db").exists()
 
     def test_sqlite_without_metadata_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         (tmp_path / "matchypatchy.db").unlink()
         conn = sqlite3.connect(tmp_path / "matchypatchy.db")
@@ -92,28 +92,28 @@ class TestOpenInvalidDatabase:
         conn.commit()
         conn.close()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
 
     def test_non_sqlite_file_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         (tmp_path / "matchypatchy.db").write_bytes(b"not a database" * 100)
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
 
     def test_embedding_folder_without_collection_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         shutil.rmtree(tmp_path / "emb.db")
         (tmp_path / "emb.db").mkdir()
         # chroma caches clients per path in-process, clear it to behave like a fresh launch
         SharedSystemClient.clear_system_cache()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
 
@@ -287,15 +287,16 @@ class TestCRUD:
         result = db.add_media(upload_id, "again.jpg", sha, ".jpg", "2024-01-01", station_id)
         assert result == "duplicate_hash"
 
-    def test_add_media_other_integrity_error_is_logged(self, tmp_db):
+    def test_add_media_other_integrity_error_is_logged(self, tmp_db, caplog):
         """A constraint failure other than a duplicate (here a missing station) returns None and logs"""
         db, _ = tmp_db
-        db.logger = MagicMock()
         upload_id = db.add_upload("/img")
+        caplog.clear()
         result = db.add_media(upload_id, "orphan.jpg", "ddd" * 22, ".jpg", "2024-01-01", 99999)
         assert result is None
-        db.logger.error.assert_called_once()
-        assert "orphan.jpg" in db.logger.error.call_args[0][0]
+        errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert len(errors) == 1
+        assert "orphan.jpg" in errors[0]
 
     def test_add_roi(self, tmp_db):
         db, _ = tmp_db
@@ -625,3 +626,48 @@ class TestExportHelpers:
         rows, columns = db.stations()
         assert rows is not None
         assert len(rows) >= 1
+
+
+class TestParameterisedQueries:
+    """Values are bound as parameters, so text with quotes needs no escaping"""
+
+    def test_query_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        db.add_individual("O'Brien", None)
+        assert db.query("SELECT name FROM individual WHERE name=?", ("O'Brien",)) == [("O'Brien",)]
+
+    def test_query_failure_returns_none(self, tmp_db, caplog):
+        db, _ = tmp_db
+        assert db.query("SELECT nope FROM individual") is None
+        assert [r.levelname for r in caplog.records] == ["ERROR"]
+
+    def test_select_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        iid = db.add_individual("O'Brien", None)
+        assert db.select("individual", "id", row_cond="name=?", params=("O'Brien",)) == [(iid,)]
+
+    def test_delete_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        keep = db.add_individual("Keep", None)
+        db.add_individual("O'Brien", None)
+        assert db.delete("individual", "name=?", ("O'Brien",)) is True
+        assert db.select("individual", "id") == [(keep,)]
+
+    def test_delete_with_params_removes_cascaded_embeddings(self, tmp_db):
+        db, _ = tmp_db
+        station = db.add_station("St. Mary's", None, None, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h1", ".jpg", "2024-01-01 10:00:00", station)
+        rid = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        db.add_emb(rid, [0.1, 0.2, 0.3])
+        assert db.delete("station", "name=?", ("St. Mary's",)) is True
+        assert db.count("roi") == 0
+        assert db.collection.get(ids=[str(rid)])["ids"] == []
+
+    def test_numpy_values_bind_as_numbers(self, tmp_db):
+        """Ids read from a DataFrame are numpy ints; bound as blobs they would match nothing"""
+        db, _ = tmp_db
+        iid = db.add_individual("A", None)
+        assert db.query("SELECT name FROM individual WHERE id=?", (np.int64(iid),)) == [("A",)]
+        assert db.edit_row("individual", iid, {"name": "B"}) is True
+        rid_station = db.add_station("S", np.float64(1.5), None, np.int64(1))
+        assert db.query("SELECT survey_id, typeof(survey_id), lat FROM station WHERE id=?", (rid_station,)) == [(1, "integer", 1.5)]

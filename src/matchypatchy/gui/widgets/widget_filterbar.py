@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QSizePolicy, QCheckBox
 from PyQt6.QtGui import QStandardItemModel
 from PyQt6.QtCore import Qt
 
+from matchypatchy.database.location import region_names, survey_names, station_names
+from matchypatchy.database.individual import individual_names
+from matchypatchy.database.media import media_without_rois
 from matchypatchy.project import UsesProject
 
 
@@ -19,8 +22,8 @@ class FilterBar(UsesProject, QWidget):
         self.project = parent.project
         self.size = size
         self.filters = {}
-        self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
-        self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name"))
+        self.valid_stations = dict(station_names(self.mpDB))
+        self.valid_surveys = dict(survey_names(self.mpDB))
 
         layout = QHBoxLayout()
         # Filter label
@@ -90,11 +93,11 @@ class FilterBar(UsesProject, QWidget):
 
         # reset all filter selections to default, reload region, survey and individual lists in case they have changed
         self.region_select.clear()
-        self.region_list_ordered = [(0, 'Region')] + list(self.mpDB.select('region', columns='id, name'))
+        self.region_list_ordered = [(0, 'Region')] + region_names(self.mpDB)
         self.region_select.addItems([el[1] for el in self.region_list_ordered])
 
         self.survey_select.clear()
-        self.survey_list_ordered = [(0, 'Survey')] + list(self.mpDB.select('survey', columns='id, name'))
+        self.survey_list_ordered = [(0, 'Survey')] + survey_names(self.mpDB)
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
 
         # filter stations based on all surveys
@@ -102,7 +105,7 @@ class FilterBar(UsesProject, QWidget):
 
         # individual list hidden until feature is implemented on QC
         self.individual_select.clear()
-        self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
+        self.individual_list_ordered = [(0, 'Individual')] + individual_names(self.mpDB)
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
 
         # Reset viewpoint selection to default, no need to reset list
@@ -202,11 +205,7 @@ class FilterBar(UsesProject, QWidget):
     def select_no_roi(self):
         """Toggle the No ROI filter."""
         if self.no_roi.isChecked():
-            mids = self.mpDB._command("""SELECT m.id
-                                      FROM media m
-                                      LEFT JOIN roi r ON m.id = r.media_id
-                                      WHERE r.media_id IS NULL;""")
-            self.no_roi_mids = [mid[0] for mid in mids]
+            self.no_roi_mids = media_without_rois(self.mpDB)
         else:
             self.no_roi_mids = False
 
@@ -218,10 +217,10 @@ class FilterBar(UsesProject, QWidget):
         if self.region_select.currentIndex() > 0:
             # get surveys in selected region
             region_id = self.filters['active_region'][0]
-            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name", row_cond=f'region_id={region_id}'))
+            self.valid_surveys = dict(survey_names(self.mpDB, region_id=region_id))
         else:
             # get all surveys
-            self.valid_surveys = dict(self.mpDB.select("survey", columns="id, name"))
+            self.valid_surveys = dict(survey_names(self.mpDB))
         # Update survey list to reflect active region
         self.survey_list_ordered = [(0, 'Survey')] + list(self.valid_surveys.items())
         self.survey_select.addItems([el[1] for el in self.survey_list_ordered])
@@ -238,13 +237,9 @@ class FilterBar(UsesProject, QWidget):
         self.station_select.blockSignals(True)
         self.station_select.clear()
         if survey_ids is None:
-            self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
-        elif not survey_ids:
-            self.valid_stations = {}
+            self.valid_stations = dict(station_names(self.mpDB))
         else:
-            survey_list = ",".join([str(s[0]) for s in survey_ids])
-            selection = f'survey_id IN ({survey_list})'
-            self.valid_stations = dict(self.mpDB.select("station", columns="id, name", row_cond=selection))
+            self.valid_stations = dict(station_names(self.mpDB, survey_ids=[s[0] for s in survey_ids]))
 
         # Update station list to reflect active survey
         self.station_list_ordered = [(0, 'Station')] + list(self.valid_stations.items())

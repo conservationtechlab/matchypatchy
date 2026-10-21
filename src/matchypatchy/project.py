@@ -44,7 +44,7 @@ class Project(QObject):
         open leaves the current project open and unchanged.
         """
         cfg = mpConfig(home_dir)
-        db = MatchyPatchyDB(cfg.DB_DIR, logger)
+        db = MatchyPatchyDB(cfg.DB_DIR)
         if not db.key:
             db.close()
             raise ValueError(f"Database at {cfg.DB_DIR} is invalid.")

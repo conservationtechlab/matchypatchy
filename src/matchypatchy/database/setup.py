@@ -2,6 +2,7 @@
 Set Up matchypatchy Database
 """
 from contextlib import contextmanager
+import logging
 from datetime import datetime
 import shutil
 import sqlite3
@@ -9,6 +10,9 @@ import chromadb
 from chromadb.config import Settings
 
 from matchypatchy import __version__
+
+
+logger = logging.getLogger(__name__)
 
 # Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
 # Databases created before schema versioning have no schema_version column and are treated as version 1.
@@ -272,7 +276,7 @@ def _migrate_1_to_2(db):
 MIGRATIONS = {1: _migrate_1_to_2}
 
 
-def migrate_database(db, filepath, logger):
+def migrate_database(db, filepath):
     """Upgrade an existing database to SCHEMA_VERSION, backing up the file first
 
     Returns the schema version of the database after migration
