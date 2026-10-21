@@ -2,6 +2,7 @@
 GUI Window for Match Comparisons
 
 """
+import logging
 import math
 import os
 from pathlib import Path
@@ -32,6 +33,9 @@ from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
 from matchypatchy.project import UsesProject
 
 
+logger = logging.getLogger(__name__)
+
+
 class DisplayCompare(UsesProject, QWidget):
     """GUI class for displaying and managing match comparisons."""
 
@@ -43,7 +47,8 @@ class DisplayCompare(UsesProject, QWidget):
         super().__init__()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.parent = parent
-        self.logger = parent.logger
+        # still read as parent.logger by children not yet on module loggers
+        self.logger = logger
         self.project = parent.project
         self.k = self.cfg.KNN  # default knn
         self.distance_metric = 'cosine'
@@ -381,7 +386,7 @@ class DisplayCompare(UsesProject, QWidget):
             box.rejected.connect(self._on_alert_rejected)
 
         if clear_cache:
-            self.logger.info("Clearing KNN cache")
+            logger.info("Clearing KNN cache")
             print("Clearing KNN cache")
             self.QueryContainer.clear_knn_cache()
 
@@ -416,7 +421,7 @@ class DisplayCompare(UsesProject, QWidget):
             thread.requestInterruption()
             thread.quit()
             if not thread.wait(3000):
-                self.logger.warning("Query thread did not stop in time")
+                logger.warning("Query thread did not stop in time")
         qc.deleteLater()  # if QueryContainer is a QObject
         self.QueryContainer = None
 
@@ -440,7 +445,7 @@ class DisplayCompare(UsesProject, QWidget):
             return
         self.update_prompt("Checking cache...")
         if self.QueryContainer.load_knn_cache():
-            self.logger.info("Using cached KNN results")
+            logger.info("Using cached KNN results")
             # skip to finalize step
             QTimer.singleShot(100, self.QueryContainer.finalize)
         else:

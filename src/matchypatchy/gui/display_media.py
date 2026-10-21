@@ -1,6 +1,7 @@
 """
 GUI Window for viewing images
 """
+import logging
 import pandas as pd
 from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QComboBox, QDialog)
@@ -18,6 +19,9 @@ from matchypatchy.threads.match_object import viewpoint_value
 from matchypatchy.project import UsesProject
 
 
+logger = logging.getLogger(__name__)
+
+
 class DisplayMedia(UsesProject, QWidget):
     """GUI class for displaying and managing media content."""
 
@@ -27,7 +31,6 @@ class DisplayMedia(UsesProject, QWidget):
     def __init__(self, parent, data_type=1):
         super().__init__()
         self.parent = parent
-        self.logger = parent.logger
         self.project = parent.project
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         # 0 for Media, 1 for ROI

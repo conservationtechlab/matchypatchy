@@ -44,7 +44,6 @@ def _make_display_media():
 
         dm = DisplayMedia.__new__(DisplayMedia)
         dm.parent = parent
-        dm.logger = parent.logger
         dm.project = SimpleNamespace(db=parent.mpDB, cfg=parent.cfg, changed=MagicMock())
         dm.VIEWPOINTS = {"None": "None", "0": "Left", "1": "Any", "2": "Right"}
         dm.data_type = 1  # ROI mode
