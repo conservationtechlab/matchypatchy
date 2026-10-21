@@ -4,6 +4,8 @@ Unit tests for matchypatchy.gui.display_media.DisplayMedia
 Tests focus on pure-Python helper/logic methods that do not require a
 real Qt display server. Qt widgets are stubbed out by conftest.py.
 """
+from types import SimpleNamespace
+
 import pandas as pd
 import pytest
 from unittest.mock import MagicMock, patch
@@ -43,8 +45,7 @@ def _make_display_media():
         dm = DisplayMedia.__new__(DisplayMedia)
         dm.parent = parent
         dm.logger = parent.logger
-        dm.cfg = parent.cfg
-        dm.mpDB = parent.mpDB
+        dm.project = SimpleNamespace(db=parent.mpDB, cfg=parent.cfg, changed=MagicMock())
         dm.VIEWPOINTS = {"None": "None", "0": "Left", "1": "Any", "2": "Right"}
         dm.data_type = 1  # ROI mode
         dm.valid_stations = {1: "S1", 2: "S2"}
@@ -420,26 +421,21 @@ class TestUndoButtonState:
         dm.button_undo.setEnabled.assert_called_with(False)
 
 
-class TestUpdateProject:
-    def test_switching_project_updates_table_and_drops_edits(self):
-        from matchypatchy.gui.display_media import DisplayMedia
+class TestProjectChanged:
+    def test_switching_project_drops_edits(self):
         dm = _make_display_media()
         dm.edit_stack = [_edit(10, 1, "viewpoint", 1)]
-        cfg, db = MagicMock(), MagicMock()
-        DisplayMedia.update_project(dm, cfg, db)
-        assert dm.mpDB is db
-        dm.media_table.update_project.assert_called_once_with(cfg, db)
+        dm.drop_edits()
         assert dm.edit_stack == []
+        dm.button_undo.setEnabled.assert_called_with(False)
 
-
-class TestMediaTableUpdateProject:
-    def test_uses_new_database_and_thumbnails(self):
-        from matchypatchy.gui.media_table import MediaTable
-        mt = MagicMock()
-        cfg, db = MagicMock(), MagicMock()
-        MediaTable.update_project(mt, cfg, db)
-        assert mt.mpDB is db
-        assert mt.thumbnail_dir is cfg.THUMBNAIL_DIR
+    def test_reads_the_open_project(self):
+        """mpDB and cfg follow the project instead of a copy taken at startup"""
+        dm = _make_display_media()
+        db, cfg = MagicMock(), MagicMock()
+        dm.project.db, dm.project.cfg = db, cfg
+        assert dm.mpDB is db
+        assert dm.cfg is cfg
 
 
 class TestCompareSelection:

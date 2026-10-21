@@ -27,9 +27,10 @@ from matchypatchy.threads.reid_thread import ReIDThread
 from matchypatchy.threads.model_download_thread import get_path
 
 from matchypatchy import config
+from matchypatchy.project import UsesProject
 
 
-class DisplayBase(QWidget):
+class DisplayBase(UsesProject, QWidget):
     """Base class for the main dashboard view in the MatchyPatchy GUI."""
 
     LOGO = str(config.asset_path("graphics/logo.png"))
@@ -38,8 +39,7 @@ class DisplayBase(QWidget):
         super().__init__()
         self.parent = parent
         self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         padding = 120
         # Initialize threads for sequence, animl, and reid processing
         self.active_survey = None
@@ -162,11 +162,8 @@ class DisplayBase(QWidget):
         self.setLayout(main_layout)
         
         self.update_survey()
-
-    def update_project(self, cfg, mpDB):
-        """Update database object"""
-        self.cfg = cfg
-        self.mpDB = mpDB
+        # the survey list belongs to the open project
+        self.project.changed.connect(self.update_survey)
 
     # ==========================================================================
     # Database Management Functions

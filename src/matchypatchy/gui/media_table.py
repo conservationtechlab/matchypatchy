@@ -10,9 +10,10 @@ from matchypatchy.database.media import EditObject
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.location import fetch_stations, fetch_cameras
 from matchypatchy.database.media import fetch_individual
+from matchypatchy.project import UsesProject
 
 
-class MediaTable(QAbstractTableModel):
+class MediaTable(UsesProject, QAbstractTableModel):
     """Widget for displaying list of Media"""
 
     user_edit = pyqtSignal(EditObject)
@@ -20,9 +21,7 @@ class MediaTable(QAbstractTableModel):
     def __init__(self, parent, headers):
         super().__init__(parent)
         self.parent = parent
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
-        self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
+        self.project = parent.project
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         self.INDIVIDUALS = fetch_individual(self.mpDB)
         self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
@@ -32,12 +31,6 @@ class MediaTable(QAbstractTableModel):
         self.header_dict = headers
         self._columns = [x[0] for x in headers.values()]
         self._headers = [x[1] for x in headers.values()]
-
-    def update_project(self, cfg, mpDB):
-        """Point at another project's database and thumbnails"""
-        self.cfg = cfg
-        self.mpDB = mpDB
-        self.thumbnail_dir = cfg.THUMBNAIL_DIR
 
     def rowCount(self, parent=QModelIndex()):
         return len(self._data_filtered)
@@ -114,7 +107,7 @@ class MediaTable(QAbstractTableModel):
             if role == Qt.ItemDataRole.DecorationRole:
                 thumbnail_path = self._data_filtered.at[row, self._columns[col]]
                 if isinstance(thumbnail_path, str) and thumbnail_path:
-                    pixmap = QPixmap(str(self.thumbnail_dir / thumbnail_path))
+                    pixmap = QPixmap(str(self.cfg.THUMBNAIL_DIR / thumbnail_path))
                     return pixmap
             # Suppress text display
             if role == Qt.ItemDataRole.DisplayRole:

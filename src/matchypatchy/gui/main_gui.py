@@ -30,8 +30,7 @@ from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
-from matchypatchy.config import mpConfig
-from matchypatchy.database.mpdb import MatchyPatchyDB
+from matchypatchy.project import Project
 from matchypatchy.database.filesystem import _is_network_path
 
 
@@ -43,6 +42,8 @@ class MainWindow(QMainWindow):
         self.settings = QSettings("SDZWA", "MatchyPatchy")
         # set logger
         self.logger = logger
+        # the open project, kept for the life of the window; views read cfg and db through it
+        self.project = Project(logger)
         # load previous home dir or start fresh, falling back to a default project
         # if the saved project or its database cannot be loaded
         self._startup_project()
@@ -67,6 +68,18 @@ class MainWindow(QMainWindow):
         container.setLayout(self.pages)
         self._set_base_view()
         self.setCentralWidget(container)
+        # views show the previous project's data until they reload, which they do on entry
+        self.project.changed.connect(self._set_base_view)
+
+    @property
+    def mpDB(self):
+        """Database of the open project"""
+        return self.project.db
+
+    @property
+    def cfg(self):
+        """Config of the open project"""
+        return self.project.cfg
 
     # MENU BAR -----------------------------------------------------------------
     def _createMenuBar(self):
@@ -251,15 +264,6 @@ class MainWindow(QMainWindow):
         """Last selected project path, None if none was saved"""
         return self.settings.value("home_dir", None)  # None is default
 
-    def _open_project(self, home_dir):
-        """Load config and database for a project folder, raise if either is unusable"""
-        cfg = mpConfig(home_dir)
-        mpDB = MatchyPatchyDB(cfg.DB_DIR, self.logger)
-        if not mpDB.key:
-            mpDB.close()
-            raise ValueError(f"Database at {cfg.DB_DIR} is invalid.")
-        return cfg, mpDB
-
     def _startup_project(self):
         """Open the saved project, or fall back to a default project so the app can still launch"""
         saved_dir = self.load_home_dir()
@@ -280,7 +284,7 @@ class MainWindow(QMainWindow):
             if str(home_dir) in failed:
                 continue
             try:
-                self.cfg, self.mpDB = self._open_project(home_dir)
+                self.project.open(home_dir)
             except Exception as e:
                 self.logger.error(f"Could not load project at {home_dir}: {e}", exc_info=True)
                 failed.append(str(home_dir))
@@ -309,9 +313,6 @@ class MainWindow(QMainWindow):
 
     def new_project(self, home_dir):
         """Create a new project in the specified home directory."""
-        # close existing database connection before creating a new project
-        self.mpDB.close()
-
         home_dir = Path(home_dir)
 
         is_remote, fs_info = _is_network_path(home_dir)
@@ -330,7 +331,7 @@ class MainWindow(QMainWindow):
         
         self.logger.info(f"Creating project folder: {str(home_dir)}.")
         try:
-            self.cfg, self.mpDB = self._open_project(home_dir)
+            self.project.open(home_dir)
         except Exception as e:
             self.logger.error(f"Could not create project at {home_dir}: {e}", exc_info=True)
             dialog = AlertPopup(self, prompt=f"Could not create project at {home_dir}:\n{e}")
@@ -339,17 +340,11 @@ class MainWindow(QMainWindow):
             return
         # save settings
         self.settings.setValue("home_dir", str(home_dir))
-        # update pages with the new configuration and database connection
-        self.Base.update_project(self.cfg, self.mpDB)
-        self.Media.update_project(self.cfg, self.mpDB)
-        self.Compare.update_project(self.cfg, self.mpDB)
 
     def change_project(self, project_folder):
         """Change the current project to the specified project folder."""
-        # close existing database connection before creating a new project
-        self.mpDB.close()
         try:
-            cfg, mpDB = self._open_project(project_folder)
+            self.project.open(project_folder)
             valid = True
         except Exception as e:
             self.logger.error(f"Could not load project at {project_folder}: {e}", exc_info=True)
@@ -358,11 +353,6 @@ class MainWindow(QMainWindow):
         if valid:
             self.settings.setValue("home_dir", str(project_folder))
             self.logger.info(f"Updating project folder to {str(project_folder)}.")
-            self.cfg = cfg
-            self.mpDB = mpDB
-            self.Base.update_project(self.cfg, self.mpDB)
-            self.Media.update_project(self.cfg, self.mpDB)
-            self.Compare.update_project(self.cfg, self.mpDB)
             return True
         # not valid
         else:
@@ -434,6 +424,5 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Close database connection when window closes"""
-        if hasattr(self, 'mpDB') and self.mpDB:
-            self.mpDB.close()  # Close DB connection
+        self.project.close()
         event.accept()

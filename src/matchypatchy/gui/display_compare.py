@@ -29,9 +29,10 @@ from matchypatchy.gui.query_manual import ManualQueryContainer
 from matchypatchy.gui.widgets.gui_assets import NoHoverDelegate
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
+from matchypatchy.project import UsesProject
 
 
-class DisplayCompare(QWidget):
+class DisplayCompare(UsesProject, QWidget):
     """GUI class for displaying and managing match comparisons."""
 
     MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
@@ -43,8 +44,7 @@ class DisplayCompare(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.parent = parent
         self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.k = self.cfg.KNN  # default knn
         self.distance_metric = 'cosine'
         self.threshold = 50
@@ -240,6 +240,7 @@ class DisplayCompare(QWidget):
 
         # remove focus from buttons to keep keyboard shortcuts working
         self.set_no_focus()
+        self.project.changed.connect(self.drop_queries)
         # ======================================================================
 
     def set_no_focus(self):
@@ -248,11 +249,16 @@ class DisplayCompare(QWidget):
             if isinstance(child, (QPushButton)):
                 child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-    def update_project(self, cfg, mpDB):
-        """Update database object"""
-        self.cfg = cfg
-        self.mpDB = mpDB
-        self.filterbar.update_project(mpDB)
+    def drop_queries(self):
+        """
+        Discard the query container when another project is opened
+
+        Connected to project.changed in __init__. The container holds the previous
+        project's rois and database, so a match made through it would write to
+        that project. A new one is built the next time compare is entered.
+        """
+        self._teardown_query_container()
+        self.QueryContainer = QueryContainer(self)
 
     # ==========================================================================
     # GUI
