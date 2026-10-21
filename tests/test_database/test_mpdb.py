@@ -47,11 +47,11 @@ class TestInitialisation:
 
     def test_reopen_existing_database(self, tmp_path, null_logger):
         """Opening the same directory a second time should reuse the existing DB."""
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         original_key = db1.key
         db1.close()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key == original_key
         db2.close()
 
@@ -60,11 +60,11 @@ class TestOpenInvalidDatabase:
     """Opening a folder that holds an incomplete or foreign database is rejected without changing it"""
 
     def test_sqlite_without_embeddings_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         shutil.rmtree(tmp_path / "emb.db")
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
         # no second metadata row and no new embedding database
@@ -74,17 +74,17 @@ class TestOpenInvalidDatabase:
         assert not (tmp_path / "emb.db").exists()
 
     def test_embeddings_without_sqlite_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         (tmp_path / "matchypatchy.db").unlink()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
         assert not (tmp_path / "matchypatchy.db").exists()
 
     def test_sqlite_without_metadata_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         (tmp_path / "matchypatchy.db").unlink()
         conn = sqlite3.connect(tmp_path / "matchypatchy.db")
@@ -92,28 +92,28 @@ class TestOpenInvalidDatabase:
         conn.commit()
         conn.close()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
 
     def test_non_sqlite_file_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         (tmp_path / "matchypatchy.db").write_bytes(b"not a database" * 100)
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
 
     def test_embedding_folder_without_collection_is_rejected(self, tmp_path, null_logger):
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         db1.close()
         shutil.rmtree(tmp_path / "emb.db")
         (tmp_path / "emb.db").mkdir()
         # chroma caches clients per path in-process, clear it to behave like a fresh launch
         SharedSystemClient.clear_system_cache()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key is False
         db2.close()
 
@@ -287,15 +287,16 @@ class TestCRUD:
         result = db.add_media(upload_id, "again.jpg", sha, ".jpg", "2024-01-01", station_id)
         assert result == "duplicate_hash"
 
-    def test_add_media_other_integrity_error_is_logged(self, tmp_db):
+    def test_add_media_other_integrity_error_is_logged(self, tmp_db, caplog):
         """A constraint failure other than a duplicate (here a missing station) returns None and logs"""
         db, _ = tmp_db
-        db.logger = MagicMock()
         upload_id = db.add_upload("/img")
+        caplog.clear()
         result = db.add_media(upload_id, "orphan.jpg", "ddd" * 22, ".jpg", "2024-01-01", 99999)
         assert result is None
-        db.logger.error.assert_called_once()
-        assert "orphan.jpg" in db.logger.error.call_args[0][0]
+        errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert len(errors) == 1
+        assert "orphan.jpg" in errors[0]
 
     def test_add_roi(self, tmp_db):
         db, _ = tmp_db

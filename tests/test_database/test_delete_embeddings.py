@@ -81,7 +81,7 @@ def test_delete_from_other_tables_leaves_embeddings(two_surveys):
 
 
 def test_orphaned_embeddings_are_pruned_on_open(tmp_path, null_logger):
-    db = MatchyPatchyDB(str(tmp_path), null_logger)
+    db = MatchyPatchyDB(str(tmp_path))
     station_id = db.add_station("Site01", None, None, 1)
     upload_id = db.add_upload("D:/2023")
     media_id = db.add_media(upload_id, "a.jpg", "hash", ".jpg", "2023-01-01", station_id)
@@ -91,7 +91,7 @@ def test_orphaned_embeddings_are_pruned_on_open(tmp_path, null_logger):
     db.add_emb(999, [0.0, 1.0, 0.0])
     db.close()
 
-    db = MatchyPatchyDB(str(tmp_path), null_logger)
+    db = MatchyPatchyDB(str(tmp_path))
 
     assert db.key
     assert _embedded_ids(db) == [roi_id]

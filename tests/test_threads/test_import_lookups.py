@@ -11,7 +11,7 @@ from matchypatchy.database.mpdb import MatchyPatchyDB, sql_text
 
 @pytest.fixture
 def db(tmp_path):
-    database = MatchyPatchyDB(str(tmp_path), logging.getLogger("test"))
+    database = MatchyPatchyDB(str(tmp_path))
     # survey 1 is the default survey; add a second one in the default region
     database.add_survey("Survey B", 1, None, None)
     yield database
