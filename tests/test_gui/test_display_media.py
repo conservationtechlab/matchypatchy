@@ -541,3 +541,14 @@ class TestSupersededLoad:
         assert dm._loaders == [old, new]
         self._slot(old.finished)()
         assert dm._loaders == [new]
+
+
+class TestSelectAllAfterReload:
+    def test_reload_unchecks_select_all(self):
+        """Reloaded rows are unticked, so the next Select All click selects again"""
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm._apply_sort = MagicMock()
+        dm._set_delegates = MagicMock()
+        DisplayMedia.handle_data_loaded(dm, pd.DataFrame({"id": [10], "select": [0]}))
+        dm.button_select.setChecked.assert_called_with(False)

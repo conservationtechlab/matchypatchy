@@ -387,6 +387,8 @@ class DisplayMedia(QWidget):
         self.filter_data()  # Apply filters to the raw data to get the filtered data
         headers = self._get_headers()
         self.media_table.receiveData(self._data_filtered, headers=headers) # Send the filtered data to the media table for display
+        # reloaded rows come back unticked
+        self.button_select.setChecked(False)
         self._apply_sort()
         self._set_delegates()
         self.update_count_label()
