@@ -88,10 +88,28 @@ class SurveyPopup(QDialog):
 
     def _region_id(self, name, timezone):
         """Id of the region with this name, adding it if new; None if it couldn't be added"""
-        rows = self.mpDB.select("region", columns="id", row_cond=f"name={sql_text(name)}")
+        rows = self.mpDB.select("region", columns="id, timezone", row_cond=f"name={sql_text(name)}")
         if rows:
-            return rows[0][0]
+            region_id, stored = rows[0]
+            self._set_region_timezone(region_id, name, stored, str(timezone))
+            return region_id
         return self.mpDB.add_region(name, str(timezone))
+
+    def _set_region_timezone(self, region_id, name, stored, timezone):
+        """Update an existing region's timezone, asking first if it already has a different one"""
+        if stored and TZ_CONVERT_DICT.get(stored, stored) == timezone:
+            return
+        if stored:
+            # regions are shared between surveys, changing one changes them all
+            dialog = AlertPopup(self, f"Region '{name}' has timezone {stored}.\n"
+                                      f"Change it to {timezone} for every survey in this region?",
+                                title="Change timezone")
+            confirmed = dialog.exec()
+            del dialog
+            if not confirmed:
+                return
+        if not self.mpDB.edit_row("region", region_id, {"timezone": timezone}):
+            self._warn(f"Could not change the timezone of region '{name}', see the log for details.")
 
     def add(self):
         """Add a new survey"""
@@ -118,10 +136,13 @@ class SurveyPopup(QDialog):
         # read the region separately, the survey may have none (region_id NULL)
         name, region_id, year_start, year_end = self.mpDB.select(
             'survey', columns='name, region_id, year_start, year_end', row_cond=f'id={survey_id}')[0]
-        region = self.mpDB.select('region', columns='name', row_cond=f'id={region_id}') if region_id is not None else []
-        region_name = region[0][0] if region else ''
+        region = self.mpDB.select('region', columns='name, timezone',
+                                  row_cond=f'id={region_id}') if region_id is not None else []
+        region_name, timezone = region[0] if region else ('', None)
+        # regions without a stored timezone (e.g. from CSV import) show local time
+        tz_kwargs = {'timezone': timezone} if timezone else {}
 
-        dialog = SurveyFillPopup(self, name=name, region_name=region_name,
+        dialog = SurveyFillPopup(self, name=name, region_name=region_name, **tz_kwargs,
                                  year_start='' if year_start is None else year_start,
                                  year_end='' if year_end is None else year_end)
 
