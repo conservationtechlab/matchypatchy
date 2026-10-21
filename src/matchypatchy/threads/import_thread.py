@@ -786,9 +786,7 @@ class FolderImportThread(QThread):
                     station_id = self.station(filepath, survey_id)
                 else:
                     # create default station if no station level and use for all media
-                    if not self.default_station:
-                        self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
-                    station_id = self.default_station
+                    station_id = self._default_station(survey_id)
                 # add camera if camera level provided (also under the default station), else None
                 camera_id = self.camera(filepath, station_id) if self.camera_level > 0 else None
 
@@ -846,9 +844,20 @@ class FolderImportThread(QThread):
         """Get the relative path of a file given its base directory"""
         return str(Path(filepath).relative_to(base_dir))
 
+    def _default_station(self, survey_id):
+        """Get or create the default station, for media without a station level"""
+        if not self.default_station:
+            self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
+        return self.default_station
+
     def station(self, filepath, survey_id):
         """Get or create station"""
-        station_name = Path(filepath).parts[self.station_level]
+        parts = Path(filepath).parts
+        # levels are picked from one file, a shallower file has no folder at that level
+        if self.station_level >= len(parts) - 1:
+            logger.warning(f"File {filepath} has no station folder, using the default station")
+            return self._default_station(survey_id)
+        station_name = parts[self.station_level]
         station_name = str(station_name)
         # check reference dictionary first, station names are only unique within a survey
         station_key = (station_name, survey_id)
@@ -863,7 +872,12 @@ class FolderImportThread(QThread):
         return station_id
 
     def camera(self, filepath, station_id):
-        camera_name = Path(filepath).parts[self.camera_level]
+        parts = Path(filepath).parts
+        # levels are picked from one file, a shallower file has no folder at that level
+        if self.camera_level >= len(parts) - 1:
+            logger.warning(f"File {filepath} has no camera folder, adding it without a camera")
+            return None
+        camera_name = parts[self.camera_level]
         camera_name = str(camera_name)
         # check reference dictionary first, camera names are only unique within a station
         camera_key = (camera_name, station_id)

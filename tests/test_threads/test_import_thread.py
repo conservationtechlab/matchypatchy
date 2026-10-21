@@ -514,6 +514,38 @@ class TestFolderImportThread:
         assert len(stations) == 1
         assert db.count("media") == 2
 
+    def test_shallower_files_fall_back_to_default_station_and_no_camera(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        base = tmp_path / "root"
+        deep = base / "stationA" / "cameraA" / "deep.jpg"
+        no_camera = base / "stationA" / "no_camera.jpg"
+        no_station = base / "no_station.jpg"
+        deep.parent.mkdir(parents=True)
+        for n, path in enumerate((deep, no_camera, no_station)):
+            path.write_bytes(bytes([n]))
+
+        # levels are picked from the first, deepest file
+        parts = deep.parts
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        data = pd.DataFrame([{"filepath": str(p), "datetime": "2024-01-01 12:00:00"}
+                             for p in (deep, no_camera, no_station)])
+        thread = import_thread.FolderImportThread(parent, (1,), data, station_level=parts.index("stationA"),
+                                                  camera_level=parts.index("cameraA"))
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        thread.finished = SignalSpy()
+        thread.import_failed = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+
+        assert thread.import_failed.calls == []
+        assert sorted(db.select("station", columns="name")) == [("Default Station",), ("stationA",)]
+        assert db.select("camera", columns="name") == [("cameraA",)]
+        media = db.select("media m JOIN station s ON m.station_id = s.id",
+                          columns="m.relative_path, s.name, m.camera_id")
+        assert sorted(media) == [("no_station.jpg", "Default Station", None),
+                                 (str(Path("stationA") / "cameraA" / "deep.jpg"), "stationA", 1),
+                                 (str(Path("stationA") / "no_camera.jpg"), "stationA", None)]
+
     def test_interruption_skips_processing_but_still_finishes(self, tmp_db, null_logger, tmp_path):
         db, _ = tmp_db
         file_1 = tmp_path / "y1.jpg"

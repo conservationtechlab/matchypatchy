@@ -382,6 +382,7 @@ class TestFolderImportCamera:
         thread.data = pd.DataFrame({"filepath": [str(image)], "datetime": ["2024-01-01 10:00:00"]})
         thread.station_level, thread.camera_level = 0, 2
         thread.default_station = None
+        thread._default_station = lambda survey_id: FolderImportThread._default_station(thread, survey_id)
         thread.PROGRESS_BATCH_SIZE = FolderImportThread.PROGRESS_BATCH_SIZE
         thread.active_survey = (1, "S")
         thread.isInterruptionRequested.return_value = False
