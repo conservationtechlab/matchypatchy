@@ -750,6 +750,21 @@ class TestRestrictToData:
         assert set(mo.match_data["id"]) == {11, 12}
         assert mo.ranked_matches == [(12, 0.2), (11, 0.1)]
 
+    def test_cut_keeps_nearer_candidate_ranked_behind_ided_ones(self):
+        """rank() puts ID'd sequence 1 first although sequence 3 is nearer"""
+        self.qc.k = 1
+        raw = _raw(2, [12], [(10, 0.4), (11, 0.4), (13, 0.1)])
+        mo = self.qc._restrict_to_data([raw], strict=False)[0]
+        assert mo.filtered_neighbors == [(13, 0.1)]
+        assert mo.ranked_matches == [(13, 0.1)]
+
+    def test_cut_keeps_whole_sequences_in_ranked_order(self):
+        """pad_sequences expanded sequence 1 to rois 10 and 11; k counts it once"""
+        self.qc.k = 2
+        raw = _raw(2, [12], [(10, 0.4), (11, 0.4), (13, 0.1)])
+        mo = self.qc._restrict_to_data([raw], strict=False)[0]
+        assert mo.filtered_neighbors == [(10, 0.4), (11, 0.4), (13, 0.1)]
+
     def test_drops_sequence_with_no_neighbors_left(self):
         self.qc.data = self.qc.data.loc[[10, 11]]
         out = self.qc._restrict_to_data([_raw(1, [10], [(12, 0.1)])], strict=False)
@@ -798,6 +813,14 @@ class TestKnnCache:
         ])
         assert out[0]["truncated"] is True
         assert out[1]["truncated"] is False
+
+    def test_serialize_truncated_counts_sequences_not_padded_rois(self, qc):
+        """One matched sequence padded to k_cache rois is a single candidate"""
+        qc.data_raw = pd.DataFrame({"sequence_id": [5] * qc.k_cache},
+                                   index=pd.Index(range(qc.k_cache), name="id"))
+        padded = [(i, 0.2) for i in range(qc.k_cache)]
+        out = qc._serialize_ranked_sequences([_fake_match(1, padded, [99])])
+        assert out[0]["truncated"] is False
 
     def test_serialize_keeps_ids_and_distances_only(self, qc):
         out = qc._serialize_ranked_sequences([_fake_match(1, [(12, 0.1)], [10])])[0]

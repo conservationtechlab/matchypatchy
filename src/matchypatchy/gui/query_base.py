@@ -750,10 +750,12 @@ class QueryContainer(BaseQueryContainer):
         Convert MatchObject list to serializable dicts.
         Stores IDs and distances only; DataFrames are rebuilt from self.data.
         """
+        seq_ids = self.data_raw['sequence_id'].to_dict() if 'sequence_id' in self.data_raw else {}
         return [{
             'sequence_id': m.sequence_id,
             'neighbors': [(rid, d) for rid, d in m.neighbors],  # [(roi_id, distance), ...]
-            'truncated': len(m.neighbors) >= self.k_cache,
+            # counted in candidate sequences, like the cut in _restrict_to_data
+            'truncated': len(self._nearest_candidates(m.neighbors, seq_ids)) >= self.k_cache,
             'og_ranked_query_rids': list(m.og_ranked_query_rids),
             'og_ranked_matches': [tuple(x) for x in m.og_ranked_matches],  # (rid, dist)
         } for m in ranked_sequences]
@@ -810,12 +812,31 @@ class QueryContainer(BaseQueryContainer):
             self.logger.error(f"Failed to load JSON cache: {e}")
             return False
 
+    @staticmethod
+    def _candidate_key(rid, seq_ids):
+        """Candidate a matched roi belongs to: its sequence, or itself without one"""
+        seq = seq_ids.get(rid)
+        return ('roi', rid) if seq is None or pd.isna(seq) else seq
+
+    @classmethod
+    def _nearest_candidates(cls, neighbors, seq_ids):
+        """
+        Candidate sequences in neighbors, nearest first. pad_sequences gives every
+        roi of a matched sequence the distance of its nearest roi.
+        """
+        distances = {}
+        for rid, d in neighbors:
+            key = cls._candidate_key(rid, seq_ids)
+            distances[key] = min(d, distances.get(key, d))
+        return sorted(distances, key=distances.get)
+
     def _restrict_to_data(self, serialized, strict):
         """
         Narrow raw KNN results to the currently filtered self.data.
         Returns list of MatchObjects, or None if strict and the cache ran out of headroom.
         """
         keep = set(self.data.index)  # roi ids are the index
+        seq_ids = self.data['sequence_id'].to_dict()
         out = []
         for s in serialized:
             q_rids = [r for r in s['og_ranked_query_rids'] if r in keep]
@@ -823,9 +844,14 @@ class QueryContainer(BaseQueryContainer):
                 continue  # whole sequence filtered out
 
             neighbors = [(rid, d) for rid, d in s['neighbors'] if rid in keep]
-            if strict and s['truncated'] and len(neighbors) < self.k:
+            candidates = self._nearest_candidates(neighbors, seq_ids)
+            if strict and s['truncated'] and len(candidates) < self.k:
                 return None  # cache was cut off, recompute
-            neighbors = neighbors[:self.k]  # assumes sorted by distance
+            # neighbors are in rank order (ID'd/favorites first), not distance order, and
+            # padded to whole sequences: keep the k nearest candidate sequences, whole
+            nearest = set(candidates[:self.k])
+            neighbors = [(rid, d) for rid, d in neighbors
+                         if self._candidate_key(rid, seq_ids) in nearest]
             if not neighbors:
                 continue
 
