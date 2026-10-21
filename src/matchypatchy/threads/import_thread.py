@@ -125,12 +125,12 @@ class CSVMigrateThread(QThread):
                                             individual_id=individual_id,
                                             emb=0,  # do not add emb, must be reprocessed in new project
                                             commit=False)
-                    # save thumbnail for new roi
-                    roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, row.filepath, row.ext,
-                                                       row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    self.mpDB.add_thumbnail("roi", rid, roi_thumbnail, commit=False)
-                    # a roi with a box was already detected, a box-less one still needs the detector
+                    # save thumbnail for new roi, a box-less one has nothing to crop
                     if bbox_w != -1:
+                        roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, row.filepath, row.ext,
+                                                           row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                        self.mpDB.add_thumbnail("roi", rid, roi_thumbnail, commit=False)
+                        # a roi with a box was already detected, a box-less one still needs the detector
                         self.mpDB.mark_detection_done([media_id], commit=False)
 
                     roi_counter += 1

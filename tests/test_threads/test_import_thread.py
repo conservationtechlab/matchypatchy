@@ -839,3 +839,15 @@ class TestCSVMigrateRerun:
         self._migrate(db, parent, [self._row(image, 0)])
         assert len(saved) == 1
         assert db.count("media_thumbnails") == 1
+
+    def test_boxless_roi_gets_no_thumbnail(self, tmp_db, null_logger, tmp_path, image, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        saved = []
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *a: saved.append(a) or "t.jpg")
+
+        self._migrate(db, parent, [self._row(image, 0, box=-1)])
+
+        assert db.count("roi") == 1
+        assert saved == []
+        assert db.count("roi_thumbnails") == 0
