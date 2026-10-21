@@ -221,10 +221,63 @@ def media_count(mpDB, survey_id):
     """
     Get number of media files associated with a given survey_id
     """
-    station_rows = mpDB.select("station", columns="id", row_cond=f'survey_id={survey_id}')
-    if not station_rows:
-        return [], 0
-    valid_stations = [row[0] for row in station_rows]
-    survey_list = ",".join([str(s) for s in valid_stations])
-    media = mpDB.select("media", columns="id", row_cond=f'station_id IN ({survey_list})')
+    media = mpDB.query("""SELECT media.id FROM media
+                         JOIN station ON station.id = media.station_id
+                         WHERE station.survey_id=?;""", (survey_id,)) or []
     return media, len(media)
+
+
+# EDITS AND DELETES ============================================================
+def _in_ids(ids):
+    """ids as ints, with the placeholders for an IN (...) of them"""
+    ids = [int(i) for i in ids]
+    return ids, ", ".join("?" * len(ids))
+
+
+def delete_rois(mpDB, roi_ids):
+    """Delete rois with their thumbnails and embeddings, False if it failed"""
+    roi_ids, placeholders = _in_ids(roi_ids)
+    if not roi_ids:
+        return True
+    return mpDB.delete("roi", f"id IN ({placeholders})", roi_ids)
+
+
+def delete_media(mpDB, media_ids):
+    """Delete media with their rois, thumbnails and embeddings, False if it failed"""
+    media_ids, placeholders = _in_ids(media_ids)
+    if not media_ids:
+        return True
+    return mpDB.delete("media", f"id IN ({placeholders})", media_ids)
+
+
+def update_roi_box(mpDB, roi_id, frame, bbox_x, bbox_y, bbox_w, bbox_h):
+    """
+    Move a roi's box, keeping its id, individual, viewpoint and favorite
+
+    Its embedding no longer matches the box, so it is dropped and emb set to 0,
+    which the next Process run picks up. False if the box couldn't be saved.
+    """
+    saved = mpDB.edit_row("roi", roi_id, {"frame": frame,
+                                          "bbox_x": round(bbox_x, 4), "bbox_y": round(bbox_y, 4),
+                                          "bbox_w": round(bbox_w, 4), "bbox_h": round(bbox_h, 4),
+                                          "emb": 0})
+    if saved:
+        mpDB.delete_emb(roi_id)
+    return saved
+
+
+def set_favorite(mpDB, roi_id, favorite):
+    """Mark a roi as a favorite (1) or not (0), False if it couldn't be saved"""
+    return mpDB.edit_row("roi", roi_id, {"favorite": int(favorite)})
+
+
+def clear_project_data(mpDB):
+    """
+    Delete every media, roi, sequence and individual, their thumbnails and all embeddings
+
+    Regions, surveys, stations and uploads are kept. False if any table couldn't be cleared.
+    """
+    cleared = all([mpDB.clear(table) for table in
+                   ("media", "media_thumbnails", "roi", "roi_thumbnails", "sequence", "individual")])
+    mpDB.clear_emb()
+    return cleared

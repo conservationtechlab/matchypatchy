@@ -37,11 +37,9 @@ class TestDelete:
         """In the media view id is a media id; it must not delete the roi with that id"""
         from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
         dialog = _popup(pd.DataFrame({"id": [5, 6]}), data_type=0)
-        with patch(f"{POPUP}.AlertPopup", return_value=_confirm()), \
-                patch(f"{POPUP}.fetch_roi", return_value=pd.DataFrame({"roi_id": [20, 21]})):
+        with patch(f"{POPUP}.AlertPopup", return_value=_confirm()):
             MediaEditPopup.delete(dialog)
-        dialog.mpDB.delete.assert_called_once_with("media", "id=5")
-        assert [c.args[0] for c in dialog.mpDB.delete_emb.call_args_list] == [20, 21]
+        dialog.mpDB.delete.assert_called_once_with("media", "id IN (?)", [5])
         assert dialog.roi_updated is True
         assert dialog.ids == [6]
         dialog.refresh.assert_called_once()
@@ -51,8 +49,7 @@ class TestDelete:
         dialog = _popup(_roi_rows(), data_type=1)
         with patch(f"{POPUP}.AlertPopup", return_value=_confirm()):
             MediaEditPopup.delete(dialog)
-        dialog.mpDB.delete.assert_called_once_with("roi", "id=10")
-        dialog.mpDB.delete_emb.assert_called_once_with(10)
+        dialog.mpDB.delete.assert_called_once_with("roi", "id IN (?)", [10])
         assert dialog.roi_updated is True
 
     def test_video_row_has_nothing_to_delete(self):

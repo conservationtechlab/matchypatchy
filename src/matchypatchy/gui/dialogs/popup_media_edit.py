@@ -13,7 +13,8 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, TextEditWithSignal
 
 from matchypatchy.threads.model_download_thread import load_model
-from matchypatchy.database.media import fetch_individual, fetch_roi, get_roi_bbox, EditObject
+from matchypatchy.database.media import (fetch_individual, get_roi_bbox, EditObject, delete_media, delete_rois,
+                                         update_roi_box)
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.project import UsesProject
@@ -267,14 +268,8 @@ class MediaEditPopup(UsesProject, QDialog):
                 dialog = AlertPopup(self, prompt=prompt)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     rid = int(rid)
-                    # update the box in place, keeping the roi's id, individual, viewpoint
-                    # and favorite; its embedding no longer matches, so drop it (emb=0 is
-                    # picked up by the next Process run)
-                    self.mpDB.edit_row("roi", rid, {"frame": frame,
-                                                    "bbox_x": round(bbox_x, 4), "bbox_y": round(bbox_y, 4),
-                                                    "bbox_w": round(bbox_w, 4), "bbox_h": round(bbox_h, 4),
-                                                    "emb": 0})
-                    self.mpDB.delete_emb(rid)
+                    # update the box in place; its embedding is dropped for the next Process run
+                    update_roi_box(self.mpDB, rid, frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     # save thumbnail and replace the roi's thumbnail entry
                     roi_thumbnail = save_roi_thumbnail(self.cfg.THUMBNAIL_DIR,
                                                        self.data.iloc[self.current_image_index]["filepath"],
@@ -342,16 +337,10 @@ class MediaEditPopup(UsesProject, QDialog):
             return
 
         if self.data_type == 1:
-            rid = int(row["id"])
-            self.mpDB.delete_emb(rid)
-            self.mpDB.delete('roi', f"id={rid}")
+            delete_rois(self.mpDB, [row["id"]])
         else:
-            # id is the media id here; its rois, thumbnails cascade with it
-            mid = int(row["id"])
-            rois = fetch_roi(self.mpDB, media_id=mid)
-            for roi_id in rois.get("roi_id", []):
-                self.mpDB.delete_emb(roi_id)
-            self.mpDB.delete('media', f"id={mid}")
+            # id is the media id here; its rois, thumbnails and embeddings go with it
+            delete_media(self.mpDB, [row["id"]])
         # tell the caller to reload
         self.roi_updated = True
 

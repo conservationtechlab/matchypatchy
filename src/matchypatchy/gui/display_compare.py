@@ -29,7 +29,7 @@ from matchypatchy.gui.query_qc import QC_QueryContainer
 from matchypatchy.gui.query_manual import ManualQueryContainer
 from matchypatchy.gui.widgets.gui_assets import NoHoverDelegate
 
-from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
+from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual, set_favorite
 from matchypatchy.project import UsesProject
 
 
@@ -934,7 +934,7 @@ class DisplayCompare(UsesProject, QWidget):
 
     def favorite(self, rid, value):
         """Set favorite status for given rid"""
-        self.mpDB.edit_row('roi', rid, {"favorite": value})
+        set_favorite(self.mpDB, rid, value)
         # reload the shown rows, keeping the active filter
         self.QueryContainer.refresh_data()
         # rebuild the favorites list if it is showing

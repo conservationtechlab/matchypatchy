@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBo
                              QHBoxLayout, QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.database.media import IMAGE_EXT, fetch_roi, fetch_individual
+from matchypatchy.database.media import IMAGE_EXT, fetch_individual, delete_media, delete_rois
 from matchypatchy.database.location import camera_names
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
@@ -681,20 +681,12 @@ class DisplayMedia(UsesProject, QWidget):
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"""Are you sure you want to delete {len(self.selected_rows)} files? This cannot be undone.""", title="Warning")
             if dialog.exec():
-                for row in self.selected_rows:
-                    if self.data_type == 0:
-                        id = int(self.media_table._data_filtered.at[row, "id"])
-                        # delete all rois associated with this media
-                        rois = fetch_roi(self.mpDB, media_id=id)
-                        if len(rois) > 0:
-                            for roi in rois['roi_id']:
-                                self.mpDB.delete_emb(roi)
-                        # cascade delete will handle associated roi_thumbnails and roi entries
-                        self.mpDB.delete('media', f'id={id}')
-                    else:
-                        id = int(self.media_table._data_filtered.at[row, "id"])
-                        self.mpDB.delete_emb(id)
-                        self.mpDB.delete('roi', f'id={id}')
+                ids = self.media_table._data_filtered.loc[self.selected_rows, "id"].tolist()
+                # media take their rois, thumbnails and embeddings with them
+                if self.data_type == 0:
+                    delete_media(self.mpDB, ids)
+                else:
+                    delete_rois(self.mpDB, ids)
                 # Reload updated data
                 self.load_table()
             del dialog

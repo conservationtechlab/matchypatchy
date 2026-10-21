@@ -232,3 +232,66 @@ class TestMediaCount:
         result = media_count(db, 1)
         _, count = result
         assert count == 0
+
+
+class TestEditsAndDeletes:
+    def _roi(self, db, name="x.jpg"):
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload(f"/{name}"), name, name, ".jpg", "2024-01-01 10:00:00", station)
+        rid = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        db.add_emb(rid, [0.1, 0.2, 0.3])
+        return mid, rid
+
+    def _has_emb(self, db, rid):
+        return db.collection.get(ids=[str(rid)])["ids"] != []
+
+    def test_delete_rois_removes_rows_and_embeddings(self, tmp_db):
+        from matchypatchy.database.media import delete_rois
+        db, _ = tmp_db
+        _, a = self._roi(db, "a.jpg")
+        _, b = self._roi(db, "b.jpg")
+        assert delete_rois(db, [a]) is True
+        assert db.select("roi", "id") == [(b,)]
+        assert not self._has_emb(db, a)
+        assert self._has_emb(db, b)
+
+    def test_delete_media_removes_its_rois_and_embeddings(self, tmp_db):
+        from matchypatchy.database.media import delete_media
+        db, _ = tmp_db
+        mid, rid = self._roi(db)
+        assert delete_media(db, [mid]) is True
+        assert db.count("media") == 0
+        assert db.count("roi") == 0
+        assert not self._has_emb(db, rid)
+
+    def test_deleting_nothing_succeeds(self, tmp_db):
+        from matchypatchy.database.media import delete_media, delete_rois
+        db, _ = tmp_db
+        assert delete_rois(db, []) is True
+        assert delete_media(db, []) is True
+
+    def test_update_roi_box_drops_the_embedding(self, tmp_db):
+        from matchypatchy.database.media import update_roi_box
+        db, _ = tmp_db
+        _, rid = self._roi(db)
+        db.edit_row("roi", rid, {"emb": 1, "favorite": 1})
+        assert update_roi_box(db, rid, 2, 0.123456, 0.2, 0.3, 0.4) is True
+        assert db.select("roi", "frame, bbox_x, bbox_w, emb, favorite", row_cond="id=?", params=(rid,)) == [(2, 0.1235, 0.3, 0, 1)]
+        assert not self._has_emb(db, rid)
+
+    def test_set_favorite(self, tmp_db):
+        from matchypatchy.database.media import set_favorite
+        db, _ = tmp_db
+        _, rid = self._roi(db)
+        assert set_favorite(db, rid, True) is True
+        assert db.select("roi", "favorite", row_cond="id=?", params=(rid,)) == [(1,)]
+
+    def test_clear_project_data_keeps_locations(self, tmp_db):
+        from matchypatchy.database.media import clear_project_data
+        db, _ = tmp_db
+        _, rid = self._roi(db)
+        db.add_individual("A")
+        assert clear_project_data(db) is True
+        assert [db.count(t) for t in ("media", "roi", "individual")] == [0, 0, 0]
+        assert db.count("station") == 1
+        assert not self._has_emb(db, rid)

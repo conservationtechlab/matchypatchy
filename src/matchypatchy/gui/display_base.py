@@ -15,6 +15,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
 
 from matchypatchy.database.location import survey_names
+from matchypatchy.database.media import clear_project_data
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy.gui.dialogs.popup_individual import IndividualPopup
@@ -390,11 +391,5 @@ class DisplayBase(UsesProject, QWidget):
         if dialog.exec():
             self.mpDB.info()
             logger.warning("DELETING DATA")
-            self.mpDB.clear("media")
-            self.mpDB.clear("media_thumbnails")
-            self.mpDB.clear("roi")
-            self.mpDB.clear("roi_thumbnails")
-            self.mpDB.clear("sequence")
-            self.mpDB.clear("individual")
-            self.mpDB.clear_emb()
+            clear_project_data(self.mpDB)
         del dialog
