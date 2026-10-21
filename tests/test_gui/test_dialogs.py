@@ -496,6 +496,29 @@ class TestUploadManagerSave:
         popup.mpDB.update_base_dir.assert_called_once_with(1, "/new")
         assert popup.updates == []
 
+    def _status(self, popup):
+        return popup.status_label.setText.call_args.args[0]
+
+    def test_failed_update_is_reported(self):
+        """update_base_dir returning False (e.g. directory already another upload's) was ignored"""
+        popup = _uploads_popup(updates=[(1, "/taken"), (2, "/ok")], errors=[[], []])
+        popup.mpDB.update_base_dir.side_effect = lambda base_dir_id, _: base_dir_id != 1
+        popup.base_dirs = [(1, "/old1", "2024", 1), (2, "/ok", "2024", 1)]
+        self._save(popup, confirm=1)
+        text = self._status(popup)
+        assert "Saved 1 of 2" in text
+        assert "/taken" in text and "/ok" not in text
+        popup.list.item.assert_any_call(0, 0)
+
+    def test_skipped_update_is_reported(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg", "b.jpg"]], contains_errors=True)
+        popup.base_dirs = [(1, "/old", "2024", 2)]
+        self._save(popup, confirm=1)
+        popup.mpDB.update_base_dir.assert_not_called()
+        text = self._status(popup)
+        assert "Saved 0 of 1" in text
+        assert "/new (2 files missing)" in text
+
     def test_choosing_another_directory_needs_verifying_again(self):
         from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
         popup = _uploads_popup(verified=True)
@@ -504,6 +527,80 @@ class TestUploadManagerSave:
         with patch(f"{UPLOADS}.QFileDialog.getExistingDirectory", return_value="/new"):
             UploadManagerPopup.edit(popup)
         assert popup.verified is False
+
+
+class TestUploadManagerVerify:
+    def _popup(self, updates=((1, "/new"),)):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = _uploads_popup(updates=updates, verified=False)
+        popup.verifying = False
+        popup.build_thread = None
+        popup.list.currentRow.return_value = 0
+        popup.set_verifying = lambda v: UploadManagerPopup.set_verifying(popup, v)
+        popup.set_editdel = lambda: UploadManagerPopup.set_editdel(popup)
+        return popup
+
+    def _verify(self, popup):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.VerifyNewBaseDirsThread") as thread:
+            UploadManagerPopup.verify(popup)
+        return thread
+
+    def test_verify_while_running_is_ignored(self):
+        """Replacing a running thread aborted the app"""
+        popup = self._popup()
+        thread = self._verify(popup)
+        running = popup.build_thread
+        running.isRunning.return_value = True
+        thread = self._verify(popup)
+        thread.assert_not_called()
+        assert popup.build_thread is running
+
+    def test_buttons_disabled_and_progress_shown_while_verifying(self):
+        popup = self._popup()
+        self._verify(popup)
+        popup.button_verify.setEnabled.assert_called_with(False)
+        popup.button_save.setEnabled.assert_called_with(False)
+        popup.button_edit.setEnabled.assert_called_with(False)
+        popup.progress_bar.show.assert_called_once()
+
+    def test_buttons_enabled_when_verification_finishes(self):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = self._popup()
+        self._verify(popup)
+        UploadManagerPopup.on_verify_finished(popup)
+        popup.button_verify.setEnabled.assert_called_with(True)
+        popup.button_save.setEnabled.assert_called_with(True)
+        popup.button_edit.setEnabled.assert_called_with(True)
+        popup.progress_bar.hide.assert_called()
+
+    def test_thread_gets_a_copy_of_updates(self):
+        popup = self._popup()
+        thread = self._verify(popup)
+        passed = thread.call_args.args[1]
+        assert passed == [(1, "/new")]
+        assert passed is not popup.updates
+
+
+class TestUploadManagerLog:
+    def _log(self, popup):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.AlertPopup") as alert:
+            UploadManagerPopup.log(popup)
+        return alert
+
+    def test_missing_files_reported_in_popup_label(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg", "b.jpg"]], contains_errors=True)
+        alert = self._log(popup)
+        alert.assert_not_called()
+        text = popup.status_label.setText.call_args.args[0]
+        assert "2 files" in text
+
+    def test_all_found_reported_in_popup_label(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[[]])
+        alert = self._log(popup)
+        alert.assert_not_called()
+        assert "All files were found" in popup.status_label.setText.call_args.args[0]
 
 
 class TestIndividualPopupList:
