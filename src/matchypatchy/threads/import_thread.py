@@ -168,8 +168,11 @@ class CSVMigrateThread(QThread):
         rel_path = Path(relative_path)
         base_dir = Path(*full_path.parts[:-len(rel_path.parts)])
 
-        # add to uploads table
-        new_base_dir_id = self.mpDB.add_upload(str(base_dir))
+        # reuse the upload if this directory is already in the project, else add it
+        try:
+            new_base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir={sql_text(str(base_dir))}')[0][0]
+        except IndexError:
+            new_base_dir_id = self.mpDB.add_upload(str(base_dir))
         # add to ref
         self.base_dir_ref[old_base_dir_id] = new_base_dir_id
 

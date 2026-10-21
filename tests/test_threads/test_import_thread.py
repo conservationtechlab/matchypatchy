@@ -782,3 +782,46 @@ class TestImportDetectionDone:
 
         assert thread.import_failed.calls == []
         assert self._detection_done(db) == {"boxed.jpg": 1, "boxless.jpg": 0}
+
+
+class TestCSVMigrateRerun:
+    """Migrating into a project that already has some of the files"""
+
+    def _row(self, path, n, box=0.2, **overrides):
+        row = {column: None for column in import_thread.CSVMigrateThread.EXPECTED_COLUMNS}
+        row.update({"id": n, "media_id": 1, "frame": 0, "bbox_x": box, "bbox_y": box, "bbox_w": box,
+                    "bbox_h": box, "base_dir_id": 1, "filepath": str(path), "relative_path": path.name,
+                    "ext": ".jpg", "timestamp": "2024-01-01 12:00:00", "station_id": 1,
+                    "station_name": "Station A", "survey_name": "Survey A"})
+        row.update(overrides)
+        return row
+
+    def _migrate(self, db, parent, rows):
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame(rows))
+        thread.progress_update = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.import_failed = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+        assert thread.import_failed.calls == []
+        return thread
+
+    @pytest.fixture
+    def image(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        path = tmp_path / "imgs" / "a.jpg"
+        path.parent.mkdir()
+        path.write_bytes(b"a")
+        return path
+
+    def test_existing_upload_is_reused(self, tmp_db, null_logger, tmp_path, image):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        upload_id = db.add_upload(str(image.parent))
+
+        self._migrate(db, parent, [self._row(image, 0)])
+
+        assert db.count("uploads") == 1
+        assert db.select("media", columns="base_dir_id") == [(upload_id,)]
