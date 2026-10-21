@@ -1,6 +1,7 @@
 """
 Set Up matchypatchy Database
 """
+from contextlib import contextmanager
 from datetime import datetime
 import shutil
 import sqlite3
@@ -11,7 +12,36 @@ from matchypatchy import __version__
 
 # Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
 # Databases created before schema versioning have no schema_version column and are treated as version 1.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Tables rebuilt by a migration, {name} lets the migration create them under a temporary name.
+# A relative path is only unique within its base directory: D:/2023/Site01/IMG_0001.JPG and
+# D:/2024/Site01/IMG_0001.JPG are both Site01/IMG_0001.JPG
+# detection_done is 1 once a file has been run through the detector, or given a full-image roi
+# when no detector was selected, so later processing only runs the files that still need it
+MEDIA_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
+                id INTEGER PRIMARY KEY,
+                base_dir_id INTEGER NOT NULL,
+                relative_path TEXT NOT NULL,
+                sha256 TEXT UNIQUE NOT NULL,
+                ext TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                station_id INTEGER NOT NULL,
+                camera_id INTEGER,
+                sequence_id INTEGER,
+                external_id INTEGER,
+                comment TEXT,
+                detection_done INTEGER NOT NULL DEFAULT 0,
+                UNIQUE (base_dir_id, relative_path),
+                FOREIGN KEY (base_dir_id) REFERENCES uploads (id) ON DELETE CASCADE,
+                FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
+                FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
+                FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);'''
+
+INDIVIDUAL_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                sex TEXT);'''
 
 
 def setup_database(key, filepath, db=None):
@@ -85,23 +115,7 @@ def setup_database(key, filepath, db=None):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);''')
 
         # MEDIA
-        cursor.execute(
-            '''CREATE TABLE IF NOT EXISTS media (
-                id INTEGER PRIMARY KEY,
-                base_dir_id INTEGER NOT NULL,
-                relative_path TEXT UNIQUE NOT NULL,
-                sha256 TEXT UNIQUE NOT NULL,
-                ext TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                station_id INTEGER NOT NULL,
-                camera_id INTEGER,
-                sequence_id INTEGER,
-                external_id INTEGER,
-                comment TEXT,
-                FOREIGN KEY (base_dir_id) REFERENCES uploads (id) ON DELETE CASCADE,
-                FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
-                FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
-                FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);''')
+        cursor.execute(MEDIA_TABLE.format(name="media"))
 
         # ROI
         cursor.execute(
@@ -122,11 +136,7 @@ def setup_database(key, filepath, db=None):
                 FOREIGN KEY(individual_id) REFERENCES individual (id) ON DELETE SET NULL);''')
 
         # INDIVIDUAL
-        cursor.execute(
-            '''CREATE TABLE IF NOT EXISTS individual (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                sex TEXT);''')
+        cursor.execute(INDIVIDUAL_TABLE.format(name="individual"))
 
         # SEQUENCE
         cursor.execute(
@@ -201,9 +211,63 @@ def get_schema_version(db):
 
 
 # Migration functions
+def _rebuild_table(db, table, create):
+    """
+    Recreate a table from its current CREATE statement, keeping its rows
+
+    SQLite cannot change a table's constraints in place. Columns the new table
+    no longer has are dropped. Foreign keys must be off, or dropping the old
+    table cascades to the rows that reference it.
+    """
+    db.execute(create.format(name=f"{table}_new"))
+    new_columns = [c[1] for c in db.execute(f'PRAGMA table_info("{table}_new")').fetchall()]
+    old_columns = [c[1] for c in db.execute(f'PRAGMA table_info("{table}")').fetchall()]
+    columns = ", ".join(c for c in new_columns if c in old_columns)
+    db.execute(f"INSERT INTO {table}_new ({columns}) SELECT {columns} FROM {table};")
+    db.execute(f"DROP TABLE {table};")
+    db.execute(f"ALTER TABLE {table}_new RENAME TO {table};")
+
+
+@contextmanager
+def _schema_change(db):
+    """
+    Run a migration as one transaction with foreign keys off
+
+    Rebuilding a table drops the old one, which would otherwise cascade to the
+    rows that reference it. Foreign keys can't be switched inside a transaction.
+    """
+    db.commit()
+    foreign_keys = db.execute("PRAGMA foreign_keys;").fetchone()[0]
+    db.execute("PRAGMA foreign_keys = OFF;")
+    try:
+        db.execute("BEGIN;")
+        yield
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.execute(f"PRAGMA foreign_keys = {foreign_keys};")
+
+
 def _migrate_1_to_2(db):
-    """Add schema_version to metadata"""
-    return
+    """
+    Bring a database from before schema versioning up to date
+
+    Adds metadata.schema_version, drops the unused individual.age, makes
+    media.relative_path unique within its base directory instead of across all of
+    them, and adds media.detection_done
+    """
+    with _schema_change(db):
+        metadata_columns = [c[1] for c in db.execute("PRAGMA table_info(metadata)").fetchall()]
+        if "schema_version" not in metadata_columns:
+            db.execute("ALTER TABLE metadata ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0;")
+        _rebuild_table(db, "individual", INDIVIDUAL_TABLE)
+        _rebuild_table(db, "media", MEDIA_TABLE)
+        # a roi with a box came from a detector (or the full-image fallback); media without
+        # one, either no rois or only rois imported without a box, still need detection
+        db.execute("""UPDATE media SET detection_done = 1
+                      WHERE EXISTS (SELECT 1 FROM roi WHERE roi.media_id = media.id AND roi.bbox_w != -1);""")
 
 
 MIGRATIONS = {1: _migrate_1_to_2}

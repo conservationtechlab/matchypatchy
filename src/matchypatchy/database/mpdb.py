@@ -346,10 +346,10 @@ class MatchyPatchyDB():
                   commit: bool = True,
                   quiet: bool = True):
         """
-        Media has 10 attributes not including id:
+        Media has 11 attributes not including id, detection_done starts at 0:
             id INTEGER PRIMARY KEY,
             base_dir_id INTEGER NOT NULL,
-            relative_path TEXT UNIQUE NOT NULL,
+            relative_path TEXT NOT NULL, (unique within base_dir_id)
             sha256 TEXT UNIQUE NOT NULL,
             ext TEXT NOT NULL,
             timestamp TEXT NOT NULL,
@@ -358,6 +358,7 @@ class MatchyPatchyDB():
             sequence_id INTEGER,
             external_id INTEGER,
             comment TEXT,
+            detection_done INTEGER NOT NULL DEFAULT 0,
         """
         try:
             cursor = self.db.cursor()
@@ -387,7 +388,8 @@ class MatchyPatchyDB():
         except sqlite3.IntegrityError as error:
             if not quiet:
                 print(f"DEBUG: IntegrityError caught: {error}")
-            if 'UNIQUE constraint failed: media.relative_path' in error.args[0]:
+            # unique (base_dir_id, relative_path)
+            if 'UNIQUE constraint failed: media.base_dir_id, media.relative_path' in error.args[0]:
                 self.logger.error(f"Failed to add {relative_path}, already exists in database.")
                 return "duplicate_error"
             if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
@@ -402,6 +404,21 @@ class MatchyPatchyDB():
                 print(f"Failed to add media: {error}")
             self.logger.error(f"Failed to add media: {error}")
             return None
+
+    def mark_detection_done(self, media_ids, commit=True):
+        """Record that media have been through detection, so later processing skips them"""
+        media_ids = [int(media_id) for media_id in media_ids]
+        if not media_ids:
+            return True
+        try:
+            placeholders = ", ".join("?" * len(media_ids))
+            self.db.execute(f"UPDATE media SET detection_done = 1 WHERE id IN ({placeholders});", media_ids)
+            if commit:
+                self.db.commit()
+            return True
+        except sqlite3.Error as error:
+            self.logger.error(f"Failed to mark {len(media_ids)} media as detected: {error}")
+            return False
 
     def add_roi(self,
                 media_id: int,

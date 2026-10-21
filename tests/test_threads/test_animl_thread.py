@@ -47,6 +47,9 @@ class FakeDB:
         self.add_roi_calls = []
         self.add_thumbnail_calls = []
         self.edit_row_calls = []
+        self.marked_done = []
+        # media ids with detection_done = 0, None for every media
+        self.pending_media = None
         self.media_rows = []
         self.media_columns = [
             "id",
@@ -76,6 +79,15 @@ class FakeDB:
 
     def edit_row(self, *args, **kwargs):
         self.edit_row_calls.append((args, kwargs))
+        return True
+
+    def select(self, table, columns="*", row_cond=None, quiet=True):
+        assert (table, columns, row_cond) == ("media", "id", "detection_done = 0")
+        pending = self.pending_media if self.pending_media is not None else range(1000)
+        return [(media_id,) for media_id in pending]
+
+    def mark_detection_done(self, media_ids):
+        self.marked_done.extend(int(media_id) for media_id in media_ids)
         return True
 
 
@@ -459,3 +471,112 @@ class TestAnimlThread:
 
         assert loads == [1]
         assert thread.detector == "det"
+
+
+class TestDetectionDone:
+    """Files are marked once they've been through detection, and only unmarked files are run"""
+
+    def test_media_selection_skips_files_already_detected(self, tmp_db, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: None)
+        station_id = db.add_station("Site01", None, None, 1)
+        upload_id = db.add_upload("D:/2023")
+        done, pending = (db.add_media(upload_id, f"{n}.jpg", f"hash{n}", ".jpg", "2023-01-01", station_id)
+                         for n in ("done", "pending"))
+        # the detector found nothing in it last time, so it has no rois
+        db.mark_detection_done([done])
+
+        thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY=None)
+
+        assert thread.media["id"].tolist() == [pending]
+
+    def test_rois_without_box_on_detected_media_are_skipped(self, tmp_path, monkeypatch):
+        db = FakeDB()
+        db.pending_media = {1}
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            animl_thread, "fetch_roi_media",
+            lambda *_a, **_k: pd.DataFrame([{"id": 10 + m, "media_id": m, "bbox_x": -1, "bbox_y": -1, "bbox_w": -1,
+                                             "bbox_h": -1, "filepath": f"/base/{m}.jpg", "ext": ".jpg"}
+                                            for m in (1, 2)]))
+
+        thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY=None)
+
+        assert thread.rois["media_id"].tolist() == [1]
+
+    def test_detected_images_are_marked_except_unreadable(self, tmp_path, monkeypatch):
+        thread, db = TestAnimlThread._thread_with_detector(None, tmp_path, monkeypatch, unreadable={"/base/bad.jpg"})
+        thread.images = pd.DataFrame([{"id": i, "filepath": f"/base/{name}.jpg", "ext": ".jpg"}
+                                      for i, name in enumerate(["a", "bad", "c"])])
+        thread.to_process = 3
+
+        thread.detect_images()
+
+        assert db.marked_done == [0, 2]
+
+    def test_images_with_nothing_detected_are_marked(self, tmp_path, monkeypatch):
+        thread, db = TestAnimlThread._thread_with_detector(None, tmp_path, monkeypatch, unreadable=())
+        monkeypatch.setattr(animl_thread.animl, "get_animals", lambda detections: detections.iloc[0:0])
+        thread.images = pd.DataFrame([{"id": 7, "filepath": "/base/empty.jpg", "ext": ".jpg"}])
+        thread.to_process = 1
+
+        thread.detect_images()
+
+        assert db.add_roi_calls == []
+        assert db.marked_done == [7]
+
+    def test_full_image_rois_mark_media(self, tmp_path, monkeypatch):
+        db = FakeDB()
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: None)
+        monkeypatch.setattr(animl_thread, "fetch_roi_media", lambda *_a, **_k: _empty_roi_media())
+        monkeypatch.setattr(animl_thread, "save_roi_thumbnail", lambda *_a, **_k: "thumb.jpg")
+        thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY=None)
+        thread.images = pd.DataFrame([{"id": 3, "filepath": "/base/new.jpg", "ext": ".jpg"}])
+        thread.rois = pd.DataFrame()
+        thread.to_process = 1
+
+        thread.detect_images()
+
+        assert db.marked_done == [3]
+
+    def test_rois_without_box_mark_their_media_even_without_a_detection(self, tmp_path, monkeypatch):
+        thread, db = TestAnimlThread._thread_with_detector(None, tmp_path, monkeypatch, unreadable=())
+        monkeypatch.setattr(animl_thread.animl, "get_animals", lambda detections: detections.assign(conf=1.0).iloc[0:0])
+        thread.images = pd.DataFrame(columns=["id", "filepath", "ext"])
+        thread.rois = pd.DataFrame([{"id": 20, "media_id": 4, "frame": 0, "filepath": "/base/old.jpg", "ext": ".jpg"}])
+        thread.to_process = 1
+
+        thread.detect_images()
+
+        assert db.edit_row_calls == []
+        assert db.marked_done == [4]
+
+    def test_rois_without_box_are_not_marked_without_a_detector(self, tmp_path, monkeypatch):
+        db = FakeDB()
+        monkeypatch.setattr(animl_thread, "get_path", lambda *_a, **_k: None)
+        monkeypatch.setattr(
+            animl_thread, "fetch_roi_media",
+            lambda *_a, **_k: pd.DataFrame([{"id": 10, "media_id": 1, "frame": 0, "bbox_x": -1, "bbox_y": -1,
+                                             "bbox_w": -1, "bbox_h": -1, "filepath": "/base/a.jpg", "ext": ".jpg"}]))
+        monkeypatch.setattr(animl_thread.animl, "get_images", lambda media: media)
+        monkeypatch.setattr(animl_thread.animl, "get_videos", lambda media: media)
+        monkeypatch.setattr(animl_thread.animl, "extract_frames", lambda videos, **_k: videos)
+        thread = animl_thread.AnimlThread(db, _cfg(tmp_path), DETECTOR_KEY=None)
+        thread.prompt_update = SignalSpy()
+        thread.progress_update = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        # left for a later run with a detector
+        assert db.marked_done == []
+
+    def test_detected_videos_are_marked_except_unreadable(self, tmp_path, monkeypatch):
+        thread, db = TestAnimlThread._thread_with_detector(None, tmp_path, monkeypatch, unreadable={"/base/bad.mp4"})
+        thread.videos = pd.DataFrame([{"id": i, "filepath": f"/base/{name}.mp4", "ext": ".mp4", "frame": 0}
+                                      for i, name in enumerate(["bad", "b"])])
+        thread.to_process = 2
+
+        thread.detect_videos()
+
+        assert db.marked_done == [1]

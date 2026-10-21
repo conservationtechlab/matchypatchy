@@ -96,13 +96,15 @@ class AnimlThread(QThread):
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
 
-        # select media that do not have rois
-        media, column_names = self.mpDB.get_media_with_filepath(row_cond="NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
+        # select media that haven't been through detection and have no rois
+        media, column_names = self.mpDB.get_media_with_filepath(
+            row_cond="m.detection_done = 0 AND NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
         self.media = pd.DataFrame(media, columns=column_names)
 
-        # select rois that do not have bbox
+        # select rois imported without a bbox whose media hasn't been through detection
+        pending = {row[0] for row in self.mpDB.select("media", columns="id", row_cond="detection_done = 0") or []}
         rois = fetch_roi_media(mpDB, reset_index=False)
-        self.rois = rois[rois['bbox_x'] == -1]  # imported without bbox
+        self.rois = rois[(rois['bbox_x'] == -1) & rois['media_id'].isin(pending)]
         self.rois = self.rois.drop(columns=['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
 
         self.images = None
@@ -198,6 +200,7 @@ class AnimlThread(QThread):
                                                    bbox_x, bbox_y, bbox_w, bbox_h)
                 self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
 
+            self._mark_done(image_batch, 'id')
             self.progress_count += len(image_batch)
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
 
@@ -233,6 +236,7 @@ class AnimlThread(QThread):
                                     {"bbox_x": bbox_x, "bbox_y": bbox_y,
                                      "bbox_w": bbox_w, "bbox_h": bbox_h})
 
+            self._mark_done(roi_batch, 'media_id')
             self.progress_count += len(roi_batch)
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
 
@@ -278,8 +282,14 @@ class AnimlThread(QThread):
                                                        roi['filepath'], roi['ext'], frame,
                                                        bbox_x, bbox_y, bbox_w, bbox_h)
                     self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
+                self._mark_done(video.iloc[[0]], 'id')
             self.progress_count += 1
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+
+    def _mark_done(self, manifest, media_column):
+        """Mark the manifest's media as through detection, except files that couldn't be read"""
+        read = manifest[~manifest['filepath'].isin(self.failed)]
+        self.mpDB.mark_detection_done(read[media_column].unique())
 
     def _detect(self, manifest, **kwargs):
         """Run the detector on the manifest's files, None if none of them could be read"""
