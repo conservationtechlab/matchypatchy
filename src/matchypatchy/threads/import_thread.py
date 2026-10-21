@@ -17,6 +17,19 @@ from matchypatchy.database.mpdb import sql_text
 
 logger = logging.getLogger(__name__)
 
+
+def roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h):
+    """Identify a roi by frame and bbox, rounded the same way add_roi stores them."""
+    return (int(frame),) + tuple(round(float(b), 4) for b in (bbox_x, bbox_y, bbox_w, bbox_h))
+
+
+def count_existing_rois(mpDB, media_id):
+    """Return a count of each roi key already in the database for media_id."""
+    rows = mpDB.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h",
+                       row_cond=f'media_id={media_id}')
+    return Counter(roi_key(*row) for row in rows or [])
+
+
 # CSV MIGRATE ==================================================================
 class CSVMigrateThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
@@ -45,6 +58,7 @@ class CSVMigrateThread(QThread):
         self.individual_ref = {}  # dictionary to store individual name to id mapping
         self.sequence_ref = {}  # dictionary to store sequence id mapping
         self.media_ref = {}  # dictionary to store file hash to media id mapping
+        self.existing_roi_ref = {}  # dictionary to store media id to count of rois already in the project
         self.errors = []  # list to store errors encountered during import
 
         assert isinstance(self.data, pd.DataFrame), "Data must be a pandas DataFrame"
@@ -97,20 +111,31 @@ class CSVMigrateThread(QThread):
                         if media_id == "duplicate_error":
                             # already in the project; media has no filepath column, but the file's hash is unique
                             media_id = self.mpDB.select("media", columns="id", row_cond=f"sha256='{hash}'")[0][0]
+                            self.existing_roi_ref[media_id] = count_existing_rois(self.mpDB, media_id)
                         else:
                             # save thumbnail for new media
                             media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
                             self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
+                            self.existing_roi_ref[media_id] = Counter()
                         self.media_ref[hash] = media_id
-
-                    # individual
-                    individual_id = self.individual(row.individual_id, row.name, row.sex)
 
                     # get bounding box coordinates, if any are missing, set to -1
                     bbox_x = row.bbox_x if not pd.isna(row.bbox_x) else -1
                     bbox_y = row.bbox_y if not pd.isna(row.bbox_y) else -1
                     bbox_w = row.bbox_w if not pd.isna(row.bbox_w) else -1
                     bbox_h = row.bbox_h if not pd.isna(row.bbox_h) else -1
+
+                    # skip rois already in the project (eg. resuming an interrupted migration)
+                    # each existing roi accounts for one row, so repeated keys (eg. -1 bboxes) are counted
+                    existing_rois = self.existing_roi_ref[media_id]
+                    key = roi_key(row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                    if existing_rois[key] > 0:
+                        existing_rois[key] -= 1
+                        roi_counter += 1
+                        continue
+
+                    # individual
+                    individual_id = self.individual(row.individual_id, row.name, row.sex)
 
                     # roi
                     rid = self.mpDB.add_roi(media_id,
@@ -351,7 +376,7 @@ class CSVImportThread(QThread):
                 # image already added, get correct media_id and its existing rois
                 if media_id == "duplicate_error":
                     media_id = self.mpDB.select("media", columns="id", row_cond=f'sha256="{hash}"')[0][0]
-                    existing_rois = self._existing_rois(media_id)
+                    existing_rois = count_existing_rois(self.mpDB, media_id)
                 # save thumbnail for new media
                 else:
                     existing_rois = Counter()
@@ -387,9 +412,9 @@ class CSVImportThread(QThread):
 
                     # skip rois already imported (eg. resuming an interrupted import)
                     # each existing roi accounts for one row, so repeated keys (eg. -1 bboxes) are counted
-                    roi_key = self._roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    if existing_rois[roi_key] > 0:
-                        existing_rois[roi_key] -= 1
+                    key = roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                    if existing_rois[key] > 0:
+                        existing_rois[key] -= 1
                         roi_counter += 1
                         continue
 
@@ -582,17 +607,6 @@ class CSVImportThread(QThread):
         return comment
 
     # ROI-RELATED METHODS
-    @staticmethod
-    def _roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h):
-        """Identify a roi by frame and bbox, rounded the same way add_roi stores them."""
-        return (int(frame),) + tuple(round(float(b), 4) for b in (bbox_x, bbox_y, bbox_w, bbox_h))
-
-    def _existing_rois(self, media_id):
-        """Return a count of each roi key already in the database for media_id."""
-        rows = self.mpDB.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h",
-                                row_cond=f'media_id={media_id}')
-        return Counter(self._roi_key(*row) for row in rows or [])
-
     def _roi_value(self, roi, column):
         """Get ROI value by selected column supporting string or integer references."""
         if column == "None" or column is None:

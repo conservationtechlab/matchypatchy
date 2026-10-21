@@ -851,3 +851,16 @@ class TestCSVMigrateRerun:
         assert db.count("roi") == 1
         assert saved == []
         assert db.count("roi_thumbnails") == 0
+
+    def test_rerun_adds_only_missing_rois(self, tmp_db, null_logger, tmp_path, image):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        self._migrate(db, parent, [self._row(image, 0), self._row(image, 1, box=-1)])
+
+        # resuming with the same rows plus one new box and one more box-less roi
+        rows = [self._row(image, 0), self._row(image, 1, box=-1),
+                self._row(image, 2, box=0.5), self._row(image, 3, box=-1)]
+        thread = self._migrate(db, parent, rows)
+
+        assert db.count("roi") == 4
+        assert thread.progress_update.calls[-1] == (4,)
