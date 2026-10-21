@@ -648,7 +648,6 @@ class DisplayCompare(QWidget):
 
         self.match_selector.set_total(len(self.QueryContainer.current_match_rois))
         self.match_selector.set_current_number(self.QueryContainer.current_match)
-        self.match_counter.setText(f"1/{len(self.QueryContainer.current_match_rois)}")
 
         self.query_image_bar.reset()
         self.match_image_bar.reset()
@@ -726,6 +725,7 @@ class DisplayCompare(QWidget):
         self.sequence_selector.set_current_number(self.QueryContainer.current_query_sn)
         self.match_selector.set_total(len(self.QueryContainer.current_match_rois))
         self.match_selector.set_current_number(self.QueryContainer.current_match)
+        self.match_counter.setText(f"{self.QueryContainer.current_match+1}/{len(self.QueryContainer.current_match_rois)}")
 
         # load images and data
         self.load_query()

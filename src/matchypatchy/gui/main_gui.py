@@ -184,8 +184,12 @@ class MainWindow(QMainWindow):
         """Switch to the manual comparison view page with selected IDs.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
-        # wait to load
-        QTimer.singleShot(100, self.Compare.refresh_filters)
+        # wait to load, reset filters before comparing so stale filters are not applied
+        QTimer.singleShot(100, lambda: self._load_manual_view(selected_ids))
+
+    def _load_manual_view(self, selected_ids=None):
+        """Reset compare filters, then compare the selected IDs."""
+        self.Compare.refresh_filters()
         self.Compare.compare_manual(selected_ids=selected_ids)
 
     # FILE =====================================================================
