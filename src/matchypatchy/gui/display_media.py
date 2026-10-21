@@ -34,6 +34,9 @@ class DisplayMedia(QWidget):
         self.data_type = data_type
         self.valid_stations = []
         self.selected_rows = []
+        # table loads, a newer load supersedes older ones still running
+        self._load_id = 0
+        self._loaders = []
 
         # data and edit stack
         self._data_raw = pd.DataFrame()
@@ -332,19 +335,53 @@ class DisplayMedia(QWidget):
 
             # load table with current data type
             self.individual_list = fetch_individual(self.mpDB)
+            # a previous load still running is for the old view type or filters
+            self._stop_loader()
+            self._load_id += 1
+            load_id = self._load_id
             self.dataloader = FetchTableThread(self)
-            self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
+            # keep a reference until the thread finishes so it is not garbage collected
+            self._loaders.append(self.dataloader)
+            self.dataloader.finished.connect(lambda loader=self.dataloader: self._forget_loader(loader))
+            self.dataloader.loaded_data.connect(lambda data, load_id=load_id: self.handle_data_loaded(data, load_id))
             self.dataloader.progress_max.connect(lambda n_missing: self.set_progress_max(n_missing))
             self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
             # Connect the progress popup's rejected signal to stop the query container's calculation
             if hasattr(self, 'alert_box') and self.alert_box:
                 self.alert_box.rejected.connect(self.dataloader.requestInterruption)
-            self.dataloader.done.connect(self.close_alert)  # Close the progress dialog when done
+            # Close the progress dialog when done
+            self.dataloader.done.connect(lambda load_id=load_id: self._loader_done(load_id))
             self.dataloader.start()
             return True
 
-    def handle_data_loaded(self, data=None):
+    def _stop_loader(self):
+        """Interrupt and disconnect the running FetchTableThread, if any"""
+        loader = getattr(self, 'dataloader', None)
+        if loader is None or not loader.isRunning():
+            return
+        loader.requestInterruption()
+        for signal in (loader.loaded_data, loader.progress_max, loader.progress_update, loader.done):
+            try:
+                signal.disconnect()
+            except TypeError:
+                pass  # nothing connected
+
+    def _forget_loader(self, loader):
+        """Drop the reference to a finished FetchTableThread"""
+        if loader in self._loaders:
+            self._loaders.remove(loader)
+
+    def _loader_done(self, load_id):
+        """Close the progress popup when the current load finishes"""
+        if load_id == self._load_id:
+            self.close_alert()
+
+    def handle_data_loaded(self, data=None, load_id=None):
         """Handle data loaded from the FetchTableThread"""
+        # ignore results from a load that was superseded, eg. by changing view type,
+        # they do not match the current headers
+        if load_id is not None and load_id != self._load_id:
+            return
         self._data_raw = data
         self.apply_edits()  # Apply any pending edits to the raw data before filtering
         self.filter_data()  # Apply filters to the raw data to get the filtered data
