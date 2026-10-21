@@ -237,6 +237,23 @@ class MatchyPatchyDB():
                               f"{db_build_version} and does not match the expected schema version {SCHEMA_VERSION}.")
             return False
 
+    def query(self, sql, params=()):
+        """
+        Run one SQL statement with its values bound as parameters, return its rows
+
+        For the named functions in matchypatchy.database, which pass values as
+        params instead of formatting them into the SQL. Returns None and logs if
+        the statement fails.
+        """
+        try:
+            cursor = self.db.execute(sql, params)
+            rows = cursor.fetchall()
+            self.db.commit()
+            return rows
+        except sqlite3.Error as error:
+            logger.error(f"Failed query {sql} with {params}: {error}")
+            return None
+
     def _command(self, command, quiet=True):
         """
         Execute a specific sql query to fetch data
@@ -732,7 +749,7 @@ class MatchyPatchyDB():
             logger.error(f"Error batch updating {table}: {e}")
             return False
 
-    def select(self, table: str, columns: str = "*", row_cond: Optional[str] = None, quiet=True):
+    def select(self, table: str, columns: str = "*", row_cond: Optional[str] = None, params=(), quiet=True):
         """
         Select columns based on optional row_cond
         Returns each row as a tuple
@@ -740,7 +757,8 @@ class MatchyPatchyDB():
         Args
             - table (str): table name
             - columns (str): columns to select, default "*"
-            - row_cond (str): optional condition for WHERE clause
+            - row_cond (str): optional condition for WHERE clause, with ? for each of params
+            - params: values bound to the ? in row_cond
             - quiet (bool): if False, prints the executed command
         """
         try:
@@ -750,8 +768,8 @@ class MatchyPatchyDB():
             else:
                 command = f'SELECT {columns} FROM {table};'
             if not quiet:
-                print(command)
-            cursor.execute(command)
+                print(command, params)
+            cursor.execute(command, params)
             rows = cursor.fetchall()
             return rows
         except sqlite3.Error as error:
@@ -936,15 +954,15 @@ class MatchyPatchyDB():
             return None
 
     # DELETE -------------------------------------------------------------------
-    def delete(self, table, cond):
-        """Delete Entries From table Given condition"""
+    def delete(self, table, cond, params=()):
+        """Delete entries from table matching cond, with ? in cond for each of params"""
         try:
             cursor = self.db.cursor()
             # find the rois this delete removes before they are gone
             roi_query = CASCADING_ROIS.get(table)
-            roi_ids = [row[0] for row in cursor.execute(roi_query.format(cond=cond))] if roi_query else []
+            roi_ids = [row[0] for row in cursor.execute(roi_query.format(cond=cond), params)] if roi_query else []
             command = f'DELETE FROM {table} WHERE {cond};'
-            cursor.execute(command)
+            cursor.execute(command, params)
             self.db.commit()
             logger.info(f"Deleted from {table} where {cond}")
         except sqlite3.Error as error:

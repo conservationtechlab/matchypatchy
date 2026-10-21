@@ -626,3 +626,39 @@ class TestExportHelpers:
         rows, columns = db.stations()
         assert rows is not None
         assert len(rows) >= 1
+
+
+class TestParameterisedQueries:
+    """Values are bound as parameters, so text with quotes needs no escaping"""
+
+    def test_query_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        db.add_individual("O'Brien", None)
+        assert db.query("SELECT name FROM individual WHERE name=?", ("O'Brien",)) == [("O'Brien",)]
+
+    def test_query_failure_returns_none(self, tmp_db, caplog):
+        db, _ = tmp_db
+        assert db.query("SELECT nope FROM individual") is None
+        assert [r.levelname for r in caplog.records] == ["ERROR"]
+
+    def test_select_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        iid = db.add_individual("O'Brien", None)
+        assert db.select("individual", "id", row_cond="name=?", params=("O'Brien",)) == [(iid,)]
+
+    def test_delete_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        keep = db.add_individual("Keep", None)
+        db.add_individual("O'Brien", None)
+        assert db.delete("individual", "name=?", ("O'Brien",)) is True
+        assert db.select("individual", "id") == [(keep,)]
+
+    def test_delete_with_params_removes_cascaded_embeddings(self, tmp_db):
+        db, _ = tmp_db
+        station = db.add_station("St. Mary's", None, None, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h1", ".jpg", "2024-01-01 10:00:00", station)
+        rid = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        db.add_emb(rid, [0.1, 0.2, 0.3])
+        assert db.delete("station", "name=?", ("St. Mary's",)) is True
+        assert db.count("roi") == 0
+        assert db.collection.get(ids=[str(rid)])["ids"] == []
