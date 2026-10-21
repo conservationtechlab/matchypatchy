@@ -65,6 +65,7 @@ def _sample_roi_df():
             "emb":         [1, 1, 0, 1],
             "sequence_id": [1, 1, 2, 3],
             "favorite":    [0, 1, 0, 0],
+            "viewpoint":   [0, 0, 1, None],
         },
         index=pd.Index([10, 11, 12, 13], name="id"),
     )
@@ -749,6 +750,21 @@ class TestRestrictToData:
         assert set(mo.match_data["id"]) == {11, 12}
         assert mo.ranked_matches == [(12, 0.2), (11, 0.1)]
 
+    def test_cut_keeps_nearer_candidate_ranked_behind_ided_ones(self):
+        """rank() puts ID'd sequence 1 first although sequence 3 is nearer"""
+        self.qc.k = 1
+        raw = _raw(2, [12], [(10, 0.4), (11, 0.4), (13, 0.1)])
+        mo = self.qc._restrict_to_data([raw], strict=False)[0]
+        assert mo.filtered_neighbors == [(13, 0.1)]
+        assert mo.ranked_matches == [(13, 0.1)]
+
+    def test_cut_keeps_whole_sequences_in_ranked_order(self):
+        """pad_sequences expanded sequence 1 to rois 10 and 11; k counts it once"""
+        self.qc.k = 2
+        raw = _raw(2, [12], [(10, 0.4), (11, 0.4), (13, 0.1)])
+        mo = self.qc._restrict_to_data([raw], strict=False)[0]
+        assert mo.filtered_neighbors == [(10, 0.4), (11, 0.4), (13, 0.1)]
+
     def test_drops_sequence_with_no_neighbors_left(self):
         self.qc.data = self.qc.data.loc[[10, 11]]
         out = self.qc._restrict_to_data([_raw(1, [10], [(12, 0.1)])], strict=False)
@@ -797,6 +813,14 @@ class TestKnnCache:
         ])
         assert out[0]["truncated"] is True
         assert out[1]["truncated"] is False
+
+    def test_serialize_truncated_counts_sequences_not_padded_rois(self, qc):
+        """One matched sequence padded to k_cache rois is a single candidate"""
+        qc.data_raw = pd.DataFrame({"sequence_id": [5] * qc.k_cache},
+                                   index=pd.Index(range(qc.k_cache), name="id"))
+        padded = [(i, 0.2) for i in range(qc.k_cache)]
+        out = qc._serialize_ranked_sequences([_fake_match(1, padded, [99])])
+        assert out[0]["truncated"] is False
 
     def test_serialize_keeps_ids_and_distances_only(self, qc):
         out = qc._serialize_ranked_sequences([_fake_match(1, [(12, 0.1)], [10])])[0]
@@ -853,6 +877,25 @@ class TestKnnCache:
         mutate(qc_raw)
         assert qc_raw.load_knn_cache() is False
         assert qc_raw._raw_ranked is None
+
+    @pytest.mark.parametrize("column, rid, value", [
+        ("individual_id", 12, 300),       # matched
+        ("individual_id", 10, None),      # unmatched
+        ("favorite", 13, 1),
+        ("emb", 13, 0),                   # bbox redrawn, embedding dropped
+    ], ids=["matched", "unmatched", "favorite", "embedding_dropped"])
+    def test_load_rejects_cache_after_roi_edits(self, qc_raw, column, rid, value):
+        """Same roi count, but the cached ranking depends on these columns"""
+        qc_raw.save_knn_cache(self._serialized())
+        qc_raw._update_roi_index({rid: {column: value}})
+        assert qc_raw.load_knn_cache() is False
+        assert qc_raw._raw_ranked is None
+
+    def test_load_accepts_cache_after_reload(self, qc_raw):
+        """None from the database and NaN from a local edit are the same state"""
+        qc_raw.save_knn_cache(self._serialized())
+        qc_raw.data_raw = qc_raw.data_raw.astype({"individual_id": float})
+        assert qc_raw.load_knn_cache() is True
 
     def test_load_corrupt_file(self, qc_raw):
         qc_raw.CACHE_PATH.write_text("{not json")
@@ -944,6 +987,35 @@ class TestUpdateSequencesInPlace:
             assert df.loc[13, "individual_id"] == 200
         assert set(qc._seq_index) == {1, 2, 3}
 
+    def test_refreshes_name_of_other_rois_moved_by_merge(self, qc, mock_db_roi):
+        """Merging 200 into 100 also moved roi 14 (seq 4), which must show the new name"""
+        df = _sample_roi_df()
+        extra = df.loc[[13]].rename(index={13: 14})
+        extra["sequence_id"] = 4
+        df = pd.concat([df, extra])
+        df.index.name = "id"
+        df["name"] = ["A", "A", None, "B", "B"]
+        df["sex"] = ["F", "F", None, "M", "M"]
+        qc.data_raw = df
+        qc.data = df.copy()
+        # merge() already moved 13 and 14 to individual 100 locally
+        qc._update_roi_index({13: {"individual_id": 100}, 14: {"individual_id": 100}})
+
+        def fetch(mpDB, rids=None, sequence_ids=None):
+            fresh = df.copy()
+            fresh.loc[[13, 14], ["individual_id", "name", "sex"]] = [100, "A", "F"]
+            if rids is not None:
+                return fresh.loc[rids]
+            return fresh[fresh["sequence_id"].isin(sequence_ids)]
+        mock_db_roi.fetch_roi_media.side_effect = fetch
+        qc.update_sequences_in_place(1, 3)
+
+        for frame in (qc.data, qc.data_raw):
+            assert frame.loc[14, "name"] == "A"
+            assert frame.loc[14, "sex"] == "F"
+            assert frame.loc[12, "name"] is None
+        assert mock_db_roi.fetch_roi_media.call_args.kwargs == {"rids": [14]}
+
     def test_same_sequence_on_both_sides_has_no_duplicates(self, qc, mock_db_roi):
         qc.data_raw = _sample_roi_df()
         qc.data = qc.data_raw.copy()
@@ -993,8 +1065,10 @@ class TestMatchActions:
 
     def test_new_iid(self):
         qc = self.qc
+        qc.current_query_rid = 10
         qc.current_query_rois = [10, 11]
         qc.current_match_rid = 13
+        qc.current_match_object = SimpleNamespace(sequence_id=1)
         qc.new_iid(500)
 
         table, updates = qc.mpDB.batch_edit.call_args.args
@@ -1003,6 +1077,29 @@ class TestMatchActions:
         assert all(u == {"individual_id": 500, "reviewed": 1} for u in updates.values())
         assert qc.mpDB.batch_edit.call_args.kwargs == {"quiet": True}
         assert qc.data.loc[13, "individual_id"] == 500
+
+    def test_new_iid_names_both_whole_sequences(self):
+        """Not just the rois left on screen by the viewpoint toggle, like merge"""
+        qc = self.qc
+        qc._update_roi_index({13: {"sequence_id": 4}})   # match sequence 4 = rois 13, 14
+        qc._build_seq_indices()
+        qc.current_query_rid = 10
+        qc.current_query_rois = [10]                # 11 hidden by the viewpoint filter
+        qc.current_match_rid = 13
+        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.new_iid(500)
+        assert set(qc.mpDB.batch_edit.call_args.args[1]) == {10, 11, 13, 14}
+
+    def test_new_iid_match_without_sequence(self):
+        qc = self.qc
+        qc._update_roi_index({13: {"sequence_id": None}})
+        qc._build_seq_indices()
+        qc.current_query_rid = 10
+        qc.current_query_rois = [10, 11]
+        qc.current_match_rid = 13
+        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.new_iid(500)
+        assert set(qc.mpDB.batch_edit.call_args.args[1]) == {10, 11, 13}
 
     def test_merge_keeps_lowest_id_and_absorbs_other_individual(self):
         qc = self.qc
@@ -1059,15 +1156,20 @@ class TestMatchActions:
         qc.merge()
         qc.mpDB.batch_edit.assert_not_called()
 
-    def test_unmatch(self):
+    def test_unmatch_clears_whole_query_sequence(self):
+        """Unmatch undoes Match, which named every roi of the query sequence"""
         qc = self.qc
-        qc.current_query_rid = 10
+        qc.current_query_rid = 10       # seq 1 = rois 10, 11
+        qc.current_match_rid = 13
+        qc.current_match_object = SimpleNamespace(sequence_id=1)
         qc.unmatch()
-        qc.mpDB.edit_row.assert_called_once_with(
-            "roi", 10, {"individual_id": None, "reviewed": 0},
-            allow_none=True, quiet=True)
-        assert pd.isna(qc.data.loc[10, "individual_id"])
-        assert qc.data.loc[10, "reviewed"] == 0
+        cleared = {"individual_id": None, "reviewed": 0}
+        qc.mpDB.batch_edit.assert_called_once_with(
+            "roi", {10: cleared, 11: cleared}, allow_none=True, quiet=True)
+        for rid in (10, 11):
+            assert pd.isna(qc.data.loc[rid, "individual_id"])
+            assert qc.data.loc[rid, "reviewed"] == 0
+        assert qc.data.loc[13, "individual_id"] == 200
 
 
 # ---------------------------------------------------------------------------

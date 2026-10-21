@@ -4,6 +4,7 @@ Query containers for the compare view
 BaseQueryContainer holds what every mode shares; QueryContainer is the
 default (KNN) mode. QC and manual mode live in query_qc.py and query_manual.py.
 """
+import hashlib
 import json
 from pathlib import Path
 import time
@@ -182,11 +183,14 @@ class BaseQueryContainer(QObject):
         return self._get_roi_field(self.current_match_rid, 'sequence_id')
 
     # MATCH FUNCTIONS ----------------------------------------------------------
+    def _new_iid_rois(self):
+        """ROIs to name when matching two unnamed rois"""
+        return set(self.current_query_rois) | {self.current_match_rid}
+
     def new_iid(self, individual_id):
         """Update records for roi after confirming a match (batched)"""
-        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1}
-                       for roi in self.current_query_rois}
-        roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
+        roi_updates = {int(roi): {"individual_id": individual_id, "reviewed": 1}
+                       for roi in self._new_iid_rois()}
 
         # Update local index
         self._update_roi_index(roi_updates)
@@ -224,15 +228,19 @@ class BaseQueryContainer(QObject):
         # Update local index
         self._update_roi_index(roi_updates)
 
+    def _unmatch_rois(self):
+        """ROIs to clear when unmatching"""
+        return {self.current_query_rid}
+
     def unmatch(self):
         """Unmatch the current query ROI from the matched ROI"""
+        roi_updates = {int(r): {'individual_id': None, "reviewed": 0}
+                       for r in self._unmatch_rois()}
         # Update local index
-        self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
+        self._update_roi_index(roi_updates)
 
         # update database
-        self.mpDB.edit_row('roi', self.current_query_rid,
-                           {'individual_id': None, "reviewed": 0},
-                           allow_none=True, quiet=True)
+        self.mpDB.batch_edit('roi', roi_updates, allow_none=True, quiet=True)
 
     # REFRESH ------------------------------------------------------------------
     def refresh_data(self):
@@ -256,6 +264,11 @@ class BaseQueryContainer(QObject):
 # Neighbors fetched per query = k * KNN_OVERFETCH, so filters can remove some
 # candidates without dropping below k.
 KNN_OVERFETCH = 3
+
+# ROI columns the cached KNN results depend on besides the id: filter_valid drops
+# neighbors of the same individual/sequence or another viewpoint, rank drops ID'd
+# query sequences and puts ID'd/favorite rois first, emb marks rois with an embedding
+KNN_CACHE_COLUMNS = ['individual_id', 'sequence_id', 'viewpoint', 'favorite', 'emb']
 
 
 class QueryContainer(BaseQueryContainer):
@@ -585,6 +598,14 @@ class QueryContainer(BaseQueryContainer):
         self.data = pd.concat([self.data[~self.data['sequence_id'].isin(seq_ids)], new_rows])
         self.data_raw = pd.concat([self.data_raw[~self.data_raw['sequence_id'].isin(seq_ids)], new_rows])
 
+        # a merge also moved other rois of the dropped individual, refresh their name/sex
+        iids = new_rows['individual_id'].dropna().unique()
+        others = self.data_raw.index[self.data_raw['individual_id'].isin(iids)
+                                     & ~self.data_raw['sequence_id'].isin(seq_ids)]
+        if len(others):
+            others_df = db_roi.fetch_roi_media(self.mpDB, rids=others.tolist())
+            self._update_roi_index(others_df[['name', 'sex']].to_dict('index'))
+
         # Rebuild indices with updated data
         self._build_seq_indices()
 
@@ -691,7 +712,18 @@ class QueryContainer(BaseQueryContainer):
         """All ROIs of the query and match sequences"""
         query_seq = self.current_match_object.sequence_id
         match_seq = self._get_roi_field(self.current_match_rid, 'sequence_id')
-        return set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, []))
+        # the shown rois too, a match roi without a sequence is not in _seq_index
+        return ({self.current_query_rid, self.current_match_rid}
+                | set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, [])))
+
+    def _new_iid_rois(self):
+        """Name both whole sequences, like merge"""
+        return self._merge_rois()
+
+    def _unmatch_rois(self):
+        """The whole query sequence, so Unmatch undoes Match"""
+        query_seq = self.current_match_object.sequence_id
+        return {self.current_query_rid} | set(self._seq_index.get(query_seq, []))
 
     # ==========================================================================
     # KNN CACHE MANAGEMENT
@@ -718,19 +750,32 @@ class QueryContainer(BaseQueryContainer):
         Convert MatchObject list to serializable dicts.
         Stores IDs and distances only; DataFrames are rebuilt from self.data.
         """
+        seq_ids = self.data_raw['sequence_id'].to_dict() if 'sequence_id' in self.data_raw else {}
         return [{
             'sequence_id': m.sequence_id,
             'neighbors': [(rid, d) for rid, d in m.neighbors],  # [(roi_id, distance), ...]
-            'truncated': len(m.neighbors) >= self.k_cache,
+            # counted in candidate sequences, like the cut in _restrict_to_data
+            'truncated': len(self._nearest_candidates(m.neighbors, seq_ids)) >= self.k_cache,
             'og_ranked_query_rids': list(m.og_ranked_query_rids),
             'og_ranked_matches': [tuple(x) for x in m.og_ranked_matches],  # (rid, dist)
         } for m in ranked_sequences]
+
+    def _cache_key(self):
+        """
+        Hash of the roi state the cached results depend on, so matching, favorites
+        or a redrawn bbox (embedding dropped) invalidate the cache
+        """
+        state = self.data_raw[KNN_CACHE_COLUMNS].apply(pd.to_numeric, errors='coerce')
+        state = state.astype('float64').sort_index()  # None and NaN hash the same
+        hashed = pd.util.hash_pandas_object(state, index=True).values
+        return hashlib.sha1(hashed.tobytes()).hexdigest()
 
     def save_knn_cache(self, serialized):
         """Save UNFILTERED results as JSON (atomic write)."""
         payload = {
             'timestamp': time.time(),
             'n_raw': len(self.data_raw),
+            'state': self._cache_key(),
             'k_cache': self.k_cache,
             'metric': str(self.metric),
             'threshold': self.threshold,
@@ -755,6 +800,7 @@ class QueryContainer(BaseQueryContainer):
                 cache = json.load(f)
             if (time.time() - cache['timestamp'] > self.cache_timeout
                     or cache.get('n_raw') != len(self.data_raw)
+                    or cache.get('state') != self._cache_key()
                     or cache.get('metric') != str(self.metric)
                     or cache.get('threshold') != self.threshold
                     or cache.get('k_cache', 0) < self.k):
@@ -766,12 +812,31 @@ class QueryContainer(BaseQueryContainer):
             self.logger.error(f"Failed to load JSON cache: {e}")
             return False
 
+    @staticmethod
+    def _candidate_key(rid, seq_ids):
+        """Candidate a matched roi belongs to: its sequence, or itself without one"""
+        seq = seq_ids.get(rid)
+        return ('roi', rid) if seq is None or pd.isna(seq) else seq
+
+    @classmethod
+    def _nearest_candidates(cls, neighbors, seq_ids):
+        """
+        Candidate sequences in neighbors, nearest first. pad_sequences gives every
+        roi of a matched sequence the distance of its nearest roi.
+        """
+        distances = {}
+        for rid, d in neighbors:
+            key = cls._candidate_key(rid, seq_ids)
+            distances[key] = min(d, distances.get(key, d))
+        return sorted(distances, key=distances.get)
+
     def _restrict_to_data(self, serialized, strict):
         """
         Narrow raw KNN results to the currently filtered self.data.
         Returns list of MatchObjects, or None if strict and the cache ran out of headroom.
         """
         keep = set(self.data.index)  # roi ids are the index
+        seq_ids = self.data['sequence_id'].to_dict()
         out = []
         for s in serialized:
             q_rids = [r for r in s['og_ranked_query_rids'] if r in keep]
@@ -779,9 +844,14 @@ class QueryContainer(BaseQueryContainer):
                 continue  # whole sequence filtered out
 
             neighbors = [(rid, d) for rid, d in s['neighbors'] if rid in keep]
-            if strict and s['truncated'] and len(neighbors) < self.k:
+            candidates = self._nearest_candidates(neighbors, seq_ids)
+            if strict and s['truncated'] and len(candidates) < self.k:
                 return None  # cache was cut off, recompute
-            neighbors = neighbors[:self.k]  # assumes sorted by distance
+            # neighbors are in rank order (ID'd/favorites first), not distance order, and
+            # padded to whole sequences: keep the k nearest candidate sequences, whole
+            nearest = set(candidates[:self.k])
+            neighbors = [(rid, d) for rid, d in neighbors
+                         if self._candidate_key(rid, seq_ids) in nearest]
             if not neighbors:
                 continue
 
