@@ -576,7 +576,8 @@ class VideoPlayerBar(QWidget):
 
     def get_frame(self):
         """Get current frame number based on position"""
-        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate))
+        # None before the metadata loads, or when the video has no frame rate
+        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate) or 0)
         if fps <= 0:
             fps = 30
         return int(self.player.position() / 1000 * fps)
