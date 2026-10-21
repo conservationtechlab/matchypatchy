@@ -3,6 +3,7 @@ import sqlite3
 
 import pytest
 
+from matchypatchy.database import setup
 from matchypatchy.database.mpdb import MatchyPatchyDB
 from matchypatchy.database.setup import SCHEMA_VERSION, setup_chromadb
 
@@ -191,6 +192,34 @@ class TestMigrateToCurrent:
                                 "2024-01-01 00:00:00", 1)
         assert media_id not in ("duplicate_error", None)
         assert db.count("media") == 4
+
+
+class TestInterruptedMigration:
+    @pytest.mark.parametrize("schema_version", [None, 1], ids=["released", "unreleased-v1"])
+    def test_reopens_after_crash_before_version_bump(self, tmp_path, null_logger, monkeypatch, schema_version):
+        _old_database(tmp_path, schema_version=schema_version)
+        migrate_1_to_2 = setup.MIGRATIONS[1]
+
+        def crash_after_step(db):
+            migrate_1_to_2(db)
+            raise RuntimeError("process killed")
+
+        # the step finishes but the process dies before its version bump is written
+        monkeypatch.setitem(setup.MIGRATIONS, 1, crash_after_step)
+        conn = sqlite3.connect(tmp_path / "matchypatchy.db")
+        with pytest.raises(RuntimeError):
+            setup.migrate_database(conn, tmp_path / "matchypatchy.db", null_logger)
+        conn.close()
+        monkeypatch.setitem(setup.MIGRATIONS, 1, migrate_1_to_2)
+
+        db = MatchyPatchyDB(str(tmp_path), null_logger)
+        try:
+            assert db.key == KEY
+            assert db.db.execute("SELECT schema_version FROM metadata").fetchone()[0] == SCHEMA_VERSION
+            assert db.count("media") == 3
+            assert db.select("roi", columns="id, media_id, individual_id") == [(1, 1, 1), (2, 3, None)]
+        finally:
+            db.close()
 
 
 class TestRelativePathUniqueness:

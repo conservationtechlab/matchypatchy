@@ -231,7 +231,7 @@ def _rebuild_table(db, table, create):
 @contextmanager
 def _schema_change(db):
     """
-    Run a migration as one transaction with foreign keys off
+    Run a migration step and its version bump as one transaction with foreign keys off
 
     Rebuilding a table drops the old one, which would otherwise cascade to the
     rows that reference it. Foreign keys can't be switched inside a transaction.
@@ -258,16 +258,15 @@ def _migrate_1_to_2(db):
     media.relative_path unique within its base directory instead of across all of
     them, and adds media.detection_done
     """
-    with _schema_change(db):
-        metadata_columns = [c[1] for c in db.execute("PRAGMA table_info(metadata)").fetchall()]
-        if "schema_version" not in metadata_columns:
-            db.execute("ALTER TABLE metadata ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0;")
-        _rebuild_table(db, "individual", INDIVIDUAL_TABLE)
-        _rebuild_table(db, "media", MEDIA_TABLE)
-        # a roi with a box came from a detector (or the full-image fallback); media without
-        # one, either no rois or only rois imported without a box, still need detection
-        db.execute("""UPDATE media SET detection_done = 1
-                      WHERE EXISTS (SELECT 1 FROM roi WHERE roi.media_id = media.id AND roi.bbox_w != -1);""")
+    metadata_columns = [c[1] for c in db.execute("PRAGMA table_info(metadata)").fetchall()]
+    if "schema_version" not in metadata_columns:
+        db.execute("ALTER TABLE metadata ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0;")
+    _rebuild_table(db, "individual", INDIVIDUAL_TABLE)
+    _rebuild_table(db, "media", MEDIA_TABLE)
+    # a roi with a box came from a detector (or the full-image fallback); media without
+    # one, either no rois or only rois imported without a box, still need detection
+    db.execute("""UPDATE media SET detection_done = 1
+                  WHERE EXISTS (SELECT 1 FROM roi WHERE roi.media_id = media.id AND roi.bbox_w != -1);""")
 
 
 MIGRATIONS = {1: _migrate_1_to_2}
@@ -287,10 +286,11 @@ def migrate_database(db, filepath, logger):
     logger.info(f"Migrating database schema from version {version} to {SCHEMA_VERSION}, backup saved to {backup_path}")
 
     while version < SCHEMA_VERSION:
-        MIGRATIONS[version](db)
+        # commit each step with its version bump, so an interrupted migration resumes from the last finished step
+        with _schema_change(db):
+            MIGRATIONS[version](db)
+            db.execute("UPDATE metadata SET schema_version=? WHERE id=1;", (version + 1,))
         version += 1
-        db.execute("UPDATE metadata SET schema_version=? WHERE id=1;", (version,))
-        db.commit()
         logger.info(f"Database schema migrated to version {version}")
     return version
 
