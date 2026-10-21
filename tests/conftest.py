@@ -105,7 +105,7 @@ class _MockModule(types.ModuleType):
             return _QThreadStub
         if name == 'QObject':
             return _QObjectStub
-        if name in ('QWidget', 'QAbstractScrollArea', 'QFrame'):
+        if name in ('QWidget', 'QAbstractScrollArea', 'QFrame', 'QMainWindow'):
             return _QWidgetStub
         if name in ('QDialog', 'QAbstractDialog'):
             return _QDialogStub
