@@ -1,6 +1,7 @@
 """
 Popup for Importing a Manifest
 """
+import logging
 from pathlib import Path
 import pandas as pd
 
@@ -10,6 +11,9 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy.threads.import_thread import CSVImportThread, CSVMigrateThread
 from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
+
+
+logger = logging.getLogger(__name__)
 
 
 class ImportCSVPopup(QDialog):
@@ -47,7 +51,6 @@ class ImportCSVPopup(QDialog):
         super().__init__(parent)
         self.mpDB = parent.mpDB
         self.cfg = parent.cfg
-        self.logger = parent.logger
         self.active_survey = parent.active_survey[1]
         self.data, self.read_error = self._read_manifest(manifest)
         self.import_thread = None
@@ -200,7 +203,7 @@ class ImportCSVPopup(QDialog):
                 # Excel on Windows saves csvs as cp1252, not utf-8
                 return pd.read_csv(manifest, encoding="cp1252"), None
         except (UnicodeDecodeError, pd.errors.EmptyDataError, pd.errors.ParserError, OSError) as e:
-            self.logger.error(f"Could not read manifest {manifest}: {e}")
+            logger.error(f"Could not read manifest {manifest}: {e}")
             return pd.DataFrame(), e
 
     @staticmethod
@@ -286,7 +289,7 @@ class ImportCSVPopup(QDialog):
 
         # migrate from exported mpdb
         if self.migrate:
-            self.logger.info(f"Migrating {len(self.data.groupby("filepath"))} files and {self.data.shape[0]} ROIs to Database")
+            logger.info(f"Migrating {len(self.data.groupby("filepath"))} files and {self.data.shape[0]} ROIs to Database")
             self.import_thread = CSVMigrateThread(self, self.data)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.error_update.connect(self.show_errors)  # Connect error signal
@@ -299,7 +302,7 @@ class ImportCSVPopup(QDialog):
             self.data.sort_values(by=[self.selections['filepath']])
             unique_images = self.data.groupby(self.selections["filepath"])
             print(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
-            self.logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
+            logger.info(f"Adding {len(unique_images)} files and {self.data.shape[0]} ROIs to Database")
             self.import_thread = CSVImportThread(self, unique_images, self.selections, self.active_survey)
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.progress_message.connect(self.show_message)  # Connect progress message signal

@@ -47,8 +47,6 @@ class DisplayCompare(UsesProject, QWidget):
         super().__init__()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.parent = parent
-        # still read as parent.logger by children not yet on module loggers
-        self.logger = logger
         self.project = parent.project
         self.k = self.cfg.KNN  # default knn
         self.distance_metric = 'cosine'

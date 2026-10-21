@@ -19,7 +19,6 @@ class QC_QueryContainer(BaseQueryContainer):
         super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
-        self.logger = parent.logger
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
         self.individuals_raw = {}

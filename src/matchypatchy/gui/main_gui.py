@@ -44,8 +44,6 @@ class MainWindow(QMainWindow):
         super().__init__()
         # Initialize main window settings and components
         self.settings = QSettings("SDZWA", "MatchyPatchy")
-        # still read as parent.logger by popups not yet on module loggers
-        self.logger = logger
         # the open project, kept for the life of the window; views read cfg and db through it
         self.project = Project()
         # load previous home dir or start fresh, falling back to a default project

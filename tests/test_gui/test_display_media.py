@@ -21,7 +21,6 @@ def _make_display_media():
 
     parent = MagicMock()
     parent.mpDB = MagicMock()
-    parent.logger = MagicMock()
     parent.cfg = MagicMock()
     parent._set_base_view = MagicMock()
     parent._set_compare_view = MagicMock()

@@ -864,7 +864,6 @@ class TestConfigSaveCancel:
         from matchypatchy.gui.dialogs.popup_config import ConfigPopup
         # a real instance (accept/reject call super()), without building the widgets
         popup = ConfigPopup.__new__(ConfigPopup)
-        popup.logger = MagicMock()
         popup.nummatches = MagicMock()
         popup.cfg = SimpleNamespace(**{name: f"old-{name}" for name in ConfigPopup.SETTINGS}, save=MagicMock())
         popup._original = popup._settings()

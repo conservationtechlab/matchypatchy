@@ -1,6 +1,7 @@
 """
 Popup to manage upload directories
 """
+import logging
 import os
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QHeaderView, QFileDialog, QProgressBar,
@@ -11,6 +12,9 @@ from matchypatchy.threads.animl_thread import VerifyNewBaseDirsThread
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 
 
+logger = logging.getLogger(__name__)
+
+
 class UploadManagerPopup(QDialog):
     """Popup dialog for managing upload directories"""
 
@@ -18,7 +22,6 @@ class UploadManagerPopup(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Manage upload directories")
         self.mpDB = parent.mpDB
-        self.logger = parent.logger
         self.setMinimumWidth(550)
 
         self.not_in_db = []
@@ -129,7 +132,7 @@ class UploadManagerPopup(QDialog):
         self.not_in_db = []
         self.not_in_new_directory = []
 
-        self.logger.info("Starting verification of new base directories")
+        logger.info("Starting verification of new base directories")
 
         self.progress_bar.setRange(0, 0)
         self.build_thread = VerifyNewBaseDirsThread(self)
@@ -149,7 +152,7 @@ class UploadManagerPopup(QDialog):
 
     def on_verify_finished(self):
         """Handle actions after verification thread finishes"""
-        self.logger.info(f"Updated base directory attempts {self.updates}")
+        logger.info(f"Updated base directory attempts {self.updates}")
         self.verified = True
         self.progress_bar.hide()
         self.colorize()
@@ -197,10 +200,10 @@ class UploadManagerPopup(QDialog):
             dialog.exec()
             del dialog
 
-            self.logger.info(f"Verification results for updates: {self.updates}")
-            self.logger.info(f"Errors: {self.errors}")
-            self.logger.info(f"Files discovered not in DB: {self.not_in_db}")
-            self.logger.info(f"Files not in new directory: {self.not_in_new_directory}")
+            logger.info(f"Verification results for updates: {self.updates}")
+            logger.info(f"Errors: {self.errors}")
+            logger.info(f"Files discovered not in DB: {self.not_in_db}")
+            logger.info(f"Files not in new directory: {self.not_in_new_directory}")
 
     def save(self):
         """Save changes to the selected upload directory"""
@@ -238,7 +241,7 @@ class UploadManagerPopup(QDialog):
                 self.mpDB.update_base_dir(update[0], update[1])
             # WARN USER: Skipping update due to missing files
             else:
-                self.logger.warning(f"Skipping update for {update} due to missing files: {missing}")
+                logger.warning(f"Skipping update for {update} due to missing files: {missing}")
 
         # saved, start over so the same updates aren't applied again
         self.updates = []

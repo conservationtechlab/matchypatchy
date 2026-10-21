@@ -317,7 +317,6 @@ class TestProjectChanged:
         from types import SimpleNamespace
         from matchypatchy.gui.display_compare import DisplayCompare
         dc = DisplayCompare.__new__(DisplayCompare)
-        dc.logger = MagicMock()
         dc.distance_metric, dc.k, dc.threshold = "cosine", 3, 50
         old_db, new_db = MagicMock(), MagicMock()
         dc.project = SimpleNamespace(db=old_db, cfg=MagicMock(DB_DIR="/old"))

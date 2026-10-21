@@ -42,8 +42,6 @@ class DisplayBase(UsesProject, QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        # still read as parent.logger by children not yet on module loggers
-        self.logger = logger
         self.project = parent.project
         padding = 120
         # Initialize threads for sequence, animl, and reid processing

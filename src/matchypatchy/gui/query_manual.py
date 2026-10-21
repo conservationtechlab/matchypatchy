@@ -19,7 +19,6 @@ class ManualQueryContainer(BaseQueryContainer):
         super().__init__()
         self.mpDB = parent.mpDB
         self.parent = parent
-        self.logger = parent.logger
         self.selected_ids = selected_ids
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()

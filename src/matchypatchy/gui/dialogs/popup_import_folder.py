@@ -1,6 +1,7 @@
 """
 Popup for Importing a Manifest
 """
+import logging
 from pathlib import Path
 import pandas as pd
 
@@ -14,6 +15,9 @@ from matchypatchy.threads.animl_thread import BuildManifestThread
 from matchypatchy.threads.import_thread import FolderImportThread
 
 
+logger = logging.getLogger(__name__)
+
+
 class ImportFolderPopup(QDialog):
     """
     Popup for importing data from a folder.
@@ -21,7 +25,6 @@ class ImportFolderPopup(QDialog):
 
     def __init__(self, parent, directory):
         super().__init__(parent)
-        self.logger = parent.logger
         self.cfg = parent.cfg
         self.mpDB = parent.mpDB
         self.active_survey = parent.active_survey
@@ -154,7 +157,7 @@ class ImportFolderPopup(QDialog):
         station_level = 0 if self.station.currentIndex() == 0 else self.station.currentIndex() - 1
         camera_level = 0 if self.camera.currentIndex() == 0 else self.camera.currentIndex() - 1
 
-        self.logger.info(f"Adding {len(self.data)} files to Database")
+        logger.info(f"Adding {len(self.data)} files to Database")
 
         self.import_thread = FolderImportThread(self, self.active_survey, self.data, station_level, camera_level)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)

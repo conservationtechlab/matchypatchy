@@ -18,7 +18,6 @@ def _make_parent(db=None):
     """Build a minimal parent mock that QueryContainer expects."""
     parent = MagicMock()
     parent.mpDB = db or MagicMock()
-    parent.logger = MagicMock()
     parent.cfg = MagicMock()
     parent.distance_metric = "cosine"
     parent.k = 3
