@@ -782,3 +782,208 @@ class TestImportDetectionDone:
 
         assert thread.import_failed.calls == []
         assert self._detection_done(db) == {"boxed.jpg": 1, "boxless.jpg": 0}
+
+
+def _migrate_row(path, n, box=0.2, **overrides):
+    """An exported roi row for path, with a square bbox of size box"""
+    row = {column: None for column in import_thread.CSVMigrateThread.EXPECTED_COLUMNS}
+    row.update({"id": n, "media_id": 1, "frame": 0, "bbox_x": box, "bbox_y": box, "bbox_w": box,
+                "bbox_h": box, "base_dir_id": 1, "filepath": str(path), "relative_path": path.name,
+                "ext": ".jpg", "timestamp": "2024-01-01 12:00:00", "station_id": 1,
+                "station_name": "Station A", "survey_name": "Survey A"})
+    row.update(overrides)
+    return row
+
+
+class TestCSVMigrateRerun:
+    """Migrating into a project that already has some of the files"""
+
+    _row = staticmethod(_migrate_row)
+
+    def _migrate(self, db, parent, rows):
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame(rows))
+        thread.progress_update = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.import_failed = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+        assert thread.import_failed.calls == []
+        return thread
+
+    @pytest.fixture
+    def image(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        path = tmp_path / "imgs" / "a.jpg"
+        path.parent.mkdir()
+        path.write_bytes(b"a")
+        return path
+
+    def test_existing_upload_is_reused(self, tmp_db, null_logger, tmp_path, image):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        upload_id = db.add_upload(str(image.parent))
+
+        self._migrate(db, parent, [self._row(image, 0)])
+
+        assert db.count("uploads") == 1
+        assert db.select("media", columns="base_dir_id") == [(upload_id,)]
+
+    def test_media_thumbnail_saved_once_per_new_file(self, tmp_db, null_logger, tmp_path, image, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        saved = []
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *a: saved.append(a) or "t.jpg")
+
+        self._migrate(db, parent, [self._row(image, 0), self._row(image, 1, box=0.5)])
+        assert len(saved) == 1
+
+        # migrating the same file again adds no thumbnail
+        self._migrate(db, parent, [self._row(image, 0)])
+        assert len(saved) == 1
+        assert db.count("media_thumbnails") == 1
+
+    def test_boxless_roi_gets_no_thumbnail(self, tmp_db, null_logger, tmp_path, image, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        saved = []
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *a: saved.append(a) or "t.jpg")
+
+        self._migrate(db, parent, [self._row(image, 0, box=-1)])
+
+        assert db.count("roi") == 1
+        assert saved == []
+        assert db.count("roi_thumbnails") == 0
+
+    def test_rerun_adds_only_missing_rois(self, tmp_db, null_logger, tmp_path, image):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        self._migrate(db, parent, [self._row(image, 0), self._row(image, 1, box=-1)])
+
+        # resuming with the same rows plus one new box and one more box-less roi
+        rows = [self._row(image, 0), self._row(image, 1, box=-1),
+                self._row(image, 2, box=0.5), self._row(image, 3, box=-1)]
+        thread = self._migrate(db, parent, rows)
+
+        assert db.count("roi") == 4
+        assert thread.progress_update.calls[-1] == (4,)
+
+    def test_individual_is_looked_up_once(self, tmp_db, null_logger, tmp_path, image, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        tables = []
+        original_select = db.select
+        monkeypatch.setattr(db, "select", lambda table, *a, **k: tables.append(table) or original_select(table, *a, **k))
+
+        self._migrate(db, parent, [self._row(image, n, box=0.1 * (n + 1), individual_id=5, name="Lion")
+                                   for n in range(3)])
+
+        assert tables.count("individual") == 1
+        assert db.select("roi", columns="individual_id") == [(1,)] * 3
+
+    def test_survey_is_looked_up_once(self, tmp_db, null_logger, tmp_path, image, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        tables = []
+        original_select = db.select
+        monkeypatch.setattr(db, "select", lambda table, *a, **k: tables.append(table) or original_select(table, *a, **k))
+
+        self._migrate(db, parent, [self._row(image, n, box=0.1 * (n + 1)) for n in range(3)])
+
+        assert tables.count("survey") == 1
+
+
+class TestFolderImportCaching:
+    def test_station_and_camera_are_looked_up_once(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        paths = []
+        for name in ("a.jpg", "b.jpg", "c.jpg"):
+            path = tmp_path / "Site01" / "Cam1" / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(name.encode())
+            paths.append(str(path))
+        data = pd.DataFrame({"filepath": paths, "datetime": ["2024-01-01 12:00:00"] * 3})
+        parts = Path(paths[0]).parts
+        thread = import_thread.FolderImportThread(parent, (1,), data,
+                                                  station_level=parts.index("Site01"),
+                                                  camera_level=parts.index("Cam1"))
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        tables = []
+        original_select = db.select
+        monkeypatch.setattr(db, "select", lambda table, *a, **k: tables.append(table) or original_select(table, *a, **k))
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert db.count("media") == 3
+        assert tables.count("station") == 1
+        assert tables.count("camera") == 1
+
+    def test_commits_and_progress_are_batched(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        paths = []
+        for n in range(12):
+            path = tmp_path / f"{n}.jpg"
+            path.write_bytes(str(n).encode())
+            paths.append(str(path))
+        data = pd.DataFrame({"filepath": paths, "datetime": ["2024-01-01 12:00:00"] * 12})
+        thread = import_thread.FolderImportThread(parent, (1,), data, station_level=0, camera_level=0)
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        thread.progress_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert db.count("media") == 12
+        assert thread.progress_update.calls == [(10,), (12,)]
+
+
+class TestCSVMigrateInsertFailures:
+    def test_failed_station_insert_is_reported(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        image = tmp_path / "a.jpg"
+        image.write_bytes(b"a")
+        row = _migrate_row(image, 0)
+        monkeypatch.setattr(db, "add_station", lambda *_: None)
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame([row]))
+        thread.import_failed = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert len(thread.import_failed.calls) == 1
+        assert thread.import_failed.calls[0][0].startswith("Failed to add station 'Station A'")
+        assert db.count("media") == 0
+
+
+class TestCSVMigrateInterruption:
+    def test_interruption_stops_the_loop_and_keeps_finished_rows(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        image = tmp_path / "a.jpg"
+        image.write_bytes(b"a")
+        rows = [_migrate_row(image, n, box=0.1 * (n + 1)) for n in range(5)]
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame(rows))
+        thread.progress_update = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.finished = SignalSpy()
+        checks = []
+        # cancel after the first row
+        thread.isInterruptionRequested = lambda: checks.append(None) or len(checks) > 1
+
+        thread.run()
+
+        assert db.count("roi") == 1
+        # checked once per row until cancelled, then once more before reporting
+        assert len(checks) == 3
+        assert thread.finished.calls == []

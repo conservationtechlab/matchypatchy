@@ -17,6 +17,19 @@ from matchypatchy.database.mpdb import sql_text
 
 logger = logging.getLogger(__name__)
 
+
+def roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h):
+    """Identify a roi by frame and bbox, rounded the same way add_roi stores them."""
+    return (int(frame),) + tuple(round(float(b), 4) for b in (bbox_x, bbox_y, bbox_w, bbox_h))
+
+
+def count_existing_rois(mpDB, media_id):
+    """Return a count of each roi key already in the database for media_id."""
+    rows = mpDB.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h",
+                       row_cond=f'media_id={media_id}')
+    return Counter(roi_key(*row) for row in rows or [])
+
+
 # CSV MIGRATE ==================================================================
 class CSVMigrateThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
@@ -40,10 +53,13 @@ class CSVMigrateThread(QThread):
         self.data = data
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.base_dir_ref = {}  # dictionary to store base directory path to id mapping
+        self.survey_ref = {}  # dictionary to store survey name to id mapping
         self.station_ref = {}  # dictionary to store survey name to id mapping
         self.camera_ref = {}  # dictionary to store camera name to id mapping
         self.individual_ref = {}  # dictionary to store individual name to id mapping
         self.sequence_ref = {}  # dictionary to store sequence id mapping
+        self.media_ref = {}  # dictionary to store file hash to media id mapping
+        self.existing_roi_ref = {}  # dictionary to store media id to count of rois already in the project
         self.errors = []  # list to store errors encountered during import
 
         assert isinstance(self.data, pd.DataFrame), "Data must be a pandas DataFrame"
@@ -57,28 +73,31 @@ class CSVMigrateThread(QThread):
 
         try:
             for row in self.data.itertuples(index=False):
-                if not self.isInterruptionRequested():
+                if self.isInterruptionRequested():
+                    break
 
-                    # get survey id, create if not exists
-                    survey_id = self.survey(row.survey_name, row.region_name)
-                    # station
-                    new_station_id = self.station(row.station_id, row.station_name, survey_id, row.lat, row.long)
-                    # camera
-                    new_camera_id = self.camera(new_station_id, row.camera_id, row.camera_name)
+                # get survey id, create if not exists
+                survey_id = self.survey(row.survey_name, row.region_name)
+                # station
+                new_station_id = self.station(row.station_id, row.station_name, survey_id, row.lat, row.long)
+                # camera
+                new_camera_id = self.camera(new_station_id, row.camera_id, row.camera_name)
 
-                    # base directory
-                    new_base_dir_id = self._get_base_dir(row.base_dir_id, row.filepath, row.relative_path)
-                    # hash
-                    hash = get_sha256(row.filepath)
-                    if hash is None:
-                        logger.warning(f"File {row.filepath} does not exist, skipping import...")
-                        self.errors.append(row.filepath)
-                        continue
+                # base directory
+                new_base_dir_id = self._get_base_dir(row.base_dir_id, row.filepath, row.relative_path)
+                # hash
+                hash = get_sha256(row.filepath)
+                if hash is None:
+                    logger.warning(f"File {row.filepath} does not exist, skipping import...")
+                    self.errors.append(row.filepath)
+                    continue
 
-                    # new sequence id
-                    sequence_id = self.sequence(row.sequence_id)
+                # new sequence id
+                sequence_id = self.sequence(row.sequence_id)
 
-                    # media
+                # media, each roi of a file is its own row so only the first adds it
+                media_id = self.media_ref.get(hash)
+                if media_id is None:
                     media_id = self.mpDB.add_media(new_base_dir_id,
                                                    row.relative_path,
                                                    hash,
@@ -92,51 +111,62 @@ class CSVMigrateThread(QThread):
                                                    commit=False)
 
                     if media_id == "duplicate_error":
-                        # already imported (eg. an earlier roi of the same file); media has no
-                        # filepath column, but the file's hash is unique
+                        # already in the project; media has no filepath column, but the file's hash is unique
                         media_id = self.mpDB.select("media", columns="id", row_cond=f"sha256='{hash}'")[0][0]
+                        self.existing_roi_ref[media_id] = count_existing_rois(self.mpDB, media_id)
+                    else:
+                        # save thumbnail for new media
+                        media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
+                        self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
+                        self.existing_roi_ref[media_id] = Counter()
+                    self.media_ref[hash] = media_id
 
-                    # save thumbnail for new media
-                    media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
-                    self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
+                # get bounding box coordinates, if any are missing, set to -1
+                bbox_x = row.bbox_x if not pd.isna(row.bbox_x) else -1
+                bbox_y = row.bbox_y if not pd.isna(row.bbox_y) else -1
+                bbox_w = row.bbox_w if not pd.isna(row.bbox_w) else -1
+                bbox_h = row.bbox_h if not pd.isna(row.bbox_h) else -1
 
-                    # individual
-                    individual_id = self.individual(row.individual_id, row.name, row.sex)
+                # skip rois already in the project (eg. resuming an interrupted migration)
+                # each existing roi accounts for one row, so repeated keys (eg. -1 bboxes) are counted
+                existing_rois = self.existing_roi_ref[media_id]
+                key = roi_key(row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                if existing_rois[key] > 0:
+                    existing_rois[key] -= 1
+                    roi_counter += 1
+                    continue
 
-                    # get bounding box coordinates, if any are missing, set to -1
-                    bbox_x = row.bbox_x if not pd.isna(row.bbox_x) else -1
-                    bbox_y = row.bbox_y if not pd.isna(row.bbox_y) else -1
-                    bbox_w = row.bbox_w if not pd.isna(row.bbox_w) else -1
-                    bbox_h = row.bbox_h if not pd.isna(row.bbox_h) else -1
+                # individual
+                individual_id = self.individual(row.individual_id, row.name, row.sex)
 
-                    # roi
-                    rid = self.mpDB.add_roi(media_id,
-                                            row.frame,
-                                            bbox_x,
-                                            bbox_y,
-                                            bbox_w,
-                                            bbox_h,
-                                            viewpoint=row.viewpoint if not pd.isna(row.viewpoint) else None,
-                                            reviewed=row.reviewed if not pd.isna(row.reviewed) else 0,
-                                            favorite=row.favorite if not pd.isna(row.favorite) else 0,
-                                            individual_id=individual_id,
-                                            emb=0,  # do not add emb, must be reprocessed in new project
-                                            commit=False)
-                    # save thumbnail for new roi
+                # roi
+                rid = self.mpDB.add_roi(media_id,
+                                        row.frame,
+                                        bbox_x,
+                                        bbox_y,
+                                        bbox_w,
+                                        bbox_h,
+                                        viewpoint=row.viewpoint if not pd.isna(row.viewpoint) else None,
+                                        reviewed=row.reviewed if not pd.isna(row.reviewed) else 0,
+                                        favorite=row.favorite if not pd.isna(row.favorite) else 0,
+                                        individual_id=individual_id,
+                                        emb=0,  # do not add emb, must be reprocessed in new project
+                                        commit=False)
+                # save thumbnail for new roi, a box-less one has nothing to crop
+                if bbox_w != -1:
                     roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, row.filepath, row.ext,
                                                        row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     self.mpDB.add_thumbnail("roi", rid, roi_thumbnail, commit=False)
                     # a roi with a box was already detected, a box-less one still needs the detector
-                    if bbox_w != -1:
-                        self.mpDB.mark_detection_done([media_id], commit=False)
+                    self.mpDB.mark_detection_done([media_id], commit=False)
 
-                    roi_counter += 1
+                roi_counter += 1
 
-                    # bank progress updates and commit in batches
-                    if roi_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
-                        self.progress_update.emit(roi_counter)
-                        emitted_counter = roi_counter
-                        self.mpDB.db.commit()
+                # bank progress updates and commit in batches
+                if roi_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
+                    self.progress_update.emit(roi_counter)
+                    emitted_counter = roi_counter
+                    self.mpDB.db.commit()
 
             self.mpDB.db.commit()  # commit anything remaining
 
@@ -168,8 +198,13 @@ class CSVMigrateThread(QThread):
         rel_path = Path(relative_path)
         base_dir = Path(*full_path.parts[:-len(rel_path.parts)])
 
-        # add to uploads table
-        new_base_dir_id = self.mpDB.add_upload(str(base_dir))
+        # reuse the upload if this directory is already in the project, else add it
+        try:
+            new_base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir={sql_text(str(base_dir))}')[0][0]
+        except IndexError:
+            new_base_dir_id = self.mpDB.add_upload(str(base_dir))
+            if new_base_dir_id is None:
+                raise RuntimeError(f"Failed to add upload '{base_dir}', see log for database error")
         # add to ref
         self.base_dir_ref[old_base_dir_id] = new_base_dir_id
 
@@ -177,12 +212,17 @@ class CSVMigrateThread(QThread):
 
     def survey(self, survey_name, region_name):
         """Get or create survey"""
-        # get active survey
+        # check reference dictionary first
+        if survey_name in self.survey_ref:
+            return self.survey_ref[survey_name]
         try:
             survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name={sql_text(survey_name)}')[0][0]
         except IndexError:
             region_id = self.region(region_name) if not pd.isna(region_name) else None
             survey_id = self.mpDB.add_survey(str(survey_name), region_id, None, None)
+            if survey_id is None:
+                raise RuntimeError(f"Failed to add survey '{survey_name}' (region: {region_name}), see log for database error")
+        self.survey_ref[survey_name] = survey_id
         return survey_id
 
     def region(self, region_name):
@@ -191,6 +231,8 @@ class CSVMigrateThread(QThread):
             region_id = self.mpDB.select("region", columns="id", row_cond=f'name={sql_text(region_name)}')[0][0]
         except IndexError:
             region_id = self.mpDB.add_region(str(region_name), None)
+            if region_id is None:
+                raise RuntimeError(f"Failed to add region '{region_name}', see log for database error")
         return region_id
 
     def station(self, old_station_id, station_name, survey_id, lat, long):
@@ -206,6 +248,8 @@ class CSVMigrateThread(QThread):
                                                    lat if not pd.isna(lat) else None,
                                                    long if not pd.isna(long) else None,
                                                    survey_id)
+                if station_id is None:
+                    raise RuntimeError(f"Failed to add station '{station_name}' (survey_id: {survey_id}), see log for database error")
             self.station_ref[old_station_id] = station_id
         return station_id
 
@@ -225,6 +269,8 @@ class CSVMigrateThread(QThread):
                 # if not in database, add camera
                 except IndexError:
                     camera_id = self.mpDB.add_camera(str(camera_name), station_id)
+                    if camera_id is None:
+                        raise RuntimeError(f"Failed to add camera '{camera_name}' (station_id: {station_id}), see log for database error")
                 # add camera id to reference dictionary
                 self.camera_ref[old_camera_id] = camera_id
             return camera_id
@@ -245,6 +291,8 @@ class CSVMigrateThread(QThread):
                 # if not in database, add individual
                 except IndexError:
                     individual_id = self.mpDB.add_individual(str(name), sex if not pd.isna(sex) else None)
+                # add individual id to reference dictionary
+                self.individual_ref[old_individual_id] = individual_id
             return individual_id
         # if no individual name, return None
         else:
@@ -345,7 +393,7 @@ class CSVImportThread(QThread):
                 # image already added, get correct media_id and its existing rois
                 if media_id == "duplicate_error":
                     media_id = self.mpDB.select("media", columns="id", row_cond=f'sha256="{hash}"')[0][0]
-                    existing_rois = self._existing_rois(media_id)
+                    existing_rois = count_existing_rois(self.mpDB, media_id)
                 # save thumbnail for new media
                 else:
                     existing_rois = Counter()
@@ -381,9 +429,9 @@ class CSVImportThread(QThread):
 
                     # skip rois already imported (eg. resuming an interrupted import)
                     # each existing roi accounts for one row, so repeated keys (eg. -1 bboxes) are counted
-                    roi_key = self._roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    if existing_rois[roi_key] > 0:
-                        existing_rois[roi_key] -= 1
+                    key = roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h)
+                    if existing_rois[key] > 0:
+                        existing_rois[key] -= 1
                         roi_counter += 1
                         continue
 
@@ -576,17 +624,6 @@ class CSVImportThread(QThread):
         return comment
 
     # ROI-RELATED METHODS
-    @staticmethod
-    def _roi_key(frame, bbox_x, bbox_y, bbox_w, bbox_h):
-        """Identify a roi by frame and bbox, rounded the same way add_roi stores them."""
-        return (int(frame),) + tuple(round(float(b), 4) for b in (bbox_x, bbox_y, bbox_w, bbox_h))
-
-    def _existing_rois(self, media_id):
-        """Return a count of each roi key already in the database for media_id."""
-        rows = self.mpDB.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h",
-                                row_cond=f'media_id={media_id}')
-        return Counter(self._roi_key(*row) for row in rows or [])
-
     def _roi_value(self, roi, column):
         """Get ROI value by selected column supporting string or integer references."""
         if column == "None" or column is None:
@@ -679,6 +716,9 @@ class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     import_failed = pyqtSignal(str)  # Signal to report a fatal import error
 
+    # How many files to process between progress signal emissions and commits.
+    PROGRESS_BATCH_SIZE = 10
+
     def __init__(self, parent, active_survey, data, station_level, camera_level):
         super().__init__()
         self.mpDB = parent.mpDB
@@ -688,9 +728,14 @@ class FolderImportThread(QThread):
         self.camera_level = camera_level
         self.default_station = None
         self.thumbnail_dir = parent.cfg.THUMBNAIL_DIR
+        self.station_ref = {}  # dictionary to store (station name, survey id) to id mapping
+        self.camera_ref = {}  # dictionary to store (camera name, station id) to id mapping
         # get timezone for timestamp parsing
 
     def run(self):
+        file_counter = 0  # progressbar counter
+        emitted_counter = 0  # last value emitted, to batch signal emission
+
         try:
             # get base directory for the files being imported
             base_dir = self._get_base_dir(self.data['filepath'].tolist())
@@ -699,59 +744,74 @@ class FolderImportThread(QThread):
             except IndexError:
                 base_dir_id = self.mpDB.add_upload(base_dir)
 
-            for i, file in self.data.iterrows():
-                if not self.isInterruptionRequested():
+            for _, file in self.data.iterrows():
+                if self.isInterruptionRequested():
+                    break
 
-                    filepath = file['filepath']
-                    # check to see if file exists
-                    if not Path(filepath).exists():
-                        logger.warning(f"File {filepath} does not exist")
-                        continue
+                file_counter += 1
 
-                    # get the relative path of the file with respect to the base directory
-                    relative_path = self._get_relative_path(filepath, base_dir)
-                    hash = get_sha256(filepath)  # Calculate the SHA256 hash of the file
-                    # get file extension
-                    ext = Path(filepath).suffix.lower()
+                filepath = file['filepath']
+                # check to see if file exists
+                if not Path(filepath).exists():
+                    logger.warning(f"File {filepath} does not exist")
+                    continue
 
-                    timestamp = file['datetime']
+                # get the relative path of the file with respect to the base directory
+                relative_path = self._get_relative_path(filepath, base_dir)
+                hash = get_sha256(filepath)  # Calculate the SHA256 hash of the file
+                # get file extension
+                ext = Path(filepath).suffix.lower()
 
-                    survey_id = self.active_survey[0]
+                timestamp = file['datetime']
 
-                    # get remaining information
-                    if self.station_level > 0:
-                        station_id = self.station(filepath, survey_id)
-                    else:
-                        # create default station if no station level and use for all media
-                        if not self.default_station:
-                            self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
-                        station_id = self.default_station
-                    # add camera if camera level provided (also under the default station), else None
-                    camera_id = self.camera(filepath, station_id) if self.camera_level > 0 else None
+                survey_id = self.active_survey[0]
 
-                    # insert into table, force type
-                    media_id = self.mpDB.add_media(base_dir_id,
-                                                   relative_path,
-                                                   hash,
-                                                   ext,
-                                                   str(timestamp),
-                                                   int(station_id),
-                                                   camera_id=int(camera_id) if camera_id is not None else None,
-                                                   sequence_id=None,
-                                                   external_id=None,
-                                                   comment=None)
-                    # save thumbnail, unless the file was already imported or failed to add
-                    if media_id not in ("duplicate_error", None):
-                        thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
-                        self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
+                # get remaining information
+                if self.station_level > 0:
+                    station_id = self.station(filepath, survey_id)
+                else:
+                    # create default station if no station level and use for all media
+                    if not self.default_station:
+                        self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
+                    station_id = self.default_station
+                # add camera if camera level provided (also under the default station), else None
+                camera_id = self.camera(filepath, station_id) if self.camera_level > 0 else None
 
-                    self.progress_update.emit(i)
+                # insert into table, force type
+                media_id = self.mpDB.add_media(base_dir_id,
+                                               relative_path,
+                                               hash,
+                                               ext,
+                                               str(timestamp),
+                                               int(station_id),
+                                               camera_id=int(camera_id) if camera_id is not None else None,
+                                               sequence_id=None,
+                                               external_id=None,
+                                               comment=None,
+                                               commit=False)
+                # save thumbnail, unless the file was already imported or failed to add
+                if media_id not in ("duplicate_error", None):
+                    thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
+                    self.mpDB.add_thumbnail("media", media_id, thumbnail_path, commit=False)
+
+                # bank progress updates and commit in batches
+                if file_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
+                    self.progress_update.emit(file_counter)
+                    emitted_counter = file_counter
+                    self.mpDB.db.commit()
+
+            self.mpDB.db.commit()  # commit anything remaining
 
         except Exception as error:
             # an unhandled exception in a QThread aborts the whole app, report it instead
+            self.mpDB.db.rollback()
             logger.exception("Import failed")
             self.import_failed.emit(str(error))
             return
+
+        # make sure the progress bar reaches its true final value
+        if emitted_counter != file_counter:
+            self.progress_update.emit(file_counter)
 
         # finished adding media
         self.finished.emit()
@@ -773,22 +833,31 @@ class FolderImportThread(QThread):
         """Get or create station"""
         station_name = Path(filepath).parts[self.station_level]
         station_name = str(station_name)
+        # check reference dictionary first, station names are only unique within a survey
+        station_key = (station_name, survey_id)
+        if station_key in self.station_ref:
+            return self.station_ref[station_key]
         try:
             row_cond = f'name={sql_text(station_name)} AND survey_id={int(survey_id)}'
             station_id = self.mpDB.select("station", columns="id", row_cond=row_cond)[0][0]
         except IndexError:
             station_id = self.mpDB.add_station(station_name, None, None, survey_id)
+        self.station_ref[station_key] = station_id
         return station_id
 
     def camera(self, filepath, station_id):
         camera_name = Path(filepath).parts[self.camera_level]
         camera_name = str(camera_name)
+        # check reference dictionary first, camera names are only unique within a station
+        camera_key = (camera_name, station_id)
+        if camera_key in self.camera_ref:
+            return self.camera_ref[camera_key]
         try:
             row_cond = f"name={sql_text(camera_name)} AND station_id={int(station_id)}"
             camera_id = self.mpDB.select("camera", columns="id", row_cond=row_cond)[0][0]
         except IndexError:
             camera_id = self.mpDB.add_camera(camera_name, station_id)
-
+        self.camera_ref[camera_key] = camera_id
         return camera_id
 
 
