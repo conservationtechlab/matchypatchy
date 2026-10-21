@@ -987,3 +987,63 @@ class TestCSVMigrateInterruption:
         # checked once per row until cancelled, then once more before reporting
         assert len(checks) == 3
         assert thread.finished.calls == []
+
+
+class TestFileReplacedAtSamePath:
+    """A file already in the project is replaced by one with new content at the same path"""
+
+    @pytest.fixture
+    def images(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        a = tmp_path / "imgs" / "a.jpg"
+        b = tmp_path / "imgs" / "b.jpg"
+        a.parent.mkdir()
+        a.write_bytes(b"old a")
+        b.write_bytes(b"b")
+        return a, b
+
+    def test_csv_import_skips_the_file(self, tmp_db, null_logger, tmp_path, images, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        a, b = images
+        selected = TestCSVImportThread._selected_columns(None)
+
+        def _row(path, box):
+            return {"filepath": str(path), "timestamp": "2024-01-01 10:00:00", "station": "Station A",
+                    "bbox_x": box, "bbox_y": box, "bbox_w": box, "bbox_h": box}
+
+        _csv_import(db, parent, [_row(a, 0.1)], selected, monkeypatch)
+        a.write_bytes(b"new a")
+        thread = _csv_import(db, parent, [_row(a, 0.2), _row(b, 0.3)], selected, monkeypatch)
+
+        assert thread.import_failed.calls == []
+        assert db.select("media", columns="relative_path") == [("a.jpg",), ("b.jpg",)]
+        # the new file's roi isn't attached to the old file
+        assert db.select("roi", columns="media_id, bbox_x") == [(1, 0.1), (2, 0.3)]
+
+    def test_csv_migrate_reports_the_file(self, tmp_db, null_logger, tmp_path, images):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        a, b = images
+
+        def _migrate(rows):
+            thread = import_thread.CSVMigrateThread(parent, pd.DataFrame(rows))
+            thread.progress_update = SignalSpy()
+            thread.error_update = SignalSpy()
+            thread.import_failed = SignalSpy()
+            thread.finished = SignalSpy()
+            thread.isInterruptionRequested = lambda: False
+            thread.run()
+            return thread
+
+        _migrate([_migrate_row(a, 0, box=0.1)])
+        a.write_bytes(b"new a")
+        # two rois of the replaced file, then a new file
+        thread = _migrate([_migrate_row(a, 0, box=0.2), _migrate_row(a, 1, box=0.3),
+                           _migrate_row(b, 2, box=0.4, media_id=2)])
+
+        assert thread.import_failed.calls == []
+        assert thread.error_update.calls == [([str(a)],)]
+        assert db.select("media", columns="relative_path") == [("a.jpg",), ("b.jpg",)]
+        assert db.select("roi", columns="media_id, bbox_x") == [(1, 0.1), (2, 0.4)]

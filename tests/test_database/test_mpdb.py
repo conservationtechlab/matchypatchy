@@ -266,7 +266,7 @@ class TestCRUD:
         sha2 = "bbb" * 22
         db.add_media(upload_id, "dup.jpg", sha1, ".jpg", "2024-01-01", station_id)
         result = db.add_media(upload_id, "dup.jpg", sha2, ".jpg", "2024-01-02", station_id)
-        assert result == "duplicate_error"
+        assert result == "duplicate_path"
 
     def test_add_media_duplicate_sha256_returns_error(self, tmp_db):
         db, _ = tmp_db
@@ -275,7 +275,17 @@ class TestCRUD:
         sha = "ccc" * 22
         db.add_media(upload_id, "original.jpg", sha, ".jpg", "2024-01-01", station_id)
         result = db.add_media(upload_id, "copy.jpg", sha, ".jpg", "2024-01-01", station_id)
-        assert result == "duplicate_error"
+        assert result == "duplicate_hash"
+
+    def test_add_media_same_file_again_is_a_duplicate_hash(self, tmp_db):
+        """sqlite reports the path constraint first, but this is the same file, not a new one at that path"""
+        db, _ = tmp_db
+        station_id = db.add_station("S4", 0, 0, 1)
+        upload_id = db.add_upload("/img")
+        sha = "eee" * 22
+        db.add_media(upload_id, "again.jpg", sha, ".jpg", "2024-01-01", station_id)
+        result = db.add_media(upload_id, "again.jpg", sha, ".jpg", "2024-01-01", station_id)
+        assert result == "duplicate_hash"
 
     def test_add_media_other_integrity_error_is_logged(self, tmp_db):
         """A constraint failure other than a duplicate (here a missing station) returns None and logs"""

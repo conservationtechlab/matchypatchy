@@ -395,6 +395,10 @@ class MatchyPatchyDB():
             external_id INTEGER,
             comment TEXT,
             detection_done INTEGER NOT NULL DEFAULT 0,
+
+        Returns the new media id, "duplicate_hash" if the file (same sha256) is
+        already in the database, "duplicate_path" if a different file is already
+        stored at this path, or None on any other error
         """
         try:
             cursor = self.db.cursor()
@@ -424,13 +428,17 @@ class MatchyPatchyDB():
         except sqlite3.IntegrityError as error:
             if not quiet:
                 print(f"DEBUG: IntegrityError caught: {error}")
-            # unique (base_dir_id, relative_path)
-            if 'UNIQUE constraint failed: media.base_dir_id, media.relative_path' in error.args[0]:
-                self.logger.error(f"Failed to add {relative_path}, already exists in database.")
-                return "duplicate_error"
-            if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
-                self.logger.error(f"Failed to add {relative_path}, file is a duplicate.")
-                return "duplicate_error"
+            # unique (base_dir_id, relative_path) or sha256
+            # sqlite names only the first constraint that failed, so re-adding the same file
+            # reports the path, check the hash to tell it apart from a new file at that path
+            if ('UNIQUE constraint failed: media.base_dir_id, media.relative_path' in error.args[0]
+                    or 'UNIQUE constraint failed: media.sha256' in error.args[0]):
+                cursor.execute("SELECT 1 FROM media WHERE sha256 = ?;", (str(sha256),))
+                if cursor.fetchone():
+                    self.logger.error(f"Failed to add {relative_path}, file is a duplicate.")
+                    return "duplicate_hash"
+                self.logger.error(f"Failed to add {relative_path}, a different file already exists at this path.")
+                return "duplicate_path"
             # eg. foreign key or not null constraint
             self.logger.error(f"Failed to add {relative_path}: {error}")
             return None
