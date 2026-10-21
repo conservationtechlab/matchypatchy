@@ -43,11 +43,11 @@ class VerifyNewBaseDirsThread(QThread):
     not_in_new_directory = pyqtSignal(list)
     finished = pyqtSignal()
 
-    def __init__(self, parent):
+    def __init__(self, parent, updates):
         super().__init__()
         self.mpDB = parent.mpDB
         self.base_dirs = parent.base_dirs
-        self.updates = parent.updates
+        self.updates = updates
         self.not_found_in_db = []
         self.not_found_in_new_directory = []
 

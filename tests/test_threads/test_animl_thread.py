@@ -140,7 +140,7 @@ class TestVerifyNewBaseDirsThread:
                 {"filepath": sorted(str(f) for f in Path(directory).rglob("*.jpg"))}),
         )
         parent = SimpleNamespace(mpDB=db, base_dirs=[], updates=updates)
-        thread = animl_thread.VerifyNewBaseDirsThread(parent)
+        thread = animl_thread.VerifyNewBaseDirsThread(parent, parent.updates)
         thread.not_in_db = SignalSpy()
         thread.not_in_new_directory = SignalSpy()
         thread.finished = SignalSpy()
@@ -193,7 +193,7 @@ class TestVerifyNewBaseDirsThread:
     def test_interruption_emits_nothing(self, tmp_db):
         db, _ = tmp_db
         parent = SimpleNamespace(mpDB=db, base_dirs=[], updates=[(1, "/new")])
-        thread = animl_thread.VerifyNewBaseDirsThread(parent)
+        thread = animl_thread.VerifyNewBaseDirsThread(parent, parent.updates)
         thread.not_in_db = SignalSpy()
         thread.not_in_new_directory = SignalSpy()
         thread.finished = SignalSpy()

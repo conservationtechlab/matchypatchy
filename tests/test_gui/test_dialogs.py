@@ -460,6 +460,59 @@ class TestUploadManagerSave:
         assert popup.verified is False
 
 
+class TestUploadManagerVerify:
+    def _popup(self, updates=((1, "/new"),)):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = _uploads_popup(updates=updates, verified=False)
+        popup.verifying = False
+        popup.build_thread = None
+        popup.list.currentRow.return_value = 0
+        popup.set_verifying = lambda v: UploadManagerPopup.set_verifying(popup, v)
+        popup.set_editdel = lambda: UploadManagerPopup.set_editdel(popup)
+        return popup
+
+    def _verify(self, popup):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.VerifyNewBaseDirsThread") as thread:
+            UploadManagerPopup.verify(popup)
+        return thread
+
+    def test_verify_while_running_is_ignored(self):
+        """Replacing a running thread aborted the app"""
+        popup = self._popup()
+        thread = self._verify(popup)
+        running = popup.build_thread
+        running.isRunning.return_value = True
+        thread = self._verify(popup)
+        thread.assert_not_called()
+        assert popup.build_thread is running
+
+    def test_buttons_disabled_and_progress_shown_while_verifying(self):
+        popup = self._popup()
+        self._verify(popup)
+        popup.button_verify.setEnabled.assert_called_with(False)
+        popup.button_save.setEnabled.assert_called_with(False)
+        popup.button_edit.setEnabled.assert_called_with(False)
+        popup.progress_bar.show.assert_called_once()
+
+    def test_buttons_enabled_when_verification_finishes(self):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = self._popup()
+        self._verify(popup)
+        UploadManagerPopup.on_verify_finished(popup)
+        popup.button_verify.setEnabled.assert_called_with(True)
+        popup.button_save.setEnabled.assert_called_with(True)
+        popup.button_edit.setEnabled.assert_called_with(True)
+        popup.progress_bar.hide.assert_called()
+
+    def test_thread_gets_a_copy_of_updates(self):
+        popup = self._popup()
+        thread = self._verify(popup)
+        passed = thread.call_args.args[1]
+        assert passed == [(1, "/new")]
+        assert passed is not popup.updates
+
+
 class TestIndividualPopupList:
     def test_individuals_without_rois_are_listed(self, tmp_db):
         """Grouping on the roi side folded every individual without rois into one row"""

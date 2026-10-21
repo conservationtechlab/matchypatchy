@@ -29,6 +29,7 @@ class UploadManagerPopup(QDialog):
         self.updates = []
         self.errors = []
         self.build_thread = None
+        self.verifying = False
 
         layout = QVBoxLayout()
         # Individuals Table
@@ -83,7 +84,7 @@ class UploadManagerPopup(QDialog):
         """Set edit/delete button enabled state"""
         # currentRow() returns -1 if nothing selected
         flag = bool(self.list.currentRow() + 1)
-        self.button_edit.setEnabled(flag)
+        self.button_edit.setEnabled(flag and not self.verifying)
 
     def update(self):
         """Get upload directories list from mpDB"""
@@ -117,6 +118,10 @@ class UploadManagerPopup(QDialog):
 
     def verify(self):
         """Verify the new directory path"""
+        # a verification is already running, replacing its thread would abort the app
+        if self.verifying or (self.build_thread is not None and self.build_thread.isRunning()):
+            return
+
         if self.updates == []:
             # No updates to verify, good to go
             self.colorize()
@@ -131,12 +136,22 @@ class UploadManagerPopup(QDialog):
 
         self.logger.info("Starting verification of new base directories")
 
+        self.set_verifying(True)
         self.progress_bar.setRange(0, 0)
-        self.build_thread = VerifyNewBaseDirsThread(self)
+        self.progress_bar.show()
+        # pass a copy so the results line up with the updates that were verified
+        self.build_thread = VerifyNewBaseDirsThread(self, list(self.updates))
         self.build_thread.not_in_db.connect(self.get_not_in_db)
         self.build_thread.not_in_new_directory.connect(self.get_not_in_new_directory)
         self.build_thread.finished.connect(self.on_verify_finished)
         self.build_thread.start()
+
+    def set_verifying(self, verifying):
+        """Disable buttons while a verification is running"""
+        self.verifying = verifying
+        self.button_verify.setEnabled(not verifying and self.updates != [])
+        self.button_save.setEnabled(not verifying and self.updates != [])
+        self.set_editdel()
 
     # 2. Receive data from thread, check if valid
     def get_not_in_db(self, not_in_db):
@@ -152,6 +167,7 @@ class UploadManagerPopup(QDialog):
         self.logger.info(f"Updated base directory attempts {self.updates}")
         self.verified = True
         self.progress_bar.hide()
+        self.set_verifying(False)
         self.colorize()
         self.log()
 
