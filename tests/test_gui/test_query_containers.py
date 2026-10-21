@@ -198,3 +198,22 @@ class TestNoSelfComparison:
         container.mpDB.calculate_similarity.assert_called_with(10, 11)
         container.mpDB.calculate_similarity.return_value = None
         assert container.current_distance() is None
+
+
+def _qc_filters(individual):
+    return {"active_region": (0,), "active_survey": (0,),
+            "active_station": (0,), "active_individual": (individual,)}
+
+
+class TestQCIndividualFilter:
+    def test_individual_filter_keeps_its_rois(self):
+        container = _container("qc")
+        assert container.filter(_qc_filters(2), {1: "A"}) is True
+        assert list(container.individuals) == [2]
+        assert sorted(container.data.index) == [12, 13]
+
+    def test_individual_without_rois_has_no_data(self):
+        """An individual emptied by a merge is still listed in the filterbar"""
+        container = _container("qc")
+        assert container.filter(_qc_filters(3), {1: "A"}) is False
+        assert container.individuals == {}

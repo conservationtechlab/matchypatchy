@@ -98,7 +98,8 @@ class ManualQueryContainer(BaseQueryContainer):
         # set number of queries to validate
         self.n_queries = len(rois)
 
-        if rois:
+        # need a second roi to compare against, a single roi would be its own match
+        if len(rois) > 1:
             # set match to first entry
             self._all_match_rois = list(rois)
             self.current_match_rois = list(rois)
@@ -123,7 +124,8 @@ class ManualQueryContainer(BaseQueryContainer):
                     'distance': distance
                 })
 
-        self.pair_table = pd.DataFrame(distances_list)
+        # explicit columns so lookups are safe when there are no pairs
+        self.pair_table = pd.DataFrame(distances_list, columns=['id1', 'id2', 'distance'])
 
     def set_query(self, n):
         """

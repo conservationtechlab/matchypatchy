@@ -97,7 +97,6 @@ class QC_QueryContainer(BaseQueryContainer):
             if filter_dict['active_individual'][0] > 0:
                 active_iid = filter_dict['active_individual'][0]
                 self.data = self.data[self.data['individual_id'] == int(active_iid)]
-                self.individuals = {active_iid: self.individuals_raw[active_iid]}
 
         # create new dict of filtered individuals
         self.individuals = db_roi.individual_roi_dict(self.data)
