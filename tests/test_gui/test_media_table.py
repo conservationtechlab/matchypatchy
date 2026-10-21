@@ -259,3 +259,45 @@ class TestUpdateHeaderDict:
         original_columns = list(mt._columns)
         mt.updateHeaderDict(None)
         assert mt._columns == original_columns
+
+
+# ---------------------------------------------------------------------------
+# TestSexColumn
+# ---------------------------------------------------------------------------
+
+def _index(row, col):
+    """Stand-in for a QModelIndex, QtCore is stubbed"""
+    index = MagicMock()
+    index.isValid.return_value = True
+    index.row.return_value = row
+    index.column.return_value = col
+    return index
+
+
+class TestSexColumn:
+    def _roi_table(self):
+        mt = _make_media_table()
+        mt.updateHeaderDict({0: ("select", "Select"),
+                             1: ("individual_id", "Individual"),
+                             2: ("sex", "Sex")})
+        mt._data_filtered = pd.DataFrame({"select": [0, 0], "id": [10, 11], "media_id": [1, 2],
+                                          "individual_id": [100, None], "sex": ["Male", None]})
+        return mt
+
+    @pytest.mark.parametrize("label", ["Unknown", "None"])
+    def test_unknown_sex_is_stored_as_null(self, label):
+        """Unknown (or a legacy 'None') clears the sex instead of saving the text"""
+        mt = self._roi_table()
+        edits = []
+        mt.user_edit.connect(edits.append)
+        assert mt.setData(_index(0, 2), label)
+        assert edits[0].new_value is None
+        assert pd.isna(mt._data_filtered.at[0, "sex"])
+
+    def test_null_sex_shows_unknown_for_identified_rois(self):
+        from PyQt6.QtCore import Qt
+        mt = self._roi_table()
+        mt._data_filtered.at[0, "sex"] = None
+        assert mt.data(_index(0, 2), Qt.ItemDataRole.DisplayRole) == "Unknown"
+        # unidentified rois have no individual to have a sex
+        assert mt.data(_index(1, 2), Qt.ItemDataRole.DisplayRole) is None

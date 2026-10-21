@@ -454,3 +454,13 @@ class TestCompareSelection:
             DisplayMedia.compare(dm)
         dm.parent._set_manual_view.assert_called_once_with(selected_ids=[10, 12])
         dm.parent._set_compare_view.assert_not_called()
+
+
+class TestSexDelegate:
+    def test_sex_combo_offers_unknown(self):
+        """The Sex column offers Unknown like the edit popups, not 'None'"""
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        with patch("matchypatchy.gui.display_media.ComboBoxDelegate") as delegate:
+            DisplayMedia._set_delegates(dm)
+        assert ['Unknown', 'Male', 'Female'] in [c.args[0] for c in delegate.call_args_list]

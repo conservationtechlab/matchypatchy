@@ -688,7 +688,7 @@ class DisplayMedia(QWidget):
             combo_items = list(self.VIEWPOINTS.values())[1:]
             self.view.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
             # SEX COMBOBOX
-            combo_items = ['None', 'Male', 'Female']
+            combo_items = ['Unknown', 'Male', 'Female']
             self.view.setItemDelegateForColumn(SEX_COLUMN, ComboBoxDelegate(combo_items, self))
 
         else:
