@@ -464,3 +464,30 @@ class TestSexDelegate:
         with patch("matchypatchy.gui.display_media.ComboBoxDelegate") as delegate:
             DisplayMedia._set_delegates(dm)
         assert ['Unknown', 'Male', 'Female'] in [c.args[0] for c in delegate.call_args_list]
+
+
+class TestIndividualPrefilter:
+    """View from Manage Individuals filters rois, so the view must show rois"""
+
+    def _refresh(self, prefilter):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = 0  # left on Full Images
+        DisplayMedia.refresh_filters(dm, prefilter=prefilter)
+        return dm
+
+    @pytest.mark.parametrize("prefilter", [{"individual_id": 5}, {"individual_id": 0},
+                                           {"unidentified_only": True}])
+    def test_switches_to_rois(self, prefilter):
+        dm = self._refresh(prefilter)
+        assert dm.data_type == 1
+        dm.show_type.setCurrentIndex.assert_called_once_with(1)
+        # signals blocked so change_type does not load the table a second time
+        dm.show_type.blockSignals.assert_any_call(True)
+        dm.filterbar.individual_visible.assert_called_with(True)
+
+    @pytest.mark.parametrize("prefilter", [None, {"no_roi_mids": [1, 2]}])
+    def test_other_filters_keep_view_type(self, prefilter):
+        dm = self._refresh(prefilter)
+        assert dm.data_type == 0
+        dm.show_type.setCurrentIndex.assert_not_called()

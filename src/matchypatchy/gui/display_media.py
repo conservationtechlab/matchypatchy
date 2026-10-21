@@ -240,6 +240,14 @@ class DisplayMedia(QWidget):
         """
         # wipe previous selections
         self.filterbar.refresh_filters(prefilter=prefilter)
+        # individual and unidentified filters only apply to rois
+        if prefilter and ('individual_id' in prefilter or prefilter.get('unidentified_only')):
+            if self.data_type != 1:
+                self.data_type = 1
+                # change_type would load the table again
+                self.show_type.blockSignals(True)
+                self.show_type.setCurrentIndex(self.data_type)
+                self.show_type.blockSignals(False)
         # get current filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
