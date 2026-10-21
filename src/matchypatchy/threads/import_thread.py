@@ -127,6 +127,9 @@ class CSVMigrateThread(QThread):
                 roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, row.filepath, row.ext,
                                                    row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
                 self.mpDB.add_thumbnail("roi", rid, roi_thumbnail)
+                # a roi with a box was already detected, a box-less one still needs the detector
+                if bbox_w != -1:
+                    self.mpDB.mark_detection_done([media_id])
 
                 roi_counter += 1
                 self.progress_update.emit(roi_counter)
@@ -394,6 +397,8 @@ class CSVImportThread(QThread):
                         roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext,
                                                            frame, bbox_x, bbox_y, bbox_w, bbox_h)
                         self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail), commit=False)
+                        # a roi with a box was already detected, a box-less one still needs the detector
+                        self.mpDB.mark_detection_done([media_id], commit=False)
 
                     roi_counter += 1
 

@@ -731,3 +731,54 @@ class TestImportFailuresAreReported:
 
         assert thread.import_failed.calls == [("boom",)]
         assert thread.error_update.calls == []
+
+
+class TestImportDetectionDone:
+    """Imported files with a boxed roi are already detected, box-less or roi-less ones still need it"""
+
+    def _image(self, tmp_path, name):
+        path = tmp_path / "imgs" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(name.encode())
+        return path
+
+    def _detection_done(self, db):
+        return {Path(path).name: done for path, done in db.select("media", columns="relative_path, detection_done")}
+
+    def test_csv_import(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        nan = float("nan")
+        rows = [{"filepath": str(self._image(tmp_path, name)), "timestamp": "2024-01-01 10:00:00",
+                 "station": "Station A", "bbox_x": box, "bbox_y": box, "bbox_w": box, "bbox_h": box}
+                for name, box in (("boxed.jpg", 0.2), ("boxless.jpg", nan))]
+
+        _csv_import(db, parent, rows, TestCSVImportThread._selected_columns(None), monkeypatch)
+
+        assert self._detection_done(db) == {"boxed.jpg": 1, "boxless.jpg": 0}
+
+    def test_csv_migrate(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        rows = []
+        for n, (name, box) in enumerate((("boxed.jpg", 0.2), ("boxless.jpg", -1))):
+            path = self._image(tmp_path, name)
+            row = {column: None for column in import_thread.CSVMigrateThread.EXPECTED_COLUMNS}
+            row.update({"id": n, "media_id": n, "frame": 0, "bbox_x": box, "bbox_y": box, "bbox_w": box,
+                        "bbox_h": box, "base_dir_id": 1, "filepath": str(path), "relative_path": name,
+                        "ext": ".jpg", "timestamp": "2024-01-01 12:00:00", "station_id": 1,
+                        "station_name": "Station A", "survey_name": "Survey A"})
+            rows.append(row)
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame(rows))
+        thread.progress_update = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.import_failed = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert thread.import_failed.calls == []
+        assert self._detection_done(db) == {"boxed.jpg": 1, "boxless.jpg": 0}

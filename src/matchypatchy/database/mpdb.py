@@ -405,7 +405,7 @@ class MatchyPatchyDB():
             self.logger.error(f"Failed to add media: {error}")
             return None
 
-    def mark_detection_done(self, media_ids):
+    def mark_detection_done(self, media_ids, commit=True):
         """Record that media have been through detection, so later processing skips them"""
         media_ids = [int(media_id) for media_id in media_ids]
         if not media_ids:
@@ -413,7 +413,8 @@ class MatchyPatchyDB():
         try:
             placeholders = ", ".join("?" * len(media_ids))
             self.db.execute(f"UPDATE media SET detection_done = 1 WHERE id IN ({placeholders});", media_ids)
-            self.db.commit()
+            if commit:
+                self.db.commit()
             return True
         except sqlite3.Error as error:
             self.logger.error(f"Failed to mark {len(media_ids)} media as detected: {error}")
