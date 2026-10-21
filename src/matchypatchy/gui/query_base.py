@@ -598,6 +598,14 @@ class QueryContainer(BaseQueryContainer):
         self.data = pd.concat([self.data[~self.data['sequence_id'].isin(seq_ids)], new_rows])
         self.data_raw = pd.concat([self.data_raw[~self.data_raw['sequence_id'].isin(seq_ids)], new_rows])
 
+        # a merge also moved other rois of the dropped individual, refresh their name/sex
+        iids = new_rows['individual_id'].dropna().unique()
+        others = self.data_raw.index[self.data_raw['individual_id'].isin(iids)
+                                     & ~self.data_raw['sequence_id'].isin(seq_ids)]
+        if len(others):
+            others_df = db_roi.fetch_roi_media(self.mpDB, rids=others.tolist())
+            self._update_roi_index(others_df[['name', 'sex']].to_dict('index'))
+
         # Rebuild indices with updated data
         self._build_seq_indices()
 

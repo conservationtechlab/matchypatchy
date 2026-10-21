@@ -964,6 +964,35 @@ class TestUpdateSequencesInPlace:
             assert df.loc[13, "individual_id"] == 200
         assert set(qc._seq_index) == {1, 2, 3}
 
+    def test_refreshes_name_of_other_rois_moved_by_merge(self, qc, mock_db_roi):
+        """Merging 200 into 100 also moved roi 14 (seq 4), which must show the new name"""
+        df = _sample_roi_df()
+        extra = df.loc[[13]].rename(index={13: 14})
+        extra["sequence_id"] = 4
+        df = pd.concat([df, extra])
+        df.index.name = "id"
+        df["name"] = ["A", "A", None, "B", "B"]
+        df["sex"] = ["F", "F", None, "M", "M"]
+        qc.data_raw = df
+        qc.data = df.copy()
+        # merge() already moved 13 and 14 to individual 100 locally
+        qc._update_roi_index({13: {"individual_id": 100}, 14: {"individual_id": 100}})
+
+        def fetch(mpDB, rids=None, sequence_ids=None):
+            fresh = df.copy()
+            fresh.loc[[13, 14], ["individual_id", "name", "sex"]] = [100, "A", "F"]
+            if rids is not None:
+                return fresh.loc[rids]
+            return fresh[fresh["sequence_id"].isin(sequence_ids)]
+        mock_db_roi.fetch_roi_media.side_effect = fetch
+        qc.update_sequences_in_place(1, 3)
+
+        for frame in (qc.data, qc.data_raw):
+            assert frame.loc[14, "name"] == "A"
+            assert frame.loc[14, "sex"] == "F"
+            assert frame.loc[12, "name"] is None
+        assert mock_db_roi.fetch_roi_media.call_args.kwargs == {"rids": [14]}
+
     def test_same_sequence_on_both_sides_has_no_duplicates(self, qc, mock_db_roi):
         qc.data_raw = _sample_roi_df()
         qc.data = qc.data_raw.copy()
