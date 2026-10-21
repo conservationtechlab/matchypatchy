@@ -513,6 +513,27 @@ class TestUploadManagerVerify:
         assert passed is not popup.updates
 
 
+class TestUploadManagerLog:
+    def _log(self, popup):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.AlertPopup") as alert:
+            UploadManagerPopup.log(popup)
+        return alert
+
+    def test_missing_files_reported_in_popup_label(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg", "b.jpg"]], contains_errors=True)
+        alert = self._log(popup)
+        alert.assert_not_called()
+        text = popup.status_label.setText.call_args.args[0]
+        assert "2 files" in text
+
+    def test_all_found_reported_in_popup_label(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[[]])
+        alert = self._log(popup)
+        alert.assert_not_called()
+        assert "All files were found" in popup.status_label.setText.call_args.args[0]
+
+
 class TestIndividualPopupList:
     def test_individuals_without_rois_are_listed(self, tmp_db):
         """Grouping on the roi side folded every individual without rois into one row"""

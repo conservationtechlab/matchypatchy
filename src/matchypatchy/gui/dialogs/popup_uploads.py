@@ -2,7 +2,7 @@
 Popup to manage upload directories
 """
 import os
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                              QHeaderView, QFileDialog, QProgressBar,
                              QAbstractItemView, QDialogButtonBox, QTableWidget, QTableWidgetItem)
 from PyQt6.QtGui import QBrush, QColor
@@ -69,6 +69,11 @@ class UploadManagerPopup(QDialog):
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
+
+        # Verification and save results
+        self.status_label = QLabel("")
+        self.status_label.setWordWrap(True)
+        layout.addWidget(self.status_label)
 
         # Progress Bar (hidden at start)
         self.progress_bar = QProgressBar()
@@ -137,6 +142,7 @@ class UploadManagerPopup(QDialog):
         self.logger.info("Starting verification of new base directories")
 
         self.set_verifying(True)
+        self.status_label.setText("Verifying new directories...")
         self.progress_bar.setRange(0, 0)
         self.progress_bar.show()
         # pass a copy so the results line up with the updates that were verified
@@ -208,15 +214,16 @@ class UploadManagerPopup(QDialog):
     def log(self):
         """Log the verification results"""
         if self.contains_errors:
-            dialog = AlertPopup(self, prompt=("Some files in the database could not be found in the new directory. "
-                                              "Results have been saved to the log."))
-            dialog.exec()
-            del dialog
+            missing = sum(len(e) for e in self.errors)
+            self.status_label.setText(f"{missing} files in the database could not be found at their paths in the "
+                                      "new directories (rows in red). Results have been saved to the log.")
 
             self.logger.info(f"Verification results for updates: {self.updates}")
             self.logger.info(f"Errors: {self.errors}")
             self.logger.info(f"Files discovered not in DB: {self.not_in_db}")
             self.logger.info(f"Files not in new directory: {self.not_in_new_directory}")
+        else:
+            self.status_label.setText("All files were found in the new directories.")
 
     def save(self):
         """Save changes to the selected upload directory"""
