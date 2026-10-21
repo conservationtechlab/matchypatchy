@@ -450,6 +450,29 @@ class TestUploadManagerSave:
         popup.mpDB.update_base_dir.assert_called_once_with(1, "/new")
         assert popup.updates == []
 
+    def _status(self, popup):
+        return popup.status_label.setText.call_args.args[0]
+
+    def test_failed_update_is_reported(self):
+        """update_base_dir returning False (e.g. directory already another upload's) was ignored"""
+        popup = _uploads_popup(updates=[(1, "/taken"), (2, "/ok")], errors=[[], []])
+        popup.mpDB.update_base_dir.side_effect = lambda base_dir_id, _: base_dir_id != 1
+        popup.base_dirs = [(1, "/old1", "2024", 1), (2, "/ok", "2024", 1)]
+        self._save(popup, confirm=1)
+        text = self._status(popup)
+        assert "Saved 1 of 2" in text
+        assert "/taken" in text and "/ok" not in text
+        popup.list.item.assert_any_call(0, 0)
+
+    def test_skipped_update_is_reported(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg", "b.jpg"]], contains_errors=True)
+        popup.base_dirs = [(1, "/old", "2024", 2)]
+        self._save(popup, confirm=1)
+        popup.mpDB.update_base_dir.assert_not_called()
+        text = self._status(popup)
+        assert "Saved 0 of 1" in text
+        assert "/new (2 files missing)" in text
+
     def test_choosing_another_directory_needs_verifying_again(self):
         from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
         popup = _uploads_popup(verified=True)

@@ -253,17 +253,26 @@ class UploadManagerPopup(QDialog):
                 return
 
         # proceed with saving changes to the database
+        saved = 0
+        failed = []
+        skipped = []
         for u, update in enumerate(self.updates):
             # no verification results when saving unverified
             missing = self.errors[u] if u < len(self.errors) else []
             # Only update if there are no errors
             if len(missing) == 0:
-                self.mpDB.update_base_dir(update[0], update[1])
+                if self.mpDB.update_base_dir(update[0], update[1]):
+                    saved += 1
+                else:
+                    self.logger.warning(f"Failed to update base directory for {update}")
+                    failed.append(update)
             # WARN USER: Skipping update due to missing files
             else:
                 self.logger.warning(f"Skipping update for {update} due to missing files: {missing}")
+                skipped.append((update, len(missing)))
 
         # saved, start over so the same updates aren't applied again
+        total = len(self.updates)
         self.updates = []
         self.errors = []
         self.verified = False
@@ -271,3 +280,21 @@ class UploadManagerPopup(QDialog):
         self.update()
         self.button_save.setEnabled(False)
         self.button_verify.setEnabled(False)
+
+        # report what wasn't saved in the popup, those rows keep their current directory
+        message = f"Saved {saved} of {total} directories."
+        if failed:
+            dirs = ", ".join(update[1] for update in failed)
+            message += f" Could not update {dirs}, the directory may already belong to another upload."
+        if skipped:
+            dirs = ", ".join(f"{update[1]} ({n} files missing)" for update, n in skipped)
+            message += f" Skipped {dirs}."
+        if failed or skipped:
+            message += " Rows in red were not changed."
+            unsaved = set(update[0] for update in failed) | set(update[0] for update, _ in skipped)
+            for row, base_dir in enumerate(self.base_dirs):
+                if base_dir[0] in unsaved:
+                    for col in range(self.list.columnCount()):
+                        self.list.item(row, col).setBackground(QColor("#6e0e1b"))
+                        self.list.item(row, col).setForeground(QBrush(QColor("white")))
+        self.status_label.setText(message)
