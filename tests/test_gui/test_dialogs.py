@@ -303,6 +303,37 @@ class TestImportCSVOkButton:
         popup.okButton.setEnabled.assert_called_with(False)
 
 
+class TestImportCSVUnreadable:
+    """A csv pandas can't read is reported in the popup instead of crashing the app"""
+    def _popup(self, manifest):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        parent = MagicMock()
+        parent.active_survey = (1, "Default Survey")
+        with patch("matchypatchy.gui.dialogs.popup_import_csv.ComboBoxSeparator"), \
+                patch("matchypatchy.gui.dialogs.popup_import_csv.QLabel") as label_cls, \
+                patch("matchypatchy.gui.dialogs.popup_import_csv.QDialogButtonBox") as box_cls:
+            popup = ImportCSVPopup(parent, str(manifest))
+        return popup, label_cls.return_value, box_cls.return_value.button.return_value
+
+    def test_cp1252_csv_is_read(self, tmp_path):
+        """Excel on Windows saves accented filenames as cp1252"""
+        manifest = tmp_path / "manifest.csv"
+        manifest.write_bytes("filepath,timestamp,station\ncaf\u00e9.jpg,2024-01-01,S1\n".encode("cp1252"))
+        popup, _, _ = self._popup(manifest)
+        assert popup.read_error is None
+        assert popup.data.loc[0, "filepath"] == "caf\u00e9.jpg"
+
+    @pytest.mark.parametrize("content", [b"", b'filepath,timestamp\n"a.jpg,2024\n'], ids=["empty", "malformed"])
+    def test_unreadable_csv_shows_error_and_keeps_ok_disabled(self, tmp_path, content):
+        manifest = tmp_path / "manifest.csv"
+        manifest.write_bytes(content)
+        popup, label, ok_button = self._popup(manifest)
+        assert popup.read_error is not None
+        assert popup.data.empty
+        assert any("Could not read manifest.csv" in c.args[0] for c in label.setText.call_args_list)
+        assert call(True) not in ok_button.setEnabled.call_args_list
+
+
 # ---------------------------------------------------------------------------
 # ImportFolderPopup / FolderImportThread
 # ---------------------------------------------------------------------------
@@ -340,14 +371,28 @@ class TestImportFolderCancel:
         ImportFolderPopup.get_manifest(popup, pd.DataFrame({"filepath": ["a.jpg"]}))
         popup.get_options.assert_not_called()
 
-    def test_no_images_flags_for_another_directory(self):
+    def test_no_images_shown_in_popup(self):
+        """Reported in this popup's label, not a second dialog on top of it"""
         from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
         import pandas as pd
         popup = MagicMock()
         popup._closed = False
         popup.no_images = False
-        with patch(f"{FOLDER}.AlertPopup"):
+        with patch(f"{FOLDER}.AlertPopup", create=True) as alert:
             ImportFolderPopup.get_manifest(popup, pd.DataFrame())
+        alert.assert_not_called()
+        popup.station_label.setText.assert_called_once_with("No images found! Choose another directory.")
+        popup.buttonBox.accepted.connect.assert_called_once_with(popup.choose_another_directory)
+        popup.buttonBox.show.assert_called_once()
+        # waits for the user instead of closing straight away
+        assert popup.no_images is False
+        popup.reject.assert_not_called()
+
+    def test_ok_on_no_images_flags_for_another_directory(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        popup = MagicMock()
+        popup.no_images = False
+        ImportFolderPopup.choose_another_directory(popup)
         assert popup.no_images is True
         popup.reject.assert_called_once()
 

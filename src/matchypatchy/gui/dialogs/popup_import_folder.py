@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QProgressBar,
                              QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
 
 from matchypatchy.threads.animl_thread import BuildManifestThread
@@ -105,7 +104,7 @@ class ImportFolderPopup(QDialog):
 
     # 2. Receive data from thread, check if valid
     def get_manifest(self, manifest):
-        """Receive manifest from thread, proceed or alert no images found"""
+        """Receive manifest from thread, proceed or report no images found"""
         # the user cancelled while the directory was being searched
         if self._closed:
             return
@@ -115,11 +114,16 @@ class ImportFolderPopup(QDialog):
         if not self.data.empty:
             self.get_options()
         else:
-            dialog = AlertPopup(self, "No images found! Choose another directory.", title="Alert")
-            dialog.exec()
-            del dialog
-            self.no_images = True
-            self.reject()
+            # OK closes and asks for another directory, Cancel just closes
+            self.station_label.setText("No images found! Choose another directory.")
+            self.buttonBox.accepted.disconnect(self.import_manifest)
+            self.buttonBox.accepted.connect(self.choose_another_directory)
+            self.buttonBox.show()
+
+    def choose_another_directory(self):
+        """Close and flag the caller to reopen the directory picker"""
+        self.no_images = True
+        self.reject()
 
     # 3. Offer Station Options
     def get_options(self):

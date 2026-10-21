@@ -1,6 +1,7 @@
 """
 Popup for Importing a Manifest
 """
+from pathlib import Path
 import pandas as pd
 
 from PyQt6.QtWidgets import (QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QProgressBar,
@@ -48,7 +49,7 @@ class ImportCSVPopup(QDialog):
         self.cfg = parent.cfg
         self.logger = parent.logger
         self.active_survey = parent.active_survey[1]
-        self.data = pd.read_csv(manifest)
+        self.data, self.read_error = self._read_manifest(manifest)
         self.import_thread = None
 
         # setup layout
@@ -59,8 +60,13 @@ class ImportCSVPopup(QDialog):
         layout.addWidget(self.label)
         layout.addSpacing(5)
 
+        # unreadable csv, show why and only allow closing
+        if self.read_error is not None:
+            self.label.setText(f"Could not read {Path(manifest).name}. View the log for details.\n{self.read_error}")
+            self.migrate = False
+
         # exported mpdb, import directly
-        if set(self.data.columns) == self.EXPECTED_COLUMNS:
+        elif set(self.data.columns) == self.EXPECTED_COLUMNS:
             self.label.setStyleSheet("QLabel { font-size : 12pt; }")
             self.label.setText("Found an exported MatchyPatchy Database. Do you want to migrate to this database?")
             self.migrate = True
@@ -178,9 +184,24 @@ class ImportCSVPopup(QDialog):
         self.progress_bar.hide()
         layout.addWidget(self.progress_bar)
         self.setLayout(layout)
+        # nothing to import, OK stays disabled
+        if self.read_error is not None:
+            return
         if not self.migrate:
             self.auto_populate_columns()
         self.check_ok_button()
+
+    def _read_manifest(self, manifest):
+        """Read the csv, returns (data, None) or (empty DataFrame, error) if it can't be read"""
+        try:
+            try:
+                return pd.read_csv(manifest), None
+            except UnicodeDecodeError:
+                # Excel on Windows saves csvs as cp1252, not utf-8
+                return pd.read_csv(manifest, encoding="cp1252"), None
+        except (UnicodeDecodeError, pd.errors.EmptyDataError, pd.errors.ParserError, OSError) as e:
+            self.logger.error(f"Could not read manifest {manifest}: {e}")
+            return pd.DataFrame(), e
 
     @staticmethod
     def _normalize(name):
