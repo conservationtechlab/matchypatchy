@@ -1,6 +1,7 @@
 """
 GUI Window for viewing images
 """
+import logging
 import pandas as pd
 from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QComboBox, QDialog)
@@ -15,9 +16,13 @@ from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 from matchypatchy.threads.table_thread import FetchTableThread
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_object import viewpoint_value
+from matchypatchy.project import UsesProject
 
 
-class DisplayMedia(QWidget):
+logger = logging.getLogger(__name__)
+
+
+class DisplayMedia(UsesProject, QWidget):
     """GUI class for displaying and managing media content."""
 
     SAVE_STYLE = """ QPushButton { background-color: #2a3e5e; color: white; }"""
@@ -26,9 +31,7 @@ class DisplayMedia(QWidget):
     def __init__(self, parent, data_type=1):
         super().__init__()
         self.parent = parent
-        self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         # 0 for Media, 1 for ROI
         self.data_type = data_type
@@ -142,15 +145,15 @@ class DisplayMedia(QWidget):
         layout.addWidget(self.count_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.setLayout(layout)
+        self.project.changed.connect(self.drop_edits)
 
-    def update_project(self, cfg, mpDB):
-        """Update database object"""
-        self.cfg = cfg
-        self.mpDB = mpDB
-        self.filterbar.update_project(mpDB)
-        # the table looks up names and thumbnails in the project too
-        self.media_table.update_project(cfg, mpDB)
-        # unsaved edits belong to the previous project
+    def drop_edits(self):
+        """
+        Discard unsaved edits when another project is opened
+
+        Connected to project.changed in __init__. The edits refer to rois of the
+        previous project, so saving them would write to the wrong rows.
+        """
         self.edit_stack = []
         self.check_undo_button()
 

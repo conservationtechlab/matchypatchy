@@ -6,6 +6,7 @@ import, process, validate, match, and export data
 Also contains database management options for
 surveys, stations, individuals, and downloading ML models
 """
+import logging
 import os
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
@@ -27,9 +28,13 @@ from matchypatchy.threads.reid_thread import ReIDThread
 from matchypatchy.threads.model_download_thread import get_path
 
 from matchypatchy import config
+from matchypatchy.project import UsesProject
 
 
-class DisplayBase(QWidget):
+logger = logging.getLogger(__name__)
+
+
+class DisplayBase(UsesProject, QWidget):
     """Base class for the main dashboard view in the MatchyPatchy GUI."""
 
     LOGO = str(config.asset_path("graphics/logo.png"))
@@ -37,9 +42,7 @@ class DisplayBase(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         padding = 120
         # Initialize threads for sequence, animl, and reid processing
         self.active_survey = None
@@ -162,11 +165,8 @@ class DisplayBase(QWidget):
         self.setLayout(main_layout)
         
         self.update_survey()
-
-    def update_project(self, cfg, mpDB):
-        """Update database object"""
-        self.cfg = cfg
-        self.mpDB = mpDB
+        # the survey list belongs to the open project
+        self.project.changed.connect(self.update_survey)
 
     # ==========================================================================
     # Database Management Functions
@@ -231,7 +231,7 @@ class DisplayBase(QWidget):
                                                    os.path.expanduser('~'),
                                                    ("CSV Files (*.csv)"))[0]
             if manifest:
-                self.logger.info(f"Importing from manifest: {manifest}")
+                logger.info(f"Importing from manifest: {manifest}")
                 dialog = ImportCSVPopup(self, manifest)
                 dialog.exec()
                 del dialog
@@ -251,7 +251,7 @@ class DisplayBase(QWidget):
                                                          QFileDialog.Option.ShowDirsOnly)
             if directory:
                 dialog = ImportFolderPopup(self, directory)
-                self.logger.info(f"Importing from directory: {directory}")
+                logger.info(f"Importing from directory: {directory}")
                 dialog.exec()
                 # ask for another directory only if this one had no images, not on Cancel
                 no_images = dialog.no_images
@@ -371,7 +371,7 @@ class DisplayBase(QWidget):
                 # without the index, so the file can be imported (migrated) again; pandas
                 # handles line endings (text mode on Windows added blank lines)
                 data.to_csv(file_path, index=False, encoding="utf-8")
-                self.logger.info(f"Data exported to: {file_path}")
+                logger.info(f"Data exported to: {file_path}")
         else:
             dialog = AlertPopup(self, prompt="No data to export.")
             if dialog.exec():
@@ -388,7 +388,7 @@ class DisplayBase(QWidget):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
         if dialog.exec():
             self.mpDB.info()
-            self.logger.warning("DELETING DATA")
+            logger.warning("DELETING DATA")
             self.mpDB.clear("media")
             self.mpDB.clear("media_thumbnails")
             self.mpDB.clear("roi")

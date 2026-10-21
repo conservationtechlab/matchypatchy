@@ -16,9 +16,10 @@ from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.media import fetch_individual, fetch_roi, get_roi_bbox, EditObject
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.database.thumbnails import save_roi_thumbnail
+from matchypatchy.project import UsesProject
 
 
-class MediaEditPopup(QDialog):
+class MediaEditPopup(UsesProject, QDialog):
     """Popup for viewing and editing media/ROI metadata"""
 
     def __init__(self, parent, data, data_type, current_image_index=0, crop=False):
@@ -34,8 +35,7 @@ class MediaEditPopup(QDialog):
             self.setWindowTitle("View Media")
             self.adjust_mode = 'bbox'
         self.setFixedSize(1000, 520)
-        self.mpDB = parent.mpDB
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.data = data
         self.data_type = data_type
         self.ids = data["id"].tolist()
@@ -369,14 +369,14 @@ class MediaEditPopup(QDialog):
         self.refresh()
 
 
-class MetadataPanel(QWidget):
+class MetadataPanel(UsesProject, QWidget):
     """Panel for displaying and editing metadata of media/ROIs"""
     edit_signal = pyqtSignal(EditObject)  # Signal to send edits to parent
 
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.data_type = parent.data_type
         self.individuals = None
         self.name_list = ["Unknown"]  # List of individual names for the combobox

@@ -309,3 +309,24 @@ class TestMatchCounter:
         dc = self._dc(n_matches=3, current_match_after_toggle=0)
         DisplayCompare.toggle_viewpoint(dc, 0)
         dc.match_counter.setText.assert_called_with("1/3")
+
+
+class TestProjectChanged:
+    def test_new_query_container_uses_the_new_project(self):
+        """A match after switching projects must not write through the old project's database"""
+        from types import SimpleNamespace
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = DisplayCompare.__new__(DisplayCompare)
+        dc.distance_metric, dc.k, dc.threshold = "cosine", 3, 50
+        old_db, new_db = MagicMock(), MagicMock()
+        dc.project = SimpleNamespace(db=old_db, cfg=MagicMock(DB_DIR="/old"))
+        with patch(f"{DC}.QueryContainer") as container:
+            container.side_effect = lambda parent: SimpleNamespace(mpDB=parent.mpDB)
+            dc.QueryContainer = container(dc)
+            dc._teardown_query_container = MagicMock()
+
+            dc.project.db, dc.project.cfg = new_db, MagicMock(DB_DIR="/new")
+            dc.drop_queries()
+
+        dc._teardown_query_container.assert_called_once()
+        assert dc.QueryContainer.mpDB is new_db

@@ -2,6 +2,7 @@
 GUI Window for Match Comparisons
 
 """
+import logging
 import math
 import os
 from pathlib import Path
@@ -29,9 +30,13 @@ from matchypatchy.gui.query_manual import ManualQueryContainer
 from matchypatchy.gui.widgets.gui_assets import NoHoverDelegate
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual
+from matchypatchy.project import UsesProject
 
 
-class DisplayCompare(QWidget):
+logger = logging.getLogger(__name__)
+
+
+class DisplayCompare(UsesProject, QWidget):
     """GUI class for displaying and managing match comparisons."""
 
     MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
@@ -42,9 +47,7 @@ class DisplayCompare(QWidget):
         super().__init__()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.parent = parent
-        self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.k = self.cfg.KNN  # default knn
         self.distance_metric = 'cosine'
         self.threshold = 50
@@ -240,6 +243,7 @@ class DisplayCompare(QWidget):
 
         # remove focus from buttons to keep keyboard shortcuts working
         self.set_no_focus()
+        self.project.changed.connect(self.drop_queries)
         # ======================================================================
 
     def set_no_focus(self):
@@ -248,11 +252,16 @@ class DisplayCompare(QWidget):
             if isinstance(child, (QPushButton)):
                 child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-    def update_project(self, cfg, mpDB):
-        """Update database object"""
-        self.cfg = cfg
-        self.mpDB = mpDB
-        self.filterbar.update_project(mpDB)
+    def drop_queries(self):
+        """
+        Discard the query container when another project is opened
+
+        Connected to project.changed in __init__. The container holds the previous
+        project's rois and database, so a match made through it would write to
+        that project. A new one is built the next time compare is entered.
+        """
+        self._teardown_query_container()
+        self.QueryContainer = QueryContainer(self)
 
     # ==========================================================================
     # GUI
@@ -375,7 +384,7 @@ class DisplayCompare(QWidget):
             box.rejected.connect(self._on_alert_rejected)
 
         if clear_cache:
-            self.logger.info("Clearing KNN cache")
+            logger.info("Clearing KNN cache")
             print("Clearing KNN cache")
             self.QueryContainer.clear_knn_cache()
 
@@ -410,7 +419,7 @@ class DisplayCompare(QWidget):
             thread.requestInterruption()
             thread.quit()
             if not thread.wait(3000):
-                self.logger.warning("Query thread did not stop in time")
+                logger.warning("Query thread did not stop in time")
         qc.deleteLater()  # if QueryContainer is a QObject
         self.QueryContainer = None
 
@@ -434,7 +443,7 @@ class DisplayCompare(QWidget):
             return
         self.update_prompt("Checking cache...")
         if self.QueryContainer.load_knn_cache():
-            self.logger.info("Using cached KNN results")
+            logger.info("Using cached KNN results")
             # skip to finalize step
             QTimer.singleShot(100, self.QueryContainer.finalize)
         else:

@@ -1,6 +1,7 @@
 '''
 Popup to add or edit config settings
 '''
+import logging
 import os
 from pathlib import Path
 import animl
@@ -15,9 +16,13 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
+from matchypatchy.project import UsesProject
 
 
-class ConfigPopup(QDialog):
+logger = logging.getLogger(__name__)
+
+
+class ConfigPopup(UsesProject, QDialog):
     """
     Popup for adding or editing configuration settings.
     """
@@ -30,9 +35,7 @@ class ConfigPopup(QDialog):
         self.parent = parent
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
-        self.logger = parent.logger
-        self.mpDB = parent.mpDB
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.ml_dir = Path(self.cfg.ML_DIR)
         self.label_width = 130
         self.edit_width = 150
@@ -250,7 +253,7 @@ class ConfigPopup(QDialog):
     def accept(self):
         """Save: write the settings to the project's config file"""
         self.cfg.save()
-        self.logger.info("Configuration saved")
+        logger.info("Configuration saved")
         super().accept()
 
     def reject(self):
@@ -306,9 +309,6 @@ class ConfigPopup(QDialog):
             valid = self.parent.change_project(new_project)
             if not valid:
                 return
-            # Update local references to the new project's database and config
-            self.mpDB = self.parent.mpDB
-            self.cfg = self.parent.cfg
             self._original = self._settings()
             self.refresh()
 
@@ -328,9 +328,6 @@ class ConfigPopup(QDialog):
         if parent_dir and project_name:
             new_project_path = Path(parent_dir) / project_name
             self.parent.new_project(new_project_path)
-            # Update local references to the new project's database and config
-            self.mpDB = self.parent.mpDB
-            self.cfg = self.parent.cfg
             self._original = self._settings()
             self.refresh()
 
@@ -346,7 +343,7 @@ class ConfigPopup(QDialog):
                 # Update config
                 self.visualizer_model.setText(new_model[0])
                 self.cfg.REID_KEY = str(Path(new_model[0]).stem)
-                self.logger.info(f"Re-ID model updated to {self.cfg.REID_KEY}")
+                logger.info(f"Re-ID model updated to {self.cfg.REID_KEY}")
             else:
                 dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
                 dialog.exec()
@@ -358,7 +355,7 @@ class ConfigPopup(QDialog):
             nummatches = int(self.nummatches.text())
             if nummatches > 0:
                 self.cfg.KNN = nummatches
-                self.logger.info(f"Max number of matches updated to {nummatches}")
+                logger.info(f"Max number of matches updated to {nummatches}")
         except ValueError:
             pass
 
@@ -370,7 +367,7 @@ class ConfigPopup(QDialog):
             if duration > 0:
                 self.cfg.SEQUENCE_DURATION = duration
                 self.cfg.SEQUENCE_N = n
-                self.logger.info(f"Sequence settings updated: duration={duration}, n={n}")
+                logger.info(f"Sequence settings updated: duration={duration}, n={n}")
         except ValueError:
             pass
 
@@ -400,14 +397,14 @@ class ConfigPopup(QDialog):
 
     def change_device(self):
         """Change hardware device for running models between CPU and CUDA-enabled GPU"""
-        self.logger.info(f"Device changed to {self.device.currentText()}")
+        logger.info(f"Device changed to {self.device.currentText()}")
         """Change hardware device for running models"""
         selected_device = self.device.currentText()
         if selected_device == "CPU":
             self.cfg.DEVICE = "CPUExecutionProvider"
         elif selected_device == "CUDA-enabled GPU":
             self.cfg.DEVICE = "CUDAExecutionProvider"
-        self.logger.info(f"Device changed to {self.cfg.DEVICE}")
+        logger.info(f"Device changed to {self.cfg.DEVICE}")
 
     def edit_uploads(self):
         """Open the upload directories manager popup."""

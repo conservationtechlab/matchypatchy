@@ -6,15 +6,17 @@ from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QSizePolicy, QCheckBox
 from PyQt6.QtGui import QStandardItemModel
 from PyQt6.QtCore import Qt
 
+from matchypatchy.project import UsesProject
 
-class FilterBar(QWidget):
+
+class FilterBar(UsesProject, QWidget):
     """
     Filter bar widget for selecting filters in MatchyPatchy GUI
     Default combobox size is 200px, can be adjusted via size parameter.
     """
     def __init__(self, parent, size=200):
         super().__init__(parent)
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.size = size
         self.filters = {}
         self.valid_stations = dict(self.mpDB.select("station", columns="id, name"))
@@ -68,10 +70,6 @@ class FilterBar(QWidget):
         layout.addWidget(self.favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.setLayout(layout)
-
-    def update_project(self, mpDB):
-        """Update database object"""
-        self.mpDB = mpDB
 
     def refresh_filters(self, prefilter=None):
         """

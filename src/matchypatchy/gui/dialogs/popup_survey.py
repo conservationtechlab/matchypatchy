@@ -13,14 +13,15 @@ from matchypatchy.database.location import TZ_CONVERT_DICT
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.database.media import media_count
 from matchypatchy.database.mpdb import sql_text
+from matchypatchy.project import UsesProject
 
 
-class SurveyPopup(QDialog):
+class SurveyPopup(UsesProject, QDialog):
     """Popup dialog for managing surveys (add/edit/delete)"""
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Manage surveys")
-        self.mpDB = parent.mpDB
+        self.project = parent.project
 
         layout = QVBoxLayout()
 

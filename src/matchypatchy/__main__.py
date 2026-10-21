@@ -55,7 +55,7 @@ if __name__ == "__main__":
     try:
         setup_cuda_path()
         app = QApplication(sys.argv)
-        window = MainWindow(logger)
+        window = MainWindow()
         logger.info("Main window initialized")
         window.show()
 

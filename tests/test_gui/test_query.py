@@ -29,9 +29,9 @@ def _make_parent(db=None, cache_dir=None):
     """Build a minimal parent mock that QueryContainer expects."""
     parent = MagicMock()
     parent.mpDB = db or MagicMock()
-    parent.logger = MagicMock()
     parent.cfg = MagicMock()
     parent.cfg.DB_DIR = str(cache_dir)
+    parent.project.db, parent.project.cfg = parent.mpDB, parent.cfg
     parent.distance_metric = "cosine"
     parent.k = 3
     parent.threshold = 50
@@ -855,10 +855,10 @@ class TestKnnCache:
         assert qc_raw.load_knn_cache() is True
         assert qc_raw._raw_ranked[0]["neighbors"] == [[12, 0.25]]
 
-    def test_save_failure_is_logged_not_raised(self, qc_raw, tmp_path):
+    def test_save_failure_is_logged_not_raised(self, qc_raw, tmp_path, caplog):
         qc_raw.CACHE_PATH = tmp_path / "missing_dir" / "knn_cache.json"
         qc_raw.save_knn_cache(self._serialized())
-        qc_raw.logger.error.assert_called_once()
+        assert [r.levelname for r in caplog.records] == ["ERROR"]
         assert list(tmp_path.rglob("*.tmp")) == []
 
     def test_load_without_file(self, qc_raw):
@@ -897,10 +897,10 @@ class TestKnnCache:
         qc_raw.data_raw = qc_raw.data_raw.astype({"individual_id": float})
         assert qc_raw.load_knn_cache() is True
 
-    def test_load_corrupt_file(self, qc_raw):
+    def test_load_corrupt_file(self, qc_raw, caplog):
         qc_raw.CACHE_PATH.write_text("{not json")
         assert qc_raw.load_knn_cache() is False
-        qc_raw.logger.error.assert_called_once()
+        assert [r.levelname for r in caplog.records] == ["ERROR"]
 
     def test_cache_is_independent_of_filter(self, qc_raw):
         """The cache stores unfiltered results, so a changed filter must not invalidate it."""

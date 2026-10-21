@@ -4,6 +4,7 @@ Query containers for the compare view
 BaseQueryContainer holds what every mode shares; QueryContainer is the
 default (KNN) mode. QC and manual mode live in query_qc.py and query_manual.py.
 """
+import logging
 import hashlib
 import json
 from pathlib import Path
@@ -18,9 +19,13 @@ from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.threads.match_object import MatchObject, FavoriteMatchObject, toggle_viewpoint_value
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
+from matchypatchy.project import UsesProject
 
 
-class BaseQueryContainer(QObject):
+logger = logging.getLogger(__name__)
+
+
+class BaseQueryContainer(UsesProject, QObject):
     """
     ROI lookups, metadata and match actions shared by every query container.
 
@@ -218,7 +223,7 @@ class BaseQueryContainer(QObject):
             rois.update(self.data_raw.index[self.data_raw['individual_id'] == iid])
 
         if not rois:
-            self.logger.warning("merge: no ROIs to update")
+            logger.warning("merge: no ROIs to update")
             return
 
         roi_updates = {int(r): {"individual_id": keep_id, "reviewed": 1}
@@ -280,10 +285,8 @@ class QueryContainer(BaseQueryContainer):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        self.mpDB = parent.mpDB
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.CACHE_PATH = Path(self.cfg.DB_DIR) / "knn_cache.json"
-        self.logger = parent.logger
         self.metric = parent.distance_metric
         self.k = parent.k
         self.k_cache = self.k * KNN_OVERFETCH
@@ -347,7 +350,7 @@ class QueryContainer(BaseQueryContainer):
         self._favorites_cache = None
         self.loaded_data.emit(self.data_raw)
         if self.data_raw.empty:
-            self.logger.warning("No ROI media found in the database.")
+            logger.warning("No ROI media found in the database.")
             return False
         # Must have embeddings to continue
         return not (self.data_raw["emb"] == 0).all()
@@ -412,7 +415,7 @@ class QueryContainer(BaseQueryContainer):
     def stop_calculation(self):
         """Request the match thread to stop calculation"""
         self._stop_requested = True
-        self.logger.info("Stop requested for query container %s", id(self))
+        logger.info("Stop requested for query container %s", id(self))
         if self.match_thread is not None:
             self.match_thread.requestInterruption()
 
@@ -454,7 +457,7 @@ class QueryContainer(BaseQueryContainer):
         # strict only for cache: if headroom ran out, recompute instead of showing < k
         ranked = self._restrict_to_data(self._raw_ranked, strict=self._from_cache)
         if ranked is None:
-            self.logger.info("Cache lacks headroom for this filter, recalculating")
+            logger.info("Cache lacks headroom for this filter, recalculating")
             self.calculate_neighbors()
             return
 
@@ -486,20 +489,20 @@ class QueryContainer(BaseQueryContainer):
 
             if station_ids is None:
                 self.data = pd.DataFrame()
-                self.logger.info("No valid stations found, resulting in empty data.")
+                logger.info("No valid stations found, resulting in empty data.")
                 return False
             else:
                 # Single vectorized filter; copy so later .loc writes don't hit a view
                 self.data = self.data_raw[self.data_raw['station_id'].isin(station_ids)].copy()
 
         if self.data.empty:
-            self.logger.info("Filter removed all data.")
+            logger.info("Filter removed all data.")
             return False
 
         # Rebuild index with filtered data
         self._build_seq_indices()
         self.sequences = db_roi.sequence_roi_dict(self.data)
-        self.logger.info(f"Filtered data contains {len(self.data)} entries.")
+        logger.info(f"Filtered data contains {len(self.data)} entries.")
         return True
 
     def refresh_data(self):
@@ -732,7 +735,7 @@ class QueryContainer(BaseQueryContainer):
         """Clear the KNN cache"""
         # delete the file
         self.CACHE_PATH.unlink(missing_ok=True)
-        self.logger.info("KNN cache cleared")
+        logger.info("KNN cache cleared")
 
     @staticmethod
     def _json_default(o):
@@ -786,9 +789,9 @@ class QueryContainer(BaseQueryContainer):
             with open(tmp, 'w') as f:
                 json.dump(payload, f, default=self._json_default)
             tmp.replace(self.CACHE_PATH)  # atomic, never a half-written file
-            self.logger.info(f"KNN cache saved to {self.CACHE_PATH}")
+            logger.info(f"KNN cache saved to {self.CACHE_PATH}")
         except Exception as e:
-            self.logger.error(f"Failed to save JSON cache: {e}")
+            logger.error(f"Failed to save JSON cache: {e}")
             tmp.unlink(missing_ok=True)
 
     def load_knn_cache(self):
@@ -809,7 +812,7 @@ class QueryContainer(BaseQueryContainer):
             self._from_cache = True
             return True
         except Exception as e:
-            self.logger.error(f"Failed to load JSON cache: {e}")
+            logger.error(f"Failed to load JSON cache: {e}")
             return False
 
     @staticmethod

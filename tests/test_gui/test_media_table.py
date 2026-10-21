@@ -4,6 +4,9 @@ Unit tests for matchypatchy.gui.media_table.MediaTable
 Tests focus on pure-Python logic methods that do not require a running Qt
 display server. Qt widgets are stubbed out by conftest.py.
 """
+from pathlib import Path
+from types import SimpleNamespace
+
 import pandas as pd
 import pytest
 from unittest.mock import MagicMock, patch
@@ -30,9 +33,7 @@ def _make_media_table():
     from matchypatchy.gui.media_table import MediaTable
 
     parent = MagicMock()
-    parent.cfg = MagicMock()
-    parent.cfg.THUMBNAIL_DIR = "/tmp/thumbs"
-    parent.mpDB = MagicMock()
+    parent.project = SimpleNamespace(db=MagicMock(), cfg=MagicMock(THUMBNAIL_DIR=Path("/tmp/thumbs")))
 
     with patch("matchypatchy.gui.media_table.load_model",
                return_value={"None": "None", "0": "Left", "1": "Right"}):
