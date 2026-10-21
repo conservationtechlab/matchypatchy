@@ -575,6 +575,21 @@ class TestExportHelpers:
         assert df is not None
         assert not df.empty
 
+    def test_export_data_mixed_timestamp_formats(self, tmp_db):
+        """CSV import keeps timestamps as typed, export parses what it can and keeps the rest"""
+        db, _ = tmp_db
+        station_id = db.add_station("S", 0, 0, 1)
+        upload_id = db.add_upload("/img")
+        timestamps = ["2024-01-01 10:00:00", "2024:01:02 03:04:05", "dawn", None]
+        for n, timestamp in enumerate(timestamps):
+            mid = db.add_media(upload_id, f"{n}.jpg", f"ts_sha_{n}" * 8, ".jpg", timestamp, station_id)
+            db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+
+        df = db.export_data()
+
+        assert [str(t) if t is not None else None for t in df.sort_values("relative_path")["timestamp"]] == [
+            "2024-01-01 10:00:00", "2024-01-02 03:04:05", "dawn", None]
+
     def test_retrieve_key(self, tmp_db):
         db, _ = tmp_db
         version, mpkey, chromakey = db.retrieve_key()

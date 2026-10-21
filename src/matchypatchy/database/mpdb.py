@@ -29,6 +29,25 @@ def sql_text(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
+def parse_timestamps(timestamps):
+    """
+    Parse media timestamps for export, which may be in mixed formats
+
+    CSV import stores the timestamp text as typed and folder import stores ISO.
+    Text that can't be parsed is kept as it is rather than blanked.
+    """
+    parsed = pd.to_datetime(timestamps, format='mixed', errors='coerce')
+    # EXIF style, eg. 2024:01:01 00:00:00
+    failed = parsed.isna()
+    parsed[failed] = pd.to_datetime(timestamps[failed], format='%Y:%m:%d %H:%M:%S', errors='coerce')
+    # missing timestamps are stored as text by add_media
+    blank = timestamps.isna() | timestamps.astype(str).str.strip().isin(['', 'None', 'nan', 'NaT'])
+    unparsed = parsed.isna() & ~blank
+    if unparsed.any():
+        return parsed.astype(object).where(~unparsed, timestamps)
+    return parsed
+
+
 # rois removed by a delete from each table, given the delete's condition
 # their embeddings live in chroma, which the sqlite cascade doesn't reach
 _MEDIA_OF = {
@@ -883,7 +902,7 @@ class MatchyPatchyDB():
         if not rois.empty:
             # convert viewpoint to int
             rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
-            rois['timestamp'] = pd.to_datetime(rois['timestamp'])
+            rois['timestamp'] = parse_timestamps(rois['timestamp'])
             # merge with stations
             stations, columns = self.stations()
             stations = pd.DataFrame(stations, columns=columns)
