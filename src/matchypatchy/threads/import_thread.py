@@ -202,6 +202,8 @@ class CSVMigrateThread(QThread):
             new_base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir={sql_text(str(base_dir))}')[0][0]
         except IndexError:
             new_base_dir_id = self.mpDB.add_upload(str(base_dir))
+            if new_base_dir_id is None:
+                raise RuntimeError(f"Failed to add upload '{base_dir}', see log for database error")
         # add to ref
         self.base_dir_ref[old_base_dir_id] = new_base_dir_id
 
@@ -217,6 +219,8 @@ class CSVMigrateThread(QThread):
         except IndexError:
             region_id = self.region(region_name) if not pd.isna(region_name) else None
             survey_id = self.mpDB.add_survey(str(survey_name), region_id, None, None)
+            if survey_id is None:
+                raise RuntimeError(f"Failed to add survey '{survey_name}' (region: {region_name}), see log for database error")
         self.survey_ref[survey_name] = survey_id
         return survey_id
 
@@ -226,6 +230,8 @@ class CSVMigrateThread(QThread):
             region_id = self.mpDB.select("region", columns="id", row_cond=f'name={sql_text(region_name)}')[0][0]
         except IndexError:
             region_id = self.mpDB.add_region(str(region_name), None)
+            if region_id is None:
+                raise RuntimeError(f"Failed to add region '{region_name}', see log for database error")
         return region_id
 
     def station(self, old_station_id, station_name, survey_id, lat, long):
@@ -241,6 +247,8 @@ class CSVMigrateThread(QThread):
                                                    lat if not pd.isna(lat) else None,
                                                    long if not pd.isna(long) else None,
                                                    survey_id)
+                if station_id is None:
+                    raise RuntimeError(f"Failed to add station '{station_name}' (survey_id: {survey_id}), see log for database error")
             self.station_ref[old_station_id] = station_id
         return station_id
 
@@ -260,6 +268,8 @@ class CSVMigrateThread(QThread):
                 # if not in database, add camera
                 except IndexError:
                     camera_id = self.mpDB.add_camera(str(camera_name), station_id)
+                    if camera_id is None:
+                        raise RuntimeError(f"Failed to add camera '{camera_name}' (station_id: {station_id}), see log for database error")
                 # add camera id to reference dictionary
                 self.camera_ref[old_camera_id] = camera_id
             return camera_id

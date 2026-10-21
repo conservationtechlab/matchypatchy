@@ -784,17 +784,21 @@ class TestImportDetectionDone:
         assert self._detection_done(db) == {"boxed.jpg": 1, "boxless.jpg": 0}
 
 
+def _migrate_row(path, n, box=0.2, **overrides):
+    """An exported roi row for path, with a square bbox of size box"""
+    row = {column: None for column in import_thread.CSVMigrateThread.EXPECTED_COLUMNS}
+    row.update({"id": n, "media_id": 1, "frame": 0, "bbox_x": box, "bbox_y": box, "bbox_w": box,
+                "bbox_h": box, "base_dir_id": 1, "filepath": str(path), "relative_path": path.name,
+                "ext": ".jpg", "timestamp": "2024-01-01 12:00:00", "station_id": 1,
+                "station_name": "Station A", "survey_name": "Survey A"})
+    row.update(overrides)
+    return row
+
+
 class TestCSVMigrateRerun:
     """Migrating into a project that already has some of the files"""
 
-    def _row(self, path, n, box=0.2, **overrides):
-        row = {column: None for column in import_thread.CSVMigrateThread.EXPECTED_COLUMNS}
-        row.update({"id": n, "media_id": 1, "frame": 0, "bbox_x": box, "bbox_y": box, "bbox_w": box,
-                    "bbox_h": box, "base_dir_id": 1, "filepath": str(path), "relative_path": path.name,
-                    "ext": ".jpg", "timestamp": "2024-01-01 12:00:00", "station_id": 1,
-                    "station_name": "Station A", "survey_name": "Survey A"})
-        row.update(overrides)
-        return row
+    _row = staticmethod(_migrate_row)
 
     def _migrate(self, db, parent, rows):
         thread = import_thread.CSVMigrateThread(parent, pd.DataFrame(rows))
@@ -937,3 +941,24 @@ class TestFolderImportCaching:
 
         assert db.count("media") == 12
         assert thread.progress_update.calls == [(10,), (12,)]
+
+
+class TestCSVMigrateInsertFailures:
+    def test_failed_station_insert_is_reported(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        image = tmp_path / "a.jpg"
+        image.write_bytes(b"a")
+        row = _migrate_row(image, 0)
+        monkeypatch.setattr(db, "add_station", lambda *_: None)
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame([row]))
+        thread.import_failed = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert len(thread.import_failed.calls) == 1
+        assert thread.import_failed.calls[0][0].startswith("Failed to add station 'Station A'")
+        assert db.count("media") == 0
