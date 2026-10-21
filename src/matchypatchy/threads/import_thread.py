@@ -23,6 +23,9 @@ class CSVMigrateThread(QThread):
     error_update = pyqtSignal(list)  # Signal to update the error log
     import_failed = pyqtSignal(str)  # Signal to report a fatal import error
 
+    # How many ROIs to process between progress signal emissions and commits.
+    PROGRESS_BATCH_SIZE = 10
+
     EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                         'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
                         'relative_path', 'ext', 'timestamp', 'station_id', 'sequence_id',
@@ -53,11 +56,13 @@ class CSVMigrateThread(QThread):
             self._run()
         except Exception as error:
             # an unhandled exception in a QThread aborts the whole app, report it instead
+            self.mpDB.db.rollback()
             logger.exception("Import failed")
             self.import_failed.emit(str(error))
 
     def _run(self):
         roi_counter = 0  # progressbar counter
+        emitted_counter = 0  # last value emitted, to batch signal emission
 
         for row in self.data.itertuples(index=False):
             if not self.isInterruptionRequested():
@@ -91,7 +96,8 @@ class CSVMigrateThread(QThread):
                                                camera_id=new_camera_id,
                                                sequence_id=sequence_id,
                                                external_id=row.external_id if not pd.isna(row.external_id) else None,
-                                               comment=row.comment if not pd.isna(row.comment) else None)
+                                               comment=row.comment if not pd.isna(row.comment) else None,
+                                               commit=False)
 
                 if media_id == "duplicate_error":
                     # already imported (eg. an earlier roi of the same file); media has no
@@ -100,7 +106,7 @@ class CSVMigrateThread(QThread):
 
                 # save thumbnail for new media
                 media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
-                self.mpDB.add_thumbnail("media", media_id, media_thumbnail)
+                self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
 
                 # individual
                 individual_id = self.individual(row.individual_id, row.name, row.sex)
@@ -122,17 +128,29 @@ class CSVMigrateThread(QThread):
                                         reviewed=row.reviewed if not pd.isna(row.reviewed) else 0,
                                         favorite=row.favorite if not pd.isna(row.favorite) else 0,
                                         individual_id=individual_id,
-                                        emb=0)  # do not add emb, must be reprocessed in new project
+                                        emb=0,  # do not add emb, must be reprocessed in new project
+                                        commit=False)
                 # save thumbnail for new roi
                 roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, row.filepath, row.ext,
                                                    row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                self.mpDB.add_thumbnail("roi", rid, roi_thumbnail)
+                self.mpDB.add_thumbnail("roi", rid, roi_thumbnail, commit=False)
                 # a roi with a box was already detected, a box-less one still needs the detector
                 if bbox_w != -1:
-                    self.mpDB.mark_detection_done([media_id])
+                    self.mpDB.mark_detection_done([media_id], commit=False)
 
                 roi_counter += 1
-                self.progress_update.emit(roi_counter)
+
+                # bank progress updates and commit in batches
+                if roi_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
+                    self.progress_update.emit(roi_counter)
+                    emitted_counter = roi_counter
+                    self.mpDB.db.commit()
+
+        self.mpDB.db.commit()  # commit anything remaining
+
+        # make sure the progress bar reaches its true final value
+        if emitted_counter != roi_counter:
+            self.progress_update.emit(roi_counter)
 
         if not self.isInterruptionRequested():
             # finished adding media
