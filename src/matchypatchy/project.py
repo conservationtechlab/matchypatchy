@@ -5,10 +5,15 @@ One Project lives as long as the main window. Opening another project swaps the
 config and database inside it, so every object holding the Project sees the new
 one, instead of each object keeping its own copy of the database.
 """
+import logging
+
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from matchypatchy.config import mpConfig
 from matchypatchy.database.mpdb import MatchyPatchyDB
+
+
+logger = logging.getLogger(__name__)
 
 
 class Project(QObject):
@@ -16,9 +21,8 @@ class Project(QObject):
 
     changed = pyqtSignal()  # emitted after cfg and db point at a newly opened project
 
-    def __init__(self, logger):
+    def __init__(self):
         super().__init__()
-        self.logger = logger
         self._cfg = None
         self._db = None
 
@@ -40,7 +44,7 @@ class Project(QObject):
         open leaves the current project open and unchanged.
         """
         cfg = mpConfig(home_dir)
-        db = MatchyPatchyDB(cfg.DB_DIR, self.logger)
+        db = MatchyPatchyDB(cfg.DB_DIR, logger)
         if not db.key:
             db.close()
             raise ValueError(f"Database at {cfg.DB_DIR} is invalid.")

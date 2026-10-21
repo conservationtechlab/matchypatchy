@@ -6,8 +6,8 @@ import pytest
 from matchypatchy.project import Project, UsesProject
 
 
-def _project(null_logger):
-    project = Project(null_logger)
+def _project():
+    project = Project()
     opened = []
     project.changed.connect(lambda: opened.append(project.cfg.HOME_DIR))
     return project, opened
@@ -22,16 +22,16 @@ def _invalid_project(tmp_path):
 
 
 class TestProject:
-    def test_open_loads_config_and_database(self, null_logger, tmp_path):
-        project, opened = _project(null_logger)
+    def test_open_loads_config_and_database(self, tmp_path):
+        project, opened = _project()
         project.open(tmp_path / "a")
         assert project.cfg.HOME_DIR == tmp_path / "a"
         assert project.db.key
         assert opened == [tmp_path / "a"]
         project.close()
 
-    def test_switching_closes_the_previous_database(self, null_logger, tmp_path, monkeypatch):
-        project, opened = _project(null_logger)
+    def test_switching_closes_the_previous_database(self, tmp_path, monkeypatch):
+        project, opened = _project()
         project.open(tmp_path / "a")
         first = project.db
         closed = []
@@ -45,9 +45,9 @@ class TestProject:
         assert opened == [tmp_path / "a", tmp_path / "b"]
         project.close()
 
-    def test_failed_open_keeps_the_current_project(self, null_logger, tmp_path, monkeypatch):
+    def test_failed_open_keeps_the_current_project(self, tmp_path, monkeypatch):
         """The current project stays open and usable when the new one can't be opened"""
-        project, opened = _project(null_logger)
+        project, opened = _project()
         project.open(tmp_path / "a")
         current_db, current_cfg = project.db, project.cfg
         closed = []
@@ -63,8 +63,8 @@ class TestProject:
         assert project.db.count("survey") == 1
         project.close()
 
-    def test_close_before_open_does_nothing(self, null_logger):
-        Project(null_logger).close()
+    def test_close_before_open_does_nothing(self):
+        Project().close()
 
 
 class TestUsesProject:
