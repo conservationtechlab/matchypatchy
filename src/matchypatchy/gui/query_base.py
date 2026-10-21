@@ -183,11 +183,14 @@ class BaseQueryContainer(QObject):
         return self._get_roi_field(self.current_match_rid, 'sequence_id')
 
     # MATCH FUNCTIONS ----------------------------------------------------------
+    def _new_iid_rois(self):
+        """ROIs to name when matching two unnamed rois"""
+        return set(self.current_query_rois) | {self.current_match_rid}
+
     def new_iid(self, individual_id):
         """Update records for roi after confirming a match (batched)"""
-        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1}
-                       for roi in self.current_query_rois}
-        roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
+        roi_updates = {int(roi): {"individual_id": individual_id, "reviewed": 1}
+                       for roi in self._new_iid_rois()}
 
         # Update local index
         self._update_roi_index(roi_updates)
@@ -225,15 +228,19 @@ class BaseQueryContainer(QObject):
         # Update local index
         self._update_roi_index(roi_updates)
 
+    def _unmatch_rois(self):
+        """ROIs to clear when unmatching"""
+        return {self.current_query_rid}
+
     def unmatch(self):
         """Unmatch the current query ROI from the matched ROI"""
+        roi_updates = {int(r): {'individual_id': None, "reviewed": 0}
+                       for r in self._unmatch_rois()}
         # Update local index
-        self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
+        self._update_roi_index(roi_updates)
 
         # update database
-        self.mpDB.edit_row('roi', self.current_query_rid,
-                           {'individual_id': None, "reviewed": 0},
-                           allow_none=True, quiet=True)
+        self.mpDB.batch_edit('roi', roi_updates, allow_none=True, quiet=True)
 
     # REFRESH ------------------------------------------------------------------
     def refresh_data(self):
@@ -697,7 +704,18 @@ class QueryContainer(BaseQueryContainer):
         """All ROIs of the query and match sequences"""
         query_seq = self.current_match_object.sequence_id
         match_seq = self._get_roi_field(self.current_match_rid, 'sequence_id')
-        return set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, []))
+        # the shown rois too, a match roi without a sequence is not in _seq_index
+        return ({self.current_query_rid, self.current_match_rid}
+                | set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, [])))
+
+    def _new_iid_rois(self):
+        """Name both whole sequences, like merge"""
+        return self._merge_rois()
+
+    def _unmatch_rois(self):
+        """The whole query sequence, so Unmatch undoes Match"""
+        query_seq = self.current_match_object.sequence_id
+        return {self.current_query_rid} | set(self._seq_index.get(query_seq, []))
 
     # ==========================================================================
     # KNN CACHE MANAGEMENT

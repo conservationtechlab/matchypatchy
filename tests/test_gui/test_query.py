@@ -1013,8 +1013,10 @@ class TestMatchActions:
 
     def test_new_iid(self):
         qc = self.qc
+        qc.current_query_rid = 10
         qc.current_query_rois = [10, 11]
         qc.current_match_rid = 13
+        qc.current_match_object = SimpleNamespace(sequence_id=1)
         qc.new_iid(500)
 
         table, updates = qc.mpDB.batch_edit.call_args.args
@@ -1023,6 +1025,29 @@ class TestMatchActions:
         assert all(u == {"individual_id": 500, "reviewed": 1} for u in updates.values())
         assert qc.mpDB.batch_edit.call_args.kwargs == {"quiet": True}
         assert qc.data.loc[13, "individual_id"] == 500
+
+    def test_new_iid_names_both_whole_sequences(self):
+        """Not just the rois left on screen by the viewpoint toggle, like merge"""
+        qc = self.qc
+        qc._update_roi_index({13: {"sequence_id": 4}})   # match sequence 4 = rois 13, 14
+        qc._build_seq_indices()
+        qc.current_query_rid = 10
+        qc.current_query_rois = [10]                # 11 hidden by the viewpoint filter
+        qc.current_match_rid = 13
+        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.new_iid(500)
+        assert set(qc.mpDB.batch_edit.call_args.args[1]) == {10, 11, 13, 14}
+
+    def test_new_iid_match_without_sequence(self):
+        qc = self.qc
+        qc._update_roi_index({13: {"sequence_id": None}})
+        qc._build_seq_indices()
+        qc.current_query_rid = 10
+        qc.current_query_rois = [10, 11]
+        qc.current_match_rid = 13
+        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.new_iid(500)
+        assert set(qc.mpDB.batch_edit.call_args.args[1]) == {10, 11, 13}
 
     def test_merge_keeps_lowest_id_and_absorbs_other_individual(self):
         qc = self.qc
@@ -1079,15 +1104,20 @@ class TestMatchActions:
         qc.merge()
         qc.mpDB.batch_edit.assert_not_called()
 
-    def test_unmatch(self):
+    def test_unmatch_clears_whole_query_sequence(self):
+        """Unmatch undoes Match, which named every roi of the query sequence"""
         qc = self.qc
-        qc.current_query_rid = 10
+        qc.current_query_rid = 10       # seq 1 = rois 10, 11
+        qc.current_match_rid = 13
+        qc.current_match_object = SimpleNamespace(sequence_id=1)
         qc.unmatch()
-        qc.mpDB.edit_row.assert_called_once_with(
-            "roi", 10, {"individual_id": None, "reviewed": 0},
-            allow_none=True, quiet=True)
-        assert pd.isna(qc.data.loc[10, "individual_id"])
-        assert qc.data.loc[10, "reviewed"] == 0
+        cleared = {"individual_id": None, "reviewed": 0}
+        qc.mpDB.batch_edit.assert_called_once_with(
+            "roi", {10: cleared, 11: cleared}, allow_none=True, quiet=True)
+        for rid in (10, 11):
+            assert pd.isna(qc.data.loc[rid, "individual_id"])
+            assert qc.data.loc[rid, "reviewed"] == 0
+        assert qc.data.loc[13, "individual_id"] == 200
 
 
 # ---------------------------------------------------------------------------

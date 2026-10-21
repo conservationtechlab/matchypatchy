@@ -83,8 +83,9 @@ class TestMatchActions:
     def test_unmatch_then_refresh(self, container):
         container.current_query_rid, container.current_match_rid = 11, 10
         container.unmatch()
-        container.mpDB.edit_row.assert_called_once_with(
-            "roi", 11, {"individual_id": None, "reviewed": 0}, allow_none=True, quiet=True)
+        # only the roi on screen, not the rest of the individual
+        container.mpDB.batch_edit.assert_called_once_with(
+            "roi", {11: {"individual_id": None, "reviewed": 0}}, allow_none=True, quiet=True)
         # DisplayCompare refreshes through these after match / unmatch
         module = type(container).__module__
         with patch(f"{module}.db_roi.fetch_roi_media", side_effect=lambda *a, **k: _roi_media()):
