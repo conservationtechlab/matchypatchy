@@ -371,14 +371,28 @@ class TestImportFolderCancel:
         ImportFolderPopup.get_manifest(popup, pd.DataFrame({"filepath": ["a.jpg"]}))
         popup.get_options.assert_not_called()
 
-    def test_no_images_flags_for_another_directory(self):
+    def test_no_images_shown_in_popup(self):
+        """Reported in this popup's label, not a second dialog on top of it"""
         from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
         import pandas as pd
         popup = MagicMock()
         popup._closed = False
         popup.no_images = False
-        with patch(f"{FOLDER}.AlertPopup"):
+        with patch(f"{FOLDER}.AlertPopup", create=True) as alert:
             ImportFolderPopup.get_manifest(popup, pd.DataFrame())
+        alert.assert_not_called()
+        popup.station_label.setText.assert_called_once_with("No images found! Choose another directory.")
+        popup.buttonBox.accepted.connect.assert_called_once_with(popup.choose_another_directory)
+        popup.buttonBox.show.assert_called_once()
+        # waits for the user instead of closing straight away
+        assert popup.no_images is False
+        popup.reject.assert_not_called()
+
+    def test_ok_on_no_images_flags_for_another_directory(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        popup = MagicMock()
+        popup.no_images = False
+        ImportFolderPopup.choose_another_directory(popup)
         assert popup.no_images is True
         popup.reject.assert_called_once()
 
