@@ -917,3 +917,23 @@ class TestFolderImportCaching:
         assert db.count("media") == 3
         assert tables.count("station") == 1
         assert tables.count("camera") == 1
+
+    def test_commits_and_progress_are_batched(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        paths = []
+        for n in range(12):
+            path = tmp_path / f"{n}.jpg"
+            path.write_bytes(str(n).encode())
+            paths.append(str(path))
+        data = pd.DataFrame({"filepath": paths, "datetime": ["2024-01-01 12:00:00"] * 12})
+        thread = import_thread.FolderImportThread(parent, (1,), data, station_level=0, camera_level=0)
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        thread.progress_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert db.count("media") == 12
+        assert thread.progress_update.calls == [(10,), (12,)]

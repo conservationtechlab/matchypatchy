@@ -705,6 +705,9 @@ class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     import_failed = pyqtSignal(str)  # Signal to report a fatal import error
 
+    # How many files to process between progress signal emissions and commits.
+    PROGRESS_BATCH_SIZE = 10
+
     def __init__(self, parent, active_survey, data, station_level, camera_level):
         super().__init__()
         self.mpDB = parent.mpDB
@@ -719,6 +722,9 @@ class FolderImportThread(QThread):
         # get timezone for timestamp parsing
 
     def run(self):
+        file_counter = 0  # progressbar counter
+        emitted_counter = 0  # last value emitted, to batch signal emission
+
         try:
             # get base directory for the files being imported
             base_dir = self._get_base_dir(self.data['filepath'].tolist())
@@ -727,8 +733,9 @@ class FolderImportThread(QThread):
             except IndexError:
                 base_dir_id = self.mpDB.add_upload(base_dir)
 
-            for i, file in self.data.iterrows():
+            for _, file in self.data.iterrows():
                 if not self.isInterruptionRequested():
+                    file_counter += 1
 
                     filepath = file['filepath']
                     # check to see if file exists
@@ -767,19 +774,31 @@ class FolderImportThread(QThread):
                                                    camera_id=int(camera_id) if camera_id is not None else None,
                                                    sequence_id=None,
                                                    external_id=None,
-                                                   comment=None)
+                                                   comment=None,
+                                                   commit=False)
                     # save thumbnail, unless the file was already imported or failed to add
                     if media_id not in ("duplicate_error", None):
                         thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
-                        self.mpDB.add_thumbnail("media", media_id, thumbnail_path)
+                        self.mpDB.add_thumbnail("media", media_id, thumbnail_path, commit=False)
 
-                    self.progress_update.emit(i)
+                    # bank progress updates and commit in batches
+                    if file_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
+                        self.progress_update.emit(file_counter)
+                        emitted_counter = file_counter
+                        self.mpDB.db.commit()
+
+            self.mpDB.db.commit()  # commit anything remaining
 
         except Exception as error:
             # an unhandled exception in a QThread aborts the whole app, report it instead
+            self.mpDB.db.rollback()
             logger.exception("Import failed")
             self.import_failed.emit(str(error))
             return
+
+        # make sure the progress bar reaches its true final value
+        if emitted_counter != file_counter:
+            self.progress_update.emit(file_counter)
 
         # finished adding media
         self.finished.emit()
