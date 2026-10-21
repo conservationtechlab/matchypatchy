@@ -13,7 +13,7 @@ def _make_mqc(similarities=None):
 
     parent = MagicMock()
     similarities = similarities or {}
-    parent.mpDB.calculate_similarity.side_effect = lambda a, b: similarities.get((a, b))
+    parent.project.db.calculate_similarity.side_effect = lambda a, b: similarities.get((a, b))
     with patch("matchypatchy.gui.query_manual.load_model", return_value={}):
         mqc = ManualQueryContainer(parent, selected_ids=[])
     return mqc

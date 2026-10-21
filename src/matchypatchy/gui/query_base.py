@@ -19,12 +19,13 @@ from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.threads.match_object import MatchObject, FavoriteMatchObject, toggle_viewpoint_value
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
+from matchypatchy.project import UsesProject
 
 
 logger = logging.getLogger(__name__)
 
 
-class BaseQueryContainer(QObject):
+class BaseQueryContainer(UsesProject, QObject):
     """
     ROI lookups, metadata and match actions shared by every query container.
 
@@ -284,8 +285,7 @@ class QueryContainer(BaseQueryContainer):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        self.mpDB = parent.mpDB
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.CACHE_PATH = Path(self.cfg.DB_DIR) / "knn_cache.json"
         self.metric = parent.distance_metric
         self.k = parent.k

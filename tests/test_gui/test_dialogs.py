@@ -7,6 +7,8 @@ Unit tests for matchypatchy GUI dialog classes:
 PyQt6 is stubbed out in conftest.py.  All dialog classes are instantiated
 via __new__ so we can exercise their pure-Python logic without a real display.
 """
+from types import SimpleNamespace
+
 import pytest
 from unittest.mock import MagicMock, patch, call
 
@@ -27,7 +29,7 @@ def _make_individual_fill_popup(name=None, sex=None, existing_names=None):
     parent.mpDB = mpDB
 
     popup = IndividualFillPopup.__new__(IndividualFillPopup)
-    popup.mpDB = mpDB
+    popup.project = SimpleNamespace(db=mpDB, cfg=MagicMock())
     popup.existing_name = name
     popup.existing_sex = sex
 
@@ -169,7 +171,7 @@ class TestIndividualPopupSetEditview:
 
         popup = IndividualPopup.__new__(IndividualPopup)
         popup.parent = parent
-        popup.mpDB = parent.mpDB
+        popup.project = SimpleNamespace(db=parent.mpDB, cfg=MagicMock())
         popup.selected_ind = None
 
         list_widget = MagicMock()
@@ -210,7 +212,7 @@ class TestIndividualPopupUpdate:
 
         popup = IndividualPopup.__new__(IndividualPopup)
         popup.parent = parent
-        popup.mpDB = parent.mpDB
+        popup.project = SimpleNamespace(db=parent.mpDB, cfg=MagicMock())
         popup.selected_ind = None
 
         list_widget = MagicMock()
@@ -962,7 +964,8 @@ class TestConfigSaveCancel:
         # a real instance (accept/reject call super()), without building the widgets
         popup = ConfigPopup.__new__(ConfigPopup)
         popup.nummatches = MagicMock()
-        popup.cfg = SimpleNamespace(**{name: f"old-{name}" for name in ConfigPopup.SETTINGS}, save=MagicMock())
+        cfg = SimpleNamespace(**{name: f"old-{name}" for name in ConfigPopup.SETTINGS}, save=MagicMock())
+        popup.project = SimpleNamespace(db=MagicMock(), cfg=cfg)
         popup._original = popup._settings()
         return popup
 

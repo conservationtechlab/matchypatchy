@@ -13,20 +13,20 @@ from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
 
 from matchypatchy.threads.animl_thread import BuildManifestThread
 from matchypatchy.threads.import_thread import FolderImportThread
+from matchypatchy.project import UsesProject
 
 
 logger = logging.getLogger(__name__)
 
 
-class ImportFolderPopup(QDialog):
+class ImportFolderPopup(UsesProject, QDialog):
     """
     Popup for importing data from a folder.
     """
 
     def __init__(self, parent, directory):
         super().__init__(parent)
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.active_survey = parent.active_survey
         self.timezone = self._survey_timezone(self.active_survey[0])
         self.directory = Path(directory)

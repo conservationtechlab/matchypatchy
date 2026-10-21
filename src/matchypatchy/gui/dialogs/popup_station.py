@@ -8,14 +8,15 @@ from PyQt6.QtCore import QLocale
 from PyQt6 import QtCore, QtWidgets
 
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.project import UsesProject
 
 
-class StationPopup(QDialog):
+class StationPopup(UsesProject, QDialog):
     """Popup dialog for managing stations (add/edit/delete)"""
     def __init__(self, parent, active_survey):
         super().__init__(parent)
         self.setWindowTitle("Manage stations")
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.survey_id = active_survey
 
         layout = QVBoxLayout()

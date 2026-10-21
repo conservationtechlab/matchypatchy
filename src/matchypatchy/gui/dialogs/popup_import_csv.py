@@ -11,12 +11,13 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy.threads.import_thread import CSVImportThread, CSVMigrateThread
 from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
+from matchypatchy.project import UsesProject
 
 
 logger = logging.getLogger(__name__)
 
 
-class ImportCSVPopup(QDialog):
+class ImportCSVPopup(UsesProject, QDialog):
     """
     Popup for importing data from a CSV manifest.
     """
@@ -49,8 +50,7 @@ class ImportCSVPopup(QDialog):
 
     def __init__(self, parent, manifest):
         super().__init__(parent)
-        self.mpDB = parent.mpDB
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.active_survey = parent.active_survey[1]
         self.data, self.read_error = self._read_manifest(manifest)
         self.import_thread = None

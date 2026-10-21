@@ -16,12 +16,13 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
+from matchypatchy.project import UsesProject
 
 
 logger = logging.getLogger(__name__)
 
 
-class ConfigPopup(QDialog):
+class ConfigPopup(UsesProject, QDialog):
     """
     Popup for adding or editing configuration settings.
     """
@@ -34,8 +35,7 @@ class ConfigPopup(QDialog):
         self.parent = parent
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
-        self.mpDB = parent.mpDB
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.ml_dir = Path(self.cfg.ML_DIR)
         self.label_width = 130
         self.edit_width = 150
@@ -309,9 +309,6 @@ class ConfigPopup(QDialog):
             valid = self.parent.change_project(new_project)
             if not valid:
                 return
-            # Update local references to the new project's database and config
-            self.mpDB = self.parent.mpDB
-            self.cfg = self.parent.cfg
             self._original = self._settings()
             self.refresh()
 
@@ -331,9 +328,6 @@ class ConfigPopup(QDialog):
         if parent_dir and project_name:
             new_project_path = Path(parent_dir) / project_name
             self.parent.new_project(new_project_path)
-            # Update local references to the new project's database and config
-            self.mpDB = self.parent.mpDB
-            self.cfg = self.parent.cfg
             self._original = self._settings()
             self.refresh()
 

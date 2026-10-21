@@ -31,6 +31,7 @@ def _make_parent(db=None, cache_dir=None):
     parent.mpDB = db or MagicMock()
     parent.cfg = MagicMock()
     parent.cfg.DB_DIR = str(cache_dir)
+    parent.project.db, parent.project.cfg = parent.mpDB, parent.cfg
     parent.distance_metric = "cosine"
     parent.k = 3
     parent.threshold = 50

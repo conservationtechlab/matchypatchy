@@ -10,18 +10,19 @@ from PyQt6.QtGui import QBrush, QColor
 
 from matchypatchy.threads.animl_thread import VerifyNewBaseDirsThread
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.project import UsesProject
 
 
 logger = logging.getLogger(__name__)
 
 
-class UploadManagerPopup(QDialog):
+class UploadManagerPopup(UsesProject, QDialog):
     """Popup dialog for managing upload directories"""
 
     def __init__(self, parent):
         super().__init__(parent)
         self.setWindowTitle("Manage upload directories")
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.setMinimumWidth(550)
 
         self.not_in_db = []

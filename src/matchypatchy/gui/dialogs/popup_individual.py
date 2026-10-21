@@ -9,8 +9,10 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QTabl
                              QLabel, QLineEdit, QDialogButtonBox, QPushButton)
 from PyQt6 import QtWidgets
 
+from matchypatchy.project import UsesProject
 
-class IndividualPopup(QDialog):
+
+class IndividualPopup(UsesProject, QDialog):
     """
     Popup for managing individuals in the database.
     Triggered from display_base
@@ -20,7 +22,7 @@ class IndividualPopup(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Manage Individuals")
         self.parent = parent
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.selected_ind = None
 
         layout = QVBoxLayout()
@@ -117,13 +119,13 @@ class IndividualPopup(QDialog):
         self.accept()
 
 
-class IndividualFillPopup(QDialog):
+class IndividualFillPopup(UsesProject, QDialog):
     """
     Popup for adding or editing an individual.
     """
     def __init__(self, parent, name=None, sex=None):
         super().__init__(parent)
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.setWindowTitle("Edit Individual")
         layout = QVBoxLayout()
 
