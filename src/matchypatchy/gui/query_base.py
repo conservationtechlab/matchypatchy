@@ -4,6 +4,7 @@ Query containers for the compare view
 BaseQueryContainer holds what every mode shares; QueryContainer is the
 default (KNN) mode. QC and manual mode live in query_qc.py and query_manual.py.
 """
+import hashlib
 import json
 from pathlib import Path
 import time
@@ -256,6 +257,11 @@ class BaseQueryContainer(QObject):
 # Neighbors fetched per query = k * KNN_OVERFETCH, so filters can remove some
 # candidates without dropping below k.
 KNN_OVERFETCH = 3
+
+# ROI columns the cached KNN results depend on besides the id: filter_valid drops
+# neighbors of the same individual/sequence or another viewpoint, rank drops ID'd
+# query sequences and puts ID'd/favorite rois first, emb marks rois with an embedding
+KNN_CACHE_COLUMNS = ['individual_id', 'sequence_id', 'viewpoint', 'favorite', 'emb']
 
 
 class QueryContainer(BaseQueryContainer):
@@ -726,11 +732,22 @@ class QueryContainer(BaseQueryContainer):
             'og_ranked_matches': [tuple(x) for x in m.og_ranked_matches],  # (rid, dist)
         } for m in ranked_sequences]
 
+    def _cache_key(self):
+        """
+        Hash of the roi state the cached results depend on, so matching, favorites
+        or a redrawn bbox (embedding dropped) invalidate the cache
+        """
+        state = self.data_raw[KNN_CACHE_COLUMNS].apply(pd.to_numeric, errors='coerce')
+        state = state.astype('float64').sort_index()  # None and NaN hash the same
+        hashed = pd.util.hash_pandas_object(state, index=True).values
+        return hashlib.sha1(hashed.tobytes()).hexdigest()
+
     def save_knn_cache(self, serialized):
         """Save UNFILTERED results as JSON (atomic write)."""
         payload = {
             'timestamp': time.time(),
             'n_raw': len(self.data_raw),
+            'state': self._cache_key(),
             'k_cache': self.k_cache,
             'metric': str(self.metric),
             'threshold': self.threshold,
@@ -755,6 +772,7 @@ class QueryContainer(BaseQueryContainer):
                 cache = json.load(f)
             if (time.time() - cache['timestamp'] > self.cache_timeout
                     or cache.get('n_raw') != len(self.data_raw)
+                    or cache.get('state') != self._cache_key()
                     or cache.get('metric') != str(self.metric)
                     or cache.get('threshold') != self.threshold
                     or cache.get('k_cache', 0) < self.k):

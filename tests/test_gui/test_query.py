@@ -65,6 +65,7 @@ def _sample_roi_df():
             "emb":         [1, 1, 0, 1],
             "sequence_id": [1, 1, 2, 3],
             "favorite":    [0, 1, 0, 0],
+            "viewpoint":   [0, 0, 1, None],
         },
         index=pd.Index([10, 11, 12, 13], name="id"),
     )
@@ -853,6 +854,25 @@ class TestKnnCache:
         mutate(qc_raw)
         assert qc_raw.load_knn_cache() is False
         assert qc_raw._raw_ranked is None
+
+    @pytest.mark.parametrize("column, rid, value", [
+        ("individual_id", 12, 300),       # matched
+        ("individual_id", 10, None),      # unmatched
+        ("favorite", 13, 1),
+        ("emb", 13, 0),                   # bbox redrawn, embedding dropped
+    ], ids=["matched", "unmatched", "favorite", "embedding_dropped"])
+    def test_load_rejects_cache_after_roi_edits(self, qc_raw, column, rid, value):
+        """Same roi count, but the cached ranking depends on these columns"""
+        qc_raw.save_knn_cache(self._serialized())
+        qc_raw._update_roi_index({rid: {column: value}})
+        assert qc_raw.load_knn_cache() is False
+        assert qc_raw._raw_ranked is None
+
+    def test_load_accepts_cache_after_reload(self, qc_raw):
+        """None from the database and NaN from a local edit are the same state"""
+        qc_raw.save_knn_cache(self._serialized())
+        qc_raw.data_raw = qc_raw.data_raw.astype({"individual_id": float})
+        assert qc_raw.load_knn_cache() is True
 
     def test_load_corrupt_file(self, qc_raw):
         qc_raw.CACHE_PATH.write_text("{not json")
