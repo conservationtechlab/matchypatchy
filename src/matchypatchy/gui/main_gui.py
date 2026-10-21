@@ -8,6 +8,7 @@ Display Pages:
     1. DisplayMedia
     2. DisplayCompare
 """
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -34,13 +35,16 @@ from matchypatchy.project import Project
 from matchypatchy.database.filesystem import _is_network_path
 
 
+logger = logging.getLogger(__name__)
+
+
 class MainWindow(QMainWindow):
     """Main GUI class for the MatchyPatchy application."""
-    def __init__(self, logger):
+    def __init__(self):
         super().__init__()
         # Initialize main window settings and components
         self.settings = QSettings("SDZWA", "MatchyPatchy")
-        # set logger
+        # still read as parent.logger by popups not yet on module loggers
         self.logger = logger
         # the open project, kept for the life of the window; views read cfg and db through it
         self.project = Project()
@@ -220,7 +224,7 @@ class MainWindow(QMainWindow):
                                                    os.path.expanduser('~'),
                                                    ("CSV Files (*.csv)"))[0]
             if manifest:
-                self.logger.info(f"Importing from manifest: {manifest}")
+                logger.info(f"Importing from manifest: {manifest}")
                 dialog = ImportCSVPopup(self, manifest)
                 dialog.exec()
                 del dialog
@@ -241,7 +245,7 @@ class MainWindow(QMainWindow):
                                                          QFileDialog.Option.ShowDirsOnly)
             if directory:
                 dialog = ImportFolderPopup(self, directory)
-                self.logger.info(f"Importing from directory: {directory}")
+                logger.info(f"Importing from directory: {directory}")
                 dialog.exec()
                 # ask for another directory only if this one had no images, not on Cancel
                 no_images = dialog.no_images
@@ -277,7 +281,7 @@ class MainWindow(QMainWindow):
             else:
                 # eg. an unmounted drive: opening it would create an empty project there,
                 # and the setting is kept so the project opens again once it's back
-                self.logger.error(f"Saved project folder {saved_dir} not found")
+                logger.error(f"Saved project folder {saved_dir} not found")
                 failed.append(str(saved_dir))
 
         for home_dir in candidates:
@@ -286,11 +290,11 @@ class MainWindow(QMainWindow):
             try:
                 self.project.open(home_dir)
             except Exception as e:
-                self.logger.error(f"Could not load project at {home_dir}: {e}", exc_info=True)
+                logger.error(f"Could not load project at {home_dir}: {e}", exc_info=True)
                 failed.append(str(home_dir))
                 continue
-            self.logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
-            self.logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
+            logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
+            logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
             # first launch: remember the default project
             if not saved_dir:
                 self.settings.setValue("home_dir", str(home_dir))
@@ -323,17 +327,17 @@ class MainWindow(QMainWindow):
                 f"filesystems and this can cause database corruption or lock errors.\n\n"
                 f"Please choose a folder on your local hard drive first and then sync to the network location instead."
             )
-            self.logger.error(msg)
+            logger.error(msg)
             dialog = AlertPopup(self, prompt=msg)
             dialog.exec()
             del dialog
             return
         
-        self.logger.info(f"Creating project folder: {str(home_dir)}.")
+        logger.info(f"Creating project folder: {str(home_dir)}.")
         try:
             self.project.open(home_dir)
         except Exception as e:
-            self.logger.error(f"Could not create project at {home_dir}: {e}", exc_info=True)
+            logger.error(f"Could not create project at {home_dir}: {e}", exc_info=True)
             dialog = AlertPopup(self, prompt=f"Could not create project at {home_dir}:\n{e}")
             dialog.exec()
             del dialog
@@ -347,16 +351,16 @@ class MainWindow(QMainWindow):
             self.project.open(project_folder)
             valid = True
         except Exception as e:
-            self.logger.error(f"Could not load project at {project_folder}: {e}", exc_info=True)
+            logger.error(f"Could not load project at {project_folder}: {e}", exc_info=True)
             valid = False
         # Check if the database key is valid
         if valid:
             self.settings.setValue("home_dir", str(project_folder))
-            self.logger.info(f"Updating project folder to {str(project_folder)}.")
+            logger.info(f"Updating project folder to {str(project_folder)}.")
             return True
         # not valid
         else:
-            self.logger.warning(f"Database at {str(project_folder)} is invalid. User prompted to select another path or delete.")
+            logger.warning(f"Database at {str(project_folder)} is invalid. User prompted to select another path or delete.")
             dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
             dialog.exec()
             del dialog
