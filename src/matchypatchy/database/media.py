@@ -328,3 +328,32 @@ def _save_edit(mpDB, edit, individual_of, assigned_iids, media_only):
     if saved and edit.reference == 'individual_id':
         assigned_iids[rid] = edit.new_value
     return saved
+
+
+# MATCHING =====================================================================
+def assign_individual(mpDB, roi_ids, individual_id):
+    """Give rois an individual and mark them reviewed, False if it couldn't be saved"""
+    updates = {int(r): {"individual_id": individual_id, "reviewed": 1} for r in roi_ids}
+    return mpDB.batch_edit("roi", updates, quiet=True)
+
+
+def clear_individual(mpDB, roi_ids):
+    """Remove the individual from rois and mark them unreviewed, False if it couldn't be saved"""
+    updates = {int(r): {"individual_id": None, "reviewed": 0} for r in roi_ids}
+    return mpDB.batch_edit("roi", updates, allow_none=True, quiet=True)
+
+
+# LOOKUPS ======================================================================
+def media_without_rois(mpDB):
+    """Ids of media that have no rois"""
+    rows = mpDB.query("""SELECT media.id FROM media
+                         LEFT JOIN roi ON roi.media_id = media.id
+                         WHERE roi.media_id IS NULL;""")
+    return [row[0] for row in rows or []]
+
+
+def uploads_with_media_counts(mpDB):
+    """(id, base_dir, created_at, number of media) of every upload directory"""
+    return mpDB.query("""SELECT uploads.id, uploads.base_dir, uploads.created_at, COUNT(media.id)
+                         FROM uploads LEFT JOIN media ON media.base_dir_id = uploads.id
+                         GROUP BY uploads.id;""") or []

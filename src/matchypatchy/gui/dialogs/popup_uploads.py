@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLa
                              QAbstractItemView, QDialogButtonBox, QTableWidget, QTableWidgetItem)
 from PyQt6.QtGui import QBrush, QColor
 
+from matchypatchy.database.media import uploads_with_media_counts
 from matchypatchy.threads.animl_thread import VerifyNewBaseDirsThread
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.project import UsesProject
@@ -98,11 +99,7 @@ class UploadManagerPopup(UsesProject, QDialog):
     def update(self):
         """Get upload directories list from mpDB"""
         self.list.clearContents()
-        self.base_dirs = self.mpDB._command("""SELECT u.id, u.base_dir, u.created_at, COUNT(media.id) AS count
-                                                 FROM uploads u LEFT JOIN media ON media.base_dir_id = u.id
-                                                 GROUP BY u.id;""")
-        if self.base_dirs is None:
-            self.base_dirs = []
+        self.base_dirs = uploads_with_media_counts(self.mpDB)
 
         self.list.setRowCount(len(self.base_dirs))
 

@@ -15,6 +15,7 @@ import pandas as pd
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 import matchypatchy.database.media as db_roi
+from matchypatchy.database.media import assign_individual, clear_individual
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.threads.match_object import MatchObject, FavoriteMatchObject, toggle_viewpoint_value
 from matchypatchy.threads.model_download_thread import load_model
@@ -201,7 +202,7 @@ class BaseQueryContainer(UsesProject, QObject):
         self._update_roi_index(roi_updates)
 
         # Then batch update the database
-        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
+        assign_individual(self.mpDB, roi_updates, individual_id)
 
     def _merge_rois(self):
         """ROIs to assign to the kept individual when merging, besides the dropped individual's"""
@@ -228,7 +229,7 @@ class BaseQueryContainer(UsesProject, QObject):
 
         roi_updates = {int(r): {"individual_id": keep_id, "reviewed": 1}
                        for r in rois}
-        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
+        assign_individual(self.mpDB, roi_updates, keep_id)
 
         # Update local index
         self._update_roi_index(roi_updates)
@@ -245,7 +246,7 @@ class BaseQueryContainer(UsesProject, QObject):
         self._update_roi_index(roi_updates)
 
         # update database
-        self.mpDB.batch_edit('roi', roi_updates, allow_none=True, quiet=True)
+        clear_individual(self.mpDB, roi_updates)
 
     # REFRESH ------------------------------------------------------------------
     def refresh_data(self):

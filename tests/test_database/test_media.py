@@ -321,3 +321,36 @@ class TestSaveEdits:
         db, _ = tmp_db
         bad_column = self._edit(1, 1, "not_a_column", 1)
         assert save_edits(db, [bad_column], individual_of=lambda r: None) == [bad_column]
+
+
+class TestMatchingAndLookups:
+    def _media(self, db, name, rois=1):
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload(f"/{name}"), name, name, ".jpg", "2024-01-01 10:00:00", station)
+        return mid, [db.add_roi(mid, 0, 0.1 * (i + 1), 0.1, 0.1, 0.1) for i in range(rois)]
+
+    def test_assign_and_clear_individual(self, tmp_db):
+        from matchypatchy.database.media import assign_individual, clear_individual
+        db, _ = tmp_db
+        _, (a, b) = self._media(db, "x.jpg", rois=2)
+        iid = db.add_individual("A")
+        assert assign_individual(db, [a, b], iid) is True
+        assert db.select("roi", "individual_id, reviewed") == [(iid, 1), (iid, 1)]
+        assert clear_individual(db, [a]) is True
+        assert db.select("roi", "id, individual_id, reviewed") == [(a, None, 0), (b, iid, 1)]
+
+    def test_media_without_rois(self, tmp_db):
+        from matchypatchy.database.media import media_without_rois
+        db, _ = tmp_db
+        self._media(db, "with.jpg", rois=1)
+        empty, _ = self._media(db, "empty.jpg", rois=0)
+        assert media_without_rois(db) == [empty]
+
+    def test_uploads_with_media_counts(self, tmp_db):
+        from matchypatchy.database.media import uploads_with_media_counts
+        db, _ = tmp_db
+        self._media(db, "x.jpg")
+        unused = db.add_upload("/unused")
+        counts = {base_dir: n for _, base_dir, _, n in uploads_with_media_counts(db)}
+        assert counts == {"/x.jpg": 1, "/unused": 0}
+        assert unused in [row[0] for row in uploads_with_media_counts(db)]

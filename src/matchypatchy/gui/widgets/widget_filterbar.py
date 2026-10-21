@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt
 
 from matchypatchy.database.location import region_names, survey_names, station_names
 from matchypatchy.database.individual import individual_names
+from matchypatchy.database.media import media_without_rois
 from matchypatchy.project import UsesProject
 
 
@@ -204,11 +205,7 @@ class FilterBar(UsesProject, QWidget):
     def select_no_roi(self):
         """Toggle the No ROI filter."""
         if self.no_roi.isChecked():
-            mids = self.mpDB._command("""SELECT m.id
-                                      FROM media m
-                                      LEFT JOIN roi r ON m.id = r.media_id
-                                      WHERE r.media_id IS NULL;""")
-            self.no_roi_mids = [mid[0] for mid in mids]
+            self.no_roi_mids = media_without_rois(self.mpDB)
         else:
             self.no_roi_mids = False
 
