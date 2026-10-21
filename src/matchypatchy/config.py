@@ -55,10 +55,12 @@ class mpConfig():
         if self.CONFIG_PATH.exists():
             with open(self.CONFIG_PATH, 'r') as cfg_file:
                 cfg = yaml.safe_load(cfg_file)
-                self.DB_DIR = Path(cfg.get('DB_DIR', self.HOME_DIR / 'Database'))
-                self.ML_DIR = Path(cfg.get('ML_DIR', self.HOME_DIR / 'Models'))
-                self.THUMBNAIL_DIR = Path(cfg.get('THUMBNAIL_DIR', self.HOME_DIR / 'Thumbnails'))
-                self.FRAME_DIR = Path(cfg.get('FRAME_DIR', self.HOME_DIR / 'Frames'))
+                # project folders always live inside the opened folder; the saved
+                # absolute paths go stale when a project is moved or copied
+                self.DB_DIR = self.HOME_DIR / 'Database'
+                self.ML_DIR = self.HOME_DIR / 'Models'
+                self.THUMBNAIL_DIR = self.HOME_DIR / 'Thumbnails'
+                self.FRAME_DIR = self.HOME_DIR / 'Frames'
                 self.BATCH_SIZE = cfg.get('BATCH_SIZE', 1)
                 self.VIDEO_FPS = cfg.get('VIDEO_FPS', 1)
                 self.N_FRAMES = cfg.get('N_FRAMES', 3)

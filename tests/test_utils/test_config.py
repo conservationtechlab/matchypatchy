@@ -122,6 +122,48 @@ class TestMpConfigSaveLoad:
 
 
 # ---------------------------------------------------------------------------
+# mpConfig — moved / copied project
+# ---------------------------------------------------------------------------
+
+class TestMpConfigMovedProject:
+    def test_copied_project_uses_own_folders(self, tmp_path):
+        import shutil
+        old = tmp_path / "projA"
+        mpConfig(old)
+        new = tmp_path / "projB"
+        shutil.copytree(old, new)
+        cfg = mpConfig(new)
+        assert cfg.DB_DIR == new / "Database"
+        assert cfg.ML_DIR == new / "Models"
+        assert cfg.THUMBNAIL_DIR == new / "Thumbnails"
+        assert cfg.FRAME_DIR == new / "Frames"
+
+    def test_moved_project_does_not_recreate_old_folder(self, tmp_path):
+        import shutil
+        old = tmp_path / "projA"
+        mpConfig(old)
+        new = tmp_path / "projB"
+        shutil.move(old, new)
+        cfg = mpConfig(new)
+        assert cfg.DB_DIR == new / "Database"
+        assert not old.exists()
+
+    def test_saved_paths_still_written_for_older_versions(self, tmp_path):
+        import shutil
+        old = tmp_path / "projA"
+        mpConfig(old)
+        new = tmp_path / "projB"
+        shutil.copytree(old, new)
+        cfg = mpConfig(new)
+        cfg.save()
+        with open(new / ".config.yml") as f:
+            data = yaml.safe_load(f)
+        assert data["DB_DIR"] == str(new / "Database")
+        assert data["ML_DIR"] == str(new / "Models")
+        assert data["THUMBNAIL_DIR"] == str(new / "Thumbnails")
+
+
+# ---------------------------------------------------------------------------
 # mpConfig — update
 # ---------------------------------------------------------------------------
 
