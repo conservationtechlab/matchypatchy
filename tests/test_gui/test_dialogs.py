@@ -344,17 +344,20 @@ FOLDER = "matchypatchy.gui.dialogs.popup_import_folder"
 
 
 class TestImportFolderTimezone:
-    def _timezone(self, select_results):
+    def _timezone(self, db, survey_id):
         from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
         popup = MagicMock()
-        popup.mpDB.select.side_effect = select_results
-        return ImportFolderPopup._survey_timezone(popup, 5)
+        popup.mpDB = db
+        return ImportFolderPopup._survey_timezone(popup, survey_id)
 
-    def test_survey_without_region_uses_local_time(self):
-        assert self._timezone([[(None,)]]) is None
+    def test_survey_without_region_uses_local_time(self, tmp_db):
+        db, _ = tmp_db
+        assert self._timezone(db, db.add_survey("No region", None, None, None)) is None
 
-    def test_region_timezone(self):
-        assert self._timezone([[(2,)], [("America/Los_Angeles",)]]) == "America/Los_Angeles"
+    def test_region_timezone(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("West", "America/Los_Angeles")
+        assert self._timezone(db, db.add_survey("S", region, None, None)) == "America/Los_Angeles"
 
 
 class TestImportFolderCancel:
@@ -657,7 +660,7 @@ class TestViewIndividualPrefilter:
 class TestFilterBarStations:
     def _bar(self):
         bar = MagicMock()
-        bar.mpDB.select.return_value = [(1, "S1"), (2, "S2")]
+        bar.mpDB.query.return_value = [(1, "S1"), (2, "S2")]
         return bar
 
     def test_survey_placeholder_without_region_shows_all_stations(self):

@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QProgressBar,
                              QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt
 
+from matchypatchy.database.location import survey_timezone
 from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
 
 from matchypatchy.threads.animl_thread import BuildManifestThread
@@ -81,11 +82,7 @@ class ImportFolderPopup(UsesProject, QDialog):
 
     def _survey_timezone(self, survey_id):
         """Timezone of the survey's region, None (local time) if it has no region"""
-        survey = self.mpDB.select("survey", columns="region_id", row_cond=f"id={survey_id}")
-        if not survey or survey[0][0] is None:
-            return None
-        region = self.mpDB.select("region", columns="timezone", row_cond=f"id={survey[0][0]}")
-        return region[0][0] if region else None
+        return survey_timezone(self.mpDB, survey_id)
 
     def reject(self):
         """Cancel: stop a running import and close when it has finished"""

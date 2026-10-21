@@ -7,6 +7,7 @@ from PyQt6.QtGui import QDoubleValidator
 from PyQt6.QtCore import QLocale
 from PyQt6 import QtCore, QtWidgets
 
+from matchypatchy.database.location import station_names, get_station, update_station, delete_station
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.project import UsesProject
 
@@ -67,8 +68,7 @@ class StationPopup(UsesProject, QDialog):
     def update(self):
         """Update station list from DB"""
         self.list.clear()
-        cond = f'survey_id={self.survey_id[0]}'
-        self.station_list_ordered = self.mpDB.select("station", columns="id, name", row_cond=cond)
+        self.station_list_ordered = station_names(self.mpDB, survey_ids=[self.survey_id[0]])
         self.station_list = dict(self.station_list_ordered)
         if self.station_list_ordered:
             self.list.addItems([el[1] for el in self.station_list_ordered])
@@ -90,12 +90,10 @@ class StationPopup(UsesProject, QDialog):
         """Edit selected station"""
         selected_station = self.list.currentRow()
         station_id = self.station_list_ordered[selected_station][0]
-        cond = f'id={station_id}'
-        station_id, name, lat, long = self.mpDB.select('station', columns='id, name, lat, long', row_cond=cond)[0]
+        name, lat, long = get_station(self.mpDB, station_id)
         dialog = StationFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
-            replace_dict = {"name": dialog.get_name(), "lat": dialog.get_lat(), "long": dialog.get_long()}
-            if not self.mpDB.edit_row("station", station_id, replace_dict, allow_none=True):
+            if not update_station(self.mpDB, station_id, dialog.get_name(), dialog.get_lat(), dialog.get_long()):
                 self._warn(f"Could not save station '{dialog.get_name()}', see the log for details.")
         del dialog
         # refresh the station list after editing a station
@@ -113,7 +111,7 @@ class StationPopup(UsesProject, QDialog):
         dialog = AlertPopup(self, f'Are you sure you want to delete {selected}?')
         if dialog.exec():
             row = self.station_list_ordered[self.list.currentRow()][0]
-            self.mpDB.delete("station", f'id={row}')
+            delete_station(self.mpDB, row)
         del dialog
         # refresh the station list after deleting a station
         self.update()

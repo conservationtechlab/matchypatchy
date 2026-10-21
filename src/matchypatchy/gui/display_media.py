@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBo
 from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.database.media import IMAGE_EXT, fetch_roi, fetch_individual
+from matchypatchy.database.location import camera_names
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
@@ -439,7 +440,7 @@ class DisplayMedia(UsesProject, QWidget):
         if self._data_filtered.empty:
             return
         # self.valid_cameras =  # select all cameras for now
-        self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
+        self.valid_cameras = dict(camera_names(self.mpDB))
         # Location Filter (depends on prefilterd stations from MediaDisplay)
         if self.valid_stations:
             self._data_filtered = self._data_filtered[self._data_filtered['station_id'].isin(list(self.valid_stations.keys()))]
