@@ -183,9 +183,10 @@ class DisplayBase(QWidget):
     def manage_survey(self):
         """Launch Survey Management Popup"""
         dialog = SurveyPopup(self)
-        if dialog.exec():
-            self.update_survey()
-            del dialog
+        # add/edit/delete are saved right away, so refresh even on cancel
+        dialog.exec()
+        self.update_survey()
+        del dialog
 
     def select_survey(self):
         """Set active survey based on dropdown selection"""

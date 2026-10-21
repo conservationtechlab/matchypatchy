@@ -927,3 +927,14 @@ class TestSurveyRegionTimezone:
             SurveyPopup.edit(popup)
         assert fill.call_args.kwargs["timezone"] == "Europe/Berlin"
         assert self._timezone(db, region) == "Asia/Tokyo"
+
+
+class TestManageSurvey:
+    def test_cancel_still_refreshes_survey_list(self):
+        """Survey changes are saved before the popup closes, so cancel must refresh too"""
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        with patch("matchypatchy.gui.display_base.SurveyPopup") as popup:
+            popup.return_value.exec.return_value = 0
+            DisplayBase.manage_survey(base)
+        base.update_survey.assert_called_once()
