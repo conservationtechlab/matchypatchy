@@ -56,20 +56,21 @@ class VerifyNewBaseDirsThread(QThread):
             if not self.isInterruptionRequested():
                 base_dir_id = update[0]
                 directory = update[1]
-                # Flatten the list of media hashes for easier comparison
                 media = self.mpDB.select("media", columns="relative_path, sha256", row_cond=f"base_dir_id = {base_dir_id}")
-                media_hashes = set([h[1] for h in media])
-
-                # Build the file manifest for the new directory
-                new_data = animl.build_file_manifest(directory, exif=False)
-                new_hashes = [get_sha256(filepath) for filepath in new_data['filepath']]
-                new_data = list(zip(new_data['filepath'], new_hashes))
-
-                hash_not_found_in_db = [h[0] for h in new_data if h[1] not in set(media_hashes)]
-                self.not_found_in_db.append(hash_not_found_in_db)
-
-                hash_not_found_in_new_directory = [h[0] for h in media if h[1] not in set(new_hashes)]
+                # Saving only swaps base_dir, so each file must sit at its relative path under the new directory
+                expected = set()
+                hash_not_found_in_new_directory = []
+                for relative_path, sha256 in media:
+                    filepath = Path(directory, relative_path)
+                    expected.add(filepath)
+                    if get_sha256(filepath) != sha256:
+                        hash_not_found_in_new_directory.append(relative_path)
                 self.not_found_in_new_directory.append(hash_not_found_in_new_directory)
+
+                # Files in the new directory that no media of this upload would point to
+                new_data = animl.build_file_manifest(directory, exif=False)
+                hash_not_found_in_db = [f for f in new_data.get('filepath', []) if Path(f) not in expected]
+                self.not_found_in_db.append(hash_not_found_in_db)
 
         # Emit signals if the thread was not interrupted
         if not self.isInterruptionRequested():

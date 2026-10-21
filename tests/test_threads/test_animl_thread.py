@@ -124,39 +124,71 @@ class TestBuildManifestThread:
 
 
 class TestVerifyNewBaseDirsThread:
-    def test_compares_hashes_and_emits_missing_lists(self, tmp_db, monkeypatch):
-        db, _ = tmp_db
-        station_id = db.add_station("S", 1.0, 2.0, 1)
-        base_id = db.add_upload("/old")
-        db.add_media(base_id, "a.jpg", "hash-a", ".jpg", "2024-01-01 00:00:00", station_id)
-        db.add_media(base_id, "b.jpg", "hash-b", ".jpg", "2024-01-01 00:00:01", station_id)
+    @staticmethod
+    def _write(path, data):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return animl_thread.get_sha256(path)
 
-        parent = SimpleNamespace(mpDB=db, base_dirs=[], updates=[(base_id, "/new")])
-
+    @staticmethod
+    def _run(db, updates, monkeypatch):
+        # list files like build_file_manifest without depending on animl being installed
         monkeypatch.setattr(
             animl_thread.animl,
             "build_file_manifest",
-            lambda *_args, **_kwargs: pd.DataFrame({"filepath": ["/new/a.jpg", "/new/c.jpg"]}),
+            lambda directory, **_kwargs: pd.DataFrame(
+                {"filepath": sorted(str(f) for f in Path(directory).rglob("*.jpg"))}),
         )
-        monkeypatch.setattr(
-            animl_thread,
-            "get_sha256",
-            lambda filepath: {
-                "/new/a.jpg": "hash-a",
-                "/new/c.jpg": "hash-c",
-            }[filepath],
-        )
-
+        parent = SimpleNamespace(mpDB=db, base_dirs=[], updates=updates)
         thread = animl_thread.VerifyNewBaseDirsThread(parent)
         thread.not_in_db = SignalSpy()
         thread.not_in_new_directory = SignalSpy()
         thread.finished = SignalSpy()
         thread.isInterruptionRequested = lambda: False
         thread.run()
+        return thread
 
-        assert thread.not_in_db.calls == [([["/new/c.jpg"]],)]
+    def test_compares_hashes_and_emits_missing_lists(self, tmp_db, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        new = tmp_path / "new"
+        hash_a = self._write(new / "a.jpg", b"a")
+        self._write(new / "c.jpg", b"c")
+        station_id = db.add_station("S", 1.0, 2.0, 1)
+        base_id = db.add_upload("/old")
+        db.add_media(base_id, "a.jpg", hash_a, ".jpg", "2024-01-01 00:00:00", station_id)
+        db.add_media(base_id, "b.jpg", "hash-b", ".jpg", "2024-01-01 00:00:01", station_id)
+
+        thread = self._run(db, [(base_id, str(new))], monkeypatch)
+
+        assert thread.not_in_db.calls == [([[str(new / "c.jpg")]],)]
         assert thread.not_in_new_directory.calls == [([["b.jpg"]],)]
         assert len(thread.finished.calls) == 1
+
+    def test_files_must_be_at_their_relative_path(self, tmp_db, tmp_path, monkeypatch):
+        """A folder holding the files one level deeper would break every path on save"""
+        db, _ = tmp_db
+        backup = tmp_path / "backup"
+        sha = self._write(backup / "2023" / "Site01" / "IMG.JPG", b"img")
+        station_id = db.add_station("S", 1.0, 2.0, 1)
+        base_id = db.add_upload("/old/2023")
+        db.add_media(base_id, "Site01/IMG.JPG", sha, ".jpg", "2024-01-01 00:00:00", station_id)
+
+        thread = self._run(db, [(base_id, str(backup))], monkeypatch)
+        assert thread.not_in_new_directory.calls == [([["Site01/IMG.JPG"]],)]
+
+        thread = self._run(db, [(base_id, str(backup / "2023"))], monkeypatch)
+        assert thread.not_in_new_directory.calls == [([[]],)]
+
+    def test_changed_file_at_relative_path_is_missing(self, tmp_db, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        new = tmp_path / "new"
+        self._write(new / "a.jpg", b"different")
+        station_id = db.add_station("S", 1.0, 2.0, 1)
+        base_id = db.add_upload("/old")
+        db.add_media(base_id, "a.jpg", "hash-a", ".jpg", "2024-01-01 00:00:00", station_id)
+
+        thread = self._run(db, [(base_id, str(new))], monkeypatch)
+        assert thread.not_in_new_directory.calls == [([["a.jpg"]],)]
 
     def test_interruption_emits_nothing(self, tmp_db):
         db, _ = tmp_db
