@@ -22,6 +22,14 @@ from matchypatchy.database.location import TZ_CONVERT_DICT
 
 logger = logging.getLogger(__name__)
 
+# sqlite3 binds numpy numbers, eg. ids read from a DataFrame, as blobs that
+# never equal an INTEGER column; bind them as Python numbers instead
+for _numpy_type in (np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64):
+    sqlite3.register_adapter(_numpy_type, int)
+for _numpy_type in (np.float16, np.float32, np.float64):
+    sqlite3.register_adapter(_numpy_type, float)
+sqlite3.register_adapter(np.bool_, bool)
+
 
 def sql_text(value):
     """

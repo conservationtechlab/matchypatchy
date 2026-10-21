@@ -662,3 +662,12 @@ class TestParameterisedQueries:
         assert db.delete("station", "name=?", ("St. Mary's",)) is True
         assert db.count("roi") == 0
         assert db.collection.get(ids=[str(rid)])["ids"] == []
+
+    def test_numpy_values_bind_as_numbers(self, tmp_db):
+        """Ids read from a DataFrame are numpy ints; bound as blobs they would match nothing"""
+        db, _ = tmp_db
+        iid = db.add_individual("A", None)
+        assert db.query("SELECT name FROM individual WHERE id=?", (np.int64(iid),)) == [("A",)]
+        assert db.edit_row("individual", iid, {"name": "B"}) is True
+        rid_station = db.add_station("S", np.float64(1.5), None, np.int64(1))
+        assert db.query("SELECT survey_id, typeof(survey_id), lat FROM station WHERE id=?", (rid_station,)) == [(1, "integer", 1.5)]
