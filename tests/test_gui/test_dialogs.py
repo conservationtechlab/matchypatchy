@@ -849,3 +849,81 @@ class TestConfigSaveCancel:
         with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
             ConfigPopup.accept(popup)
         popup.cfg.save.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# SurveyPopup
+# ---------------------------------------------------------------------------
+
+SURVEY = "matchypatchy.gui.dialogs.popup_survey"
+
+
+class TestSurveyRegionTimezone:
+    def _popup(self, db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        popup = MagicMock()
+        popup.mpDB = db
+        popup._year = SurveyPopup._year
+        popup._region_id =lambda *args: SurveyPopup._region_id(popup, *args)
+        popup._set_region_timezone = lambda *args: SurveyPopup._set_region_timezone(popup, *args)
+        return popup
+
+    def _region_id(self, db, name, timezone, confirm=1):
+        with patch(f"{SURVEY}.AlertPopup") as alert:
+            alert.return_value.exec.return_value = confirm
+            region_id = self._popup(db)._region_id(name, timezone)
+        return region_id, alert
+
+    def _timezone(self, db, region_id):
+        return db.select("region", columns="timezone", row_cond=f"id={region_id}")[0][0]
+
+    def test_existing_region_without_timezone_is_set(self, tmp_db):
+        """CSV import leaves the timezone NULL, choosing one fills it in without asking"""
+        db, _ = tmp_db
+        region = db.add_region("R", None)
+        db.edit_row("region", region, {"timezone": None}, allow_none=True)
+        region_id, alert = self._region_id(db, "R", "America/Los_Angeles")
+        assert region_id == region
+        assert self._timezone(db, region) == "America/Los_Angeles"
+        alert.assert_not_called()
+
+    def test_existing_region_different_timezone_confirmed(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "America/Los_Angeles", confirm=1)
+        alert.assert_called_once()
+        assert self._timezone(db, region) == "America/Los_Angeles"
+
+    def test_existing_region_different_timezone_declined(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "America/Los_Angeles", confirm=0)
+        alert.assert_called_once()
+        assert self._timezone(db, region) == "Europe/Berlin"
+
+    def test_existing_region_same_timezone_does_not_ask(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "Europe/Berlin")
+        alert.assert_not_called()
+        assert self._timezone(db, region) == "Europe/Berlin"
+
+    def test_edit_shows_and_saves_region_timezone(self, tmp_db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        survey = db.add_survey("S", region, None, None)
+        popup = self._popup(db)
+        popup.list.currentRow.return_value = 0
+        popup.survey_list_ordered = [(survey, "S")]
+        with patch(f"{SURVEY}.SurveyFillPopup") as fill, patch(f"{SURVEY}.AlertPopup") as alert:
+            fill.return_value.exec.return_value = 1
+            fill.return_value.get_name.return_value = "S"
+            fill.return_value.get_region.return_value = "R"
+            fill.return_value.get_timezone.return_value = "Asia/Tokyo"
+            fill.return_value.get_year_start.return_value = ""
+            fill.return_value.get_year_end.return_value = ""
+            alert.return_value.exec.return_value = 1
+            SurveyPopup.edit(popup)
+        assert fill.call_args.kwargs["timezone"] == "Europe/Berlin"
+        assert self._timezone(db, region) == "Asia/Tokyo"
