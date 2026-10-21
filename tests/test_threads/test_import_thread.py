@@ -825,3 +825,17 @@ class TestCSVMigrateRerun:
 
         assert db.count("uploads") == 1
         assert db.select("media", columns="base_dir_id") == [(upload_id,)]
+
+    def test_media_thumbnail_saved_once_per_new_file(self, tmp_db, null_logger, tmp_path, image, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        saved = []
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *a: saved.append(a) or "t.jpg")
+
+        self._migrate(db, parent, [self._row(image, 0), self._row(image, 1, box=0.5)])
+        assert len(saved) == 1
+
+        # migrating the same file again adds no thumbnail
+        self._migrate(db, parent, [self._row(image, 0)])
+        assert len(saved) == 1
+        assert db.count("media_thumbnails") == 1

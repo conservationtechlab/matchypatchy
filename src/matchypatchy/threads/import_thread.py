@@ -44,6 +44,7 @@ class CSVMigrateThread(QThread):
         self.camera_ref = {}  # dictionary to store camera name to id mapping
         self.individual_ref = {}  # dictionary to store individual name to id mapping
         self.sequence_ref = {}  # dictionary to store sequence id mapping
+        self.media_ref = {}  # dictionary to store file hash to media id mapping
         self.errors = []  # list to store errors encountered during import
 
         assert isinstance(self.data, pd.DataFrame), "Data must be a pandas DataFrame"
@@ -78,27 +79,29 @@ class CSVMigrateThread(QThread):
                     # new sequence id
                     sequence_id = self.sequence(row.sequence_id)
 
-                    # media
-                    media_id = self.mpDB.add_media(new_base_dir_id,
-                                                   row.relative_path,
-                                                   hash,
-                                                   row.ext,
-                                                   row.timestamp,
-                                                   station_id=new_station_id,
-                                                   camera_id=new_camera_id,
-                                                   sequence_id=sequence_id,
-                                                   external_id=row.external_id if not pd.isna(row.external_id) else None,
-                                                   comment=row.comment if not pd.isna(row.comment) else None,
-                                                   commit=False)
+                    # media, each roi of a file is its own row so only the first adds it
+                    media_id = self.media_ref.get(hash)
+                    if media_id is None:
+                        media_id = self.mpDB.add_media(new_base_dir_id,
+                                                       row.relative_path,
+                                                       hash,
+                                                       row.ext,
+                                                       row.timestamp,
+                                                       station_id=new_station_id,
+                                                       camera_id=new_camera_id,
+                                                       sequence_id=sequence_id,
+                                                       external_id=row.external_id if not pd.isna(row.external_id) else None,
+                                                       comment=row.comment if not pd.isna(row.comment) else None,
+                                                       commit=False)
 
-                    if media_id == "duplicate_error":
-                        # already imported (eg. an earlier roi of the same file); media has no
-                        # filepath column, but the file's hash is unique
-                        media_id = self.mpDB.select("media", columns="id", row_cond=f"sha256='{hash}'")[0][0]
-
-                    # save thumbnail for new media
-                    media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
-                    self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
+                        if media_id == "duplicate_error":
+                            # already in the project; media has no filepath column, but the file's hash is unique
+                            media_id = self.mpDB.select("media", columns="id", row_cond=f"sha256='{hash}'")[0][0]
+                        else:
+                            # save thumbnail for new media
+                            media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
+                            self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
+                        self.media_ref[hash] = media_id
 
                     # individual
                     individual_id = self.individual(row.individual_id, row.name, row.sex)
