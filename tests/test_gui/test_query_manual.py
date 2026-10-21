@@ -54,3 +54,23 @@ class TestCurrentDistance:
         mqc.current_query_rid, mqc.current_match_rid = 1, 2
         distance = mqc.current_distance()
         assert distance is None or not math.isfinite(distance)
+
+
+class TestSingleRoi:
+    def test_single_roi_pair_table_is_safe(self):
+        mqc = _make_mqc()
+        mqc.data = pd.DataFrame(index=[1])
+        mqc.calculate_neighbors()
+        assert list(mqc.pair_table.columns) == ["id1", "id2", "distance"]
+        mqc.current_query_rid, mqc.current_match_rid = 1, 1
+        assert mqc.current_distance() is None
+
+    def test_filter_needs_two_rois(self):
+        """One roi would be both query and match, so there is nothing to compare"""
+        mqc = _make_mqc()
+        mqc.data_raw = pd.DataFrame({"station_id": [1, 2]}, index=[1, 2])
+        stations = {1: "A", 2: "B"}
+        one = {"active_region": (0,), "active_survey": (0,), "active_station": (1,)}
+        both = {"active_region": (0,), "active_survey": (0,), "active_station": (0,)}
+        assert mqc.filter(one, stations) is False
+        assert mqc.filter(both, stations) is True
