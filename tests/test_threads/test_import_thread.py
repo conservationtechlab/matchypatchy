@@ -877,3 +877,43 @@ class TestCSVMigrateRerun:
 
         assert tables.count("individual") == 1
         assert db.select("roi", columns="individual_id") == [(1,)] * 3
+
+    def test_survey_is_looked_up_once(self, tmp_db, null_logger, tmp_path, image, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        tables = []
+        original_select = db.select
+        monkeypatch.setattr(db, "select", lambda table, *a, **k: tables.append(table) or original_select(table, *a, **k))
+
+        self._migrate(db, parent, [self._row(image, n, box=0.1 * (n + 1)) for n in range(3)])
+
+        assert tables.count("survey") == 1
+
+
+class TestFolderImportCaching:
+    def test_station_and_camera_are_looked_up_once(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        paths = []
+        for name in ("a.jpg", "b.jpg", "c.jpg"):
+            path = tmp_path / "Site01" / "Cam1" / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(name.encode())
+            paths.append(str(path))
+        data = pd.DataFrame({"filepath": paths, "datetime": ["2024-01-01 12:00:00"] * 3})
+        parts = Path(paths[0]).parts
+        thread = import_thread.FolderImportThread(parent, (1,), data,
+                                                  station_level=parts.index("Site01"),
+                                                  camera_level=parts.index("Cam1"))
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        tables = []
+        original_select = db.select
+        monkeypatch.setattr(db, "select", lambda table, *a, **k: tables.append(table) or original_select(table, *a, **k))
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert db.count("media") == 3
+        assert tables.count("station") == 1
+        assert tables.count("camera") == 1

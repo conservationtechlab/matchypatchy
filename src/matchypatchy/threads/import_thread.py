@@ -53,6 +53,7 @@ class CSVMigrateThread(QThread):
         self.data = data
         self.thumbnail_dir = self.cfg.THUMBNAIL_DIR
         self.base_dir_ref = {}  # dictionary to store base directory path to id mapping
+        self.survey_ref = {}  # dictionary to store survey name to id mapping
         self.station_ref = {}  # dictionary to store survey name to id mapping
         self.camera_ref = {}  # dictionary to store camera name to id mapping
         self.individual_ref = {}  # dictionary to store individual name to id mapping
@@ -208,12 +209,15 @@ class CSVMigrateThread(QThread):
 
     def survey(self, survey_name, region_name):
         """Get or create survey"""
-        # get active survey
+        # check reference dictionary first
+        if survey_name in self.survey_ref:
+            return self.survey_ref[survey_name]
         try:
             survey_id = self.mpDB.select("survey", columns="id", row_cond=f'name={sql_text(survey_name)}')[0][0]
         except IndexError:
             region_id = self.region(region_name) if not pd.isna(region_name) else None
             survey_id = self.mpDB.add_survey(str(survey_name), region_id, None, None)
+        self.survey_ref[survey_name] = survey_id
         return survey_id
 
     def region(self, region_name):
@@ -710,6 +714,8 @@ class FolderImportThread(QThread):
         self.camera_level = camera_level
         self.default_station = None
         self.thumbnail_dir = parent.cfg.THUMBNAIL_DIR
+        self.station_ref = {}  # dictionary to store (station name, survey id) to id mapping
+        self.camera_ref = {}  # dictionary to store (camera name, station id) to id mapping
         # get timezone for timestamp parsing
 
     def run(self):
@@ -795,22 +801,31 @@ class FolderImportThread(QThread):
         """Get or create station"""
         station_name = Path(filepath).parts[self.station_level]
         station_name = str(station_name)
+        # check reference dictionary first, station names are only unique within a survey
+        station_key = (station_name, survey_id)
+        if station_key in self.station_ref:
+            return self.station_ref[station_key]
         try:
             row_cond = f'name={sql_text(station_name)} AND survey_id={int(survey_id)}'
             station_id = self.mpDB.select("station", columns="id", row_cond=row_cond)[0][0]
         except IndexError:
             station_id = self.mpDB.add_station(station_name, None, None, survey_id)
+        self.station_ref[station_key] = station_id
         return station_id
 
     def camera(self, filepath, station_id):
         camera_name = Path(filepath).parts[self.camera_level]
         camera_name = str(camera_name)
+        # check reference dictionary first, camera names are only unique within a station
+        camera_key = (camera_name, station_id)
+        if camera_key in self.camera_ref:
+            return self.camera_ref[camera_key]
         try:
             row_cond = f"name={sql_text(camera_name)} AND station_id={int(station_id)}"
             camera_id = self.mpDB.select("camera", columns="id", row_cond=row_cond)[0][0]
         except IndexError:
             camera_id = self.mpDB.add_camera(camera_name, station_id)
-
+        self.camera_ref[camera_key] = camera_id
         return camera_id
 
 
