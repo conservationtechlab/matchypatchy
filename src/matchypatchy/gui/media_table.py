@@ -161,6 +161,15 @@ class MediaTable(QAbstractTableModel):
                     name = None
                 return name
 
+        # sex, shown as Unknown for identified rois without one
+        if self._columns[col] == "sex":
+            if role == Qt.ItemDataRole.DisplayRole:
+                value = self._data_filtered.at[row, self._columns[col]]
+                if pd.isna(value):
+                    iid = self._data_filtered.at[row, "individual_id"]
+                    return None if pd.isna(iid) else 'Unknown'
+                return str(value)
+
         if role == Qt.ItemDataRole.DisplayRole:
             # Return the raw data directly from your memory structure
             if pd.isna(self._data_filtered.at[row, self._columns[col]]):
@@ -203,6 +212,9 @@ class MediaTable(QAbstractTableModel):
                 return False
             old_value = self._data_filtered.at[row, reference]
             new_value = str(value)
+            # Unknown sex is stored as NULL ('None' from older versions too)
+            if reference == 'sex' and new_value in ('Unknown', 'None'):
+                new_value = None
             
         # Handle editable columns
         else:

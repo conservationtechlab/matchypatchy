@@ -52,6 +52,8 @@ def _make_display_media():
         dm._data_filtered = pd.DataFrame()
         dm.edit_stack = []
         dm.progress = None
+        dm._load_id = 0
+        dm._loaders = []
 
         # Mock widgets
         dm.filterbar = MagicMock()
@@ -438,3 +440,115 @@ class TestMediaTableUpdateProject:
         MediaTable.update_project(mt, cfg, db)
         assert mt.mpDB is db
         assert mt.thumbnail_dir is cfg.THUMBNAIL_DIR
+
+
+class TestCompareSelection:
+    def test_compare_uses_ticked_rows(self):
+        """Compare sends the rois ticked in the Select column, not the highlighted rows"""
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.media_table._data_filtered = _sample_roi_data()
+        dm.media_table.selectedIds.return_value = [10, 12]
+        dm.view.selectionModel.return_value.selectedRows.return_value = []  # nothing highlighted
+        with patch("matchypatchy.gui.display_media.AlertPopup") as popup, \
+             patch("matchypatchy.gui.display_media.QDialog") as qdialog:
+            popup.return_value.exec.return_value = qdialog.DialogCode.Accepted
+            DisplayMedia.compare(dm)
+        dm.parent._set_manual_view.assert_called_once_with(selected_ids=[10, 12])
+        dm.parent._set_compare_view.assert_not_called()
+
+
+class TestSexDelegate:
+    def test_sex_combo_offers_unknown(self):
+        """The Sex column offers Unknown like the edit popups, not 'None'"""
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        with patch("matchypatchy.gui.display_media.ComboBoxDelegate") as delegate:
+            DisplayMedia._set_delegates(dm)
+        assert ['Unknown', 'Male', 'Female'] in [c.args[0] for c in delegate.call_args_list]
+
+
+class TestIndividualPrefilter:
+    """View from Manage Individuals filters rois, so the view must show rois"""
+
+    def _refresh(self, prefilter):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = 0  # left on Full Images
+        DisplayMedia.refresh_filters(dm, prefilter=prefilter)
+        return dm
+
+    @pytest.mark.parametrize("prefilter", [{"individual_id": 5}, {"individual_id": 0},
+                                           {"unidentified_only": True}])
+    def test_switches_to_rois(self, prefilter):
+        dm = self._refresh(prefilter)
+        assert dm.data_type == 1
+        dm.show_type.setCurrentIndex.assert_called_once_with(1)
+        # signals blocked so change_type does not load the table a second time
+        dm.show_type.blockSignals.assert_any_call(True)
+        dm.filterbar.individual_visible.assert_called_with(True)
+
+    @pytest.mark.parametrize("prefilter", [None, {"no_roi_mids": [1, 2]}])
+    def test_other_filters_keep_view_type(self, prefilter):
+        dm = self._refresh(prefilter)
+        assert dm.data_type == 0
+        dm.show_type.setCurrentIndex.assert_not_called()
+
+
+class TestSupersededLoad:
+    """A slow load finishing after the view type changed must not be shown"""
+
+    def _two_loads(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.mpDB.count.side_effect = lambda tbl: 5
+        dm.handle_data_loaded = DisplayMedia.handle_data_loaded.__get__(dm)
+        dm._apply_sort = MagicMock()
+        dm._set_delegates = MagicMock()
+        dm.close_alert = MagicMock()
+        dm.show_alert = MagicMock()
+        loaders = [MagicMock(), MagicMock()]
+        with patch("matchypatchy.gui.display_media.FetchTableThread", side_effect=loaders), \
+             patch("matchypatchy.gui.display_media.fetch_individual", return_value=pd.DataFrame()):
+            dm.data_type = 1
+            DisplayMedia.load_table(dm)
+            dm.data_type = 0  # user switches to Full Images before the roi load finishes
+            DisplayMedia.load_table(dm)
+        return dm, loaders
+
+    @staticmethod
+    def _slot(signal):
+        return signal.connect.call_args.args[0]
+
+    def test_stale_results_are_ignored(self):
+        dm, (old, new) = self._two_loads()
+        self._slot(old.loaded_data)(pd.DataFrame({"id": [10]}))
+        dm.media_table.receiveData.assert_not_called()
+        self._slot(new.loaded_data)(pd.DataFrame({"id": [1]}))
+        dm.media_table.receiveData.assert_called_once()
+
+    def test_stale_done_keeps_progress_open(self):
+        dm, (old, new) = self._two_loads()
+        self._slot(old.done)()
+        dm.close_alert.assert_not_called()
+        self._slot(new.done)()
+        dm.close_alert.assert_called_once()
+
+    def test_previous_load_is_stopped_and_kept_until_finished(self):
+        dm, (old, new) = self._two_loads()
+        old.requestInterruption.assert_called_once()
+        old.loaded_data.disconnect.assert_called_once()
+        assert dm._loaders == [old, new]
+        self._slot(old.finished)()
+        assert dm._loaders == [new]
+
+
+class TestSelectAllAfterReload:
+    def test_reload_unchecks_select_all(self):
+        """Reloaded rows are unticked, so the next Select All click selects again"""
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm._apply_sort = MagicMock()
+        dm._set_delegates = MagicMock()
+        DisplayMedia.handle_data_loaded(dm, pd.DataFrame({"id": [10], "select": [0]}))
+        dm.button_select.setChecked.assert_called_with(False)

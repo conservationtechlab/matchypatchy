@@ -34,6 +34,9 @@ class DisplayMedia(QWidget):
         self.data_type = data_type
         self.valid_stations = []
         self.selected_rows = []
+        # table loads, a newer load supersedes older ones still running
+        self._load_id = 0
+        self._loaders = []
 
         # data and edit stack
         self._data_raw = pd.DataFrame()
@@ -177,9 +180,8 @@ class DisplayMedia(QWidget):
         else:
             rois = None
             if self.data_type == 1:
-                selected_rows = self.view.selectionModel().selectedRows()
-                rois = self.media_table._data_filtered.loc[[index.row() for index in selected_rows], "id"]
-                rois = rois.tolist()
+                # rows ticked in the Select column, not the highlighted rows
+                rois = self.media_table.selectedIds()
                 if len(rois) > 1:
                     dialog = AlertPopup(self, prompt=f"Would you like to compare the {len(rois)} selected ROIs?")
                     if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -241,6 +243,14 @@ class DisplayMedia(QWidget):
         """
         # wipe previous selections
         self.filterbar.refresh_filters(prefilter=prefilter)
+        # individual and unidentified filters only apply to rois
+        if prefilter and ('individual_id' in prefilter or prefilter.get('unidentified_only')):
+            if self.data_type != 1:
+                self.data_type = 1
+                # change_type would load the table again
+                self.show_type.blockSignals(True)
+                self.show_type.setCurrentIndex(self.data_type)
+                self.show_type.blockSignals(False)
         # get current filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
@@ -325,24 +335,60 @@ class DisplayMedia(QWidget):
 
             # load table with current data type
             self.individual_list = fetch_individual(self.mpDB)
+            # a previous load still running is for the old view type or filters
+            self._stop_loader()
+            self._load_id += 1
+            load_id = self._load_id
             self.dataloader = FetchTableThread(self)
-            self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
+            # keep a reference until the thread finishes so it is not garbage collected
+            self._loaders.append(self.dataloader)
+            self.dataloader.finished.connect(lambda loader=self.dataloader: self._forget_loader(loader))
+            self.dataloader.loaded_data.connect(lambda data, load_id=load_id: self.handle_data_loaded(data, load_id))
             self.dataloader.progress_max.connect(lambda n_missing: self.set_progress_max(n_missing))
             self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
             # Connect the progress popup's rejected signal to stop the query container's calculation
             if hasattr(self, 'alert_box') and self.alert_box:
                 self.alert_box.rejected.connect(self.dataloader.requestInterruption)
-            self.dataloader.done.connect(self.close_alert)  # Close the progress dialog when done
+            # Close the progress dialog when done
+            self.dataloader.done.connect(lambda load_id=load_id: self._loader_done(load_id))
             self.dataloader.start()
             return True
 
-    def handle_data_loaded(self, data=None):
+    def _stop_loader(self):
+        """Interrupt and disconnect the running FetchTableThread, if any"""
+        loader = getattr(self, 'dataloader', None)
+        if loader is None or not loader.isRunning():
+            return
+        loader.requestInterruption()
+        for signal in (loader.loaded_data, loader.progress_max, loader.progress_update, loader.done):
+            try:
+                signal.disconnect()
+            except TypeError:
+                pass  # nothing connected
+
+    def _forget_loader(self, loader):
+        """Drop the reference to a finished FetchTableThread"""
+        if loader in self._loaders:
+            self._loaders.remove(loader)
+
+    def _loader_done(self, load_id):
+        """Close the progress popup when the current load finishes"""
+        if load_id == self._load_id:
+            self.close_alert()
+
+    def handle_data_loaded(self, data=None, load_id=None):
         """Handle data loaded from the FetchTableThread"""
+        # ignore results from a load that was superseded, eg. by changing view type,
+        # they do not match the current headers
+        if load_id is not None and load_id != self._load_id:
+            return
         self._data_raw = data
         self.apply_edits()  # Apply any pending edits to the raw data before filtering
         self.filter_data()  # Apply filters to the raw data to get the filtered data
         headers = self._get_headers()
         self.media_table.receiveData(self._data_filtered, headers=headers) # Send the filtered data to the media table for display
+        # reloaded rows come back unticked
+        self.button_select.setChecked(False)
         self._apply_sort()
         self._set_delegates()
         self.update_count_label()
@@ -689,7 +735,7 @@ class DisplayMedia(QWidget):
             combo_items = list(self.VIEWPOINTS.values())[1:]
             self.view.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
             # SEX COMBOBOX
-            combo_items = ['None', 'Male', 'Female']
+            combo_items = ['Unknown', 'Male', 'Female']
             self.view.setItemDelegateForColumn(SEX_COLUMN, ComboBoxDelegate(combo_items, self))
 
         else:
