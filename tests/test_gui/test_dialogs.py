@@ -389,7 +389,9 @@ class TestFolderImportCamera:
         thread.camera.return_value = 7
         with patch("matchypatchy.threads.import_thread.get_sha256", return_value="h"), \
                 patch("matchypatchy.threads.import_thread.save_media_thumbnail", return_value="t.jpg"):
-            FolderImportThread._run(thread)
+            FolderImportThread.run(thread)
+        # run() reports exceptions instead of raising them
+        thread.import_failed.emit.assert_not_called()
         thread.camera.assert_called_once_with(str(image), 3)
         assert thread.mpDB.add_media.call_args.kwargs["camera_id"] == 7
 
