@@ -962,3 +962,28 @@ class TestCSVMigrateInsertFailures:
         assert len(thread.import_failed.calls) == 1
         assert thread.import_failed.calls[0][0].startswith("Failed to add station 'Station A'")
         assert db.count("media") == 0
+
+
+class TestCSVMigrateInterruption:
+    def test_interruption_stops_the_loop_and_keeps_finished_rows(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        image = tmp_path / "a.jpg"
+        image.write_bytes(b"a")
+        rows = [_migrate_row(image, n, box=0.1 * (n + 1)) for n in range(5)]
+        thread = import_thread.CSVMigrateThread(parent, pd.DataFrame(rows))
+        thread.progress_update = SignalSpy()
+        thread.error_update = SignalSpy()
+        thread.finished = SignalSpy()
+        checks = []
+        # cancel after the first row
+        thread.isInterruptionRequested = lambda: checks.append(None) or len(checks) > 1
+
+        thread.run()
+
+        assert db.count("roi") == 1
+        # checked once per row until cancelled, then once more before reporting
+        assert len(checks) == 3
+        assert thread.finished.calls == []
