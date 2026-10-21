@@ -177,9 +177,8 @@ class DisplayMedia(QWidget):
         else:
             rois = None
             if self.data_type == 1:
-                selected_rows = self.view.selectionModel().selectedRows()
-                rois = self.media_table._data_filtered.loc[[index.row() for index in selected_rows], "id"]
-                rois = rois.tolist()
+                # rows ticked in the Select column, not the highlighted rows
+                rois = self.media_table.selectedIds()
                 if len(rois) > 1:
                     dialog = AlertPopup(self, prompt=f"Would you like to compare the {len(rois)} selected ROIs?")
                     if dialog.exec() == QDialog.DialogCode.Accepted:

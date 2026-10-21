@@ -438,3 +438,19 @@ class TestMediaTableUpdateProject:
         MediaTable.update_project(mt, cfg, db)
         assert mt.mpDB is db
         assert mt.thumbnail_dir is cfg.THUMBNAIL_DIR
+
+
+class TestCompareSelection:
+    def test_compare_uses_ticked_rows(self):
+        """Compare sends the rois ticked in the Select column, not the highlighted rows"""
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.media_table._data_filtered = _sample_roi_data()
+        dm.media_table.selectedIds.return_value = [10, 12]
+        dm.view.selectionModel.return_value.selectedRows.return_value = []  # nothing highlighted
+        with patch("matchypatchy.gui.display_media.AlertPopup") as popup, \
+             patch("matchypatchy.gui.display_media.QDialog") as qdialog:
+            popup.return_value.exec.return_value = qdialog.DialogCode.Accepted
+            DisplayMedia.compare(dm)
+        dm.parent._set_manual_view.assert_called_once_with(selected_ids=[10, 12])
+        dm.parent._set_compare_view.assert_not_called()
