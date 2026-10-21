@@ -496,6 +496,29 @@ class TestUploadManagerSave:
         popup.mpDB.update_base_dir.assert_called_once_with(1, "/new")
         assert popup.updates == []
 
+    def _status(self, popup):
+        return popup.status_label.setText.call_args.args[0]
+
+    def test_failed_update_is_reported(self):
+        """update_base_dir returning False (e.g. directory already another upload's) was ignored"""
+        popup = _uploads_popup(updates=[(1, "/taken"), (2, "/ok")], errors=[[], []])
+        popup.mpDB.update_base_dir.side_effect = lambda base_dir_id, _: base_dir_id != 1
+        popup.base_dirs = [(1, "/old1", "2024", 1), (2, "/ok", "2024", 1)]
+        self._save(popup, confirm=1)
+        text = self._status(popup)
+        assert "Saved 1 of 2" in text
+        assert "/taken" in text and "/ok" not in text
+        popup.list.item.assert_any_call(0, 0)
+
+    def test_skipped_update_is_reported(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg", "b.jpg"]], contains_errors=True)
+        popup.base_dirs = [(1, "/old", "2024", 2)]
+        self._save(popup, confirm=1)
+        popup.mpDB.update_base_dir.assert_not_called()
+        text = self._status(popup)
+        assert "Saved 0 of 1" in text
+        assert "/new (2 files missing)" in text
+
     def test_choosing_another_directory_needs_verifying_again(self):
         from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
         popup = _uploads_popup(verified=True)
@@ -504,6 +527,80 @@ class TestUploadManagerSave:
         with patch(f"{UPLOADS}.QFileDialog.getExistingDirectory", return_value="/new"):
             UploadManagerPopup.edit(popup)
         assert popup.verified is False
+
+
+class TestUploadManagerVerify:
+    def _popup(self, updates=((1, "/new"),)):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = _uploads_popup(updates=updates, verified=False)
+        popup.verifying = False
+        popup.build_thread = None
+        popup.list.currentRow.return_value = 0
+        popup.set_verifying = lambda v: UploadManagerPopup.set_verifying(popup, v)
+        popup.set_editdel = lambda: UploadManagerPopup.set_editdel(popup)
+        return popup
+
+    def _verify(self, popup):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.VerifyNewBaseDirsThread") as thread:
+            UploadManagerPopup.verify(popup)
+        return thread
+
+    def test_verify_while_running_is_ignored(self):
+        """Replacing a running thread aborted the app"""
+        popup = self._popup()
+        thread = self._verify(popup)
+        running = popup.build_thread
+        running.isRunning.return_value = True
+        thread = self._verify(popup)
+        thread.assert_not_called()
+        assert popup.build_thread is running
+
+    def test_buttons_disabled_and_progress_shown_while_verifying(self):
+        popup = self._popup()
+        self._verify(popup)
+        popup.button_verify.setEnabled.assert_called_with(False)
+        popup.button_save.setEnabled.assert_called_with(False)
+        popup.button_edit.setEnabled.assert_called_with(False)
+        popup.progress_bar.show.assert_called_once()
+
+    def test_buttons_enabled_when_verification_finishes(self):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = self._popup()
+        self._verify(popup)
+        UploadManagerPopup.on_verify_finished(popup)
+        popup.button_verify.setEnabled.assert_called_with(True)
+        popup.button_save.setEnabled.assert_called_with(True)
+        popup.button_edit.setEnabled.assert_called_with(True)
+        popup.progress_bar.hide.assert_called()
+
+    def test_thread_gets_a_copy_of_updates(self):
+        popup = self._popup()
+        thread = self._verify(popup)
+        passed = thread.call_args.args[1]
+        assert passed == [(1, "/new")]
+        assert passed is not popup.updates
+
+
+class TestUploadManagerLog:
+    def _log(self, popup):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.AlertPopup") as alert:
+            UploadManagerPopup.log(popup)
+        return alert
+
+    def test_missing_files_reported_in_popup_label(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg", "b.jpg"]], contains_errors=True)
+        alert = self._log(popup)
+        alert.assert_not_called()
+        text = popup.status_label.setText.call_args.args[0]
+        assert "2 files" in text
+
+    def test_all_found_reported_in_popup_label(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[[]])
+        alert = self._log(popup)
+        alert.assert_not_called()
+        assert "All files were found" in popup.status_label.setText.call_args.args[0]
 
 
 class TestIndividualPopupList:
@@ -894,3 +991,92 @@ class TestConfigSaveCancel:
         with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
             ConfigPopup.accept(popup)
         popup.cfg.save.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# SurveyPopup
+# ---------------------------------------------------------------------------
+
+SURVEY = "matchypatchy.gui.dialogs.popup_survey"
+
+
+class TestSurveyRegionTimezone:
+    def _popup(self, db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        popup = MagicMock()
+        popup.mpDB = db
+        popup._year = SurveyPopup._year
+        popup._region_id =lambda *args: SurveyPopup._region_id(popup, *args)
+        popup._set_region_timezone = lambda *args: SurveyPopup._set_region_timezone(popup, *args)
+        return popup
+
+    def _region_id(self, db, name, timezone, confirm=1):
+        with patch(f"{SURVEY}.AlertPopup") as alert:
+            alert.return_value.exec.return_value = confirm
+            region_id = self._popup(db)._region_id(name, timezone)
+        return region_id, alert
+
+    def _timezone(self, db, region_id):
+        return db.select("region", columns="timezone", row_cond=f"id={region_id}")[0][0]
+
+    def test_existing_region_without_timezone_is_set(self, tmp_db):
+        """CSV import leaves the timezone NULL, choosing one fills it in without asking"""
+        db, _ = tmp_db
+        region = db.add_region("R", None)
+        db.edit_row("region", region, {"timezone": None}, allow_none=True)
+        region_id, alert = self._region_id(db, "R", "America/Los_Angeles")
+        assert region_id == region
+        assert self._timezone(db, region) == "America/Los_Angeles"
+        alert.assert_not_called()
+
+    def test_existing_region_different_timezone_confirmed(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "America/Los_Angeles", confirm=1)
+        alert.assert_called_once()
+        assert self._timezone(db, region) == "America/Los_Angeles"
+
+    def test_existing_region_different_timezone_declined(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "America/Los_Angeles", confirm=0)
+        alert.assert_called_once()
+        assert self._timezone(db, region) == "Europe/Berlin"
+
+    def test_existing_region_same_timezone_does_not_ask(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "Europe/Berlin")
+        alert.assert_not_called()
+        assert self._timezone(db, region) == "Europe/Berlin"
+
+    def test_edit_shows_and_saves_region_timezone(self, tmp_db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        survey = db.add_survey("S", region, None, None)
+        popup = self._popup(db)
+        popup.list.currentRow.return_value = 0
+        popup.survey_list_ordered = [(survey, "S")]
+        with patch(f"{SURVEY}.SurveyFillPopup") as fill, patch(f"{SURVEY}.AlertPopup") as alert:
+            fill.return_value.exec.return_value = 1
+            fill.return_value.get_name.return_value = "S"
+            fill.return_value.get_region.return_value = "R"
+            fill.return_value.get_timezone.return_value = "Asia/Tokyo"
+            fill.return_value.get_year_start.return_value = ""
+            fill.return_value.get_year_end.return_value = ""
+            alert.return_value.exec.return_value = 1
+            SurveyPopup.edit(popup)
+        assert fill.call_args.kwargs["timezone"] == "Europe/Berlin"
+        assert self._timezone(db, region) == "Asia/Tokyo"
+
+
+class TestManageSurvey:
+    def test_cancel_still_refreshes_survey_list(self):
+        """Survey changes are saved before the popup closes, so cancel must refresh too"""
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        with patch("matchypatchy.gui.display_base.SurveyPopup") as popup:
+            popup.return_value.exec.return_value = 0
+            DisplayBase.manage_survey(base)
+        base.update_survey.assert_called_once()
