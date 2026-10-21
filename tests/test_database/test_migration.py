@@ -104,6 +104,14 @@ INSERT INTO roi (id, media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h, viewpoint,
     VALUES (1, 1, 0, 0.1, 0.2, 0.3, 0.4, 0, 1, 0, 1, 1);
 INSERT INTO media_thumbnails (fid, filepath) VALUES (1, 'media1.jpg');
 INSERT INTO roi_thumbnails (fid, filepath) VALUES (1, 'roi1.jpg');
+-- never detected, or the detector found nothing
+INSERT INTO media (id, base_dir_id, relative_path, sha256, ext, timestamp, station_id)
+    VALUES (2, 1, 'Site01/IMG_0002.JPG', 'hash3', '.jpg', '2023-01-01 00:01:00', 1);
+-- imported with a roi but no box
+INSERT INTO media (id, base_dir_id, relative_path, sha256, ext, timestamp, station_id)
+    VALUES (3, 1, 'Site01/IMG_0003.JPG', 'hash4', '.jpg', '2023-01-01 00:02:00', 1);
+INSERT INTO roi (id, media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h, reviewed, favorite, emb)
+    VALUES (2, 3, 0, -1, -1, -1, -1, 0, 0, 0);
 """
 
 
@@ -150,9 +158,10 @@ class TestMigrateToCurrent:
 
     def test_rows_are_kept(self, migrated_db):
         db, _ = migrated_db
-        assert db.select("media", columns="id, base_dir_id, relative_path, sha256, sequence_id, comment") == [
-            (1, 1, "Site01/IMG_0001.JPG", "hash1", 1, "first")]
-        assert db.select("roi", columns="id, media_id, individual_id") == [(1, 1, 1)]
+        assert db.select("media", columns="id, base_dir_id, relative_path, sha256, sequence_id, comment",
+                         row_cond="id=1") == [(1, 1, "Site01/IMG_0001.JPG", "hash1", 1, "first")]
+        assert db.count("media") == 3
+        assert db.select("roi", columns="id, media_id, individual_id") == [(1, 1, 1), (2, 3, None)]
         assert db.select("individual", columns="id, name, sex") == [(1, "Jaguar-1", "Female")]
         assert db.select("media_thumbnails", columns="fid, filepath") == [(1, "media1.jpg")]
         assert db.select("roi_thumbnails", columns="fid, filepath") == [(1, "roi1.jpg")]
@@ -166,9 +175,14 @@ class TestMigrateToCurrent:
         db, _ = migrated_db
         assert db.db.execute("PRAGMA foreign_keys").fetchone()[0] == 1
         db.delete("media", "id=1")
-        assert db.count("roi") == 0
+        assert db.select("roi", columns="id") == [(2,)]
         assert db.count("media_thumbnails") == 0
         assert db.count("roi_thumbnails") == 0
+
+    def test_detection_done_marks_media_with_a_boxed_roi(self, migrated_db):
+        db, _ = migrated_db
+        # 1 has a boxed roi, 2 has no rois, 3 only a roi imported without a box
+        assert db.select("media", columns="id, detection_done") == [(1, 1), (2, 0), (3, 0)]
 
     def test_same_relative_path_under_another_base_dir_is_added(self, migrated_db):
         db, _ = migrated_db
@@ -176,7 +190,7 @@ class TestMigrateToCurrent:
         media_id = db.add_media(base_dir_id, "Site01/IMG_0001.JPG", "hash2", ".jpg",
                                 "2024-01-01 00:00:00", 1)
         assert media_id not in ("duplicate_error", None)
-        assert db.count("media") == 2
+        assert db.count("media") == 4
 
 
 class TestRelativePathUniqueness:

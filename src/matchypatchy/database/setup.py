@@ -17,6 +17,8 @@ SCHEMA_VERSION = 2
 # Tables rebuilt by a migration, {name} lets the migration create them under a temporary name.
 # A relative path is only unique within its base directory: D:/2023/Site01/IMG_0001.JPG and
 # D:/2024/Site01/IMG_0001.JPG are both Site01/IMG_0001.JPG
+# detection_done is 1 once a file has been run through the detector, or given a full-image roi
+# when no detector was selected, so later processing only runs the files that still need it
 MEDIA_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 id INTEGER PRIMARY KEY,
                 base_dir_id INTEGER NOT NULL,
@@ -29,6 +31,7 @@ MEDIA_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 sequence_id INTEGER,
                 external_id INTEGER,
                 comment TEXT,
+                detection_done INTEGER NOT NULL DEFAULT 0,
                 UNIQUE (base_dir_id, relative_path),
                 FOREIGN KEY (base_dir_id) REFERENCES uploads (id) ON DELETE CASCADE,
                 FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
@@ -251,8 +254,9 @@ def _migrate_1_to_2(db):
     """
     Bring a database from before schema versioning up to date
 
-    Adds metadata.schema_version, drops the unused individual.age, and makes
-    media.relative_path unique within its base directory instead of across all of them
+    Adds metadata.schema_version, drops the unused individual.age, makes
+    media.relative_path unique within its base directory instead of across all of
+    them, and adds media.detection_done
     """
     with _schema_change(db):
         metadata_columns = [c[1] for c in db.execute("PRAGMA table_info(metadata)").fetchall()]
@@ -260,6 +264,10 @@ def _migrate_1_to_2(db):
             db.execute("ALTER TABLE metadata ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 0;")
         _rebuild_table(db, "individual", INDIVIDUAL_TABLE)
         _rebuild_table(db, "media", MEDIA_TABLE)
+        # a roi with a box came from a detector (or the full-image fallback); media without
+        # one, either no rois or only rois imported without a box, still need detection
+        db.execute("""UPDATE media SET detection_done = 1
+                      WHERE EXISTS (SELECT 1 FROM roi WHERE roi.media_id = media.id AND roi.bbox_w != -1);""")
 
 
 MIGRATIONS = {1: _migrate_1_to_2}

@@ -346,7 +346,7 @@ class MatchyPatchyDB():
                   commit: bool = True,
                   quiet: bool = True):
         """
-        Media has 10 attributes not including id:
+        Media has 11 attributes not including id, detection_done starts at 0:
             id INTEGER PRIMARY KEY,
             base_dir_id INTEGER NOT NULL,
             relative_path TEXT NOT NULL, (unique within base_dir_id)
@@ -358,6 +358,7 @@ class MatchyPatchyDB():
             sequence_id INTEGER,
             external_id INTEGER,
             comment TEXT,
+            detection_done INTEGER NOT NULL DEFAULT 0,
         """
         try:
             cursor = self.db.cursor()
