@@ -281,3 +281,50 @@ def clear_project_data(mpDB):
                    ("media", "media_thumbnails", "roi", "roi_thumbnails", "sequence", "individual")])
     mpDB.clear_emb()
     return cleared
+
+
+# media columns, the rest of an EditObject's references are roi columns or sex
+MEDIA_COLUMNS = {'station_id', 'sequence_id', 'external_id', 'comment'}
+
+
+def save_edits(mpDB, edits, individual_of, media_only=False):
+    """
+    Save EditObjects in the order they were made, return the ones that failed
+
+    individual_of(rid) gives a roi's individual from before these edits. A sex
+    edit changes the individual of its roi, using an individual_id edit earlier
+    in the same save when there is one. media_only (the media view) saves
+    every edit to the media, by mid.
+    """
+    failed = []
+    # individual_id edits applied so far, so a later sex edit targets the new individual
+    assigned_iids = {}
+    for edit in edits:
+        if not _save_edit(mpDB, edit, individual_of, assigned_iids, media_only):
+            failed.append(edit)
+    return failed
+
+
+def _save_edit(mpDB, edit, individual_of, assigned_iids, media_only):
+    """
+    Write one EditObject, return False if it failed
+
+    Called only by save_edits, which keeps assigned_iids across the edits of one save.
+    """
+    replace_dict = {edit.reference: edit.new_value}
+    if media_only or edit.reference in MEDIA_COLUMNS:
+        return mpDB.edit_row("media", int(edit.mid), replace_dict, allow_none=True)
+    # rows without a roi id (eg. the full video row) have nothing to update
+    if edit.rid is None or pd.isna(edit.rid):
+        return True
+    rid = int(edit.rid)
+    if edit.reference == 'sex':
+        iid = assigned_iids[rid] if rid in assigned_iids else individual_of(rid)
+        if iid is None or pd.isna(iid):
+            return True  # no individual to update
+        return mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
+    # roi columns; individual_id and viewpoint may be cleared (Unknown / None)
+    saved = mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
+    if saved and edit.reference == 'individual_id':
+        assigned_iids[rid] = edit.new_value
+    return saved

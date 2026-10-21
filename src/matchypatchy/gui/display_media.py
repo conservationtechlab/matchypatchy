@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBo
                              QHBoxLayout, QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.database.media import IMAGE_EXT, fetch_individual, delete_media, delete_rois
+from matchypatchy.database.media import IMAGE_EXT, fetch_individual, delete_media, delete_rois, save_edits
 from matchypatchy.database.location import camera_names
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
@@ -559,17 +559,9 @@ class DisplayMedia(UsesProject, QWidget):
 
     # EDIT POPUP ---------------------------------------------------------------
 
-    # media table columns edited from the roi view
-    MEDIA_COLUMNS = {'station_id', 'sequence_id', 'external_id', 'comment'}
-
     def save(self):
         """Save changes to the database in the order they were made"""
-        failed = []
-        # individual_id edits applied so far, so a later sex edit targets the new individual
-        assigned_iids = {}
-        for edit in self.edit_stack:
-            if not self._save_edit(edit, assigned_iids):
-                failed.append(edit)
+        failed = save_edits(self.mpDB, self.edit_stack, self._individual_of, media_only=self.data_type == 0)
 
         # keep unsaved edits so they are not silently lost
         self.edit_stack = failed
@@ -581,31 +573,14 @@ class DisplayMedia(UsesProject, QWidget):
         # reload so filters and undo work from the saved values
         self.refresh_table(reload=True)
 
-    def _save_edit(self, edit, assigned_iids):
-        """Write one EditObject to the database, return False if it failed"""
-        replace_dict = {edit.reference: edit.new_value}
-        # media view, or media columns from the roi view
-        if self.data_type == 0 or edit.reference in self.MEDIA_COLUMNS:
-            return self.mpDB.edit_row("media", int(edit.mid), replace_dict, allow_none=True)
-        # rows without a roi id (eg. the full video row) have nothing to update
-        if edit.rid is None or pd.isna(edit.rid):
-            return True
-        rid = int(edit.rid)
-        if edit.reference == 'sex':
-            # look up in the unfiltered data, the roi may be hidden by the current filter
-            if rid in assigned_iids:
-                iid = assigned_iids[rid]
-            else:
-                rows = self._data_raw.loc[self._data_raw['id'] == rid, 'individual_id']
-                iid = rows.iloc[0] if len(rows) else None
-            if iid is None or pd.isna(iid):
-                return True  # no individual to update
-            return self.mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
-        # roi columns; individual_id and viewpoint may be cleared (Unknown / None)
-        ok = self.mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
-        if ok and edit.reference == 'individual_id':
-            assigned_iids[rid] = edit.new_value
-        return ok
+    def _individual_of(self, rid):
+        """
+        A roi's individual as loaded, for save_edits to apply sex edits to
+
+        Looks in the unfiltered data, the roi may be hidden by the current filter.
+        """
+        rows = self._data_raw.loc[self._data_raw['id'] == rid, 'individual_id']
+        return rows.iloc[0] if len(rows) else None
 
     def edit_row(self, row):
         """Edit a single row"""

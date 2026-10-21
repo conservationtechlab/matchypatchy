@@ -295,3 +295,29 @@ class TestEditsAndDeletes:
         assert [db.count(t) for t in ("media", "roi", "individual")] == [0, 0, 0]
         assert db.count("station") == 1
         assert not self._has_emb(db, rid)
+
+
+class TestSaveEdits:
+    def _edit(self, rid, mid, reference, new_value):
+        from matchypatchy.database.media import EditObject
+        return EditObject(rid=rid, mid=mid, reference=reference, previous_value=None, new_value=new_value)
+
+    def test_sex_follows_a_name_change_in_the_same_save(self, tmp_db):
+        from matchypatchy.database.media import save_edits
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h", ".jpg", "2024-01-01 10:00:00", station)
+        old, new = db.add_individual("Old", "Male"), db.add_individual("New")
+        rid = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1, individual_id=old)
+        failed = save_edits(db, [self._edit(rid, mid, "individual_id", new), self._edit(rid, mid, "sex", "Female"),
+                                 self._edit(rid, mid, "comment", "O'Neil saw it")],
+                            individual_of=lambda r: old)
+        assert failed == []
+        assert db.select("individual", "id, sex") == [(old, "Male"), (new, "Female")]
+        assert db.select("media", "comment") == [("O'Neil saw it",)]
+
+    def test_failed_edit_is_returned(self, tmp_db):
+        from matchypatchy.database.media import save_edits
+        db, _ = tmp_db
+        bad_column = self._edit(1, 1, "not_a_column", 1)
+        assert save_edits(db, [bad_column], individual_of=lambda r: None) == [bad_column]
