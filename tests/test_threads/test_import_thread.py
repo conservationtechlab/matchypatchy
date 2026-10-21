@@ -864,3 +864,16 @@ class TestCSVMigrateRerun:
 
         assert db.count("roi") == 4
         assert thread.progress_update.calls[-1] == (4,)
+
+    def test_individual_is_looked_up_once(self, tmp_db, null_logger, tmp_path, image, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        tables = []
+        original_select = db.select
+        monkeypatch.setattr(db, "select", lambda table, *a, **k: tables.append(table) or original_select(table, *a, **k))
+
+        self._migrate(db, parent, [self._row(image, n, box=0.1 * (n + 1), individual_id=5, name="Lion")
+                                   for n in range(3)])
+
+        assert tables.count("individual") == 1
+        assert db.select("roi", columns="individual_id") == [(1,)] * 3

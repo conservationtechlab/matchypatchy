@@ -276,6 +276,8 @@ class CSVMigrateThread(QThread):
                 # if not in database, add individual
                 except IndexError:
                     individual_id = self.mpDB.add_individual(str(name), sex if not pd.isna(sex) else None)
+                # add individual id to reference dictionary
+                self.individual_ref[old_individual_id] = individual_id
             return individual_id
         # if no individual name, return None
         else:
