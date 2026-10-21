@@ -7,6 +7,7 @@ from PyQt6.QtGui import QStandardItemModel
 from PyQt6.QtCore import Qt
 
 from matchypatchy.database.location import region_names, survey_names, station_names
+from matchypatchy.database.individual import individual_names
 from matchypatchy.project import UsesProject
 
 
@@ -103,7 +104,7 @@ class FilterBar(UsesProject, QWidget):
 
         # individual list hidden until feature is implemented on QC
         self.individual_select.clear()
-        self.individual_list_ordered = [(0, 'Individual')] + list(self.mpDB.select('individual', columns='id, name'))
+        self.individual_list_ordered = [(0, 'Individual')] + individual_names(self.mpDB)
         self.individual_select.addItems([el[1] for el in self.individual_list_ordered])
 
         # Reset viewpoint selection to default, no need to reset list

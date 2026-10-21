@@ -25,7 +25,8 @@ def _make_individual_fill_popup(name=None, sex=None, existing_names=None):
 
     parent = MagicMock()
     mpDB = MagicMock()
-    mpDB.select.return_value = [(n,) for n in (existing_names or [])]
+    names = set(existing_names or [])
+    mpDB.query.side_effect = lambda sql, params=(): [(1,)] if params and params[0] in names else []
     parent.mpDB = mpDB
 
     popup = IndividualFillPopup.__new__(IndividualFillPopup)
@@ -207,8 +208,8 @@ class TestIndividualPopupUpdate:
 
         parent = MagicMock()
         parent.mpDB = MagicMock()
-        parent.mpDB._command.return_value = individuals or []
-        parent.mpDB.select.return_value = [(null_count,)]
+        rows = individuals or []
+        parent.mpDB.query.side_effect = lambda sql, params=(): [(null_count,)] if "IS NULL" in sql else rows
 
         popup = IndividualPopup.__new__(IndividualPopup)
         popup.parent = parent
@@ -223,7 +224,7 @@ class TestIndividualPopupUpdate:
 
     def test_update_sets_correct_row_count(self):
         """Row count = number of individuals + 1 (unidentified row)."""
-        individuals = [("Tiger-01", 1, 5), ("Leopard-02", 2, 3)]
+        individuals = [(1, "Tiger-01", 5), (2, "Leopard-02", 3)]
         popup = self._make_individual_popup(individuals=individuals, null_count=2)
         popup.update()
         popup.list.setRowCount.assert_called_with(3)  # 2 named + 1 unidentified
@@ -235,7 +236,7 @@ class TestIndividualPopupUpdate:
         popup.list.setRowCount.assert_called_with(1)
 
     def test_update_stores_individuals(self):
-        individuals = [("Tiger-01", 1, 5)]
+        individuals = [(1, "Tiger-01", 5)]
         popup = self._make_individual_popup(individuals=individuals)
         popup.update()
         assert popup.individuals == individuals
@@ -621,7 +622,7 @@ class TestIndividualPopupList:
         popup = MagicMock()
         popup.mpDB = db
         IndividualPopup.update(popup)
-        assert sorted((name, count) for name, _, count in popup.individuals) == [("A", 1), ("B", 0), ("C", 0)]
+        assert sorted((name, count) for _, name, count in popup.individuals) == [("A", 1), ("B", 0), ("C", 0)]
 
 
 class TestViewIndividualPrefilter:
@@ -630,8 +631,9 @@ class TestViewIndividualPrefilter:
     def _refresh(self, individual_id):
         from matchypatchy.gui.widgets.widget_filterbar import FilterBar
         bar = MagicMock()
+        import re
         tables = {"region": [], "survey": [], "individual": [(4, "Spot"), (9, "Dot")]}
-        bar.mpDB.select.side_effect = lambda table, columns=None, row_cond=None: tables.get(table, [])
+        bar.mpDB.query.side_effect = lambda sql, params=(): tables.get(re.search(r"FROM (\w+)", sql).group(1), [])
         bar.region_select.currentIndex.return_value = 0
         bar.survey_select.currentIndex.return_value = 0
         bar.station_select.currentIndex.return_value = 0
