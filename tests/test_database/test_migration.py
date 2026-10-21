@@ -190,7 +190,7 @@ class TestMigrateToCurrent:
         base_dir_id = db.add_upload("D:/2024")
         media_id = db.add_media(base_dir_id, "Site01/IMG_0001.JPG", "hash2", ".jpg",
                                 "2024-01-01 00:00:00", 1)
-        assert media_id not in ("duplicate_error", None)
+        assert media_id not in ("duplicate_path", "duplicate_hash", None)
         assert db.count("media") == 4
 
 
@@ -232,8 +232,8 @@ class TestRelativePathUniqueness:
         first = db.add_media(dir_2023, "Site01/IMG_0001.JPG", "hash1", ".jpg", "2023-01-01", station_id)
         second = db.add_media(dir_2024, "Site01/IMG_0001.JPG", "hash2", ".jpg", "2024-01-01", station_id)
 
-        assert first not in ("duplicate_error", None)
-        assert second not in ("duplicate_error", None)
+        assert first not in ("duplicate_path", "duplicate_hash", None)
+        assert second not in ("duplicate_path", "duplicate_hash", None)
         assert first != second
 
     def test_same_relative_path_in_one_base_dir_is_a_duplicate(self, tmp_db):
@@ -244,5 +244,5 @@ class TestRelativePathUniqueness:
         db.add_media(base_dir_id, "Site01/IMG_0001.JPG", "hash1", ".jpg", "2023-01-01", station_id)
         again = db.add_media(base_dir_id, "Site01/IMG_0001.JPG", "hash2", ".jpg", "2023-01-01", station_id)
 
-        assert again == "duplicate_error"
+        assert again == "duplicate_path"
         assert db.count("media") == 1

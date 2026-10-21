@@ -59,6 +59,7 @@ class CSVMigrateThread(QThread):
         self.individual_ref = {}  # dictionary to store individual name to id mapping
         self.sequence_ref = {}  # dictionary to store sequence id mapping
         self.media_ref = {}  # dictionary to store file hash to media id mapping
+        self.skipped_ref = set()  # hashes of files skipped because a different file has their path
         self.existing_roi_ref = {}  # dictionary to store media id to count of rois already in the project
         self.errors = []  # list to store errors encountered during import
 
@@ -95,6 +96,10 @@ class CSVMigrateThread(QThread):
                 # new sequence id
                 sequence_id = self.sequence(row.sequence_id)
 
+                # a different file was already at this path, its other rois are skipped too
+                if hash in self.skipped_ref:
+                    continue
+
                 # media, each roi of a file is its own row so only the first adds it
                 media_id = self.media_ref.get(hash)
                 if media_id is None:
@@ -110,7 +115,13 @@ class CSVMigrateThread(QThread):
                                                    comment=row.comment if not pd.isna(row.comment) else None,
                                                    commit=False)
 
-                    if media_id == "duplicate_error":
+                    if media_id == "duplicate_path":
+                        # don't attach its rois to the file already at that path
+                        logger.warning(f"A different file is already in the project at {row.filepath}, skipping import...")
+                        self.errors.append(row.filepath)
+                        self.skipped_ref.add(hash)
+                        continue
+                    elif media_id == "duplicate_hash":
                         # already in the project; media has no filepath column, but the file's hash is unique
                         media_id = self.mpDB.select("media", columns="id", row_cond=f"sha256='{hash}'")[0][0]
                         self.existing_roi_ref[media_id] = count_existing_rois(self.mpDB, media_id)
@@ -390,8 +401,12 @@ class CSVImportThread(QThread):
                                                external_id=self.external(exemplar),
                                                comment=self.comment(exemplar),
                                                commit=False)
+                # a different file is already at this path, skip rather than attach rois to it
+                if media_id == "duplicate_path":
+                    logger.warning(f"A different file is already in the project at {filepath}, skipping import...")
+                    continue
                 # image already added, get correct media_id and its existing rois
-                if media_id == "duplicate_error":
+                elif media_id == "duplicate_hash":
                     media_id = self.mpDB.select("media", columns="id", row_cond=f'sha256="{hash}"')[0][0]
                     existing_rois = count_existing_rois(self.mpDB, media_id)
                 # save thumbnail for new media
@@ -771,9 +786,7 @@ class FolderImportThread(QThread):
                     station_id = self.station(filepath, survey_id)
                 else:
                     # create default station if no station level and use for all media
-                    if not self.default_station:
-                        self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
-                    station_id = self.default_station
+                    station_id = self._default_station(survey_id)
                 # add camera if camera level provided (also under the default station), else None
                 camera_id = self.camera(filepath, station_id) if self.camera_level > 0 else None
 
@@ -789,8 +802,10 @@ class FolderImportThread(QThread):
                                                external_id=None,
                                                comment=None,
                                                commit=False)
+                if media_id == "duplicate_path":
+                    logger.warning(f"A different file is already in the project at {filepath}, skipping import...")
                 # save thumbnail, unless the file was already imported or failed to add
-                if media_id not in ("duplicate_error", None):
+                elif media_id not in ("duplicate_hash", None):
                     thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
                     self.mpDB.add_thumbnail("media", media_id, thumbnail_path, commit=False)
 
@@ -829,9 +844,20 @@ class FolderImportThread(QThread):
         """Get the relative path of a file given its base directory"""
         return str(Path(filepath).relative_to(base_dir))
 
+    def _default_station(self, survey_id):
+        """Get or create the default station, for media without a station level"""
+        if not self.default_station:
+            self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
+        return self.default_station
+
     def station(self, filepath, survey_id):
         """Get or create station"""
-        station_name = Path(filepath).parts[self.station_level]
+        parts = Path(filepath).parts
+        # levels are picked from one file, a shallower file has no folder at that level
+        if self.station_level >= len(parts) - 1:
+            logger.warning(f"File {filepath} has no station folder, using the default station")
+            return self._default_station(survey_id)
+        station_name = parts[self.station_level]
         station_name = str(station_name)
         # check reference dictionary first, station names are only unique within a survey
         station_key = (station_name, survey_id)
@@ -846,7 +872,12 @@ class FolderImportThread(QThread):
         return station_id
 
     def camera(self, filepath, station_id):
-        camera_name = Path(filepath).parts[self.camera_level]
+        parts = Path(filepath).parts
+        # levels are picked from one file, a shallower file has no folder at that level
+        if self.camera_level >= len(parts) - 1:
+            logger.warning(f"File {filepath} has no camera folder, adding it without a camera")
+            return None
+        camera_name = parts[self.camera_level]
         camera_name = str(camera_name)
         # check reference dictionary first, camera names are only unique within a station
         camera_key = (camera_name, station_id)

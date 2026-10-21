@@ -29,6 +29,25 @@ def sql_text(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
+def parse_timestamps(timestamps):
+    """
+    Parse media timestamps for export, which may be in mixed formats
+
+    CSV import stores the timestamp text as typed and folder import stores ISO.
+    Text that can't be parsed is kept as it is rather than blanked.
+    """
+    parsed = pd.to_datetime(timestamps, format='mixed', errors='coerce')
+    # EXIF style, eg. 2024:01:01 00:00:00
+    failed = parsed.isna()
+    parsed[failed] = pd.to_datetime(timestamps[failed], format='%Y:%m:%d %H:%M:%S', errors='coerce')
+    # missing timestamps are stored as text by add_media
+    blank = timestamps.isna() | timestamps.astype(str).str.strip().isin(['', 'None', 'nan', 'NaT'])
+    unparsed = parsed.isna() & ~blank
+    if unparsed.any():
+        return parsed.astype(object).where(~unparsed, timestamps)
+    return parsed
+
+
 # rois removed by a delete from each table, given the delete's condition
 # their embeddings live in chroma, which the sqlite cascade doesn't reach
 _MEDIA_OF = {
@@ -376,6 +395,10 @@ class MatchyPatchyDB():
             external_id INTEGER,
             comment TEXT,
             detection_done INTEGER NOT NULL DEFAULT 0,
+
+        Returns the new media id, "duplicate_hash" if the file (same sha256) is
+        already in the database, "duplicate_path" if a different file is already
+        stored at this path, or None on any other error
         """
         try:
             cursor = self.db.cursor()
@@ -405,13 +428,17 @@ class MatchyPatchyDB():
         except sqlite3.IntegrityError as error:
             if not quiet:
                 print(f"DEBUG: IntegrityError caught: {error}")
-            # unique (base_dir_id, relative_path)
-            if 'UNIQUE constraint failed: media.base_dir_id, media.relative_path' in error.args[0]:
-                self.logger.error(f"Failed to add {relative_path}, already exists in database.")
-                return "duplicate_error"
-            if 'UNIQUE constraint failed: media.sha256' in error.args[0]:
-                self.logger.error(f"Failed to add {relative_path}, file is a duplicate.")
-                return "duplicate_error"
+            # unique (base_dir_id, relative_path) or sha256
+            # sqlite names only the first constraint that failed, so re-adding the same file
+            # reports the path, check the hash to tell it apart from a new file at that path
+            if ('UNIQUE constraint failed: media.base_dir_id, media.relative_path' in error.args[0]
+                    or 'UNIQUE constraint failed: media.sha256' in error.args[0]):
+                cursor.execute("SELECT 1 FROM media WHERE sha256 = ?;", (str(sha256),))
+                if cursor.fetchone():
+                    self.logger.error(f"Failed to add {relative_path}, file is a duplicate.")
+                    return "duplicate_hash"
+                self.logger.error(f"Failed to add {relative_path}, a different file already exists at this path.")
+                return "duplicate_path"
             # eg. foreign key or not null constraint
             self.logger.error(f"Failed to add {relative_path}: {error}")
             return None
@@ -883,7 +910,7 @@ class MatchyPatchyDB():
         if not rois.empty:
             # convert viewpoint to int
             rois['viewpoint'] = pd.to_numeric(rois['viewpoint'], errors='coerce').astype('Int64')
-            rois['timestamp'] = pd.to_datetime(rois['timestamp'])
+            rois['timestamp'] = parse_timestamps(rois['timestamp'])
             # merge with stations
             stations, columns = self.stations()
             stations = pd.DataFrame(stations, columns=columns)
@@ -892,6 +919,9 @@ class MatchyPatchyDB():
             cameras = self.select("camera")
             if cameras:
                 cameras = pd.DataFrame(cameras, columns=["camera_id", "camera_name", "station_id"])
+                # same nullable type on both sides, media.camera_id is all None (object) if no media has a camera
+                export_data['camera_id'] = pd.to_numeric(export_data['camera_id'], errors='coerce').astype('Int64')
+                cameras['camera_id'] = cameras['camera_id'].astype('Int64')
                 # left join to keep media without a camera
                 export_data = pd.merge(export_data, cameras[["camera_id", "camera_name"]], on="camera_id", how="left")
             else:
