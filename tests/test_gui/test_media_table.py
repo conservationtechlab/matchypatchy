@@ -33,7 +33,8 @@ def _make_media_table():
     from matchypatchy.gui.media_table import MediaTable
 
     parent = MagicMock()
-    parent.project = SimpleNamespace(db=MagicMock(), cfg=MagicMock(THUMBNAIL_DIR=Path("/tmp/thumbs")))
+    parent.project = SimpleNamespace(db=MagicMock(), cfg=MagicMock(THUMBNAIL_DIR=Path("/tmp/thumbs")),
+                                     data_changed=MagicMock())
 
     with patch("matchypatchy.gui.media_table.load_model",
                return_value={"None": "None", "0": "Left", "1": "Right"}):

@@ -27,10 +27,28 @@ class MediaTable(UsesProject, QAbstractTableModel):
         self.STATIONS = fetch_stations(self.mpDB, reset_index=True)
         self.CAMERAS = fetch_cameras(self.mpDB, reset_index=True)
 
+        self.project.data_changed.connect(self.names_written)
+
         self._data_filtered = pd.DataFrame()
         self.header_dict = headers
         self._columns = [x[0] for x in headers.values()]
         self._headers = [x[1] for x in headers.values()]
+
+    def names_written(self, table):
+        """
+        Reload the individual, station and camera names after one of them is written
+
+        Connected to project.data_changed in __init__, so renamed or new names
+        show without reloading the table.
+        """
+        lookups = {"individual": ("INDIVIDUALS", fetch_individual),
+                   "station": ("STATIONS", lambda db: fetch_stations(db, reset_index=True)),
+                   "camera": ("CAMERAS", lambda db: fetch_cameras(db, reset_index=True))}
+        if table not in lookups:
+            return
+        name, fetch = lookups[table]
+        setattr(self, name, fetch(self.mpDB))
+        self.layoutChanged.emit()
 
     def rowCount(self, parent=QModelIndex()):
         return len(self._data_filtered)

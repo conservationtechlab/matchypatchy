@@ -369,13 +369,11 @@ class MainWindow(QMainWindow):
         dialog = ConfigPopup(self)
         dialog.exec()
         del dialog
-        self.Base.update_survey()
 
     def manage_survey(self):
         """Open the survey management popup."""
         dialog = SurveyPopup(self)
         dialog.exec()
-        self.Base.update_survey()
         del dialog
 
     def manage_station(self):

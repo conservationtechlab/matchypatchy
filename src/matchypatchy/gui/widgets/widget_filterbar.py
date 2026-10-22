@@ -73,6 +73,63 @@ class FilterBar(UsesProject, QWidget):
         layout.addWidget(self.favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.setLayout(layout)
+        self.project.data_changed.connect(self.lists_written)
+
+    def lists_written(self, table):
+        """
+        Reload the region, survey, station and individual lists after one of them is written
+
+        Connected to project.data_changed in __init__. The chosen filters stay
+        put, matched by id; a choice that was deleted goes back to its placeholder
+        (all). Unlike refresh_filters, which resets every filter on entering a view.
+        """
+        if table not in ("region", "survey", "station", "individual"):
+            return
+        region_id, survey_id, station_id, individual_id = (
+            self._chosen_id(self.region_select, self.region_list_ordered),
+            self._chosen_id(self.survey_select, self.survey_list_ordered),
+            self._chosen_id(self.station_select, self.station_list_ordered),
+            self._chosen_id(self.individual_select, self.individual_list_ordered))
+        combos = (self.region_select, self.survey_select, self.station_select, self.individual_select)
+        for combo in combos:
+            combo.blockSignals(True)
+
+        self.region_list_ordered = [(0, 'Region')] + region_names(self.mpDB)
+        self._fill(self.region_select, self.region_list_ordered, region_id)
+        # surveys of the chosen region, stations of the chosen survey(s), as select_region/select_survey do
+        region_id = self._chosen_id(self.region_select, self.region_list_ordered)
+        self.valid_surveys = dict(survey_names(self.mpDB, region_id=region_id or None))
+        self.survey_list_ordered = [(0, 'Survey')] + list(self.valid_surveys.items())
+        self._fill(self.survey_select, self.survey_list_ordered, survey_id)
+        survey_id = self._chosen_id(self.survey_select, self.survey_list_ordered)
+        if survey_id:
+            survey_ids = [survey_id]
+        elif region_id:
+            survey_ids = list(self.valid_surveys)
+        else:
+            survey_ids = None
+        self.valid_stations = dict(station_names(self.mpDB, survey_ids=survey_ids))
+        self.station_list_ordered = [(0, 'Station')] + list(self.valid_stations.items())
+        self._fill(self.station_select, self.station_list_ordered, station_id)
+        self.individual_list_ordered = [(0, 'Individual')] + individual_names(self.mpDB)
+        self._fill(self.individual_select, self.individual_list_ordered, individual_id)
+
+        for combo in combos:
+            combo.blockSignals(False)
+        self.get_filters()
+
+    @staticmethod
+    def _chosen_id(combo, items):
+        """Id of the combo's current item, 0 for the placeholder; a lists_written helper"""
+        index = combo.currentIndex()
+        return items[index][0] if 0 <= index < len(items) else 0
+
+    @staticmethod
+    def _fill(combo, items, chosen_id):
+        """Replace the combo's items, choosing chosen_id or the placeholder; a lists_written helper"""
+        combo.clear()
+        combo.addItems([name for _, name in items])
+        combo.setCurrentIndex(next((i for i, (item_id, _) in enumerate(items) if item_id == chosen_id), 0))
 
     def refresh_filters(self, prefilter=None):
         """
