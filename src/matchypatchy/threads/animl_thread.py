@@ -10,7 +10,7 @@ import pandas as pd
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
-from matchypatchy.database.media import fetch_roi_media, get_sha256, native_relative_path
+from matchypatchy.database.media import get_sha256, native_relative_path
 from matchypatchy.threads.model_download_thread import get_path
 
 
@@ -97,17 +97,8 @@ class AnimlThread(QThread):
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
 
-        # select media that haven't been through detection and have no rois
-        media, column_names = self.mpDB.get_media_with_filepath(
-            row_cond="m.detection_done = 0 AND NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
-        self.media = pd.DataFrame(media, columns=column_names)
-
-        # select rois imported without a bbox whose media hasn't been through detection
-        pending = {row[0] for row in self.mpDB.select("media", columns="id", row_cond="detection_done = 0") or []}
-        rois = fetch_roi_media(mpDB, reset_index=False)
-        self.rois = rois[(rois['bbox_x'] == -1) & rois['media_id'].isin(pending)]
-        self.rois = self.rois.drop(columns=['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
-
+        self.media = None  # loaded in run(), off the GUI thread
+        self.rois = None
         self.images = None
         self.video = None
         self.to_process = 0
@@ -116,6 +107,8 @@ class AnimlThread(QThread):
         self.detector = None  # loaded in run(), off the GUI thread
 
     def run(self):
+        self.prompt_update.emit("Loading media...")
+        self._load_media()
         if self.DETECTOR_KEY is not None:
             self.prompt_update.emit("Loading detector...")
             self.detector = animl.load_detector(self.md_filepath, device=self.device)
@@ -286,6 +279,24 @@ class AnimlThread(QThread):
                 self._mark_done(video.iloc[[0]], 'id')
             self.progress_count += 1
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+
+    def _load_media(self):
+        """
+        Select the media and ROIs still waiting on detection
+
+        Called at the start of run() rather than in __init__: the thread is built on the
+        GUI thread, where these queries froze the progress popup on large databases,
+        and by run() sequencing has finished so the rows are current.
+        """
+        # select media that haven't been through detection and have no rois
+        media, column_names = self.mpDB.get_media_with_filepath(
+            row_cond="m.detection_done = 0 AND NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
+        self.media = pd.DataFrame(media or [], columns=column_names)
+
+        # select rois imported without a bbox whose media hasn't been through detection
+        rois, column_names = self.mpDB.all_media(row_cond="roi.bbox_x = -1 AND media.detection_done = 0")
+        self.rois = pd.DataFrame(rois or [], columns=column_names)
+        self.rois = self.rois.drop(columns=['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
 
     def _mark_done(self, manifest, media_column):
         """Mark the manifest's media as through detection, except files that couldn't be read"""

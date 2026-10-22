@@ -29,12 +29,11 @@ class SequenceThread(QThread):
         self.flag = flag
         self.max_time = timedelta(seconds=int(cfg.SEQUENCE_DURATION))
         self.max_n = int(cfg.SEQUENCE_N)
-
-        self.media = fetch_media(self.mpDB)
-        self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')
-        self.media = self.media.sort_values(by=['station_id', 'camera_id', 'timestamp'])
+        self.media = None  # loaded in run(), off the GUI thread
 
     def run(self):
+        self.prompt_update.emit("Loading media...")
+        self._load_media()
         # if process sequence option is checked, will rewrite sequence_id
         if self.flag:
             self.prompt_update.emit("Processing sequences...")
@@ -85,3 +84,15 @@ class SequenceThread(QThread):
 
         if not self.isInterruptionRequested():
             self.done.emit()
+
+    def _load_media(self):
+        """
+        Fetch all media sorted by station, camera and time
+
+        Called at the start of run() rather than in __init__: the thread is built on the
+        GUI thread, where fetching and parsing every timestamp froze the progress popup
+        on large databases.
+        """
+        self.media = fetch_media(self.mpDB)
+        self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')
+        self.media = self.media.sort_values(by=['station_id', 'camera_id', 'timestamp'])

@@ -61,3 +61,13 @@ def test_cancel_stops_writing_sequences(monkeypatch):
 
     assert list(thread.mpDB.sequence_of) == [1]
     assert done == []
+
+
+def test_media_is_loaded_in_run_not_on_the_gui_thread(monkeypatch):
+    fetches = []
+    monkeypatch.setattr(sequence_thread, "fetch_media", lambda _db: fetches.append(1))
+    cfg = SimpleNamespace(SEQUENCE_DURATION=60, SEQUENCE_N=10)
+
+    SequenceThread(FakeDB(), cfg, True)
+
+    assert fetches == []
