@@ -17,7 +17,7 @@ from matchypatchy.config import asset_path
 
 THUMBNAIL_NOTFOUND = "graphics/thumbnail_notfound.png"
 THUMBNAIL_NOBBOX = "graphics/thumbnail_nobbox.png"
-THUMBNAIL_SIZE = 150
+THUMBNAIL_SIZE = 200
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 
 logger = logging.getLogger(__name__)

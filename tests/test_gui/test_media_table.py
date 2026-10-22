@@ -303,3 +303,40 @@ class TestSexColumn:
         assert mt.data(_index(0, 2), Qt.ItemDataRole.DisplayRole) == "Unknown"
         # unidentified rois have no individual to have a sex
         assert mt.data(_index(1, 2), Qt.ItemDataRole.DisplayRole) is None
+
+
+class TestThumbnail:
+    MT = "matchypatchy.gui.media_table"
+
+    def test_old_small_thumbnail_is_stretched_and_cached(self):
+        from matchypatchy.gui.media_table import MediaTable
+        with patch(f"{self.MT}.QPixmapCache") as cache, patch(f"{self.MT}.QPixmap") as pixmap_class, \
+                patch(f"{self.MT}.THUMBNAIL_SIZE", 200):
+            cache.find.return_value = None
+            small = pixmap_class.return_value
+            small.isNull.return_value = False
+            small.width.return_value, small.height.return_value = 150, 112
+            result = MediaTable._thumbnail(None, "/thumbs/a.jpg")
+        small.scaled.assert_called_once()
+        assert small.scaled.call_args[0][:2] == (200, 200)
+        assert result is small.scaled.return_value
+        cache.insert.assert_called_once_with("/thumbs/a.jpg", result)
+
+    def test_full_size_thumbnail_is_not_rescaled(self):
+        from matchypatchy.gui.media_table import MediaTable
+        with patch(f"{self.MT}.QPixmapCache") as cache, patch(f"{self.MT}.QPixmap") as pixmap_class, \
+                patch(f"{self.MT}.THUMBNAIL_SIZE", 200):
+            cache.find.return_value = None
+            full = pixmap_class.return_value
+            full.isNull.return_value = False
+            full.width.return_value, full.height.return_value = 200, 150
+            result = MediaTable._thumbnail(None, "/thumbs/b.jpg")
+        full.scaled.assert_not_called()
+        assert result is full
+
+    def test_cached_thumbnail_is_not_read_again(self):
+        from matchypatchy.gui.media_table import MediaTable
+        with patch(f"{self.MT}.QPixmapCache") as cache, patch(f"{self.MT}.QPixmap") as pixmap_class:
+            result = MediaTable._thumbnail(None, "/thumbs/c.jpg")
+        assert result is cache.find.return_value
+        pixmap_class.assert_not_called()

@@ -10,6 +10,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 
 from matchypatchy.database.media import IMAGE_EXT, fetch_individual, delete_media, delete_rois, save_edits
 from matchypatchy.database.location import camera_names
+from matchypatchy.database.thumbnails import THUMBNAIL_SIZE
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
@@ -129,13 +130,15 @@ class DisplayMedia(UsesProject, QWidget):
         self.view.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.view.horizontalHeader().setSortIndicatorShown(True)
         self.view.horizontalHeader().setSectionsClickable(True)
-        self.view.verticalHeader().setDefaultSectionSize(150)  # row size = thumbnail with
-        self.view.horizontalHeader().setDefaultSectionSize(80)
+        self.view.verticalHeader().setDefaultSectionSize(THUMBNAIL_SIZE + 10)  # row size = thumbnail with
+        self.view.horizontalHeader().setDefaultSectionSize(100)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.view.doubleClicked.connect(self.edit_thumbnail)
-        self.view.setColumnWidth(0, 30)  # Set the width of the select column
-        self.view.setColumnWidth(1, 150)  # Set the width of the thumbnail column
+        self.view.setColumnWidth(0, 50)  # Set the width of the select column
+        self.view.setColumnWidth(1, THUMBNAIL_SIZE + 10)  # Set the width of the thumbnail column
         self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
+        self.view.setColumnWidth(3, 180)  # Set the width of the timestamp column
+
         self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
 

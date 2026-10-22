@@ -2,11 +2,12 @@
 Widget for displaying list of Media
 """
 import pandas as pd
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QPixmapCache
 
 from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal, QAbstractTableModel
 
 from matchypatchy.database.media import EditObject
+from matchypatchy.database.thumbnails import THUMBNAIL_SIZE
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.location import fetch_stations, fetch_cameras
 from matchypatchy.database.media import fetch_individual
@@ -15,6 +16,8 @@ from matchypatchy.project import UsesProject
 
 class MediaTable(UsesProject, QAbstractTableModel):
     """Widget for displaying list of Media"""
+
+    THUMBNAIL_CACHE_KB = 64 * 1024  # about 400 thumbnails at 200px
 
     user_edit = pyqtSignal(EditObject)
 
@@ -28,6 +31,8 @@ class MediaTable(UsesProject, QAbstractTableModel):
         self.CAMERAS = fetch_cameras(self.mpDB, reset_index=True)
 
         self.project.data_changed.connect(self.names_written)
+        # room for a few screens of thumbnails, Qt's default 10MB holds about 60
+        QPixmapCache.setCacheLimit(self.THUMBNAIL_CACHE_KB)
 
         self._data_filtered = pd.DataFrame()
         self.header_dict = headers
@@ -49,6 +54,26 @@ class MediaTable(UsesProject, QAbstractTableModel):
         name, fetch = lookups[table]
         setattr(self, name, fetch(self.mpDB))
         self.layoutChanged.emit()
+
+    def _thumbnail(self, path):
+        """
+        Thumbnail at THUMBNAIL_SIZE, from the pixmap cache once it has been loaded
+
+        Called by data() for the thumbnail column, which runs on every repaint and
+        used to read the file from disk each time. Kept out of data() for the cache
+        and the scaling: thumbnails saved before THUMBNAIL_SIZE went from 150 to 200px
+        are stretched to fill the row like new ones. QPixmapCache drops the least
+        recently used pixmaps, so scrolling a large project doesn't hold them all.
+        """
+        pixmap = QPixmapCache.find(path)
+        if pixmap is None:
+            pixmap = QPixmap(path)
+            if not pixmap.isNull() and max(pixmap.width(), pixmap.height()) < THUMBNAIL_SIZE:
+                pixmap = pixmap.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE,
+                                       Qt.AspectRatioMode.KeepAspectRatio,
+                                       Qt.TransformationMode.SmoothTransformation)
+            QPixmapCache.insert(path, pixmap)
+        return pixmap
 
     def rowCount(self, parent=QModelIndex()):
         return len(self._data_filtered)
@@ -125,8 +150,7 @@ class MediaTable(UsesProject, QAbstractTableModel):
             if role == Qt.ItemDataRole.DecorationRole:
                 thumbnail_path = self._data_filtered.at[row, self._columns[col]]
                 if isinstance(thumbnail_path, str) and thumbnail_path:
-                    pixmap = QPixmap(str(self.cfg.THUMBNAIL_DIR / thumbnail_path))
-                    return pixmap
+                    return self._thumbnail(str(self.cfg.THUMBNAIL_DIR / thumbnail_path))
             # Suppress text display
             if role == Qt.ItemDataRole.DisplayRole:
                 return None
