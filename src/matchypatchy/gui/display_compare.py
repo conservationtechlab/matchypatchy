@@ -744,6 +744,7 @@ class DisplayCompare(UsesProject, QWidget):
         table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         table.setMouseTracking(False)
         table.setItemDelegate(NoHoverDelegate())
+        # remove headers, grid, and scrollbars
         table.verticalHeader().setVisible(False)
         table.horizontalHeader().setVisible(False)
         table.setShowGrid(False)
@@ -752,13 +753,13 @@ class DisplayCompare(UsesProject, QWidget):
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.setRowCount(6)
         table.setColumnCount(4) 
+        # label columns are fixed, the two value columns (1 and 3) stretch to share the rest equally
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
         table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        table.setColumnWidth(0, 120)
-        table.setColumnWidth(1, 150)
-        table.setColumnWidth(2, 120)
         table.setMaximumHeight(250)
+
+        table.setColumnWidth(0, 120)
+        table.setColumnWidth(2, 120)
         # stretch rows evenly to fill the table height
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setStyleSheet("""
