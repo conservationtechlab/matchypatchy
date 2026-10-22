@@ -9,7 +9,7 @@ from PIL import Image, ImageEnhance
 from PyQt6.QtWidgets import (QDialog, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
                              QStackedLayout, QPushButton, QSlider)
 from PyQt6.QtGui import QPixmap, QPainter, QImage, QPen
-from PyQt6.QtCore import Qt, pyqtSignal, QRect, QPointF, QRectF, QUrl
+from PyQt6.QtCore import Qt, pyqtSignal, QRect, QPointF, QRectF, QUrl, QSize
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput, QMediaMetaData
 from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -128,6 +128,8 @@ class ImageWidget(QLabel):
     Custom Widget for Displaying an Image
     """
     box_drawn = pyqtSignal(dict)
+    # smallest the image is drawn, so two fit side by side on a small screen
+    MINIMUM_SIZE = (320, 240)
 
     def __init__(self, image_path=None, width=600, height=400, adjust_mode='zoom'):
         super().__init__()
@@ -154,8 +156,8 @@ class ImageWidget(QLabel):
         self.sharpness_factor = 1.0
         self.image_offset = QPointF(0, 0)  # Image translation offset
 
-        # Create a QLabel to hold the image
-        self.setMinimumSize(self.default_width, self.default_height)
+        # Create a QLabel to hold the image; width and height are its preferred size
+        self.setMinimumSize(*self.MINIMUM_SIZE)
         self.setScaledContents(True)
 
         self.pixmap = QPixmap(self.size())
@@ -166,6 +168,10 @@ class ImageWidget(QLabel):
         self.end_pos = None
         # zoom position
         self.drag_start_position = None
+
+    def sizeHint(self):
+        """Preferred size, the layout may shrink it to MINIMUM_SIZE"""
+        return QSize(self.default_width, self.default_height)
 
     def load(self, image_path, bbox=None, frame=None, crop=False):
         """

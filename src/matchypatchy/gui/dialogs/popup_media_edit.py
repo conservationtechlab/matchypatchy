@@ -70,11 +70,12 @@ class MediaEditPopup(UsesProject, QDialog):
         content_layout = QHBoxLayout()
         self.image = MediaWidget(adjust_mode=self.adjust_mode)
         self.image.new_bbox.connect(self.capture_new_bbox)
-        content_layout.addWidget(self.image, 1)
+        # the image gets the larger share of the width
+        content_layout.addWidget(self.image, 3)
         # Metadata
         self.metadatapanel = MetadataPanel(self)
         self.metadatapanel.edit_signal.connect(self.on_edit_received)
-        content_layout.addWidget(self.metadatapanel, 1)
+        content_layout.addWidget(self.metadatapanel, 2)
         container_layout.addLayout(content_layout)
         container_layout.addStretch()
 
