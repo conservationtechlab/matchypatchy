@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import animl
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QComboBox, QInputDialog,
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QGridLayout, QFileDialog, QComboBox, QInputDialog,
                              QPushButton, QLineEdit, QLabel, QDialogButtonBox)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt
 from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
-from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
+from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
 from matchypatchy.project import UsesProject
 
@@ -27,7 +27,7 @@ class ConfigPopup(UsesProject, QDialog):
     Popup for adding or editing configuration settings.
     """
 
-    ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
+    ICON_PENCIL = str(config.asset_path("graphics/fluent_pencil_icon.png"))
     DEVICE_OPTIONS = {"CPUExecutionProvider": "CPU", "CUDAExecutionProvider": "CUDA-enabled GPU"}
 
     def __init__(self, parent):
@@ -56,10 +56,12 @@ class ConfigPopup(UsesProject, QDialog):
         button_home_dir.setMaximumHeight(30)
         button_home_dir.setFixedWidth(30)
         button_home_dir.setIcon(QIcon(self.ICON_PENCIL))
+        button_home_dir.setToolTip("Open another project folder")
         button_home_dir.clicked.connect(self.set_home_dir)
         directory_layout.addWidget(button_home_dir)
         # Add Button
         button_add = QPushButton("+")
+        button_add.setToolTip("Create a new project")
         button_add.clicked.connect(self.new_project)
         button_add.setMaximumHeight(30)
         button_add.setFixedWidth(30)
@@ -69,7 +71,6 @@ class ConfigPopup(UsesProject, QDialog):
         # UPDATE UPLOADS DIRECTORIES -------------------------------------------
         uploads_layout = QHBoxLayout()
         self.button_uploads = QPushButton("Edit Source Directories")
-        self.button_uploads.setFixedWidth(self.label_width)
         self.button_uploads.clicked.connect(self.edit_uploads)
         uploads_layout.addWidget(self.button_uploads, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(uploads_layout)
@@ -93,94 +94,62 @@ class ConfigPopup(UsesProject, QDialog):
         # Disable for now
         # layout.addLayout(visualizer_layout)
 
+        # SETTINGS, label and field pairs in two aligned columns -----------
+        grid = QGridLayout()
+        grid.setColumnMinimumWidth(2, 20)  # gap between the two columns
+        grid.setColumnStretch(4, 1)
+
+        def add_setting(row, column, text, tooltip, field):
+            """Put a label and its field in the grid, column 0 or 1 of label/field pairs"""
+            label = QLabel(text)
+            label.setToolTip(tooltip)
+            grid.addWidget(label, row, column * 3)
+            field.setFixedWidth(self.edit_width)
+            grid.addWidget(field, row, column * 3 + 1)
+            return label
+
         # Sequence
-        sequence_layout = QHBoxLayout()
-        sequence_duration_label = QLabel("Sequence Length (s):")
-        sequence_duration_label.setToolTip("Maximum duration of the sequence in seconds.")
-        sequence_duration_label.setFixedWidth(self.label_width)
-        sequence_layout.addWidget(sequence_duration_label)
         self.sequence_duration = QLineEdit()
-        self.sequence_duration.setFixedWidth(self.edit_width)
         self.sequence_duration.setText(str(self.cfg.SEQUENCE_DURATION))
         self.sequence_duration.textChanged.connect(self.update_sequence)
-        sequence_layout.addWidget(self.sequence_duration, alignment=Qt.AlignmentFlag.AlignLeft)
-        sequence_layout.addWidget(VerticalSeparator())
-        sequence_n_label = QLabel("Images per Sequence:")
-        sequence_n_label.setFixedWidth(self.label_width)
-        sequence_n_label.setToolTip("Max number of images in each sequence.")
-        sequence_layout.addWidget(sequence_n_label)
+        add_setting(0, 0, "Sequence Length (s):", "Maximum duration of the sequence in seconds.",
+                    self.sequence_duration)
         self.sequence_n = QLineEdit()
-        self.sequence_n.setFixedWidth(self.edit_width)
         self.sequence_n.setText(str(self.cfg.SEQUENCE_N))
         self.sequence_n.textChanged.connect(self.update_sequence)
-        sequence_layout.addWidget(self.sequence_n, alignment=Qt.AlignmentFlag.AlignLeft)
-        sequence_layout.addStretch()
-        layout.addLayout(sequence_layout)
+        add_setting(0, 1, "Images per Sequence:", "Max number of images in each sequence.", self.sequence_n)
 
         # VIDEOS
-        video_layout = QHBoxLayout()
-        smart_frames_label = QLabel("Smart Frames:")
-        smart_frames_label.setToolTip("If enabled, only frames with ROIs will be processed for video files.")
-        smart_frames_label.setFixedWidth(self.label_width)
-        video_layout.addWidget(smart_frames_label)
         self.smart_frames = QComboBox()
-        self.smart_frames.setFixedWidth(self.edit_width)
         self.smart_frames.addItem("Enabled")
         self.smart_frames.addItem("Disabled")
         self.smart_frames.setCurrentIndex(0 if self.cfg.SMART_FRAMES else 1)
         self.smart_frames.setToolTip("Enable or disable smart frame processing for video files.")
         self.smart_frames.currentTextChanged.connect(self.update_smart_frames)
-        video_layout.addWidget(self.smart_frames, alignment=Qt.AlignmentFlag.AlignLeft)
-        video_layout.addWidget(VerticalSeparator())
-        self.video_fps_label = QLabel("Video FPS:")
-        self.video_fps_label.setToolTip("Frames per second to analyze for quality.")
-        self.video_fps_label.setFixedWidth(self.label_width)
-        video_layout.addWidget(self.video_fps_label)
+        add_setting(1, 0, "Smart Frames:", "If enabled, only frames with ROIs will be processed for video files.",
+                    self.smart_frames)
         self.video_fps = QLineEdit()
-        self.video_fps.setFixedWidth(self.edit_width)
         self.video_fps.setText(str(self.cfg.VIDEO_FPS))
         self.video_fps.textChanged.connect(self.update_video_fps)
-        video_layout.addWidget(self.video_fps, alignment=Qt.AlignmentFlag.AlignLeft)
-        video_layout.addStretch()
-        layout.addLayout(video_layout)
-
+        self.video_fps_label = add_setting(1, 1, "Video FPS:", "Frames per second to analyze for quality.",
+                                           self.video_fps)
         self.video_fps_label.setVisible(self.cfg.SMART_FRAMES)
         self.video_fps.setVisible(self.cfg.SMART_FRAMES)
 
-        video_frames_layout = QHBoxLayout()
-        video_n_frames_label = QLabel("Video Frames:")
-        video_n_frames_label.setToolTip("Number of frames to extract from each video.")
-        video_n_frames_label.setFixedWidth(self.label_width)
-        video_frames_layout.addWidget(video_n_frames_label)
         self.n_frames = QLineEdit()
-        self.n_frames.setFixedWidth(self.edit_width)
         self.n_frames.setText(str(self.cfg.N_FRAMES))
         self.n_frames.textChanged.connect(self.update_n_frames)
-        video_frames_layout.addWidget(self.n_frames, alignment=Qt.AlignmentFlag.AlignLeft)
-        video_frames_layout.addStretch()
-        layout.addLayout(video_frames_layout)
+        add_setting(2, 0, "Video Frames:", "Number of frames to extract from each video.", self.n_frames)
 
         # NUM MATCHES
-        nummatches_layout = QHBoxLayout()
-        nummatches_label = QLabel("Max # of Matches:")
-        nummatches_label.setToolTip("Number of nearest neighbors to consider.")
-        nummatches_label.setFixedWidth(self.label_width)
-        nummatches_layout.addWidget(nummatches_label)
         self.nummatches = QLineEdit()
-        self.nummatches.setFixedWidth(self.edit_width)
         self.nummatches.setText(str(self.cfg.KNN))
-        nummatches_layout.addWidget(self.nummatches, alignment=Qt.AlignmentFlag.AlignLeft)
         self.nummatches.textChanged.connect(self.update_nummatches)
-        layout.addLayout(nummatches_layout)
+        add_setting(3, 0, "Max # of Matches:", "Number of nearest neighbors to consider.", self.nummatches)
 
         # CUDA -----------------------------------------------------------------
-        cuda_layout = QHBoxLayout()
-        cuda_label = QLabel("Hardware Device:")
-        cuda_label.setFixedWidth(self.label_width)
-        cuda_layout.addWidget(cuda_label)
         providers = animl.get_onnx_device(quiet=True)
         self.device = QComboBox()
-        self.device.setFixedWidth(self.edit_width)
         self.device.addItem("CPU")
         if "CUDAExecutionProvider" in providers:
             self.device.addItem("CUDA-enabled GPU")
@@ -188,20 +157,17 @@ class ConfigPopup(UsesProject, QDialog):
         self.device.setCurrentText(self.DEVICE_OPTIONS.get(current_device, "CPU"))
         self.device.setToolTip("Select the hardware device for running models.")
         self.device.currentTextChanged.connect(self.change_device)
-        cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
-        layout.addLayout(cuda_layout)
+        add_setting(4, 0, "Hardware Device:", "", self.device)
 
         # MPDB KEY -------------------------------------------------------------
-        mpdbkey_layout = QHBoxLayout()
-        mpdbkey_label = QLabel("Database Key:")
-        mpdbkey_label.setToolTip("Unique identifier for the current database.")
-        mpdbkey_label.setFixedWidth(self.label_width)
-        mpdbkey_layout.addWidget(mpdbkey_label)
         mpdbkey = self.mpDB.validate()
         self.mpdbkey_valid = QLabel(f"{mpdbkey}")
         self.mpdbkey_valid.setStyleSheet("color: red;" if not mpdbkey else "")
-        mpdbkey_layout.addWidget(self.mpdbkey_valid, alignment=Qt.AlignmentFlag.AlignLeft)
-        layout.addLayout(mpdbkey_layout)
+        mpdbkey_label = QLabel("Database Key:")
+        mpdbkey_label.setToolTip("Unique identifier for the current database.")
+        grid.addWidget(mpdbkey_label, 5, 0)
+        grid.addWidget(self.mpdbkey_valid, 5, 1)
+        layout.addLayout(grid)
 
         # Advanced -------------------------------------------------------------
         self.separator = HorizontalSeparator()
