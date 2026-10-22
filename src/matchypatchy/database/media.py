@@ -43,6 +43,32 @@ def get_sha256(path: str | Path,
     return h.hexdigest()
 
 
+
+def filepath_sql(base_dir, relative_path):
+    """
+    SQL expression joining an upload's base_dir and a media relative_path into a full path.
+
+    Used by every query that selects a media filepath (mpdb, fetch_media, fetch_roi,
+    reid_thread). relative_path keeps the separators of the OS that imported it, so a
+    project imported on Windows has "7\\a.jpg"; the other OS's separator is swapped
+    for os.sep here so the path opens on the current OS. Kept as one function so all
+    those queries build the same path.
+    """
+    other = '/' if os.sep == '\\' else '\\'
+    return f"{base_dir} || '{os.sep}' || REPLACE({relative_path}, '{other}', '{os.sep}')"
+
+
+def native_relative_path(relative_path):
+    """
+    relative_path with the current OS's separators, the Python twin of filepath_sql.
+
+    Used by VerifyNewBaseDirsThread, which joins relative paths onto a new base
+    directory in Python rather than SQL.
+    """
+    other = '/' if os.sep == '\\' else '\\'
+    return str(relative_path).replace(other, os.sep)
+
+
 def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     Fetches all media info with full paths, converts to dataframe
@@ -62,7 +88,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
                 m.external_id, m.comment,
                 COUNT(roi.id) AS roi_count,
-                u.base_dir || '{os.sep}' || m.relative_path AS filepath
+                {filepath_sql('u.base_dir', 'm.relative_path')} AS filepath
             FROM media m
             LEFT JOIN uploads u ON m.base_dir_id = u.id
             LEFT JOIN roi ON roi.media_id = m.id
@@ -83,7 +109,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                 m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
                 m.external_id, m.comment,
-                u.base_dir || '{os.sep}' || m.relative_path AS filepath
+                {filepath_sql('u.base_dir', 'm.relative_path')} AS filepath
             FROM media m
             LEFT JOIN uploads u ON m.base_dir_id = u.id
             {row_cond if row_cond else ''}
@@ -112,7 +138,7 @@ def fetch_roi(mpDB, media_id=None):
         SELECT
             r.id, r.media_id, r.frame, r.bbox_x, r.bbox_y, r.bbox_w, r.bbox_h,
             r.viewpoint, r.reviewed, r.favorite, r.individual_id, r.emb,
-            u.base_dir || '{os.sep}' || m.relative_path AS filepath
+            {filepath_sql('u.base_dir', 'm.relative_path')} AS filepath
         FROM roi r
         JOIN media m ON r.media_id = m.id
         LEFT JOIN uploads u ON m.base_dir_id = u.id
