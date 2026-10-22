@@ -167,27 +167,43 @@ class DisplayBase(UsesProject, QWidget):
         self.setLayout(main_layout)
         
         self.update_survey()
-        # the survey list belongs to the open project
-        self.project.changed.connect(self.update_survey)
+        # the survey list belongs to the open project, start from its first survey
+        self.project.changed.connect(lambda: self.update_survey(keep_selection=False))
+        self.project.data_changed.connect(self.surveys_written)
 
     # ==========================================================================
     # Database Management Functions
     # ==========================================================================
-    def update_survey(self):
-        """Update survey dropdown list"""
+    def update_survey(self, keep_selection=True):
+        """Update survey dropdown list, keeping the selected survey unless it was deleted"""
+        selected = self.active_survey[0] if keep_selection and self.active_survey else None
+        self.survey_select.blockSignals(True)
         self.survey_select.clear()
         surveys = survey_names(self.mpDB)
         self.survey_list = dict(surveys)
         self.survey_list_ordered = list(surveys)
         if self.survey_list_ordered:
             self.survey_select.addItems([el[1] for el in surveys])
+        position = next((i for i, (sid, _) in enumerate(self.survey_list_ordered) if sid == selected), 0)
+        self.survey_select.setCurrentIndex(position)
+        self.survey_select.blockSignals(False)
+        self.select_survey()
+
+    def surveys_written(self, table):
+        """
+        Reload the survey list after a write to the survey table
+
+        Connected to project.data_changed in __init__, so surveys added by an
+        import or edited in Manage Surveys show up without the caller refreshing.
+        """
+        if table == "survey":
+            self.update_survey()
 
     def manage_survey(self):
         """Launch Survey Management Popup"""
         dialog = SurveyPopup(self)
-        # add/edit/delete are saved right away, so refresh even on cancel
+        # the survey list refreshes itself as surveys are written
         dialog.exec()
-        self.update_survey()
         del dialog
 
     def select_survey(self):

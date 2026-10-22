@@ -1079,12 +1079,154 @@ class TestSurveyRegionTimezone:
         assert self._timezone(db, region) == "Asia/Tokyo"
 
 
-class TestManageSurvey:
-    def test_cancel_still_refreshes_survey_list(self):
-        """Survey changes are saved before the popup closes, so cancel must refresh too"""
+class _Combo:
+    """Just enough of a QComboBox to check which item is chosen"""
+    def __init__(self, items=(), index=0):
+        self.items, self.index = list(items), index
+
+    def clear(self):
+        self.items, self.index = [], -1
+
+    def addItems(self, items):
+        self.items += list(items)
+        if self.index < 0 and self.items:
+            self.index = 0
+
+    def setCurrentIndex(self, index):
+        self.index = index
+
+    def currentIndex(self):
+        return self.index
+
+    def currentText(self):
+        return self.items[self.index]
+
+    def blockSignals(self, blocked):
+        pass
+
+
+class TestHomeSurveyList:
+    def _base(self, db, surveys, chosen):
         from matchypatchy.gui.display_base import DisplayBase
         base = MagicMock()
-        with patch("matchypatchy.gui.display_base.SurveyPopup") as popup:
-            popup.return_value.exec.return_value = 0
+        base.mpDB = db
+        base.survey_list_ordered = surveys
+        base.survey_select = _Combo([name for _, name in surveys], surveys.index(chosen))
+        base.active_survey = chosen
+        base.select_survey = lambda: DisplayBase.select_survey(base)
+        return base
+
+    def test_survey_write_refreshes_and_keeps_the_selection(self, tmp_db):
+        from matchypatchy.gui.display_base import DisplayBase
+        db, _ = tmp_db
+        b = db.add_survey("B", None, None, None)
+        surveys = db.query("SELECT id, name FROM survey")
+        base = self._base(db, surveys, (b, "B"))
+        db.add_survey("A new one", None, None, None)
+        DisplayBase.update_survey(base)
+        assert "A new one" in base.survey_select.items
+        assert base.survey_select.currentText() == "B"
+        assert base.active_survey == (b, "B")
+
+    def test_deleted_selection_falls_back_to_the_first_survey(self, tmp_db):
+        from matchypatchy.gui.display_base import DisplayBase
+        db, _ = tmp_db
+        b = db.add_survey("B", None, None, None)
+        base = self._base(db, db.query("SELECT id, name FROM survey"), (b, "B"))
+        db.delete("survey", "id=?", (b,))
+        DisplayBase.update_survey(base)
+        assert base.survey_select.currentIndex() == 0
+        assert base.active_survey == db.query("SELECT id, name FROM survey")[0]
+
+    def test_only_survey_writes_refresh_the_list(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        DisplayBase.surveys_written(base, "station")
+        base.update_survey.assert_not_called()
+        DisplayBase.surveys_written(base, "survey")
+        base.update_survey.assert_called_once_with()
+
+    def test_manage_surveys_leaves_refreshing_to_the_writes(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        with patch("matchypatchy.gui.display_base.SurveyPopup"):
             DisplayBase.manage_survey(base)
-        base.update_survey.assert_called_once()
+        base.update_survey.assert_not_called()
+
+
+class TestFilterBarListsWritten:
+    def _bar(self, db):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = MagicMock()
+        bar.mpDB = db
+        bar._chosen_id = FilterBar._chosen_id
+        bar._fill = FilterBar._fill
+        bar.region_list_ordered = [(0, "Region")] + db.query("SELECT id, name FROM region")
+        bar.survey_list_ordered = [(0, "Survey")] + db.query("SELECT id, name FROM survey")
+        bar.station_list_ordered = [(0, "Station")] + db.query("SELECT id, name FROM station")
+        bar.individual_list_ordered = [(0, "Individual")] + db.query("SELECT id, name FROM individual")
+        for name in ("region", "survey", "station", "individual"):
+            items = getattr(bar, f"{name}_list_ordered")
+            setattr(bar, f"{name}_select", _Combo([n for _, n in items]))
+        return bar
+
+    def _choose(self, combo, items, item_id):
+        combo.setCurrentIndex([i for i, _ in items].index(item_id))
+
+    def test_new_names_appear_and_choices_stay(self, tmp_db):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        db, _ = tmp_db
+        survey = db.add_survey("S2", None, None, None)
+        station = db.add_station("St", None, None, survey)
+        spot = db.add_individual("Spot")
+        bar = self._bar(db)
+        self._choose(bar.survey_select, bar.survey_list_ordered, survey)
+        self._choose(bar.individual_select, bar.individual_list_ordered, spot)
+        FilterBar.lists_written(bar, "survey")
+        self._choose(bar.station_select, bar.station_list_ordered, station)
+
+        db.add_individual("Dot")
+        db.add_station("St2", None, None, survey)
+        FilterBar.lists_written(bar, "individual")
+
+        assert "Dot" in bar.individual_select.items
+        assert bar.individual_select.currentText() == "Spot"
+        assert bar.survey_select.currentText() == "S2"
+        assert bar.station_select.currentText() == "St"
+        # stations listed for the chosen survey only
+        assert bar.station_select.items == ["Station", "St", "St2"]
+
+    def test_deleted_choice_goes_back_to_all(self, tmp_db):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        db, _ = tmp_db
+        survey = db.add_survey("S2", None, None, None)
+        bar = self._bar(db)
+        self._choose(bar.survey_select, bar.survey_list_ordered, survey)
+        db.delete("survey", "id=?", (survey,))
+        FilterBar.lists_written(bar, "survey")
+        assert bar.survey_select.currentIndex() == 0
+        assert "S2" not in bar.survey_select.items
+
+    def test_other_tables_are_ignored(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = MagicMock()
+        FilterBar.lists_written(bar, "camera")
+        bar.mpDB.query.assert_not_called()
+
+
+class TestMediaTableNamesWritten:
+    def test_individual_write_reloads_names(self, tmp_db):
+        from matchypatchy.gui.media_table import MediaTable
+        db, _ = tmp_db
+        mt = MagicMock()
+        mt.mpDB = db
+        iid = db.add_individual("Spot")
+        MediaTable.names_written(mt, "individual")
+        assert mt.INDIVIDUALS.at[iid, "name"] == "Spot"
+        mt.layoutChanged.emit.assert_called_once()
+
+    def test_survey_write_is_ignored(self):
+        from matchypatchy.gui.media_table import MediaTable
+        mt = MagicMock()
+        MediaTable.names_written(mt, "survey")
+        mt.layoutChanged.emit.assert_not_called()
