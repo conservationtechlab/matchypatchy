@@ -49,13 +49,14 @@ def filepath_sql(base_dir, relative_path):
     SQL expression joining an upload's base_dir and a media relative_path into a full path.
 
     Used by every query that selects a media filepath (mpdb, fetch_media, fetch_roi,
-    reid_thread). relative_path keeps the separators of the OS that imported it, so a
-    project imported on Windows has "7\\a.jpg"; the other OS's separator is swapped
-    for os.sep here so the path opens on the current OS. Kept as one function so all
-    those queries build the same path.
+    reid_thread). base_dir and relative_path keep the separators of the OS that imported
+    them, so a project imported on Windows has "H:\\Images" and "7\\a.jpg"; the other
+    OS's separator is swapped for os.sep in both so the whole path uses the current OS's
+    separator. Kept as one function so all those queries build the same path.
     """
     other = '/' if os.sep == '\\' else '\\'
-    return f"{base_dir} || '{os.sep}' || REPLACE({relative_path}, '{other}', '{os.sep}')"
+    return (f"REPLACE({base_dir}, '{other}', '{os.sep}') || '{os.sep}' || "
+            f"REPLACE({relative_path}, '{other}', '{os.sep}')")
 
 
 def native_relative_path(relative_path):

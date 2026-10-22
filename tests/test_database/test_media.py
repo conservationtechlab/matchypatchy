@@ -359,14 +359,15 @@ class TestMatchingAndLookups:
 class TestFilepathSeparators:
     """relative_path keeps the importing OS's separators, filepaths use the current OS's"""
 
+    @pytest.mark.parametrize("base_dir", ["H:\\Images", "H:/Images"])
     @pytest.mark.parametrize("relative_path", ["7\\a.jpg", "7/a.jpg"])
-    def test_filepath_uses_current_separator(self, tmp_db, relative_path):
+    def test_filepath_uses_current_separator(self, tmp_db, base_dir, relative_path):
         import os
         db, _ = tmp_db
         station = db.add_station("S", None, None, 1)
-        mid = db.add_media(db.add_upload("BASE"), relative_path, "h", ".jpg", "2024-01-01 10:00:00", station)
+        mid = db.add_media(db.add_upload(base_dir), relative_path, "h", ".jpg", "2024-01-01 10:00:00", station)
         db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
-        expected = os.sep.join(["BASE", "7", "a.jpg"])
+        expected = os.sep.join(["H:", "Images", "7", "a.jpg"])
         assert fetch_media(db).loc[0, "filepath"] == expected
         assert fetch_media(db, counts=True).loc[0, "filepath"] == expected
         assert fetch_roi(db).loc[0, "filepath"] == expected
