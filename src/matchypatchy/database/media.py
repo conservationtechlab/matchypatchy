@@ -346,9 +346,10 @@ def clear_individual(mpDB, roi_ids):
 # LOOKUPS ======================================================================
 def media_without_rois(mpDB):
     """Ids of media that have no rois"""
-    rows = mpDB.query("""SELECT media.id FROM media
+    rows = mpDB.query("""SELECT DISTINCT media.id FROM media
                          LEFT JOIN roi ON roi.media_id = media.id
-                         WHERE roi.media_id IS NULL;""")
+                         WHERE roi.media_id IS NULL
+                         OR roi.bbox_w = -1;""")
     return [row[0] for row in rows or []]
 
 
