@@ -358,6 +358,51 @@ def _edit(rid, mid, reference, new_value):
     from matchypatchy.database.media import EditObject
     return EditObject(rid=rid, mid=mid, reference=reference, previous_value=None, new_value=new_value)
 
+class TestMissingMedia:
+    """The edit popup is not opened for media files that cannot be found"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, tmp_path):
+        self.dm = _make_display_media()
+        self.dm.data_type = 0
+        self.dm.refresh_table = MagicMock()
+        self.dm.check_undo_button = MagicMock()
+        self.found = tmp_path / "a.jpg"
+        self.found.touch()
+        self.gone = str(tmp_path / "gone.jpg")
+
+    def _edit(self, filepaths):
+        self.dm.media_table._data_filtered = pd.DataFrame({"id": range(len(filepaths)),
+                                                           "filepath": filepaths,
+                                                           "ext": ".jpg"})
+        self.dm.media_table.selectedRows.return_value = list(range(len(filepaths)))
+        with patch("matchypatchy.gui.display_media.AlertPopup") as alert, \
+             patch("matchypatchy.gui.display_media.MediaEditPopup") as popup:
+            popup.return_value.exec.return_value = False
+            popup.return_value.roi_updated = False
+            self.dm.edit_row_multiple()
+        return alert, popup
+
+    def test_missing_file_warns_instead_of_opening(self):
+        alert, popup = self._edit([str(self.found), self.gone])
+        popup.assert_not_called()
+        prompt = alert.call_args.kwargs["prompt"]
+        assert self.gone in prompt and "Edit > Configuration" in prompt
+
+    def test_existing_files_open_popup(self):
+        alert, popup = self._edit([str(self.found)])
+        alert.assert_not_called()
+        popup.assert_called_once()
+
+    def test_single_row_missing_file_warns(self):
+        self.dm.media_table._data_filtered = pd.DataFrame({"id": [0], "filepath": [self.gone], "ext": ".jpg"})
+        with patch("matchypatchy.gui.display_media.AlertPopup") as alert, \
+             patch("matchypatchy.gui.display_media.MediaEditPopup") as popup:
+            self.dm.edit_row(0)
+        popup.assert_not_called()
+        alert.assert_called_once()
+
+
 
 class TestSave:
     def _save(self, edits, data_type=1, edit_ok=True):
