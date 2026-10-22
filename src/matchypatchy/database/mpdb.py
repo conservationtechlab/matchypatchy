@@ -75,6 +75,14 @@ CASCADING_ROIS = {
 }
 
 
+# tables the gui keeps lists of (Home's surveys, the filter bars, the media table's
+# names); writes to them are reported to change listeners. media and roi writes are
+# not, an import makes thousands of them
+REPORTED_TABLES = ("region", "survey", "station", "camera", "individual")
+# reported tables that a delete from a table also removes rows from (or unlinks, for region)
+CASCADES = {"region": ("survey",), "survey": ("station", "camera"), "station": ("camera",)}
+
+
 class MatchyPatchyDB():
     """
     Class representing the MatchyPatchy database
@@ -86,6 +94,7 @@ class MatchyPatchyDB():
         self.filepath = Path(DB_PATH) / 'matchypatchy.db'
         self.chroma_filepath = Path(DB_PATH) / 'emb.db'
         self.local = threading.local()  # Thread-local storage
+        self._change_listeners = []  # called with a table name after it is written to
 
         db_exists = self.filepath.is_file()
         chroma_exists = self.chroma_filepath.is_dir()
@@ -245,6 +254,28 @@ class MatchyPatchyDB():
                               f"{db_build_version} and does not match the expected schema version {SCHEMA_VERSION}.")
             return False
 
+    def add_change_listener(self, listener):
+        """
+        Call listener(table) after each committed write to a reported table
+
+        Project uses this to turn writes into its data_changed signal. Listeners
+        run in the thread that wrote, which may be an import thread.
+        """
+        self._change_listeners.append(listener)
+
+    def _changed(self, table, cascade=False):
+        """
+        Tell the change listeners about a write to table, and with cascade the tables it cascades to
+
+        Called by each write method after its commit; delete and clear pass
+        cascade, since removing rows also removes or unlinks rows elsewhere.
+        Unreported tables are ignored.
+        """
+        for changed in (table, *(CASCADES.get(table, ()) if cascade else ())):
+            if changed in REPORTED_TABLES:
+                for listener in self._change_listeners:
+                    listener(changed)
+
     def query(self, sql, params=()):
         """
         Run one SQL statement with its values bound as parameters, return its rows
@@ -275,6 +306,9 @@ class MatchyPatchyDB():
             logger.info(f"Executed command: {command}")
             rows = cursor.fetchall()
             self.db.commit()
+            # any table may have changed
+            for table in REPORTED_TABLES:
+                self._changed(table)
             return rows
         except sqlite3.OperationalError as error:
             if not quiet:
@@ -305,6 +339,7 @@ class MatchyPatchyDB():
             cursor.execute(command, data_tuple)
             survey_id = cursor.lastrowid
             self.db.commit()
+            self._changed("survey")
             logger.info(f"Added survey: {name} with region_id: {region_id}, year_start: {year_start}, year_end: {year_end}")
             return survey_id
         except sqlite3.Error as error:
@@ -327,6 +362,7 @@ class MatchyPatchyDB():
             cursor.execute(command, data_tuple)
             region_id = cursor.lastrowid
             self.db.commit()
+            self._changed("region")
             logger.info(f"Added region: {name} with timezone: {timezone}")
             return region_id
         except sqlite3.Error as error:
@@ -350,6 +386,7 @@ class MatchyPatchyDB():
             cursor.execute(command, data_tuple)
             station_id = cursor.lastrowid
             self.db.commit()
+            self._changed("station")
             logger.info(f"Added station: {name} with lat: {lat}, long: {long}, survey_id: {survey_id}")
             return station_id
         except sqlite3.Error as error:
@@ -371,6 +408,7 @@ class MatchyPatchyDB():
             cursor.execute(command, data_tuple)
             individual_id = cursor.lastrowid
             self.db.commit()
+            self._changed("individual")
             logger.info(f"Added individual: {name} with sex: {sex}")
             return individual_id
         except sqlite3.Error as error:
@@ -572,6 +610,7 @@ class MatchyPatchyDB():
             cursor.execute(command, data_tuple)
             camera_id = cursor.lastrowid
             self.db.commit()
+            self._changed("camera")
             return camera_id
         except sqlite3.Error as error:
             logger.error(f"Failed to add camera: {error}")
@@ -669,6 +708,7 @@ class MatchyPatchyDB():
                 print(command, params)
             cursor.execute(command, params)
             self.db.commit()
+            self._changed(table)
             return True
         except sqlite3.Error as error:
             logger.error(f"Failed to update table: {error}")
@@ -719,6 +759,7 @@ class MatchyPatchyDB():
                     print(command, params)
                 cursor.execute(command, params)
             self.db.commit()
+            self._changed(table)
             return True
         except sqlite3.Error as error:
             self.db.rollback()
@@ -972,6 +1013,7 @@ class MatchyPatchyDB():
             command = f'DELETE FROM {table} WHERE {cond};'
             cursor.execute(command, params)
             self.db.commit()
+            self._changed(table, cascade=True)
             logger.info(f"Deleted from {table} where {cond}")
         except sqlite3.Error as error:
             logger.error(f"Failed delete: {error}")
@@ -987,6 +1029,7 @@ class MatchyPatchyDB():
             command = f'DELETE FROM {table};'
             cursor.execute(command)
             self.db.commit()
+            self._changed(table, cascade=True)
             logger.info(f"Cleared table {table}")
             return True
         except sqlite3.Error as error:

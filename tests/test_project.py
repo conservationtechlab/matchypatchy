@@ -86,3 +86,60 @@ class TestUsesProject:
 
         with pytest.raises(AttributeError):
             View().mpDB = "copy"
+
+
+class TestDataChanged:
+    def _written(self, tmp_path):
+        project, _ = _project()
+        project.open(tmp_path / "a")
+        tables = []
+        project.changed.connect(lambda: None)
+        project.data_changed.connect(tables.append)
+        return project, tables
+
+    def test_writes_to_listed_tables_are_reported(self, tmp_path):
+        project, tables = self._written(tmp_path)
+        db = project.db
+        survey = db.add_survey("S", None, None, None)
+        station = db.add_station("St", None, None, survey)
+        db.add_camera("Cam", station)
+        iid = db.add_individual("Spot")
+        db.edit_row("individual", iid, {"name": "Dot"})
+        assert tables == ["survey", "station", "camera", "individual", "individual"]
+        project.close()
+
+    def test_deletes_report_the_tables_they_cascade_to(self, tmp_path):
+        project, tables = self._written(tmp_path)
+        db = project.db
+        survey = db.add_survey("S", None, None, None)
+        tables.clear()
+        db.delete("survey", "id=?", (survey,))
+        assert tables == ["survey", "station", "camera"]
+        project.close()
+
+    def test_media_and_roi_writes_are_not_reported(self, tmp_path):
+        """An import makes thousands of these"""
+        project, tables = self._written(tmp_path)
+        db = project.db
+        station = db.add_station("St", None, None, 1)
+        tables.clear()
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h", ".jpg", "2024-01-01 10:00:00", station)
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        db.edit_row("roi", 1, {"favorite": 1})
+        assert tables == []
+        project.close()
+
+    def test_failed_write_is_not_reported(self, tmp_path):
+        project, tables = self._written(tmp_path)
+        db = project.db
+        db.add_survey("Taken", None, None, None)
+        tables.clear()
+        assert db.add_survey("Taken", None, None, None) is None
+        assert tables == []
+        project.close()
+
+    def test_console_commands_report_every_listed_table(self, tmp_path):
+        project, tables = self._written(tmp_path)
+        project.db._command("UPDATE survey SET year_start=2024;")
+        assert sorted(tables) == sorted(["region", "survey", "station", "camera", "individual"])
+        project.close()

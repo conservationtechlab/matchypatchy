@@ -20,6 +20,9 @@ class Project(QObject):
     """Config and database of the open project"""
 
     changed = pyqtSignal()  # emitted after cfg and db point at a newly opened project
+    # emitted with a table name after a write to one of the tables the gui keeps lists of
+    # (mpdb.REPORTED_TABLES). Writes from import threads arrive queued in the main thread
+    data_changed = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -48,6 +51,7 @@ class Project(QObject):
         if not db.key:
             db.close()
             raise ValueError(f"Database at {cfg.DB_DIR} is invalid.")
+        db.add_change_listener(self.data_changed.emit)
 
         old_db = self._db
         self._cfg, self._db = cfg, db
