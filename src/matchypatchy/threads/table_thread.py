@@ -94,6 +94,10 @@ class FetchTableThread(QThread):
                              .reset_index(drop=True))
 
             self.data['select'] = 0
+
+            self.data['sequence_id'] = self.data['sequence_id'].astype("Int64")
+            self.data['external_id'] = self.data['external_id'].astype("Int64")
+
             self.loaded_data.emit(self.data)
         except Exception as e:
             logger.error(f"Error loading thumbnails: {str(e)}")
