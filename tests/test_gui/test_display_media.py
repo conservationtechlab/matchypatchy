@@ -53,6 +53,7 @@ def _make_display_media():
         dm.progress = None
         dm._load_id = 0
         dm._loaders = []
+        dm._elide_left = MagicMock()
 
         # Mock widgets
         dm.filterbar = MagicMock()
@@ -217,12 +218,14 @@ class TestToggleFilterbarDatatype:
 # ---------------------------------------------------------------------------
 
 class TestUpdateCountLabel:
-    def test_count_label_total(self):
-        """update_count_label displays total count."""
+    @pytest.mark.parametrize("data_type, kind", [(1, "ROIs"), (0, "Media")])
+    def test_count_label_total(self, data_type, kind):
+        """update_count_label displays the total, of rois or media depending on the view"""
         dm = _make_display_media()
+        dm.data_type = data_type
         dm.media_table.rowCount.return_value = 5
         dm.update_count_label()
-        dm.count_label.setText.assert_called_with("Total Media: 5")
+        dm.count_label.setText.assert_called_with(f"Total {kind}: 5")
 
     def test_count_label_selected(self):
         """update_count_label_selected displays selection count."""
@@ -544,6 +547,7 @@ class TestSelectAllAfterReload:
         dm = _make_display_media()
         dm._apply_sort = MagicMock()
         dm._set_delegates = MagicMock()
+        dm._size_columns = MagicMock()
         DisplayMedia.handle_data_loaded(dm, pd.DataFrame({"id": [10], "select": [0]}))
         dm.button_select.setChecked.assert_called_with(False)
 
@@ -563,3 +567,19 @@ class TestDelete:
         dm.mpDB.delete.assert_called_once_with(table, "id IN (?, ?)", [10, 12])
         dm.mpDB.delete_emb.assert_not_called()
         dm.load_table.assert_called_once()
+
+
+class TestSizeColumns:
+    @pytest.mark.parametrize("data_type", [0, 1])
+    def test_columns_sized_by_name(self, data_type):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = data_type
+        dm.view.horizontalHeader.return_value.defaultSectionSize.return_value = 80
+        DisplayMedia._size_columns(dm)
+        names = [name for name, _ in dm._get_headers().values()]
+        widths = {c.args[0]: c.args[1] for c in dm.view.setColumnWidth.call_args_list}
+        assert widths[names.index("timestamp")] == DisplayMedia.COLUMN_WIDTHS["timestamp"]
+        assert widths[names.index("station_id")] == 80
+        assert names.index("filepath") not in widths
+        dm.view.setItemDelegateForColumn.assert_called_once_with(names.index("filepath"), dm._elide_left)

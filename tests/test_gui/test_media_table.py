@@ -303,3 +303,26 @@ class TestSexColumn:
         assert mt.data(_index(0, 2), Qt.ItemDataRole.DisplayRole) == "Unknown"
         # unidentified rois have no individual to have a sex
         assert mt.data(_index(1, 2), Qt.ItemDataRole.DisplayRole) is None
+
+
+class TestThumbnails:
+    def test_each_thumbnail_is_read_once_until_reload(self):
+        mt = _make_media_table()
+        mt._data_filtered = pd.DataFrame({"thumbnail_path": ["a.jpg", "a.jpg"]})
+        with patch("matchypatchy.gui.media_table.QPixmap") as pixmap:
+            mt._thumbnail("a.jpg")
+            mt._thumbnail("a.jpg")
+            assert pixmap.call_count == 1
+            mt.receiveData(pd.DataFrame({"thumbnail_path": ["a.jpg"]}))
+            mt._thumbnail("a.jpg")
+            assert pixmap.call_count == 2
+
+    def test_filepath_tooltip_is_the_full_path(self):
+        from PyQt6.QtCore import Qt
+        mt = _make_media_table()
+        mt._columns = ["filepath"]
+        mt._data_filtered = pd.DataFrame({"filepath": ["/long/path/to/IMG_0001.jpg"]})
+        index = MagicMock()
+        index.isValid.return_value = True
+        index.row.return_value, index.column.return_value = 0, 0
+        assert mt.data(index, Qt.ItemDataRole.ToolTipRole) == "/long/path/to/IMG_0001.jpg"

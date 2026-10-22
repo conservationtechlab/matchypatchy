@@ -10,7 +10,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from matchypatchy.gui.dialogs.popup_individual import IndividualFillPopup
 from matchypatchy.gui.widgets.widget_media import MediaWidget
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
-from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, TextEditWithSignal
+from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, TextEditWithSignal, ElidedLabel
 
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.media import (fetch_individual, get_roi_bbox, EditObject, delete_media, delete_rois,
@@ -53,8 +53,10 @@ class MediaEditPopup(UsesProject, QDialog):
         container_layout = QVBoxLayout()
         top = QHBoxLayout()
         # Filepath
-        self.filepath = QLabel()
-        top.addWidget(self.filepath, 1, alignment=Qt.AlignmentFlag.AlignCenter)
+        # long paths are cut from the left, the full path is its tooltip
+        self.filepath = ElidedLabel()
+        self.filepath.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        top.addWidget(self.filepath, 1)
         # Favorite
         self.button_favorite = QPushButton("♥")
         self.button_favorite.setFixedWidth(30)

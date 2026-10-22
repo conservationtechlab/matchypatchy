@@ -12,7 +12,7 @@ from matchypatchy.database.location import camera_names
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
-from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButton, ComboBoxDelegate
+from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButton, ComboBoxDelegate, ElideLeftDelegate
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 from matchypatchy.threads.table_thread import FetchTableThread
 from matchypatchy.threads.model_download_thread import load_model
@@ -128,13 +128,13 @@ class DisplayMedia(UsesProject, QWidget):
         self.view.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.view.horizontalHeader().setSortIndicatorShown(True)
         self.view.horizontalHeader().setSectionsClickable(True)
-        self.view.verticalHeader().setDefaultSectionSize(150)  # row size = thumbnail with
+        # rows fit a thumbnail; one line of text each, long paths are cut from the left
+        self.view.verticalHeader().setDefaultSectionSize(self.media_table.THUMBNAIL_CELL[1] + 4)
         self.view.horizontalHeader().setDefaultSectionSize(80)
+        self.view.setWordWrap(False)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
-        self.view.setColumnWidth(0, 30)  # Set the width of the select column
-        self.view.setColumnWidth(1, 150)  # Set the width of the thumbnail column
-        self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
-        self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self._elide_left = ElideLeftDelegate(self.view)  # for the filepath column, see _size_columns
+        self._size_columns()
 
 
         # Connect the selection changed signal from the media table to a handler
@@ -395,6 +395,7 @@ class DisplayMedia(UsesProject, QWidget):
         self.button_select.setChecked(False)
         self._apply_sort()
         self._set_delegates()
+        self._size_columns()
         self.update_count_label()
         self.update_edd_buttons()
 
@@ -486,7 +487,8 @@ class DisplayMedia(UsesProject, QWidget):
         if len(self.selected_rows) > 0:
             self.count_label.setText(f"Selected: {len(self.selected_rows)} / {self.media_table.rowCount()}")
         else:
-            self.count_label.setText(f"Total Media: {self.media_table.rowCount()}")
+            kind = "ROIs" if self.data_type == 1 else "Media"
+            self.count_label.setText(f"Total {kind}: {self.media_table.rowCount()}")
 
     def _apply_sort(self):
         """Reapply the current sort order to the media table"""
@@ -696,6 +698,24 @@ class DisplayMedia(UsesProject, QWidget):
                            8: ["comment", "Comment"],
                            9: ["roi_count", "# of Rois"]}
             return headers
+
+    # widths of the columns that need more or less than the default, the filepath column takes the rest
+    COLUMN_WIDTHS = {"select": 50, "thumbnail_path": 140, "timestamp": 140, "reviewed": 70, "favorite": 70}
+
+    def _size_columns(self):
+        """
+        Set column widths by column name, the columns differ between the media and roi views
+
+        Called in __init__ and after each load, since changing view type changes the headers.
+        """
+        header = self.view.horizontalHeader()
+        for col, (name, _) in enumerate(self._get_headers().values()):
+            if name == "filepath":
+                header.setSectionResizeMode(col, QHeaderView.ResizeMode.Stretch)
+                self.view.setItemDelegateForColumn(col, self._elide_left)
+            else:
+                header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+                self.view.setColumnWidth(col, self.COLUMN_WIDTHS.get(name, header.defaultSectionSize()))
 
     def _set_delegates(self):
         """Set delegates for the table based on the data type"""

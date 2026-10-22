@@ -340,6 +340,45 @@ class SliderWithLabel(QWidget):
             self.slider.setValue(value)
             self.slider.blockSignals(False)
             self.slider_value_changed.emit(value)
+class ElidedLabel(QLabel):
+    """
+    Label that cuts long text from the left to fit, with the full text as its tooltip
+
+    For file paths, whose end is the useful part. Unlike a plain QLabel, long
+    text doesn't make the label, and the window around it, wider.
+    """
+    def __init__(self, text=""):
+        super().__init__()
+        self._full_text = ""
+        self.setMinimumWidth(100)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.setText(text)
+
+    def setText(self, text):
+        self._full_text = str(text)
+        self.setToolTip(self._full_text)
+        self._elide()
+
+    def text(self):
+        return self._full_text
+
+    def resizeEvent(self, event):
+        self._elide()
+        super().resizeEvent(event)
+
+    def _elide(self):
+        """Show as much of the end of the text as fits; called on setText and resize"""
+        shown = self.fontMetrics().elidedText(self._full_text, Qt.TextElideMode.ElideLeft, self.width())
+        super().setText(shown)
+
+
+class ElideLeftDelegate(QStyledItemDelegate):
+    """Delegate that cuts long text from the left, so the end of a file path stays visible"""
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        option.textElideMode = Qt.TextElideMode.ElideLeft
+
+
 
 
 class NoHoverDelegate(QStyledItemDelegate):
