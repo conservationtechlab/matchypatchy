@@ -341,11 +341,24 @@ class FilterBar(UsesProject, QWidget):
 
 
 class FilterBox(QComboBox):
-    """Custom QComboBox for filter selections with fixed width."""
+    """QComboBox for filter selections, width up to width, shrinking to MINIMUM_WIDTH on small windows."""
+
+    MINIMUM_WIDTH = 110
 
     def __init__(self, initial_list, width):
         super().__init__()
         self.setModel(QStandardItemModel())
-        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.setFixedWidth(width)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        # long names are cut off rather than widening the box
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.setMinimumContentsLength(1)
+        self.setMinimumWidth(min(self.MINIMUM_WIDTH, width))
+        self.setMaximumWidth(width)
+        self._width = width
         self.addItems([el[1] for el in initial_list])
+
+    def sizeHint(self):
+        """Preferred width is the configured width, the layout shrinks it when space is short"""
+        hint = super().sizeHint()
+        hint.setWidth(self._width)
+        return hint
