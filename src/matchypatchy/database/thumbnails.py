@@ -2,6 +2,7 @@
 QThread for saving thumbnails to temp dir for media table
 """
 import logging
+import os
 from pathlib import Path
 import uuid
 
@@ -128,13 +129,45 @@ def check_missing_thumbnails(mpDB, thumbnail_dir, data_type):
     missing_ids = [row[0] for row in missing] if missing else []
 
     # Also check for files that are listed but the file is missing, or that are the not-found placeholder
-    for _, row in thumbnails.iterrows():
-        file_missing = not (Path(thumbnail_dir) / Path(row['thumbnail_path'])).is_file()
-        is_placeholder = row['thumbnail_path'] == str(asset_path(THUMBNAIL_NOTFOUND))
-        if file_missing or is_placeholder:
-            missing_ids.append(row['id'])
+    # list the directory once instead of a stat per thumbnail, which is slow on network drives
+    existing = _list_files(thumbnail_dir)
+    placeholder = str(asset_path(THUMBNAIL_NOTFOUND))
+    for fid, thumbnail_path in zip(thumbnails['id'], thumbnails['thumbnail_path']):
+        if thumbnail_path == placeholder or not _thumbnail_exists(thumbnail_dir, thumbnail_path, existing):
+            missing_ids.append(fid)
 
     return missing_ids
+
+
+def _list_files(directory):
+    """
+    Names of the files directly in directory, empty if it cannot be read.
+
+    Called by check_missing_thumbnails, so one directory listing answers whether
+    each thumbnail exists; kept separate so the OSError handling stays out of that loop.
+    """
+    try:
+        with os.scandir(directory) as entries:
+            return {entry.name for entry in entries if entry.is_file()}
+    except OSError as e:
+        logger.error(f"Could not list thumbnails in {directory}: {e}")
+        return set()
+
+
+def _thumbnail_exists(thumbnail_dir, thumbnail_path, existing):
+    """
+    Whether a stored thumbnail path points at a file.
+
+    Called by check_missing_thumbnails per thumbnail row. Plain filenames, which is
+    what save_thumbnail stores, are looked up in the directory listing `existing`;
+    anything else (absolute or nested paths, e.g. from older databases) falls back
+    to a stat. Kept separate so that fallback rule lives in one place.
+    """
+    if not thumbnail_path:
+        return False
+    if os.path.basename(thumbnail_path) == thumbnail_path:
+        return thumbnail_path in existing
+    return (Path(thumbnail_dir) / Path(thumbnail_path)).is_file()
 
 
 def fetch_roi_thumbnails(mpDB):
