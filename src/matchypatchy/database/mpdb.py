@@ -3,7 +3,6 @@ Class Definition for MatchyPatchyDB
 '''
 import datetime
 import logging
-import os
 from typing import Optional
 import sqlite3
 import threading
@@ -18,6 +17,7 @@ import pandas as pd
 from matchypatchy.database.setup import (setup_database, setup_chromadb, migrate_database,
                                          schema_signature, expected_schema_signature, SCHEMA_VERSION)
 from matchypatchy.database.location import TZ_CONVERT_DICT
+from matchypatchy.database.media import filepath_sql
 
 
 logger = logging.getLogger(__name__)
@@ -867,7 +867,7 @@ class MatchyPatchyDB():
         """
         try:
             cursor = self.db.cursor()
-            command = f"""SELECT m.*, u.base_dir || '{os.sep}' || m.relative_path AS filepath
+            command = f"""SELECT m.*, {filepath_sql('u.base_dir', 'm.relative_path')} AS filepath
                           FROM media m
                           LEFT JOIN uploads u ON m.base_dir_id = u.id"""
             if row_cond is not None:
@@ -888,7 +888,7 @@ class MatchyPatchyDB():
             columns = f"""roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
                         roi.media_id, roi.individual_id, emb, base_dir_id, relative_path, ext, timestamp,
                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex,
-                        uploads.base_dir || '{os.sep}' || media.relative_path AS filepath"""
+                        {filepath_sql('uploads.base_dir', 'media.relative_path')} AS filepath"""
             if row_cond:
                 command = f"""SELECT {columns} FROM roi
                             INNER JOIN media ON roi.media_id = media.id
@@ -911,7 +911,7 @@ class MatchyPatchyDB():
     def get_full_path(self, media_id):
         """Get the full filepath for a given media id"""
         cursor = self.db.cursor()
-        cursor.execute(f"""SELECT u.base_dir || '{os.sep}' || m.relative_path
+        cursor.execute(f"""SELECT {filepath_sql('u.base_dir', 'm.relative_path')}
                        FROM media m
                        JOIN uploads u ON m.base_dir_id = u.id
                        WHERE m.id = ?""", (media_id,))

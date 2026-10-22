@@ -3,7 +3,6 @@ Thread Class for Processing Viewpoint and Miew Embedding
 
 """
 import logging
-import os
 
 import animl
 from numpy import argmax
@@ -12,7 +11,7 @@ import pandas as pd
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.threads.model_download_thread import get_path
-from matchypatchy.database.media import fetch_roi
+from matchypatchy.database.media import fetch_roi, filepath_sql
 
 # from matchypatchy.pairx.core import explain
 # from matchypatchy.pairx import xai_dataset
@@ -48,7 +47,7 @@ class ReIDThread(QThread):
         # need only media that has corresponding ROIs
         media = self.mpDB._command(f"""
             SELECT roi.id, roi.media_id,
-                uploads.base_dir || '{os.sep}' || media.relative_path AS filepath,
+                {filepath_sql('uploads.base_dir', 'media.relative_path')} AS filepath,
                 media.external_id, media.camera_id, media.sequence_id
             FROM roi
             JOIN media ON roi.media_id = media.id

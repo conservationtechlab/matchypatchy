@@ -354,3 +354,28 @@ class TestMatchingAndLookups:
         counts = {base_dir: n for _, base_dir, _, n in uploads_with_media_counts(db)}
         assert counts == {"/x.jpg": 1, "/unused": 0}
         assert unused in [row[0] for row in uploads_with_media_counts(db)]
+
+
+class TestFilepathSeparators:
+    """relative_path keeps the importing OS's separators, filepaths use the current OS's"""
+
+    @pytest.mark.parametrize("relative_path", ["7\\a.jpg", "7/a.jpg"])
+    def test_filepath_uses_current_separator(self, tmp_db, relative_path):
+        import os
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload("BASE"), relative_path, "h", ".jpg", "2024-01-01 10:00:00", station)
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        expected = os.sep.join(["BASE", "7", "a.jpg"])
+        assert fetch_media(db).loc[0, "filepath"] == expected
+        assert fetch_media(db, counts=True).loc[0, "filepath"] == expected
+        assert fetch_roi(db).loc[0, "filepath"] == expected
+        assert db.get_full_path(mid) == expected
+        rows, columns = db.all_media()
+        assert rows[0][columns.index("filepath")] == expected
+
+    @pytest.mark.parametrize("relative_path", ["7\\a.jpg", "7/a.jpg"])
+    def test_native_relative_path(self, relative_path):
+        import os
+        from matchypatchy.database.media import native_relative_path
+        assert native_relative_path(relative_path) == os.sep.join(["7", "a.jpg"])

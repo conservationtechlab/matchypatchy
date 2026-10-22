@@ -10,7 +10,7 @@ import pandas as pd
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
-from matchypatchy.database.media import fetch_roi_media, get_sha256
+from matchypatchy.database.media import fetch_roi_media, get_sha256, native_relative_path
 from matchypatchy.threads.model_download_thread import get_path
 
 
@@ -61,7 +61,7 @@ class VerifyNewBaseDirsThread(QThread):
                 expected = set()
                 hash_not_found_in_new_directory = []
                 for relative_path, sha256 in media:
-                    filepath = Path(directory, relative_path)
+                    filepath = Path(directory, native_relative_path(relative_path))
                     expected.add(filepath)
                     if get_sha256(filepath) != sha256:
                         hash_not_found_in_new_directory.append(relative_path)
