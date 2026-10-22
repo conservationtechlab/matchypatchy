@@ -33,6 +33,7 @@ from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy import __version__
 from matchypatchy.project import Project
 from matchypatchy.database.filesystem import _is_network_path
+from matchypatchy.database.lock import ProjectLockedError, describe_holder
 
 
 logger = logging.getLogger(__name__)
@@ -266,6 +267,29 @@ class MainWindow(QMainWindow):
         """Last selected project path, None if none was saved"""
         return self.settings.value("home_dir", None)  # None is default
 
+    def _open_project(self, home_dir):
+        """
+        Open the project in home_dir, asking before taking over another MatchyPatchy's lock
+
+        Called by _startup_project, new_project and change_project in place of
+        project.open, so all three ask the same question when the database is
+        already open somewhere else. Returns False if the user chose not to open
+        it, other errors from project.open are raised for the caller to report.
+        """
+        try:
+            self.project.open(home_dir)
+        except ProjectLockedError as e:
+            logger.warning(str(e))
+            msg = (f"This database is in use by {describe_holder(e.holder)}.\n\n"
+                   f"Opening it in two places at once can corrupt it. Only open it anyway\n"
+                   f"if that MatchyPatchy is closed, eg. it crashed or lost its connection.\n\n"
+                   f"Open anyway?")
+            dialog = AlertPopup(self, prompt=msg, title="Database in use")
+            if not dialog.exec():
+                return False
+            self.project.open(home_dir, force=True)
+        return True
+
     def _startup_project(self):
         """Open the saved project, or fall back to a default project so the app can still launch"""
         saved_dir = self.load_home_dir()
@@ -286,9 +310,11 @@ class MainWindow(QMainWindow):
             if str(home_dir) in failed:
                 continue
             try:
-                self.project.open(home_dir)
+                opened = self._open_project(home_dir)
             except Exception as e:
                 logger.error(f"Could not load project at {home_dir}: {e}", exc_info=True)
+                opened = False
+            if not opened:
                 failed.append(str(home_dir))
                 continue
             logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
@@ -333,7 +359,8 @@ class MainWindow(QMainWindow):
         
         logger.info(f"Creating project folder: {str(home_dir)}.")
         try:
-            self.project.open(home_dir)
+            if not self._open_project(home_dir):
+                return
         except Exception as e:
             logger.error(f"Could not create project at {home_dir}: {e}", exc_info=True)
             dialog = AlertPopup(self, prompt=f"Could not create project at {home_dir}:\n{e}")
@@ -346,7 +373,8 @@ class MainWindow(QMainWindow):
     def change_project(self, project_folder):
         """Change the current project to the specified project folder."""
         try:
-            self.project.open(project_folder)
+            if not self._open_project(project_folder):
+                return False  # in use elsewhere, the user chose not to open it
             valid = True
         except Exception as e:
             logger.error(f"Could not load project at {project_folder}: {e}", exc_info=True)

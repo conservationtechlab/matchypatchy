@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from matchypatchy.project import Project, UsesProject
+from matchypatchy.database.lock import ProjectLockedError, LOCK_NAME
 
 
 def _project():
@@ -65,6 +66,65 @@ class TestProject:
 
     def test_close_before_open_does_nothing(self):
         Project().close()
+
+
+class TestProjectLock:
+    def test_open_project_is_locked_until_closed(self, tmp_path):
+        project, _ = _project()
+        project.open(tmp_path / "a")
+        lock_file = tmp_path / "a" / "Database" / LOCK_NAME
+        assert lock_file.exists()
+        with pytest.raises(ProjectLockedError):
+            Project().open(tmp_path / "a")
+        project.close()
+        assert not lock_file.exists()
+
+    def test_switching_releases_the_previous_lock(self, tmp_path):
+        project, _ = _project()
+        project.open(tmp_path / "a")
+        project.open(tmp_path / "b")
+        assert not (tmp_path / "a" / "Database" / LOCK_NAME).exists()
+        assert (tmp_path / "b" / "Database" / LOCK_NAME).exists()
+        project.close()
+
+    def test_reopening_the_open_project_keeps_its_lock(self, tmp_path):
+        project, opened = _project()
+        project.open(tmp_path / "a")
+        project.open(tmp_path / "a")
+        assert opened == [tmp_path / "a", tmp_path / "a"]
+        assert (tmp_path / "a" / "Database" / LOCK_NAME).exists()
+        project.close()
+        assert not (tmp_path / "a" / "Database" / LOCK_NAME).exists()
+
+    def test_locked_project_is_not_opened(self, tmp_path):
+        """The database isn't touched (eg. migrated) while someone else has it"""
+        other = Project()
+        other.open(tmp_path / "a")
+        project, opened = _project()
+        project.open(tmp_path / "b")
+        with pytest.raises(ProjectLockedError):
+            project.open(tmp_path / "a")
+        assert project.cfg.HOME_DIR == tmp_path / "b"
+        assert opened == [tmp_path / "b"]
+        project.close()
+        other.close()
+
+    def test_force_opens_a_locked_project(self, tmp_path):
+        other = Project()
+        other.open(tmp_path / "a")
+        project, _ = _project()
+        project.open(tmp_path / "a", force=True)
+        assert project.cfg.HOME_DIR == tmp_path / "a"
+        project.close()
+        # the lock now belongs to project, the other's close leaves it alone
+        other.close()
+
+    def test_failed_open_releases_its_lock(self, tmp_path):
+        project = Project()
+        broken = _invalid_project(tmp_path)
+        with pytest.raises(ValueError):
+            project.open(broken)
+        assert not (broken / "Database" / LOCK_NAME).exists()
 
 
 class TestUsesProject:
