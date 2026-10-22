@@ -2,6 +2,7 @@
 GUI Window for viewing images
 """
 import logging
+from pathlib import Path
 import pandas as pd
 from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QComboBox, QDialog)
@@ -131,6 +132,7 @@ class DisplayMedia(UsesProject, QWidget):
         self.view.verticalHeader().setDefaultSectionSize(150)  # row size = thumbnail with
         self.view.horizontalHeader().setDefaultSectionSize(80)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
+        self.view.doubleClicked.connect(self.edit_thumbnail)
         self.view.setColumnWidth(0, 30)  # Set the width of the select column
         self.view.setColumnWidth(1, 150)  # Set the width of the thumbnail column
         self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
@@ -607,6 +609,8 @@ class DisplayMedia(UsesProject, QWidget):
                 data = pd.concat([data, video_row], ignore_index=True)  # add video row
 
         # Launch Media Edit Popup
+        if not self._media_found(data):
+            return
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
@@ -620,12 +624,24 @@ class DisplayMedia(UsesProject, QWidget):
         # reload data and update buttons
         self.refresh_table(reload=roi_updated)
 
+    def edit_thumbnail(self, index):
+        """
+        Edit a single row when its thumbnail is double-clicked.
+
+        Connected to the view's doubleClicked signal. Only the thumbnail column opens the
+        popup, double-clicking the editable columns edits them in place instead.
+        """
+        if self.media_table._columns[index.column()] == "thumbnail_path":
+            self.edit_row(index.row())
+
     def edit_row_multiple(self):
         """Edit multiple selected rows"""
         self.selected_rows = self.media_table.selectedRows()
         data = self.media_table._data_filtered.iloc[self.selected_rows].reset_index(drop=True)
         current_image_index = 0
         # Launch Media Edit Popup
+        if not self._media_found(data):
+            return
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
@@ -638,6 +654,25 @@ class DisplayMedia(UsesProject, QWidget):
         del dialog
         # reload data and update buttons
         self.refresh_table(reload=roi_updated)
+
+    def _media_found(self, data):
+        """
+        Whether every media file in data exists, warning the user if not.
+
+        Called by edit_row and edit_row_multiple before opening MediaEditPopup, which
+        crashes on a missing file, e.g. when the source directories moved and have not
+        been updated. Kept separate so both share the check and the message.
+        """
+        missing = [f for f in data['filepath'].dropna().unique() if not Path(f).is_file()]
+        if not missing:
+            return True
+        logger.warning(f"Could not find {len(missing)} media file(s), e.g. {missing[0]}")
+        dialog = AlertPopup(self, prompt=f"Could not find {len(missing)} media file(s), e.g.\n{missing[0]}\n\n"
+                                         "If the media has moved, update its location in\n"
+                                         "Edit > Configuration > Edit Source Directories.")
+        dialog.exec()
+        del dialog
+        return False
 
     def duplicate(self):
         """Duplicate selected rows in the database."""
