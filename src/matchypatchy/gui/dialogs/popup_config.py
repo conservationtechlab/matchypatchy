@@ -7,7 +7,7 @@ from pathlib import Path
 import animl
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QComboBox, QInputDialog,
-                             QPushButton, QLineEdit, QLabel, QDialogButtonBox)
+                             QPushButton, QLineEdit, QLabel, QDialogButtonBox, QSpinBox)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
 
@@ -29,6 +29,8 @@ class ConfigPopup(UsesProject, QDialog):
 
     ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
     DEVICE_OPTIONS = {"CPUExecutionProvider": "CPU", "CUDAExecutionProvider": "CUDA-enabled GPU"}
+    FONT_SIZE_MIN = 8
+    FONT_SIZE_MAX = 24
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -191,6 +193,28 @@ class ConfigPopup(UsesProject, QDialog):
         cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(cuda_layout)
 
+        # FONT SIZE ------------------------------------------------------------
+        font_layout = QHBoxLayout()
+        font_label = QLabel("Font Size:")
+        font_label.setToolTip(f"Default text size in points, for all projects. "
+                              f"The system's size is {self.parent.system_font_size} pt.")
+        font_label.setFixedWidth(self.label_width)
+        font_layout.addWidget(font_label)
+        self.font_size = QSpinBox()
+        self.font_size.setFixedWidth(self.edit_width)
+        self.font_size.setRange(self.FONT_SIZE_MIN, self.FONT_SIZE_MAX)
+        self.font_size.setSuffix(" pt")
+        self._original_font_size = self.parent.font_size()
+        self.font_size.setValue(self._original_font_size)
+        self.font_size.valueChanged.connect(self.parent.apply_font_size)
+        font_layout.addWidget(self.font_size, alignment=Qt.AlignmentFlag.AlignLeft)
+        button_font_reset = QPushButton("System Default")
+        button_font_reset.setToolTip("Go back to the system's text size.")
+        button_font_reset.clicked.connect(lambda: self.font_size.setValue(self.parent.system_font_size))
+        font_layout.addWidget(button_font_reset, alignment=Qt.AlignmentFlag.AlignLeft)
+        font_layout.addStretch()
+        layout.addLayout(font_layout)
+
         # MPDB KEY -------------------------------------------------------------
         mpdbkey_layout = QHBoxLayout()
         mpdbkey_label = QLabel("Database Key:")
@@ -251,15 +275,17 @@ class ConfigPopup(UsesProject, QDialog):
         return {name: getattr(self.cfg, name) for name in self.SETTINGS}
 
     def accept(self):
-        """Save: write the settings to the project's config file"""
+        """Save: write the settings to the project's config file, and the font size to the app's settings"""
         self.cfg.save()
+        self.parent.save_font_size(self.font_size.value())
         logger.info("Configuration saved")
         super().accept()
 
     def reject(self):
-        """Cancel: put back the settings as they were when the dialog opened"""
+        """Cancel: put back the settings and font size as they were when the dialog opened"""
         for name, value in self._original.items():
             setattr(self.cfg, name, value)
+        self.parent.apply_font_size(self._original_font_size)
         super().reject()
 
     def show_advanced(self):

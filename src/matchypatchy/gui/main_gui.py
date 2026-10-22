@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog,
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction, QGuiApplication
 from PyQt6.QtCore import QSettings, QTimer
@@ -44,6 +44,13 @@ class MainWindow(QMainWindow):
         super().__init__()
         # Initialize main window settings and components
         self.settings = QSettings("SDZWA", "MatchyPatchy")
+        # the platform's own size, used until the user picks one in the config
+        # (-1 when the system font is sized in pixels, then use a common size)
+        self.system_font_size = QApplication.instance().font().pointSize()
+        if self.system_font_size <= 0:
+            self.system_font_size = 10
+        # before the views are built, so they lay out at the saved size
+        self.apply_font_size(self.font_size())
         # the open project, kept for the life of the window; views read cfg and db through it
         self.project = Project()
         # load previous home dir or start fresh, falling back to a default project
@@ -137,6 +144,48 @@ class MainWindow(QMainWindow):
         help.addAction(help_about)
         help.addAction(help_readme)
         help.addAction(help_license)
+
+    # FONT SIZE ----------------------------------------------------------------
+    def font_size(self):
+        """
+        Saved default font size in pt, the system's size if never set or unreadable
+
+        Read in __init__ and by ConfigPopup to fill its font size field. Stored in
+        QSettings rather than the project config so it stays the same across projects.
+        Falls back to the system size rather than a fixed one because platforms
+        differ (Windows 9pt, macOS 13pt, where a point is also smaller on screen).
+        """
+        try:
+            return int(self.settings.value("font_size", self.system_font_size))
+        except (TypeError, ValueError):
+            return self.system_font_size
+
+    def apply_font_size(self, size):
+        """
+        Set the app's default font size without saving it
+
+        Called in __init__ with the saved size, and by ConfigPopup to preview a size
+        while it's edited and to put the old size back on Cancel. Kept separate from
+        save_font_size so the preview isn't written until Save. Widgets with a size
+        in their stylesheet keep it.
+        """
+        app = QApplication.instance()
+        font = app.font()
+        font.setPointSize(size)
+        app.setFont(font)
+
+    def save_font_size(self, size):
+        """
+        Apply the default font size and keep it for next time, called by ConfigPopup on Save
+
+        Saving the system's size clears the setting instead, so the app keeps following
+        the system if it changes or the settings move to another platform.
+        """
+        if size == self.system_font_size:
+            self.settings.remove("font_size")
+        else:
+            self.settings.setValue("font_size", size)
+        self.apply_font_size(size)
 
     # PAGE VIEWS ---------------------------------------------------------------
 

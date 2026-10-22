@@ -972,6 +972,9 @@ class TestConfigSaveCancel:
         cfg = SimpleNamespace(**{name: f"old-{name}" for name in ConfigPopup.SETTINGS}, save=MagicMock())
         popup.project = SimpleNamespace(db=MagicMock(), cfg=cfg)
         popup._original = popup._settings()
+        popup.parent = MagicMock()
+        popup.font_size = MagicMock()
+        popup._original_font_size = 12
         return popup
 
     def test_editing_doesnt_save(self):
@@ -999,6 +1002,23 @@ class TestConfigSaveCancel:
         with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
             ConfigPopup.accept(popup)
         popup.cfg.save.assert_called_once()
+
+    def test_save_keeps_font_size(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        popup.font_size.value.return_value = 15
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
+            ConfigPopup.accept(popup)
+        popup.parent.save_font_size.assert_called_once_with(15)
+
+    def test_cancel_restores_font_size(self):
+        """The size is previewed while it's edited, so Cancel puts the old one back"""
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.reject", create=True):
+            ConfigPopup.reject(popup)
+        popup.parent.apply_font_size.assert_called_once_with(12)
+        popup.parent.save_font_size.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
