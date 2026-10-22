@@ -383,7 +383,6 @@ class DisplayCompare(UsesProject, QWidget):
 
         if clear_cache:
             logger.info("Clearing KNN cache")
-            print("Clearing KNN cache")
             self.QueryContainer.clear_knn_cache()
 
         # Load raw data only. filter() now runs later, in QueryContainer.finalize()

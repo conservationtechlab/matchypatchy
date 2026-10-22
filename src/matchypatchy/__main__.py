@@ -12,7 +12,7 @@ from matchypatchy.logging_config import setup_logger, get_logger
 from matchypatchy.gui import MainWindow
 
 
-def setup_cuda_path():
+def setup_cuda_path(logger):
     """Dynamically find and add NVIDIA CUDA/cuDNN libraries to PATH"""
     try:
         # Try to find nvidia packages in site-packages
@@ -37,7 +37,7 @@ def setup_cuda_path():
                         os.environ['PATH'] = str(folder) + os.pathsep + os.environ['PATH']
                 return True
     except Exception as e:
-        print(f"Warning: Could not setup CUDA path: {e}")
+        logger.warning(f"Could not setup CUDA path: {e}")
 
     return False
 
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     exit_code = 1  # Default to error; overwritten on successful run
 
     try:
-        setup_cuda_path()
+        setup_cuda_path(logger)
         app = QApplication(sys.argv)
         window = MainWindow()
         logger.info("Main window initialized")

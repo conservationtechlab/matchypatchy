@@ -7,6 +7,9 @@ import sys
 from pathlib import Path
 import yaml
 import animl
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class mpConfig():
@@ -76,7 +79,7 @@ class mpConfig():
 
         # config file not found, save the current defaults
         else:
-            print(f"Configuration file not found at {self.CONFIG_PATH}. Saving default configuration.")
+            logger.info(f"Configuration file not found at {self.CONFIG_PATH}. Saving default configuration.")
             self.HOME_DIR.mkdir(parents=True, exist_ok=True)
             self.set_default()
             self.save()
