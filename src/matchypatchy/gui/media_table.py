@@ -18,6 +18,7 @@ class MediaTable(UsesProject, QAbstractTableModel):
     """Widget for displaying list of Media"""
 
     THUMBNAIL_CACHE_KB = 64 * 1024  # about 400 thumbnails at 200px
+    ORDER_COLUMN = "_row_order"  # position each row arrived in, not shown
 
     user_edit = pyqtSignal(EditObject)
 
@@ -280,7 +281,8 @@ class MediaTable(UsesProject, QAbstractTableModel):
         selected_ids re-ticks rows by id, since row positions change when the
         data is re-filtered or re-sorted
         """
-        self._data_filtered = data
+        # remember the order rows arrived in, to go back to when sorting is turned off
+        self._data_filtered = data.assign(**{self.ORDER_COLUMN: range(len(data))})
         if headers is not None:
             self.updateHeaderDict(headers)
 
@@ -311,11 +313,23 @@ class MediaTable(UsesProject, QAbstractTableModel):
         return super().headerData(section, orientation, role)
 
     def sort(self, column, order):
-        """Sorts the underlying data; None/NaN are treated as the smallest value."""
+        """
+        Sorts the underlying data; None/NaN are treated as the smallest value.
+
+        column -1 comes from the view when the sort indicator is cleared,
+        and puts the rows back in the order they arrived in.
+        """
         if self._data_filtered.empty:
             return
 
-        if column < 0 or column >= len(self._columns):
+        if column < 0:
+            if self.ORDER_COLUMN in self._data_filtered.columns:
+                self.layoutAboutToBeChanged.emit()
+                self._data_filtered = self._data_filtered.sort_values(self.ORDER_COLUMN).reset_index(drop=True)
+                self.layoutChanged.emit()
+            return
+
+        if column >= len(self._columns):
             return
 
         if column == 1: # do not sort by thumbnail

@@ -129,6 +129,8 @@ class DisplayMedia(UsesProject, QWidget):
         self.view.setSortingEnabled(True)
         self.view.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.view.horizontalHeader().setSortIndicatorShown(True)
+        # clicking a header cycles ascending, descending, then back to unsorted
+        self.view.horizontalHeader().setSortIndicatorClearable(True)
         self.view.horizontalHeader().setSectionsClickable(True)
         self.view.verticalHeader().setDefaultSectionSize(THUMBNAIL_SIZE + 10)  # row size = thumbnail with
         self.view.horizontalHeader().setDefaultSectionSize(100)

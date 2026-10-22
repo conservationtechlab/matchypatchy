@@ -158,6 +158,22 @@ class TestSort:
         mt.sort(1, Qt.SortOrder.AscendingOrder)  # column 1 = thumbnail_path
         assert list(mt._data_filtered["filepath"]) == original_order
 
+    def test_cleared_sort_restores_arrival_order(self):
+        """Clicking a header a third time clears the sort, which the view sends as column -1"""
+        mt = _make_media_table()
+        from PyQt6.QtCore import Qt
+        with patch("matchypatchy.gui.media_table.fetch_individual"), \
+                patch("matchypatchy.gui.media_table.fetch_stations"), \
+                patch("matchypatchy.gui.media_table.fetch_cameras"):
+            mt.receiveData(_sample_df())
+        original_order = list(mt._data_filtered["filepath"])
+        mt.STATIONS = pd.DataFrame({"name": ["Beta", "Alpha"]}, index=[1, 2])
+        mt.sort(4, Qt.SortOrder.AscendingOrder)
+        assert list(mt._data_filtered["filepath"]) != original_order
+        mt.sort(-1, Qt.SortOrder.AscendingOrder)
+        assert list(mt._data_filtered["filepath"]) == original_order
+        assert list(mt._data_filtered.index) == [0, 1, 2]
+
     def test_sort_empty_data_is_noop(self):
         mt = _make_media_table()
         from PyQt6.QtCore import Qt
