@@ -4,7 +4,7 @@ Custom assets for the GUI, such as buttons and separators.
 """
 from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QWidget, QTextEdit, QLineEdit, QStyle,
                              QSlider, QLabel, QHBoxLayout, QSpacerItem, QStyledItemDelegate)
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 
@@ -24,6 +24,30 @@ class HorizontalSeparator(QFrame):
         self.setFrameShape(QFrame.Shape.HLine)
         self.setFrameShadow(QFrame.Shadow.Sunken)
         self.setLineWidth(linewidth)
+
+
+class ScaledImageLabel(QLabel):
+    """
+    Label showing an image scaled down smoothly to fit, keeping its aspect ratio
+
+    Never scaled above the image's own size, which would blur it. The label can
+    shrink to minimum_size, so the image doesn't set the window's minimum size.
+    """
+    def __init__(self, filepath, minimum_size=(150, 100)):
+        super().__init__()
+        self._pixmap = QPixmap(filepath)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setMinimumSize(*minimum_size)
+        self.setMaximumSize(self._pixmap.size())
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    def sizeHint(self):
+        return self._pixmap.size()
+
+    def resizeEvent(self, event):
+        self.setPixmap(self._pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                           Qt.TransformationMode.SmoothTransformation))
+        super().resizeEvent(event)
 
 
 class StandardButton(QPushButton):

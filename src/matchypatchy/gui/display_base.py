@@ -12,7 +12,6 @@ import os
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
                              QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QImage
 
 from matchypatchy.database.location import survey_names
 from matchypatchy.database.media import clear_project_data
@@ -23,6 +22,7 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.dialogs.popup_ml import MLOptionsPopup
+from matchypatchy.gui.widgets.gui_assets import ScaledImageLabel
 
 from matchypatchy.threads.sequence_thread import SequenceThread
 from matchypatchy.threads.animl_thread import AnimlThread
@@ -40,12 +40,12 @@ class DisplayBase(UsesProject, QWidget):
     """Base class for the main dashboard view in the MatchyPatchy GUI."""
 
     LOGO = str(config.asset_path("graphics/logo.png"))
+    PANEL_WIDTH = 600  # widest the import and database panels get
 
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.project = parent.project
-        padding = 120
         # Initialize threads for sequence, animl, and reid processing
         self.active_survey = None
         self.sequence_thread = None
@@ -62,20 +62,17 @@ class DisplayBase(UsesProject, QWidget):
         label.setFixedHeight(25)
         label.setStyleSheet("""#Title {font-size: 22px;}""")
         layout.addWidget(label)
-        layout.addSpacing(10)
-        layout.addStretch()
+        # spare height above and below the logo and panels, so they stay centered
+        layout.addStretch(1)
 
-        logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
-        logo.setFixedSize(600, 400)
-        logo.setObjectName("borderWidget")
-        logo_img = QImage(self.LOGO)
-        logo.setPixmap(QPixmap.fromImage(logo_img))
-        layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignCenter)
+        # shrinks with the window, so it doesn't set the window's minimum size
+        logo = ScaledImageLabel(self.LOGO)
+        # grows to its own size before the spacing above and below gets any
+        layout.addWidget(logo, 4, alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addSpacing(10)
-        layout.addStretch()
 
+        # the two panels side by side, centered, at most PANEL_WIDTH each
         column_layout = QHBoxLayout()
-        column_layout.addSpacing(padding)  # add padding to left side
         column_layout.addStretch()
 
         # MAIN PROCESS ---------------------------------------------------------
@@ -92,7 +89,7 @@ class DisplayBase(UsesProject, QWidget):
         button_process = QPushButton("2. Process")
         button_validate = QPushButton("3. Validate")
         button_match = QPushButton("4. Match")
-        button_export = QPushButton("5.Export")
+        button_export = QPushButton("5. Export")
 
         button_load_csv.clicked.connect(self.import_csv)
         button_load_folder.clicked.connect(self.import_folder)
@@ -111,6 +108,7 @@ class DisplayBase(UsesProject, QWidget):
         import_layer.addWidget(button_export)
 
         border_import.setLayout(import_layer)
+        border_import.setMaximumWidth(self.PANEL_WIDTH)
         column_layout.addWidget(border_import, 1)
         column_layout.addSpacing(40)
 
@@ -152,12 +150,11 @@ class DisplayBase(UsesProject, QWidget):
         db_layer.addWidget(button_download_models)
 
         border_db.setLayout(db_layer)
+        border_db.setMaximumWidth(self.PANEL_WIDTH)
         column_layout.addWidget(border_db, 1)
-        column_layout.addSpacing(padding)  # add spacing to right side
         column_layout.addStretch()
         layout.addLayout(column_layout)
-        layout.addSpacing(40)  # add spacing to bottom
-        layout.addStretch()
+        layout.addStretch(1)
 
         self.setStyleSheet("QPushButton, QComboBox { height: 40px; font-size: 16px;}"
                            "#QLabel_Base { font-size: 16px; }")
