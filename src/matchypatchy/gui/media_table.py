@@ -30,6 +30,7 @@ class MediaTable(UsesProject, QAbstractTableModel):
         self.project.data_changed.connect(self.names_written)
 
         self._data_filtered = pd.DataFrame()
+        self._thumbnails = {}  # thumbnail path -> scaled pixmap, see _thumbnail
         self.header_dict = headers
         self._columns = [x[0] for x in headers.values()]
         self._headers = [x[1] for x in headers.values()]
@@ -49,6 +50,23 @@ class MediaTable(UsesProject, QAbstractTableModel):
         name, fetch = lookups[table]
         setattr(self, name, fetch(self.mpDB))
         self.layoutChanged.emit()
+
+    # thumbnails are drawn at most this size, to fit the table's rows
+    THUMBNAIL_CELL = (133, 96)
+
+    def _thumbnail(self, thumbnail_path):
+        """
+        A thumbnail scaled to THUMBNAIL_CELL, read from disk once per load
+
+        data() is called for every repaint of every visible cell, which re-read
+        the file each time. receiveData clears the cache.
+        """
+        pixmap = self._thumbnails.get(thumbnail_path)
+        if pixmap is None:
+            pixmap = QPixmap(str(self.cfg.THUMBNAIL_DIR / thumbnail_path)).scaled(
+                *self.THUMBNAIL_CELL, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self._thumbnails[thumbnail_path] = pixmap
+        return pixmap
 
     def rowCount(self, parent=QModelIndex()):
         return len(self._data_filtered)
@@ -120,13 +138,16 @@ class MediaTable(UsesProject, QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 return None
 
+        # the full path when the cell cuts it short
+        if self._columns[col] == "filepath" and role == Qt.ItemDataRole.ToolTipRole:
+            return self._data_filtered.at[row, "filepath"]
+
         # thumbnail
         if self._columns[col] == "thumbnail_path":
             if role == Qt.ItemDataRole.DecorationRole:
                 thumbnail_path = self._data_filtered.at[row, self._columns[col]]
                 if isinstance(thumbnail_path, str) and thumbnail_path:
-                    pixmap = QPixmap(str(self.cfg.THUMBNAIL_DIR / thumbnail_path))
-                    return pixmap
+                    return self._thumbnail(thumbnail_path)
             # Suppress text display
             if role == Qt.ItemDataRole.DisplayRole:
                 return None
@@ -256,6 +277,8 @@ class MediaTable(UsesProject, QAbstractTableModel):
         selected_ids re-ticks rows by id, since row positions change when the
         data is re-filtered or re-sorted
         """
+        # thumbnails may have been regenerated, eg. after editing a roi
+        self._thumbnails = {}
         self._data_filtered = data
         if headers is not None:
             self.updateHeaderDict(headers)

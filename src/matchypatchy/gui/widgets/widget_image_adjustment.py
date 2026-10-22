@@ -2,7 +2,7 @@
 Image Adjustment Bar Widget for brightness, contrast, sharpness
 """
 
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSlider, QPushButton
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSlider, QPushButton, QSizePolicy
 from PyQt6.QtCore import Qt
 
 
@@ -24,45 +24,56 @@ class ImageAdjustBar(QWidget):
 
         # Layout ---------------------------------------------------------------
         query_image_buttons = QHBoxLayout()
+        query_image_buttons.setContentsMargins(0, 0, 0, 0)
         # Brightness
-        query_image_buttons.addWidget(QLabel("Brightness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(QLabel("Brightness:"))
         self.slider_brightness = QSlider(Qt.Orientation.Horizontal)
         self.slider_brightness.setRange(25, 75)  # Set range from 1 to 100
         self.slider_brightness.setValue(50)  # Set initial value
+        self.slider_brightness.setMinimumWidth(40)
         self.slider_brightness.valueChanged.connect(self.adjust_brightness)
-        query_image_buttons.addWidget(self.slider_brightness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(self.slider_brightness)
         # Contrast
-        query_image_buttons.addWidget(QLabel("Contrast:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(QLabel("Contrast:"))
         self.slider_contrast = QSlider(Qt.Orientation.Horizontal)
         self.slider_contrast.setRange(25, 75)  # Set range from 1 to 100
         self.slider_contrast.setValue(50)  # Set initial value
+        self.slider_contrast.setMinimumWidth(40)
         self.slider_contrast.valueChanged.connect(self.adjust_contrast)
-        query_image_buttons.addWidget(self.slider_contrast, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(self.slider_contrast)
         # Sharpness
-        query_image_buttons.addWidget(QLabel("Sharpness:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(QLabel("Sharpness:"))
         self.slider_sharpness = QSlider(Qt.Orientation.Horizontal)
         self.slider_sharpness.setRange(25, 75)  # Set range from 1 to 100
         self.slider_sharpness.setValue(50)  # Set initial value
+        self.slider_sharpness.setMinimumWidth(40)
         self.slider_sharpness.valueChanged.connect(self.adjust_sharpness)
-        query_image_buttons.addWidget(self.slider_sharpness, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(self.slider_sharpness)
         # Reset
         button_query_image_reset = QPushButton("Reset")
         button_query_image_reset.clicked.connect(self.reset)
-        query_image_buttons.addWidget(button_query_image_reset, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(button_query_image_reset)
         # View Image
-        button_query_image_edit = QPushButton("Edit Image")
+        button_query_image_edit = QPushButton("Edit")
+        button_query_image_edit.setToolTip("Edit this image's metadata and ROI")
         button_query_image_edit.clicked.connect(self.edit_image)
-        query_image_buttons.addWidget(button_query_image_edit, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(button_query_image_edit)
         # Open Image
-        button_query_image_open = QPushButton("Open Image")
+        button_query_image_open = QPushButton("Open")
+        button_query_image_open.setToolTip("Open the image in your image viewer")
         button_query_image_open.clicked.connect(self.open_image)
-        query_image_buttons.addWidget(button_query_image_open, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        query_image_buttons.addWidget(button_query_image_open)
         # favorite
         self.button_favorite = QPushButton("♥")
         self.button_favorite.setFixedWidth(30)
         self.button_favorite.clicked.connect(self.press_favorite)
         query_image_buttons.addWidget(self.button_favorite)
         self.button_favorite.setCheckable(True)
+
+        # buttons only as wide as their text, the style's default minimum is wider
+        for button in (button_query_image_reset, button_query_image_edit, button_query_image_open):
+            button.setMinimumWidth(button.fontMetrics().horizontalAdvance(button.text()) + 20)
+            button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         query_image_buttons.addStretch()
         self.setLayout(query_image_buttons)

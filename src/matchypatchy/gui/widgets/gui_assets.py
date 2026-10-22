@@ -4,7 +4,7 @@ Custom assets for the GUI, such as buttons and separators.
 """
 from PyQt6.QtWidgets import (QFrame, QSizePolicy, QPushButton, QComboBox, QWidget, QTextEdit, QLineEdit, QStyle,
                              QSlider, QLabel, QHBoxLayout, QSpacerItem, QStyledItemDelegate)
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 
@@ -24,6 +24,30 @@ class HorizontalSeparator(QFrame):
         self.setFrameShape(QFrame.Shape.HLine)
         self.setFrameShadow(QFrame.Shadow.Sunken)
         self.setLineWidth(linewidth)
+
+
+class ScaledImageLabel(QLabel):
+    """
+    Label showing an image scaled down smoothly to fit, keeping its aspect ratio
+
+    Never scaled above the image's own size, which would blur it. The label can
+    shrink to minimum_size, so the image doesn't set the window's minimum size.
+    """
+    def __init__(self, filepath, minimum_size=(150, 100)):
+        super().__init__()
+        self._pixmap = QPixmap(filepath)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setMinimumSize(*minimum_size)
+        self.setMaximumSize(self._pixmap.size())
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+    def sizeHint(self):
+        return self._pixmap.size()
+
+    def resizeEvent(self, event):
+        self.setPixmap(self._pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                           Qt.TransformationMode.SmoothTransformation))
+        super().resizeEvent(event)
 
 
 class StandardButton(QPushButton):
@@ -250,21 +274,20 @@ class SequenceSelector(QWidget):
         super().__init__()
 
         layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
         layout.addWidget(QLabel(name))
         self.button_previous = QPushButton("<<")
-        self.button_previous.setMaximumWidth(40)
-        
+        self.button_previous.setMaximumWidth(32)
         layout.addWidget(self.button_previous)
         self.current_number = QLineEdit("1")
-        self.current_number.setFixedWidth(50)
+        self.current_number.setFixedWidth(40)
         layout.addWidget(self.current_number)
         self.total = QLabel("/9")
         layout.addWidget(self.total)
         self.button_next = QPushButton(">>")
-        self.button_next.setMaximumWidth(40)
-        
+        self.button_next.setMaximumWidth(32)
         layout.addWidget(self.button_next)
-        layout.addSpacing(20)
 
     def set_current_number(self, number):
         self.current_number.setText(str(number + 1))
@@ -285,7 +308,6 @@ class SliderWithLabel(QWidget):
         layout = QHBoxLayout(self)
         # text label for the slider value
         self.label = QLabel(label + ": ")
-        self.label.setStyleSheet("border: 1px solid black;")
         layout.addWidget(self.label)
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
@@ -316,6 +338,45 @@ class SliderWithLabel(QWidget):
             self.slider.setValue(value)
             self.slider.blockSignals(False)
             self.slider_value_changed.emit(value)
+
+
+class ElidedLabel(QLabel):
+    """
+    Label that cuts long text from the left to fit, with the full text as its tooltip
+
+    For file paths, whose end is the useful part. Unlike a plain QLabel, long
+    text doesn't make the label, and the window around it, wider.
+    """
+    def __init__(self, text=""):
+        super().__init__()
+        self._full_text = ""
+        self.setMinimumWidth(100)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.setText(text)
+
+    def setText(self, text):
+        self._full_text = str(text)
+        self.setToolTip(self._full_text)
+        self._elide()
+
+    def text(self):
+        return self._full_text
+
+    def resizeEvent(self, event):
+        self._elide()
+        super().resizeEvent(event)
+
+    def _elide(self):
+        """Show as much of the end of the text as fits; called on setText and resize"""
+        shown = self.fontMetrics().elidedText(self._full_text, Qt.TextElideMode.ElideLeft, self.width())
+        super().setText(shown)
+
+
+class ElideLeftDelegate(QStyledItemDelegate):
+    """Delegate that cuts long text from the left, so the end of a file path stays visible"""
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        option.textElideMode = Qt.TextElideMode.ElideLeft
 
 
 class NoHoverDelegate(QStyledItemDelegate):

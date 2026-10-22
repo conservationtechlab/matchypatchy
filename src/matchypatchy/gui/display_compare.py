@@ -8,9 +8,9 @@ import os
 from pathlib import Path
 from PIL import Image
 
-from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSplitter,
                              QHeaderView, QTableWidget, QTableWidgetItem)
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSettings
 from PyQt6.QtGui import QPalette, QColor
 
 from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
@@ -40,6 +40,8 @@ class DisplayCompare(UsesProject, QWidget):
     MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
     FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
     VIEWPOINT_DICT = {0: 'Left', 1: 'Any', 2: 'Right'}
+    MIDDLE_WIDTH = 90  # the Match button column between the images
+    SPLITTER_SETTING = "compare_splitter"  # QSettings key of the image/metadata divider
 
     def __init__(self, parent):
         super().__init__()
@@ -79,30 +81,36 @@ class DisplayCompare(UsesProject, QWidget):
         button_recalc.clicked.connect(self.compare_by_individual)
         first_layer.addWidget(button_recalc)
 
-        # FILTERBAR --------------------------------------------------------------
-        first_layer.addSpacing(10)
-        first_layer.addWidget(VerticalSeparator())
-        self.filterbar = FilterBar(self, 100)
+        first_layer.addStretch()
+        layout.addLayout(first_layer)
+
+        # FILTERBAR, its own row like the media view's ------------------------
+        filter_layer = QHBoxLayout()
+        self.filterbar = FilterBar(self, 140)
         self.filterbar.viewpoint_visible(False)
         self.filterbar.individual_visible(False)
         self.filterbar.unidentified_visible(False)
         self.filterbar.favorites_visible(False)
         self.filterbar.no_roi_visible(False)
 
-        first_layer.addWidget(self.filterbar)
+        filter_layer.addWidget(self.filterbar)
         # get initial filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
 
         button_filter = QPushButton("Apply Filters")
         button_filter.clicked.connect(self.filter_neighbors)
-        first_layer.addWidget(button_filter)
+        filter_layer.addWidget(button_filter)
 
-        first_layer.addStretch()
-        layout.addLayout(first_layer)
+        filter_layer.addStretch()
+        layout.addLayout(filter_layer)
 
         # IMAGE COMPARISON =====================================================
+        # images on top, metadata below, with a divider the user can drag
         image_layout = QHBoxLayout()
+        image_layout.setContentsMargins(0, 0, 0, 0)
+        metadata_layout = QHBoxLayout()
+        metadata_layout.setContentsMargins(0, 0, 0, 0)
         # QUERY ----------------------------------------------------------------
         query_layout = QVBoxLayout()
         query_layout.setSpacing(4)
@@ -118,8 +126,9 @@ class DisplayCompare(UsesProject, QWidget):
         # # Query Number
 
         # Query Selector for selecting the current query image within a sequence
-        self.query_selector = SequenceSelector("Query Image:")
+        self.query_selector = SequenceSelector("Image:")
         query_options.addWidget(self.query_selector)
+        query_options.addSpacing(12)
         self.query_selector.button_previous.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query - 1))
         self.query_selector.button_next.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query + 1))
     
@@ -145,25 +154,35 @@ class DisplayCompare(UsesProject, QWidget):
         # MetaData
         self.query_info = QTableWidget()
         self._set_table(self.query_info)
-        query_layout.addWidget(self.query_info, 1)
-        image_layout.addLayout(query_layout)
+        metadata_layout.addWidget(self.query_info, 1)
+        image_layout.addLayout(query_layout, 1)
 
         # MIDDLE COLUMN --------------------------------------------------------
-        middle_column = QVBoxLayout()
+        middle = QWidget()
+        middle.setFixedWidth(self.MIDDLE_WIDTH)
+        middle_column = QVBoxLayout(middle)
+        middle_column.setContentsMargins(0, 0, 0, 0)
         middle_column.addStretch()
-
-        self.match_counter = QLabel("/9")
-        middle_column.addWidget(self.match_counter, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.button_match = QPushButton("Match")
         self.button_match.pressed.connect(self.press_match_button)
         self.button_match.setCheckable(True)
         self.button_match.setChecked(False)
-        self.button_match.setFixedSize(50, 50)
-        middle_column.addWidget(self.button_match,
-                                alignment=Qt.AlignmentFlag.AlignCenter)
+        self.button_match.setFixedSize(self.MIDDLE_WIDTH, 60)
+        self.button_match.setStyleSheet("QPushButton { font-size: 16px; font-weight: bold; }")
+        middle_column.addWidget(self.button_match, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # which of the query's matches is shown, eg. 2/5, and how similar it is
+        self.match_counter = QLabel("/9")
+        middle_column.addWidget(self.match_counter, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.match_distance = QLabel("Similarity: ")
+        self.match_distance.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.match_distance.setWordWrap(True)
+        middle_column.addWidget(self.match_distance)
         middle_column.addStretch()
-        image_layout.addLayout(middle_column)
+        image_layout.addWidget(middle)
+        # keeps the two metadata tables under their images
+        metadata_layout.addSpacing(self.MIDDLE_WIDTH + 2 * image_layout.spacing())
 
         # MATCH ----------------------------------------------------------------
         match_layout = QVBoxLayout()
@@ -185,16 +204,11 @@ class DisplayCompare(UsesProject, QWidget):
         match_options.addSpacing(20)
 
         # # Match Number
-        self.match_selector = SequenceSelector("Match Image:")
+        self.match_selector = SequenceSelector("Image:")
         self.match_selector.button_previous.clicked.connect(lambda: self.change_match(self.QueryContainer.current_match - 1))
         self.match_selector.button_next.clicked.connect(lambda: self.change_match(self.QueryContainer.current_match + 1))
         match_options.addWidget(self.match_selector)
 
-        # Similarity Label
-        self.match_distance = QLabel("Similarity: ")
-        self.match_distance.setFixedHeight(25)
-        self.match_distance.setStyleSheet("border: 1px solid black;")
-        match_options.addWidget(self.match_distance)
 
         # Toggle match favorites button
         self.button_match_favorites = QPushButton("Show ♥")
@@ -224,10 +238,30 @@ class DisplayCompare(UsesProject, QWidget):
         # MetaData
         self.match_info = QTableWidget()
         self._set_table(self.match_info)
-        match_layout.addWidget(self.match_info, 1)
-        image_layout.addLayout(match_layout)
-        # Add image block to layout
-        layout.addLayout(image_layout)
+        metadata_layout.addWidget(self.match_info, 1)
+        image_layout.addLayout(match_layout, 1)
+
+        images = QWidget()
+        images.setLayout(image_layout)
+        metadata = QWidget()
+        metadata.setLayout(metadata_layout)
+        self.splitter = QSplitter(Qt.Orientation.Vertical)
+        self.splitter.addWidget(images)
+        self.splitter.addWidget(metadata)
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.setHandleWidth(8)
+        self.splitter.setStyleSheet("QSplitter::handle { background: palette(midlight); }")
+        self.splitter.handle(1).setToolTip("Drag to resize the images and details")
+        self.splitter.setStretchFactor(0, 3)
+        self.splitter.setStretchFactor(1, 1)
+        # remember where the user left the divider
+        settings = QSettings("SDZWA", "MatchyPatchy")
+        state = settings.value(self.SPLITTER_SETTING)
+        if state is not None:
+            self.splitter.restoreState(state)
+        self.splitter.splitterMoved.connect(
+            lambda *_: settings.setValue(self.SPLITTER_SETTING, self.splitter.saveState()))
+        layout.addWidget(self.splitter, 1)
 
         # BOTTOM LAYER =========================================================
         # PAIRX DEACTIVATED
@@ -753,13 +787,11 @@ class DisplayCompare(UsesProject, QWidget):
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.setRowCount(6)
         table.setColumnCount(4) 
-        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        table.setColumnWidth(0, 120)
-        table.setColumnWidth(1, 150)
-        table.setColumnWidth(2, 120)
-        table.setMaximumHeight(250)
+        # label columns fit their labels, the two value columns share the rest
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        # the splitter above sets the height; small enough to leave the images room
+        table.setMinimumHeight(150)
         # stretch rows evenly to fill the table height
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setStyleSheet("""
