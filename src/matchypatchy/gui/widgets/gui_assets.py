@@ -274,21 +274,20 @@ class SequenceSelector(QWidget):
         super().__init__()
 
         layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
         layout.addWidget(QLabel(name))
         self.button_previous = QPushButton("<<")
-        self.button_previous.setMaximumWidth(40)
-        
+        self.button_previous.setMaximumWidth(32)
         layout.addWidget(self.button_previous)
         self.current_number = QLineEdit("1")
-        self.current_number.setFixedWidth(50)
+        self.current_number.setFixedWidth(40)
         layout.addWidget(self.current_number)
         self.total = QLabel("/9")
         layout.addWidget(self.total)
         self.button_next = QPushButton(">>")
-        self.button_next.setMaximumWidth(40)
-        
+        self.button_next.setMaximumWidth(32)
         layout.addWidget(self.button_next)
-        layout.addSpacing(20)
 
     def set_current_number(self, number):
         self.current_number.setText(str(number + 1))
@@ -309,7 +308,6 @@ class SliderWithLabel(QWidget):
         layout = QHBoxLayout(self)
         # text label for the slider value
         self.label = QLabel(label + ": ")
-        self.label.setStyleSheet("border: 1px solid black;")
         layout.addWidget(self.label)
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
@@ -340,6 +338,8 @@ class SliderWithLabel(QWidget):
             self.slider.setValue(value)
             self.slider.blockSignals(False)
             self.slider_value_changed.emit(value)
+
+
 class ElidedLabel(QLabel):
     """
     Label that cuts long text from the left to fit, with the full text as its tooltip
@@ -377,8 +377,6 @@ class ElideLeftDelegate(QStyledItemDelegate):
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         option.textElideMode = Qt.TextElideMode.ElideLeft
-
-
 
 
 class NoHoverDelegate(QStyledItemDelegate):
