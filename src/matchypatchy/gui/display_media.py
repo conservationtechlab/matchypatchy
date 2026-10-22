@@ -213,23 +213,21 @@ class DisplayMedia(UsesProject, QWidget):
         if hasattr(self, 'alert_box') and self.alert_box is not None:
             self.alert_box.update_prompt(prompt)
 
-    def hide_progress(self):
-        """Hide the progress bar in the progress popup"""
-        if hasattr(self, 'alert_box') and self.alert_box is not None:
-            self.alert_box.progress_bar.hide()
-
     def update_progress(self, progress):
         """Update the progress bar in the progress popup"""
+        # set_value, not set_counter, which closes the popup once the bar is full
+        # while the table is still being built
         if hasattr(self, 'alert_box') and self.alert_box is not None:
-            self.alert_box.set_counter(progress)
+            self.alert_box.set_value(progress)
 
     def set_progress_max(self, max_value):
-        """Set the maximum value for the progress bar"""
+        """Set the maximum value for the progress bar, 0 shows a busy bar"""
         # connects to FetchTableThread's progress_max signal
         if hasattr(self, 'alert_box') and self.alert_box is not None:
-            self.update_prompt("Collecting missing thumbnails...")
+            self.alert_box.set_min(0)
             self.alert_box.set_max(max_value)
-            self.alert_box.progress_bar.setFormat("%v/%m")   # shows percentage, e.g. 42%
+            self.alert_box.reset_counter()
+            self.alert_box.progress_bar.setFormat("%v/%m")   # shows count, e.g. 42/100
 
     def close_alert(self):
         """Close the alert popup"""
@@ -314,6 +312,8 @@ class DisplayMedia(UsesProject, QWidget):
         """Load media/roi data into table based on current data_type"""
         # check if there are rois first
         self.show_alert("Loading media...")
+        # nothing measurable until the loader starts generating thumbnails
+        self.set_progress_max(0)
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
 
@@ -327,11 +327,13 @@ class DisplayMedia(UsesProject, QWidget):
             del dialog
             return False
         else:
+            # kept above the loader's stage text so it is not overwritten
+            note = ""
             if self.data_type == 1 and roi_n == 0:
                 # no rois, default to full images
                 self.data_type = 0
-                self.update_prompt("No rois found, defaulting to full images.")
-                self.hide_progress()
+                note = "No rois found, defaulting to full images.\n"
+                self.update_prompt(note)
 
                 self.show_type.blockSignals(True)
                 self.show_type.setCurrentIndex(self.data_type)
@@ -350,6 +352,7 @@ class DisplayMedia(UsesProject, QWidget):
             self.dataloader.loaded_data.connect(lambda data, load_id=load_id: self.handle_data_loaded(data, load_id))
             self.dataloader.progress_max.connect(lambda n_missing: self.set_progress_max(n_missing))
             self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
+            self.dataloader.progress_prompt.connect(lambda prompt, note=note: self.update_prompt(note + prompt))
             # Connect the progress popup's rejected signal to stop the query container's calculation
             if hasattr(self, 'alert_box') and self.alert_box:
                 self.alert_box.rejected.connect(self.dataloader.requestInterruption)
@@ -364,7 +367,8 @@ class DisplayMedia(UsesProject, QWidget):
         if loader is None or not loader.isRunning():
             return
         loader.requestInterruption()
-        for signal in (loader.loaded_data, loader.progress_max, loader.progress_update, loader.done):
+        for signal in (loader.loaded_data, loader.progress_max, loader.progress_update,
+                       loader.progress_prompt, loader.done):
             try:
                 signal.disconnect()
             except TypeError:
