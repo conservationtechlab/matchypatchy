@@ -11,6 +11,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from matchypatchy.config import mpConfig
 from matchypatchy.database.mpdb import MatchyPatchyDB
+from matchypatchy.database.lock import ProjectLock
 
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ class Project(QObject):
         super().__init__()
         self._cfg = None
         self._db = None
+        self._lock = None  # check-out lock on the open project's database
 
     @property
     def cfg(self):
@@ -39,30 +41,48 @@ class Project(QObject):
         """Database of the open project, None before the first open()"""
         return self._db
 
-    def open(self, home_dir):
+    def open(self, home_dir, force=False):
         """
         Open the project in home_dir, raise if its database is unusable
 
-        The new project is loaded before the current one is closed, so a failed
-        open leaves the current project open and unchanged.
+        Raises ProjectLockedError if another MatchyPatchy has the database open,
+        force takes over its lock. The new project is loaded before the current
+        one is closed, so a failed open leaves the current project open and unchanged.
         """
         cfg = mpConfig(home_dir)
-        db = MatchyPatchyDB(cfg.DB_DIR)
-        if not db.key:
-            db.close()
-            raise ValueError(f"Database at {cfg.DB_DIR} is invalid.")
+        lock = ProjectLock(cfg.DB_DIR)
+        # reopening the open project keeps its lock, it would otherwise lock itself out
+        reopening = self._lock is not None and self._lock.path.resolve() == lock.path.resolve()
+        if reopening:
+            lock = self._lock
+        else:
+            lock.acquire(force=force)
+        try:
+            db = MatchyPatchyDB(cfg.DB_DIR)
+            if not db.key:
+                db.close()
+                raise ValueError(f"Database at {cfg.DB_DIR} is invalid.")
+        except Exception:
+            if not reopening:
+                lock.release()
+            raise
         db.add_change_listener(self.data_changed.emit)
 
-        old_db = self._db
-        self._cfg, self._db = cfg, db
+        old_db, old_lock = self._db, self._lock
+        self._cfg, self._db, self._lock = cfg, db, lock
         if old_db is not None:
             old_db.close()
+        if old_lock is not None and not reopening:
+            old_lock.release()
         self.changed.emit()
 
     def close(self):
-        """Close the open project's database"""
+        """Close the open project's database and release its lock"""
         if self._db is not None:
             self._db.close()
+        if self._lock is not None:
+            self._lock.release()
+            self._lock = None
 
 
 class UsesProject:
