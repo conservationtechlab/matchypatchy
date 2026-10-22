@@ -40,3 +40,14 @@ class TestCheckMissingThumbnails:
         mpDB = _mpdb([], [(4, str(placeholder))])
         with patch("matchypatchy.database.thumbnails.asset_path", return_value=placeholder):
             assert thumbnails.check_missing_thumbnails(mpDB, tmp_path, data_type=1) == [4]
+
+    def test_absolute_thumbnail_path(self, tmp_path):
+        """Paths that are not plain filenames are checked on disk"""
+        (tmp_path / "abs.jpg").touch()
+        mpDB = _mpdb([], [(5, str(tmp_path / "abs.jpg")), (6, str(tmp_path / "gone.jpg"))])
+        assert thumbnails.check_missing_thumbnails(mpDB, tmp_path, data_type=0) == [6]
+
+    def test_missing_thumbnail_dir(self, tmp_path):
+        """An unreadable thumbnail directory makes every listed thumbnail missing"""
+        mpDB = _mpdb([], [(7, "a.jpg")])
+        assert thumbnails.check_missing_thumbnails(mpDB, tmp_path / "nope", data_type=0) == [7]

@@ -56,7 +56,7 @@ class FilterBar(UsesProject, QWidget):
         layout.addWidget(self.individual_select, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # No ROI Filter
-        self.no_roi = QCheckBox("No ROI")
+        self.no_roi = QCheckBox("Missing/Unspecified ROI")
         self.no_roi.toggled.connect(self.select_no_roi)
         self.no_roi_mids = False
         layout.addWidget(self.no_roi, 0, alignment=Qt.AlignmentFlag.AlignLeft)
