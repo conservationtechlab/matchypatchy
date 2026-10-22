@@ -131,6 +131,7 @@ class DisplayMedia(UsesProject, QWidget):
         self.view.verticalHeader().setDefaultSectionSize(150)  # row size = thumbnail with
         self.view.horizontalHeader().setDefaultSectionSize(80)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
+        self.view.doubleClicked.connect(self.edit_thumbnail)
         self.view.setColumnWidth(0, 30)  # Set the width of the select column
         self.view.setColumnWidth(1, 150)  # Set the width of the thumbnail column
         self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
@@ -619,6 +620,16 @@ class DisplayMedia(UsesProject, QWidget):
         del dialog
         # reload data and update buttons
         self.refresh_table(reload=roi_updated)
+
+    def edit_thumbnail(self, index):
+        """
+        Edit a single row when its thumbnail is double-clicked.
+
+        Connected to the view's doubleClicked signal. Only the thumbnail column opens the
+        popup, double-clicking the editable columns edits them in place instead.
+        """
+        if self.media_table._columns[index.column()] == "thumbnail_path":
+            self.edit_row(index.row())
 
     def edit_row_multiple(self):
         """Edit multiple selected rows"""

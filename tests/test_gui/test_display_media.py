@@ -563,3 +563,28 @@ class TestDelete:
         dm.mpDB.delete.assert_called_once_with(table, "id IN (?, ?)", [10, 12])
         dm.mpDB.delete_emb.assert_not_called()
         dm.load_table.assert_called_once()
+
+
+class TestEditThumbnail:
+    """Double-clicking a thumbnail opens the edit popup for that row"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.dm = _make_display_media()
+        self.dm.media_table._columns = ["select", "thumbnail_path", "filepath", "comment"]
+        self.dm.edit_row = MagicMock()
+
+    def _index(self, row, col):
+        index = MagicMock()
+        index.row.return_value = row
+        index.column.return_value = col
+        return index
+
+    def test_thumbnail_opens_edit_popup(self):
+        self.dm.edit_thumbnail(self._index(3, 1))
+        self.dm.edit_row.assert_called_once_with(3)
+
+    def test_other_columns_do_not_open_popup(self):
+        for col in (0, 2, 3):
+            self.dm.edit_thumbnail(self._index(3, col))
+        self.dm.edit_row.assert_not_called()
