@@ -975,6 +975,8 @@ class TestConfigSaveCancel:
         popup.parent = MagicMock()
         popup.font_size = MagicMock()
         popup._original_font_size = 12
+        popup.theme = MagicMock()
+        popup._original_theme = "System"
         return popup
 
     def test_editing_doesnt_save(self):
@@ -1019,6 +1021,23 @@ class TestConfigSaveCancel:
             ConfigPopup.reject(popup)
         popup.parent.apply_font_size.assert_called_once_with(12)
         popup.parent.save_font_size.assert_not_called()
+
+    def test_save_keeps_theme(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        popup.theme.currentText.return_value = "Dark"
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
+            ConfigPopup.accept(popup)
+        popup.parent.save_theme.assert_called_once_with("Dark")
+
+    def test_cancel_restores_theme(self):
+        """The theme is previewed while it's chosen, so Cancel puts the old one back"""
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.reject", create=True):
+            ConfigPopup.reject(popup)
+        popup.parent.apply_theme.assert_called_once_with("System")
+        popup.parent.save_theme.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

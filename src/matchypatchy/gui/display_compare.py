@@ -10,7 +10,7 @@ from PIL import Image
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QHeaderView, QTableWidget, QTableWidgetItem)
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QEvent, QTimer
 from PyQt6.QtGui import QPalette, QColor
 
 from matchypatchy.gui.widgets.widget_media import MediaWidget, VideoViewer
@@ -774,7 +774,24 @@ class DisplayCompare(UsesProject, QWidget):
             }
         """)
 
+    def changeEvent(self, event):
+        """
+        Recolor the metadata tables when the palette changes, eg. a theme picked in the config
+
+        Qt override, called on the widget for any state change. format_metadata copies
+        the palette's colors into each cell, so without this the tables keep the old
+        theme's colors until the next query or match loads.
+        """
+        if event.type() == QEvent.Type.PaletteChange:
+            for table, info_dict in getattr(self, "_shown_metadata", {}).items():
+                self.format_metadata(table, info_dict)
+        super().changeEvent(event)
+
     def format_metadata(self, table, info_dict):
+        # kept to redraw in the new colors if the theme changes, see changeEvent
+        if not hasattr(self, "_shown_metadata"):
+            self._shown_metadata = {}
+        self._shown_metadata[table] = info_dict
         table.setAlternatingRowColors(False)  # we are doing custom row shading
 
         base = self.palette().color(QPalette.ColorRole.Base)

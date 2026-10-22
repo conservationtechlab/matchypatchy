@@ -215,6 +215,22 @@ class ConfigPopup(UsesProject, QDialog):
         font_layout.addStretch()
         layout.addLayout(font_layout)
 
+        # THEME ----------------------------------------------------------------
+        theme_layout = QHBoxLayout()
+        theme_label = QLabel("Theme:")
+        theme_label.setToolTip("Light or dark colors for all projects. System follows the computer's setting.")
+        theme_label.setFixedWidth(self.label_width)
+        theme_layout.addWidget(theme_label)
+        self.theme = QComboBox()
+        self.theme.setFixedWidth(self.edit_width)
+        self.theme.addItems(list(self.parent.THEMES))
+        self._original_theme = self.parent.theme()
+        self.theme.setCurrentText(self._original_theme)
+        self.theme.currentTextChanged.connect(self.parent.apply_theme)
+        theme_layout.addWidget(self.theme, alignment=Qt.AlignmentFlag.AlignLeft)
+        theme_layout.addStretch()
+        layout.addLayout(theme_layout)
+
         # MPDB KEY -------------------------------------------------------------
         mpdbkey_layout = QHBoxLayout()
         mpdbkey_label = QLabel("Database Key:")
@@ -275,17 +291,19 @@ class ConfigPopup(UsesProject, QDialog):
         return {name: getattr(self.cfg, name) for name in self.SETTINGS}
 
     def accept(self):
-        """Save: write the settings to the project's config file, and the font size to the app's settings"""
+        """Save: write the settings to the project's config file, and the font size and theme to the app's settings"""
         self.cfg.save()
         self.parent.save_font_size(self.font_size.value())
+        self.parent.save_theme(self.theme.currentText())
         logger.info("Configuration saved")
         super().accept()
 
     def reject(self):
-        """Cancel: put back the settings and font size as they were when the dialog opened"""
+        """Cancel: put back the settings, font size and theme as they were when the dialog opened"""
         for name, value in self._original.items():
             setattr(self.cfg, name, value)
         self.parent.apply_font_size(self._original_font_size)
+        self.parent.apply_theme(self._original_theme)
         super().reject()
 
     def show_advanced(self):

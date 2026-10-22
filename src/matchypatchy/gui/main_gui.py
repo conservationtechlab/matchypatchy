@@ -16,7 +16,7 @@ from typing import Optional
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction, QGuiApplication
-from PyQt6.QtCore import QSettings, QTimer
+from PyQt6.QtCore import Qt, QEvent, QSettings, QTimer
 
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
@@ -38,8 +38,17 @@ from matchypatchy.database.filesystem import _is_network_path
 logger = logging.getLogger(__name__)
 
 
+# theme choices in the config, System follows the platform's light/dark setting
+THEMES = {"System": Qt.ColorScheme.Unknown,
+          "Light": Qt.ColorScheme.Light,
+          "Dark": Qt.ColorScheme.Dark}
+
+
 class MainWindow(QMainWindow):
     """Main GUI class for the MatchyPatchy application."""
+
+    THEMES = THEMES  # for ConfigPopup, which can't import this module back
+    _repolishing = False  # set while changeEvent restyles, see there
     def __init__(self):
         super().__init__()
         # Initialize main window settings and components
@@ -51,6 +60,7 @@ class MainWindow(QMainWindow):
             self.system_font_size = 10
         # before the views are built, so they lay out at the saved size
         self.apply_font_size(self.font_size())
+        self.apply_theme(self.theme())
         # the open project, kept for the life of the window; views read cfg and db through it
         self.project = Project()
         # load previous home dir or start fresh, falling back to a default project
@@ -186,6 +196,61 @@ class MainWindow(QMainWindow):
         else:
             self.settings.setValue("font_size", size)
         self.apply_font_size(size)
+
+    # THEME --------------------------------------------------------------------
+    def theme(self):
+        """
+        Saved theme, one of THEMES, "System" if never set or not a known theme
+
+        Read in __init__ and by ConfigPopup to fill its theme field. Stored in
+        QSettings next to the font size, so it's the same across projects.
+        """
+        theme = self.settings.value("theme", "System")
+        return theme if theme in THEMES else "System"
+
+    def apply_theme(self, theme):
+        """
+        Switch the app to a light or dark palette, or back to the system's, without saving it
+
+        Called in __init__ with the saved theme, and by ConfigPopup to preview a theme
+        while it's chosen and to put the old one back on Cancel. Kept separate from
+        save_theme so the preview isn't written until Save. Platforms that can't
+        switch schemes keep the system's.
+        """
+        QApplication.instance().styleHints().setColorScheme(THEMES[theme])
+
+    def save_theme(self, theme):
+        """
+        Apply the theme and keep it for next time, called by ConfigPopup on Save
+
+        "System" clears the setting rather than storing it, like the font size.
+        """
+        if theme == "System":
+            self.settings.remove("theme")
+        else:
+            self.settings.setValue("theme", theme)
+        self.apply_theme(theme)
+
+    def changeEvent(self, event):
+        """
+        Restyle every widget after the palette changes, eg. a new theme or the system's switching
+
+        Qt override, called on the window for any state change. Widgets with a
+        stylesheet (like DisplayBase's buttons, which only set a height and font size)
+        keep the colors they were styled with, so without this they stayed dark in
+        Light mode or light in Dark mode. Restyling can send the window another
+        PaletteChange, hence _repolishing.
+        """
+        if event.type() == QEvent.Type.PaletteChange and not self._repolishing:
+            self._repolishing = True
+            try:
+                for widget in QApplication.allWidgets():
+                    widget.style().unpolish(widget)
+                    widget.style().polish(widget)
+                    widget.update()
+            finally:
+                self._repolishing = False
+        super().changeEvent(event)
 
     # PAGE VIEWS ---------------------------------------------------------------
 
