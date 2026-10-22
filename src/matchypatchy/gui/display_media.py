@@ -220,8 +220,10 @@ class DisplayMedia(UsesProject, QWidget):
 
     def update_progress(self, progress):
         """Update the progress bar in the progress popup"""
+        # set_value, not set_counter, which closes the popup once the bar is full
+        # while the table is still being built
         if hasattr(self, 'alert_box') and self.alert_box is not None:
-            self.alert_box.set_counter(progress)
+            self.alert_box.set_value(progress)
 
     def set_progress_max(self, max_value):
         """Set the maximum value for the progress bar"""
