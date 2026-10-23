@@ -55,13 +55,13 @@ class TestCheckMissingThumbnails:
 
 class TestDecodeScale:
     """Decoding itself is not tested here: conftest stubs out cv2 and Qt"""
-    def test_large_crop_decodes_small(self):
+    def test_large_region_decodes_small(self):
         assert thumbnails._decode_scale(4000, 3000) == 8
 
-    def test_crop_is_kept_at_least_thumbnail_size(self):
+    def test_region_is_kept_at_least_thumbnail_size(self):
         assert thumbnails._decode_scale(799, 400) == 2
         assert thumbnails._decode_scale(800, 400) == 4
 
-    def test_small_or_unknown_crop_decodes_full_size(self):
+    def test_small_or_unknown_region_decodes_full_size(self):
         assert thumbnails._decode_scale(300, 300) == 1
         assert thumbnails._decode_scale(0, 0) == 1

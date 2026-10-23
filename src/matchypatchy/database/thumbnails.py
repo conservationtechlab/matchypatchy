@@ -44,21 +44,23 @@ def read_bytes(filepath):
         return None
 
 
-def load_image(filepath, crop=(1.0, 1.0)):
+def load_image(filepath, detail=(1.0, 1.0)):
     """
-    Load an image file as a BGR array, decoded only as large as the thumbnail needs.
+    Load the whole image file as a BGR array, decoded only as large as the thumbnail needs.
 
-    crop is the (width, height) fraction of the image that will be cut out and shrunk
-    to a thumbnail. JPEGs can be decoded straight to 1/2, 1/4 or 1/8 size, which is far
-    cheaper than a full decode, so the smallest size that still leaves the crop at least
-    THUMBNAIL_SIZE pixels is used. EXIF orientation is ignored, as it was with Qt, so
-    stored bounding boxes still line up with the pixels.
+    The image is never cropped here. detail is the (width, height) fraction of the image
+    that has to keep thumbnail resolution: (1, 1) for a media thumbnail, a roi's
+    (bbox_w, bbox_h) for its thumbnail, which the caller cuts out afterwards. JPEGs can
+    be decoded straight to 1/2, 1/4 or 1/8 size, far cheaper than a full decode, so the
+    smallest size that still leaves that region at least THUMBNAIL_SIZE pixels is used.
+    EXIF orientation is ignored, as it was with Qt, so stored bounding boxes still line
+    up with the pixels.
     """
     data = read_bytes(filepath)
     if data is None:
         return None
     width, height = _image_size(data)
-    scale = _decode_scale(width * crop[0], height * crop[1])
+    scale = _decode_scale(width * detail[0], height * detail[1])
     image = cv2.imdecode(np.frombuffer(data, np.uint8), DECODE_FLAGS[scale] | cv2.IMREAD_IGNORE_ORIENTATION)
     if image is None:
         logger.error(f"Could not decode {filepath} for thumbnail")
@@ -80,27 +82,31 @@ def _image_size(data):
     return max(size.width(), 0), max(size.height(), 0)
 
 
-def _decode_scale(crop_width, crop_height):
+def _decode_scale(region_width, region_height):
     """
-    Largest decode reduction that keeps a crop of this many full-size pixels at least THUMBNAIL_SIZE.
+    Largest decode reduction that keeps a region of this many full-size pixels at least THUMBNAIL_SIZE.
 
     Called by load_image; kept separate so the rule can be tested without decoding images.
     """
-    longest = max(crop_width, crop_height)
+    longest = max(region_width, region_height)
     for scale in (8, 4, 2):
         if longest / scale >= THUMBNAIL_SIZE:
             return scale
     return 1
 
 
-def load_media(filepath, ext, frame=0, crop=(1.0, 1.0)):
-    """Load the given frame of a video, or the image itself, as a BGR array"""
+def load_media(filepath, ext, frame=0, detail=(1.0, 1.0)):
+    """
+    Load the given frame of a video, or the whole image, as a BGR array
+
+    detail sizes the image decode, see load_image; video frames are always full size.
+    """
     if ext in VIDEO_EXT:
         image = read_frame(filepath, frame=frame)
         if image is None:
             logger.error(f"Could not read frame {frame} of {filepath} for thumbnail")
         return image
-    return load_image(filepath, crop=crop)
+    return load_image(filepath, detail=detail)
 
 
 def save_thumbnail(thumbnail_dir, filepath, image):
@@ -138,7 +144,8 @@ def save_media_thumbnail(thumbnail_dir, filepath, ext):
 
 def save_roi_thumbnail(thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox_w, bbox_h):
     """Save thumbnail for ROI given bbox coordinates"""
-    original = load_media(filepath, ext, frame=frame, crop=(bbox_w, bbox_h))
+    # load the whole image, decoded large enough that the box keeps thumbnail resolution
+    original = load_media(filepath, ext, frame=frame, detail=(bbox_w, bbox_h))
     if original is None:
         return str(asset_path(THUMBNAIL_NOTFOUND))
 
