@@ -106,16 +106,6 @@ class ConfigPopup(UsesProject, QDialog):
         self.sequence_duration.setText(str(self.cfg.SEQUENCE_DURATION))
         self.sequence_duration.textChanged.connect(self.update_sequence)
         sequence_layout.addWidget(self.sequence_duration, alignment=Qt.AlignmentFlag.AlignLeft)
-        sequence_layout.addWidget(VerticalSeparator())
-        sequence_n_label = QLabel("Images per Sequence:")
-        sequence_n_label.setFixedWidth(self.label_width)
-        sequence_n_label.setToolTip("Max number of images in each sequence.")
-        sequence_layout.addWidget(sequence_n_label)
-        self.sequence_n = QLineEdit()
-        self.sequence_n.setFixedWidth(self.edit_width)
-        self.sequence_n.setText(str(self.cfg.SEQUENCE_N))
-        self.sequence_n.textChanged.connect(self.update_sequence)
-        sequence_layout.addWidget(self.sequence_n, alignment=Qt.AlignmentFlag.AlignLeft)
         sequence_layout.addStretch()
         layout.addLayout(sequence_layout)
 
@@ -283,7 +273,7 @@ class ConfigPopup(UsesProject, QDialog):
         self._original = self._settings()
 
     # settings this dialog edits
-    SETTINGS = ("KNN", "SEQUENCE_DURATION", "SEQUENCE_N", "SMART_FRAMES",
+    SETTINGS = ("KNN", "SEQUENCE_DURATION", "SMART_FRAMES",
                 "VIDEO_FPS", "N_FRAMES", "DEVICE", "REID_KEY")
 
     def _settings(self):
@@ -323,7 +313,7 @@ class ConfigPopup(UsesProject, QDialog):
         """Show the current project's values, eg. after switching project"""
         self.ml_dir = Path(self.cfg.ML_DIR)
         fields = (self.home_dir, self.visualizer_model, self.nummatches, self.sequence_duration,
-                  self.sequence_n, self.smart_frames, self.video_fps, self.n_frames, self.device)
+                  self.smart_frames, self.video_fps, self.n_frames, self.device)
         # filling the fields must not trigger their save handlers
         for field in fields:
             field.blockSignals(True)
@@ -332,7 +322,6 @@ class ConfigPopup(UsesProject, QDialog):
         self.visualizer_model.setText(str(reid_path))
         self.nummatches.setText(str(self.cfg.KNN))
         self.sequence_duration.setText(str(self.cfg.SEQUENCE_DURATION))
-        self.sequence_n.setText(str(self.cfg.SEQUENCE_N))
         self.smart_frames.setCurrentIndex(0 if self.cfg.SMART_FRAMES else 1)
         self.video_fps.setText(str(self.cfg.VIDEO_FPS))
         self.n_frames.setText(str(self.cfg.N_FRAMES))
@@ -407,11 +396,9 @@ class ConfigPopup(UsesProject, QDialog):
         """Update sequence settings"""
         try:
             duration = int(self.sequence_duration.text())
-            n = int(self.sequence_n.text())
             if duration > 0:
                 self.cfg.SEQUENCE_DURATION = duration
-                self.cfg.SEQUENCE_N = n
-                logger.info(f"Sequence settings updated: duration={duration}, n={n}")
+                logger.info(f"Sequence settings updated: duration={duration}")
         except ValueError:
             pass
 
