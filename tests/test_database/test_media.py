@@ -316,6 +316,18 @@ class TestSaveEdits:
         assert db.select("individual", "id, sex") == [(old, "Male"), (new, "Female")]
         assert db.select("media", "comment") == [("O'Neil saw it",)]
 
+    def test_name_change_sets_reviewed(self, tmp_db):
+        from matchypatchy.database.media import save_edits
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h", ".jpg", "2024-01-01 10:00:00", station)
+        iid = db.add_individual("New")
+        named, unknown = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1), db.add_roi(mid, 0, 0.2, 0.1, 0.1, 0.1, individual_id=iid, reviewed=1)
+        failed = save_edits(db, [self._edit(named, mid, "individual_id", iid), self._edit(unknown, mid, "individual_id", None)],
+                            individual_of=lambda r: None)
+        assert failed == []
+        assert db.select("roi", "id, individual_id, reviewed") == [(named, iid, 1), (unknown, None, 0)]
+
     def test_failed_edit_is_returned(self, tmp_db):
         from matchypatchy.database.media import save_edits
         db, _ = tmp_db

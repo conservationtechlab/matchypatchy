@@ -350,6 +350,9 @@ def _save_edit(mpDB, edit, individual_of, assigned_iids, media_only):
         if iid is None or pd.isna(iid):
             return True  # no individual to update
         return mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
+    # naming a roi reviews it, Unknown unreviews it, same as assign_individual/clear_individual
+    if edit.reference == 'individual_id':
+        replace_dict['reviewed'] = 0 if edit.new_value is None or pd.isna(edit.new_value) else 1
     # roi columns; individual_id and viewpoint may be cleared (Unknown / None)
     saved = mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
     if saved and edit.reference == 'individual_id':
