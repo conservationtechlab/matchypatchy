@@ -77,6 +77,15 @@ class CSVMigrateThread(QThread):
                 if self.isInterruptionRequested():
                     break
 
+                # bank progress updates and commit in batches
+                if roi_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
+                    self.progress_update.emit(roi_counter)
+                    emitted_counter = roi_counter
+                    self.mpDB.db.commit()
+                # count every row up front, so rows skipped below (missing files,
+                # duplicates, rois already imported) still move the progress bar
+                roi_counter += 1
+
                 # get survey id, create if not exists
                 survey_id = self.survey(row.survey_name, row.region_name)
                 # station
@@ -144,7 +153,6 @@ class CSVMigrateThread(QThread):
                 key = roi_key(row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
                 if existing_rois[key] > 0:
                     existing_rois[key] -= 1
-                    roi_counter += 1
                     continue
 
                 # individual
@@ -170,14 +178,6 @@ class CSVMigrateThread(QThread):
                     self.mpDB.add_thumbnail("roi", rid, roi_thumbnail, commit=False)
                     # a roi with a box was already detected, a box-less one still needs the detector
                     self.mpDB.mark_detection_done([media_id], commit=False)
-
-                roi_counter += 1
-
-                # bank progress updates and commit in batches
-                if roi_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
-                    self.progress_update.emit(roi_counter)
-                    emitted_counter = roi_counter
-                    self.mpDB.db.commit()
 
             self.mpDB.db.commit()  # commit anything remaining
 

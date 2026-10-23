@@ -852,6 +852,29 @@ class TestCSVMigrateRerun:
         path.write_bytes(b"a")
         return path
 
+    def test_resume_moves_progress_over_existing_rois(self, tmp_db, null_logger, tmp_path, image):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        rows = [self._row(image, n, box=0.01 * (n + 1)) for n in range(12)]
+        self._migrate(db, parent, rows)
+
+        # every roi is already in the project, the bar still has to reach the end
+        thread = self._migrate(db, parent, rows)
+
+        assert db.count("roi") == 12
+        assert thread.progress_update.calls == [(10,), (12,)]
+
+    def test_skipped_rows_move_progress(self, tmp_db, null_logger, tmp_path, image):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        missing = tmp_path / "imgs" / "gone.jpg"
+        rows = [self._row(missing, n) for n in range(3)] + [self._row(image, 3)]
+
+        thread = self._migrate(db, parent, rows)
+
+        assert thread.error_update.calls == [([str(missing)] * 3,)]
+        assert thread.progress_update.calls == [(4,)]
+
     def test_existing_upload_is_reused(self, tmp_db, null_logger, tmp_path, image):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
