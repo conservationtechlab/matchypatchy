@@ -1153,3 +1153,36 @@ class TestThumbnailQueue:
             queue.add("media", fid, lambda: barrier.wait() and "t.jpg")
         queue.finish()
         queue.close()
+
+
+class TestCSVImportFiles:
+    """_files must give what iterating the groupby gave, it replaces that loop"""
+
+    def _data(self):
+        return pd.DataFrame({
+            "filepath": ["c.jpg", "a.jpg", "c.jpg", None, "b.jpg", "a.jpg"],
+            "station": ["S1", "S2", "S1", "S3", pd.NA, "S2"],
+            "frame": [0, 1, 2, 3, 4, 5],
+            "bbox_x": [0.1, float("nan"), 0.3, 0.4, 0.5, 0.6],
+            "timestamp": pd.to_datetime(["2024-01-01"] * 6),
+        })
+
+    def _expected(self, grouped):
+        return [(filepath, group.head(1).to_dict(orient="records")[0], list(group.itertuples(index=False)))
+                for filepath, group in grouped]
+
+    @pytest.mark.parametrize("sort", [True, False])
+    def test_matches_groupby(self, tmp_db, null_logger, tmp_path, sort):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        grouped = self._data().groupby("filepath", sort=sort)
+        thread = import_thread.CSVImportThread(parent, grouped, {}, "Default Survey")
+
+        files = thread._files()
+
+        expected = self._expected(grouped)
+        assert [f[0] for f in files] == [e[0] for e in expected]
+        for (_, exemplar, rois), (_, expected_exemplar, expected_rois) in zip(files, expected):
+            # compare as strings so nan == nan
+            assert {k: str(v) for k, v in exemplar.items()} == {k: str(v) for k, v in expected_exemplar.items()}
+            assert [str(r) for r in rois] == [str(r) for r in expected_rois]

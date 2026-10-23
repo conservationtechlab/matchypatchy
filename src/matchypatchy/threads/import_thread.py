@@ -404,14 +404,15 @@ class CSVImportThread(QThread):
         self.progress_message.emit("Starting import...")
 
         # get common base directory for all images
-        base_dir = self._get_base_dir(list(self.unique_images.groups.keys()))
+        files = self._files()
+        base_dir = self._get_base_dir([filepath for filepath, _, _ in files])
         try:
             base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir={sql_text(base_dir)}')[0][0]
         except IndexError:
             base_dir_id = self.mpDB.add_upload(base_dir)
 
         try:
-            for filepath, group in self.unique_images:
+            for filepath, exemplar, rois in files:
                 if self.isInterruptionRequested():
                     break
 
@@ -427,8 +428,6 @@ class CSVImportThread(QThread):
                 # Calculate the SHA256 hash of the file
                 hash = get_sha256(filepath)
 
-                # get remaining information
-                exemplar = group.head(1).to_dict(orient='records')[0]
                 # timestamp
                 timestamp = exemplar.get(self.selected_columns["timestamp"])
 
@@ -463,9 +462,9 @@ class CSVImportThread(QThread):
                     thumbnails.add("media", media_id, save_media_thumbnail, self.thumbnail_dir, filepath, ext)
 
                 # add rois
-                for roi in group.itertuples(index=False):
+                for roi in rois:
                     # frame number for videos, else 1 if image
-                    frame = roi.frame if "frame" in group.columns else 0
+                    frame = roi.frame if "frame" in roi._fields else 0
 
                     # convert old md bbox format if present, else look for new bbox format, else add filterable empties
                     if "bbox1" in roi._fields:
@@ -553,6 +552,37 @@ class CSVImportThread(QThread):
         if not self.isInterruptionRequested():
             # finished adding media
             self.finished.emit()
+
+    def _files(self):
+        """
+        List (filepath, exemplar, rois) for each file, in the order iterating the groupby gives.
+
+        Called once by run() in place of iterating self.unique_images. Iterating a groupby
+        builds a DataFrame per file, and calling to_dict/itertuples on each small frame cost
+        several ms per file, most of a CSV import's time. One itertuples over the whole table,
+        grouped in Python, gives the same rows. exemplar is the file's first row keyed by column
+        name, as group.head(1).to_dict(orient='records')[0] gave; rois are its rows as
+        namedtuples, as group.itertuples(index=False) gave.
+        """
+        data = self.unique_images.obj
+        key = self.unique_images.keys
+        key = key[0] if isinstance(key, list) else key
+        rows = {}
+        for filepath, row in zip(data[key], data.itertuples(index=False)):
+            # groupby leaves out rows without a filepath
+            if self.unique_images.dropna and pd.isna(filepath):
+                continue
+            rows.setdefault(filepath, []).append(row)
+        filepaths = sorted(rows) if self.unique_images.sort else rows
+        return [(filepath, self._exemplar(data.columns, rows[filepath][0]), rows[filepath]) for filepath in filepaths]
+
+    def _exemplar(self, columns, row):
+        """
+        A file's first row as a dict keyed by column name, with pd.NA read as None like to_dict gives.
+
+        Called by _files; kept separate so the NA rule sits apart from the grouping.
+        """
+        return {column: None if value is pd.NA else value for column, value in zip(columns, row)}
 
     def _get_base_dir(self, filepaths):
         """Get the common base directory for a list of filepaths"""
