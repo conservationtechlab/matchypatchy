@@ -13,7 +13,7 @@ from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail, THUMBNAIL_NOTFOUND
-from matchypatchy.database.media import get_sha256
+from matchypatchy.database.media import get_sha256, native_relative_path
 from matchypatchy.database.mpdb import sql_text
 
 
@@ -261,7 +261,9 @@ class CSVMigrateThread(QThread):
             return None
 
         full_path = Path(filepath)
-        rel_path = Path(relative_path)
+        # relative_path keeps the separators of the OS that exported it, so "1\a.jpg" from
+        # Windows has to be split as two parts on Linux, or the base keeps its first folder
+        rel_path = Path(native_relative_path(relative_path))
         base_dir = Path(*full_path.parts[:-len(rel_path.parts)])
 
         # reuse the upload if this directory is already in the project, else add it

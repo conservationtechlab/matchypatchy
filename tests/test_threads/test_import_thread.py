@@ -941,6 +941,15 @@ class TestCSVMigrateRerun:
         assert thread.error_update.calls == [([str(missing)] * 3,)]
         assert thread.progress_update.calls == [(4,)]
 
+    def test_windows_relative_path_gives_the_base_above_it(self, tmp_db, null_logger, tmp_path, image):
+        """An export from Windows has relative paths like "imgs\\a.jpg", which must split on Linux too"""
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+
+        self._migrate(db, parent, [self._row(image, 0, relative_path="imgs\\a.jpg")])
+
+        assert db.select("uploads", columns="base_dir") == [(str(tmp_path),)]
+
     def test_existing_upload_is_reused(self, tmp_db, null_logger, tmp_path, image):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
