@@ -133,9 +133,12 @@ def _panel(data):
     from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
     panel = MagicMock()
     panel.data = data
+    panel.ids = data["id"].tolist()
     panel.individuals = pd.DataFrame({"name": ["Spot", "Spot"], "sex": ["F", "M"]}, index=[3, 4])
     panel._roi_rows = lambda: MetadataPanel._roi_rows(panel)
+    panel._name_offset = lambda: MetadataPanel._name_offset(panel)
     panel._name_index = lambda iid: MetadataPanel._name_index(panel, iid)
+    panel._selected_iid = lambda: MetadataPanel._selected_iid(panel)
     return panel
 
 
@@ -149,7 +152,7 @@ class TestMetadataPanel:
         """Two individuals named Spot: picking the second assigns id 4"""
         from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
         panel = _panel(_edit_rows())
-        panel.name.currentIndex.return_value = 2
+        panel.name.currentIndex.return_value = 3  # multi-row list: Mixed, Unknown, Spot, Spot
         MetadataPanel.change_name(panel)
         edits = [c.args[0] for c in panel.send_edit.call_args_list]
         assert [(e.rid, e.new_value) for e in edits] == [(10, 4)]  # video row skipped
@@ -175,7 +178,7 @@ class TestMetadataPanel:
     def test_sex_edit_is_sent(self):
         from matchypatchy.gui.dialogs.popup_media_edit import MetadataPanel
         panel = _panel(_edit_rows())
-        panel.name.currentIndex.return_value = 1
+        panel.name.currentIndex.return_value = 2  # multi-row list: Mixed, Unknown, Spot, Spot
         panel.sex.currentText.return_value = 'Male'
         MetadataPanel.change_sex(panel)
         assert [(c.args[0].rid, c.args[0].new_value) for c in panel.send_edit.call_args_list] == [(10, 'Male')]
@@ -207,7 +210,7 @@ class TestMetadataPanel:
             fill.return_value.exec.return_value = True
             MetadataPanel.new_individual(panel)
         panel.mpDB.edit_row.assert_not_called()   # assignment goes through the edit stack
-        panel.name.setCurrentIndex.assert_called_once_with(2)
+        panel.name.setCurrentIndex.assert_called_once_with(3)  # after Mixed, Unknown and Spot (3)
 
 
 class TestPopupFavorite:
