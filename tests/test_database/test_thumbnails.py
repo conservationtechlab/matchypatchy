@@ -1,5 +1,5 @@
 """
-Tests for check_missing_thumbnails in matchypatchy.database.thumbnails
+Tests for matchypatchy.database.thumbnails
 """
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -51,3 +51,17 @@ class TestCheckMissingThumbnails:
         """An unreadable thumbnail directory makes every listed thumbnail missing"""
         mpDB = _mpdb([], [(7, "a.jpg")])
         assert thumbnails.check_missing_thumbnails(mpDB, tmp_path / "nope", data_type=0) == [7]
+
+
+class TestDecodeScale:
+    """Decoding itself is not tested here: conftest stubs out cv2 and Qt"""
+    def test_large_crop_decodes_small(self):
+        assert thumbnails._decode_scale(4000, 3000) == 8
+
+    def test_crop_is_kept_at_least_thumbnail_size(self):
+        assert thumbnails._decode_scale(799, 400) == 2
+        assert thumbnails._decode_scale(800, 400) == 4
+
+    def test_small_or_unknown_crop_decodes_full_size(self):
+        assert thumbnails._decode_scale(300, 300) == 1
+        assert thumbnails._decode_scale(0, 0) == 1
