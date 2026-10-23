@@ -393,19 +393,15 @@ class MetadataPanel(UsesProject, QWidget):
         metadata_layout.addSpacing(int(self.vertical_gap / 2))
 
         # Editable fields
-        self.name = QComboBox()
         name_layout = QHBoxLayout()
-        name_label = QLabel("Name: ")
-        name_label.setFixedWidth(self.horizontal_gap)
-        name_layout.addWidget(name_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        name_layout.addWidget(self.name, stretch=1)
+        self.name = self._add_metadata_field(name_layout, "Name: ", QComboBox(),
+                                             is_editable=True, on_change=self.change_name, stretch=True)
         self.add_individual = QPushButton("+")
         self.add_individual.pressed.connect(self.new_individual)
         name_layout.addWidget(self.add_individual)
-        self.name.currentIndexChanged.connect(self.change_name)
+
         metadata_layout.addLayout(name_layout)
         metadata_layout.addSpacing(self.vertical_gap)
-
         self.sex = self._add_metadata_field(metadata_layout, "Sex: ", QComboBox(),
                                             is_editable=True, on_change=self.change_sex, stretch=True)
 
@@ -465,31 +461,20 @@ class MetadataPanel(UsesProject, QWidget):
 
         # update lists
         self.individuals = fetch_individual(self.mpDB)
-        self.name.clear()
-        self.name_list = ["Unknown"] + list(self.individuals["name"])
-        self.name.addItems(self.name_list)
-        self.timestamp_data.setText(str(self.data.iloc[current_image_index]["timestamp"]))
         survey_info = fetch_station_names_from_id(self.mpDB,
                                                   self.data.iloc[current_image_index]["station_id"],
                                                   self.data.iloc[current_image_index]["camera_id"])
+        # set the text of the read-only fields
         self.station_data.setText(str(survey_info['station_name']))
         self.survey_data.setText(str(survey_info["survey_name"]))
         self.region_data.setText(str(survey_info["region_name"]))
         self.camera_data.setText(str(survey_info["camera_name"]))
+        self.timestamp_data.setText(str(self.data.iloc[current_image_index]["timestamp"]))
         self.sequence_data.setText(str(self.data.iloc[current_image_index]["sequence_id"]))
         self.external_data.setText(str(self.data.iloc[current_image_index]["external_id"]))
 
         if self.data_type == 1:
-            # Name
-            iid = self.data.iloc[current_image_index]["individual_id"] if {"individual_id"}.issubset(self.data.columns) else 0
-            if iid == 0 or iid is None or pd.isna(iid):
-                # media only, no individual column
-                self.name.setCurrentIndex(0)
-                self.sex.setDisabled(True)
-            else:
-                self.name.setCurrentIndex(self._name_index(iid))
-                self.sex.setDisabled(False)
-
+            self.set_name_combobox(current_image_index)
             self.set_sex_combobox(current_image_index)
             self.set_viewpoint_combobox(current_image_index)
 
@@ -511,30 +496,99 @@ class MetadataPanel(UsesProject, QWidget):
         self.viewpoint.blockSignals(False)
         self.comment.blockSignals(False)
 
+    def _name_offset(self):
+        """
+        Position of the first individual in the name list, after '— Mixed —' (multiple rows) and 'Unknown'
+
+        Shared by _name_index, _selected_iid and change_name so the list layout
+        from set_name_combobox is decided in one place.
+        """
+        return 2 if len(self.ids) > 1 else 1
+
     def _name_index(self, iid):
-        """Position of an individual in the name list (by id, names may repeat), 0 Unknown"""
+        """Position of an individual in the name list (by id, names may repeat), Unknown if not found"""
+        offset = self._name_offset()
         positions = list(self.individuals.index)
-        return positions.index(int(iid)) + 1 if int(iid) in positions else 0
+        return positions.index(int(iid)) + offset if int(iid) in positions else offset - 1
+
+    def _selected_iid(self):
+        """
+        Id of the individual selected in the name list, None for Mixed/Unknown
+
+        By position, not text, since names may repeat or be 'Unknown'. Used by
+        change_name and change_sex. Returns a python int, sqlite can't bind numpy ints.
+        """
+        position = self.name.currentIndex() - self._name_offset()
+        return int(self.individuals.index[position]) if position >= 0 else None
 
     def _roi_rows(self):
         """Rows with a roi, skipping the full video row"""
         return [row for row in self.data.itertuples() if not pd.isna(row.id)]
+
+    def _unique_roi_values(self, column):
+        """
+        Distinct values of a column over the roi rows, empty values included
+
+        Used by the set_*_combobox methods to decide between a single value and
+        '— Mixed —'. Skips the full video row (no roi, always empty) so a video
+        with one roi isn't shown as Mixed.
+        """
+        if column not in self.data.columns:
+            return []
+        return self.data.loc[self.data["id"].notna(), column].unique()
 
     def send_edit(self, edit):
         """Send edit to parent popup"""
         self.edit_signal.emit(edit)
 
     # Set Boxes -------------------------------------------------------------
+    def set_name_combobox(self, current_image_index):
+        """Set the name combobox based on the current image index."""
+        self.name.clear()
+
+        if len(self.ids) > 1:
+            self.name_list = ["— Mixed —", 'Unknown'] + list(self.individuals["name"])
+            self.name.addItems(self.name_list)
+            unique_ids = self._unique_roi_values("individual_id")
+            if len(unique_ids) == 0:
+                self.name.setCurrentIndex(self.name.findText('Unknown'))
+                self.sex.setDisabled(True)
+            elif len(unique_ids) == 1:
+                iid = unique_ids[0]
+                if iid == 0 or iid is None or pd.isna(iid):
+                    self.name.setCurrentIndex(self.name.findText('Unknown'))
+                    self.sex.setDisabled(True)
+                else:
+                    self.name.setCurrentIndex(self._name_index(iid))
+                    self.sex.setDisabled(False)
+            else:
+                self.name.setCurrentIndex(0)  # '— Mixed —'
+                self.sex.setDisabled(True)
+
+        else:  # single image
+            self.name_list = ['Unknown'] + list(self.individuals["name"])
+            self.name.addItems(self.name_list)
+            iid = self.data.iloc[current_image_index]["individual_id"] if {"individual_id"}.issubset(self.data.columns) else 0
+            if iid == 0 or iid is None or pd.isna(iid):
+                self.name.setCurrentIndex(0)
+                self.sex.setDisabled(True)
+            else:
+                self.name.setCurrentIndex(self._name_index(iid))
+                self.sex.setDisabled(False)
+
     def set_sex_combobox(self, current_image_index):
         """Set the sex combobox based on the current image index."""
         self.sex.clear()
         if len(self.ids) > 1:
             self.sex.addItems(['— Mixed —', 'Unknown', 'Male', 'Female'])
-            unique_sexes = self.data["sex"].dropna().unique() if {"sex"}.issubset(self.data.columns) else []
+            unique_sexes = self._unique_roi_values("sex")
             if len(unique_sexes) == 0:
                 self.sex.setCurrentIndex(self.sex.findText('Unknown'))
             elif len(unique_sexes) == 1:
                 sex_text = unique_sexes[0]
+                # empty is its own value for Mixed, shown as Unknown
+                if sex_text is None or pd.isna(sex_text):
+                    sex_text = 'Unknown'
                 self.sex.setCurrentIndex(self.sex.findText(str(sex_text)))
             else:
                 self.sex.setCurrentIndex(0)  # '— Mixed —'
@@ -551,11 +605,12 @@ class MetadataPanel(UsesProject, QWidget):
         self.viewpoint.clear()
         if len(self.ids) > 1:
             self.viewpoint.addItems(['— Mixed —'] + list(self.VIEWPOINTS.values())[1:])  # skip 'any'
-            unique_viewpoints = self.data["viewpoint"].dropna().unique() if {"viewpoint"}.issubset(self.data.columns) else []
+            unique_viewpoints = self._unique_roi_values("viewpoint")
             if len(unique_viewpoints) == 0:
                 self.viewpoint.setCurrentIndex(self.viewpoint.findText('None'))
             elif len(unique_viewpoints) == 1:
-                viewpoint_key = str(unique_viewpoints[0])
+                # empty is its own value for Mixed, shown as None (str(nan) isn't a key)
+                viewpoint_key = 'None' if pd.isna(unique_viewpoints[0]) else str(unique_viewpoints[0])
                 viewpoint_text = self.VIEWPOINTS[viewpoint_key]
                 self.viewpoint.setCurrentIndex(self.viewpoint.findText(str(viewpoint_text)))
             else:
@@ -574,20 +629,17 @@ class MetadataPanel(UsesProject, QWidget):
     # Edits --------------------------------------------------------------------
     def change_name(self):
         """Update the name for all selected ROIs."""
-        if self.name.currentIndex() > 0:
-            # by position, names may repeat
-            iid = int(self.individuals.index[self.name.currentIndex() - 1])
-            for row in self._roi_rows():
-                edit = EditObject(rid=row.id,
-                                  mid=row.media_id,
-                                  reference='individual_id',
-                                  previous_value=row.individual_id,
-                                  new_value=iid)
-                self.send_edit(edit)
 
-            self.sex.setCurrentIndex(self.sex.findText(str(self.individuals.loc[iid, 'sex'])))
-            self.sex.setDisabled(False)
-        else:
+        # by position, names may repeat or be 'Unknown'/'— Mixed —'
+        position = self.name.currentIndex()
+        offset = self._name_offset()
+
+        # do nothing if the selection is '— Mixed —', it is not a value
+        if offset == 2 and position == 0:
+            return
+
+        # if the selection is 'Unknown', remove the individual assignment from the selected ROIs
+        elif position == offset - 1:
             dialog = AlertPopup(self, "Are you sure you want to set the name to 'Unknown'?\nThis will remove the ID assignment from the selected ROI(s).")
             if dialog.exec():
                 for row in self._roi_rows():
@@ -599,6 +651,19 @@ class MetadataPanel(UsesProject, QWidget):
                     self.send_edit(edit)
             self.sex.setCurrentIndex(0)
             self.sex.setDisabled(True)
+        # if the selection is a valid individual, update the individual assignment for the selected ROIs
+        else:
+            iid = self._selected_iid()
+            for row in self._roi_rows():
+                edit = EditObject(rid=row.id,
+                                  mid=row.media_id,
+                                  reference='individual_id',
+                                  previous_value=row.individual_id,
+                                  new_value=iid)
+                self.send_edit(edit)
+
+            self.sex.setCurrentIndex(self.sex.findText(str(self.individuals.loc[iid, 'sex'])))
+            self.sex.setDisabled(False)
 
     def change_sex(self):
         """Update sex for all selected ROIs."""
@@ -606,7 +671,8 @@ class MetadataPanel(UsesProject, QWidget):
         # '— Mixed —' only shows the selection differs, it is not a value
         if self.sex.currentText() == '— Mixed —':
             return
-        if self.name.currentIndex() > 0:
+        # must be a valid selection, not 'Unknown' or '— Mixed —'
+        if self._selected_iid() is not None:
             for row in self._roi_rows():
                 edit = EditObject(rid=row.id,
                                   mid=row.media_id,
