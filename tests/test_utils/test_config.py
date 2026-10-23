@@ -49,11 +49,6 @@ class TestMpConfigInit:
         cfg = mpConfig(home)
         assert cfg.SEQUENCE_DURATION == 60
 
-    def test_default_sequence_n(self, tmp_path):
-        home = tmp_path / "project"
-        cfg = mpConfig(home)
-        assert cfg.SEQUENCE_N == 3
-
     def test_device_is_string(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
@@ -101,7 +96,7 @@ class TestMpConfigSaveLoad:
             data = yaml.safe_load(f)
         for key in ("DB_DIR", "ML_DIR", "THUMBNAIL_DIR", "VIDEO_FPS",
                     "N_FRAMES", "SMART_FRAMES", "KNN", "SEQUENCE_DURATION",
-                    "SEQUENCE_N", "DEVICE"):
+                    "DEVICE"):
             assert key in data, f"Expected key {key!r} in saved config"
 
     def test_load_restores_knn(self, tmp_path):
@@ -192,9 +187,9 @@ class TestMpConfigUpdate:
     def test_update_does_not_clobber_other_keys(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
-        original_seq_n = cfg.SEQUENCE_N
+        original_duration = cfg.SEQUENCE_DURATION
         cfg.update({"KNN": 77})
-        assert cfg.SEQUENCE_N == original_seq_n
+        assert cfg.SEQUENCE_DURATION == original_duration
 
 
 # ---------------------------------------------------------------------------
@@ -215,13 +210,6 @@ class TestMpConfigSetDefault:
         cfg.SMART_FRAMES = 99
         cfg.set_default()
         assert cfg.SMART_FRAMES == True
-
-    def test_set_default_resets_sequence_n(self, tmp_path):
-        home = tmp_path / "project"
-        cfg = mpConfig(home)
-        cfg.SEQUENCE_N = 99
-        cfg.set_default()
-        assert cfg.SEQUENCE_N == 3
 
     def test_set_default_resets_fps(self, tmp_path):
         home = tmp_path / "project"

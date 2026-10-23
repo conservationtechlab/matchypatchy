@@ -34,7 +34,6 @@ class mpConfig():
         self.DETECTOR_KEY = None
         self.KNN = 100
         self.SEQUENCE_DURATION = 60
-        self.SEQUENCE_N = 3
         # Check if CUDA is available and set DEVICE accordingly
         providers = animl.get_onnx_device(quiet=True)
         if "CUDAExecutionProvider" in providers:
@@ -74,7 +73,6 @@ class mpConfig():
                 self.DETECTOR_KEY = cfg.get('DETECTOR_KEY', None)
                 self.KNN = cfg.get('KNN', 100)
                 self.SEQUENCE_DURATION = cfg.get('SEQUENCE_DURATION', 60)
-                self.SEQUENCE_N = cfg.get('SEQUENCE_N', 3)
                 self.DEVICE = cfg.get('DEVICE', "CPUExecutionProvider")
 
         # config file not found, save the current defaults
@@ -103,7 +101,6 @@ class mpConfig():
             'DETECTOR_KEY': self.DETECTOR_KEY,
             'KNN': self.KNN,
             'SEQUENCE_DURATION': self.SEQUENCE_DURATION,
-            'SEQUENCE_N': self.SEQUENCE_N,
             'DEVICE': self.DEVICE,
         }
         with open(self.CONFIG_PATH, 'w') as cfg_file:
@@ -124,7 +121,6 @@ class mpConfig():
         self.DETECTOR_KEY = None
         self.KNN = 100
         self.SEQUENCE_DURATION = 60
-        self.SEQUENCE_N = 3
         if "CUDAExecutionProvider" in animl.get_onnx_device(quiet=True):
             self.DEVICE = "CUDAExecutionProvider"
         else:
