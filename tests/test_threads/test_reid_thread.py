@@ -122,6 +122,15 @@ class TestGetViewpointBatching:
 
         assert [call[1] for call in db.edit_row_calls] == [0, 2]
 
+    def test_progress_reaches_end_when_last_files_fail(self, monkeypatch):
+        """Skipped rois still move the bar, it stalled below 100 when the last files were unreadable"""
+        thread, db = _make_thread(monkeypatch, n_rois=4, unreadable={"/img_2.jpg", "/img_3.jpg"})
+        thread.rois.loc[0, "bbox_x"] = -1
+
+        thread.get_viewpoint()
+
+        assert thread.progress_update.calls == [(0,), (25,), (50,), (75,), (100,)]
+
     def test_skips_when_no_viewpoint_model_selected(self, monkeypatch):
         thread, db = _make_thread(monkeypatch, n_rois=3)
         thread.viewpoint_filepath = None
@@ -151,3 +160,5 @@ class TestGetEmbeddings:
 
         assert db.add_emb_calls == [0, 2]
         assert thread.failed == {"/img_1.jpg"}
+        # the unreadable roi still moved the bar, and it ends full
+        assert thread.progress_update.calls == [(0,), (33,), (67,), (100,)]
