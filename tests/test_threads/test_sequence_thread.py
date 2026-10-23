@@ -26,7 +26,7 @@ class FakeDB:
 def _thread(monkeypatch, rows, flag=True):
     media = pd.DataFrame(rows, columns=["id", "station_id", "camera_id", "timestamp", "sequence_id"])
     monkeypatch.setattr(sequence_thread, "fetch_media", lambda _db: media.copy())
-    cfg = SimpleNamespace(SEQUENCE_DURATION=60, SEQUENCE_N=10)
+    cfg = SimpleNamespace(SEQUENCE_DURATION=60)
     return SequenceThread(FakeDB(), cfg, flag)
 
 
@@ -66,7 +66,7 @@ def test_cancel_stops_writing_sequences(monkeypatch):
 def test_media_is_loaded_in_run_not_on_the_gui_thread(monkeypatch):
     fetches = []
     monkeypatch.setattr(sequence_thread, "fetch_media", lambda _db: fetches.append(1))
-    cfg = SimpleNamespace(SEQUENCE_DURATION=60, SEQUENCE_N=10)
+    cfg = SimpleNamespace(SEQUENCE_DURATION=60)
 
     SequenceThread(FakeDB(), cfg, True)
 

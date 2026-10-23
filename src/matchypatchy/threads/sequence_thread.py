@@ -28,7 +28,6 @@ class SequenceThread(QThread):
         self.mpDB = mpDB
         self.flag = flag
         self.max_time = timedelta(seconds=int(cfg.SEQUENCE_DURATION))
-        self.max_n = int(cfg.SEQUENCE_N)
         self.media = None  # loaded in run(), off the GUI thread
 
     def run(self):
@@ -45,12 +44,11 @@ class SequenceThread(QThread):
                 if self.isInterruptionRequested():
                     return
                 if current_sequence:
-                    # station and camera are the same, timestamp under threshold, n under threshold
+                    # station and camera are the same, timestamp under threshold
                     # images without a camera each get their own sequence
                     if (image['station_id'] == current_sequence[0]['station_id']) and \
                         same_camera(image['camera_id'], current_sequence[0]['camera_id']) and \
-                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
-                        (len(current_sequence) < self.max_n):
+                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time):
                         current_sequence.append(image)
                     else:
                         # bank the current sequence and start a new group
