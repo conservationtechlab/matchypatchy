@@ -420,7 +420,8 @@ class TestSave:
     def test_clearing_a_value_is_saved(self):
         """Setting a name to Unknown or viewpoint to None stores NULL instead of being refused"""
         dm, _ = self._save([_edit(10, 1, "individual_id", None), _edit(10, 1, "viewpoint", None)])
-        dm.mpDB.edit_row.assert_any_call("roi", 10, {"individual_id": None}, allow_none=True)
+        # Unknown also unreviews the roi
+        dm.mpDB.edit_row.assert_any_call("roi", 10, {"individual_id": None, "reviewed": 0}, allow_none=True)
         dm.mpDB.edit_row.assert_any_call("roi", 10, {"viewpoint": None}, allow_none=True)
         assert dm.edit_stack == []
 

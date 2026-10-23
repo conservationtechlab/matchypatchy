@@ -73,9 +73,9 @@ class TestSaveChanges:
         assert dc.edit_stack == []
 
     def test_clearing_a_value_is_allowed(self):
-        """Setting a name to Unknown stores NULL"""
+        """Setting a name to Unknown stores NULL and unreviews the roi"""
         dc = self._save([self._edit(5, 2, "individual_id", None)])
-        dc.mpDB.edit_row.assert_called_once_with("roi", 5, {"individual_id": None}, allow_none=True)
+        dc.mpDB.edit_row.assert_called_once_with("roi", 5, {"individual_id": None, "reviewed": 0}, allow_none=True)
 
     def test_comment_goes_to_media_by_media_id(self):
         dc = self._save([self._edit(None, 2, "comment", "hi")])
