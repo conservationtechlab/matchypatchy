@@ -385,3 +385,9 @@ def uploads_with_media_counts(mpDB):
     return mpDB.query("""SELECT uploads.id, uploads.base_dir, uploads.created_at, COUNT(media.id)
                          FROM uploads LEFT JOIN media ON media.base_dir_id = uploads.id
                          GROUP BY uploads.id;""") or []
+
+def rois_without_embeddings(mpDB):
+    """Ids of rois that have no embeddings"""
+    rows = mpDB.query("""SELECT DISTINCT roi.id FROM roi
+                         WHERE roi.emb = 0;""")
+    return [row[0] for row in rows or []]
