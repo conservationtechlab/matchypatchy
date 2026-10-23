@@ -1,4 +1,6 @@
 """Tests for matchypatchy thread workers in import_thread.py."""
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -748,6 +750,24 @@ class TestImportFailuresAreReported:
         assert thread.import_failed.calls == [("boom",)]
         assert thread.finished.calls == []
 
+    def test_thumbnail_failure_rolls_back_import(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        """An exception on a thumbnail worker reaches the import thread and fails the import"""
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        file_path = tmp_path / "a.jpg"
+        file_path.write_bytes(b"a")
+        data = pd.DataFrame([{"filepath": str(file_path), "datetime": "2024-01-01 12:00:00"}])
+        thread = import_thread.FolderImportThread(parent, (1,), data, station_level=0, camera_level=0)
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", self._boom)
+        thread.import_failed = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert thread.import_failed.calls == [("boom",)]
+        assert db.count("media") == 0
+
     def test_csv_migrate(self, tmp_db, null_logger, tmp_path, monkeypatch):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
@@ -1079,3 +1099,57 @@ class TestFileReplacedAtSamePath:
         assert thread.error_update.calls == [([str(a)],)]
         assert db.select("media", columns="relative_path") == [("a.jpg",), ("b.jpg",)]
         assert db.select("roi", columns="media_id, bbox_x") == [(1, 0.1), (2, 0.4)]
+
+
+class FakeThumbnailDB:
+    """Records add_thumbnail calls, noting which thread made them"""
+    def __init__(self):
+        self.rows = []
+        self.threads = set()
+
+    def add_thumbnail(self, table, fid, filepath, commit=True):
+        self.threads.add(threading.get_ident())
+        self.rows.append((table, fid, filepath))
+
+
+class TestThumbnailQueue:
+    def test_rows_recorded_in_order_from_calling_thread(self):
+        db = FakeThumbnailDB()
+        queue = import_thread.ThumbnailQueue(db, workers=4)
+        for fid in range(50):
+            # later work finishes first, rows must still be in order
+            queue.add("media", fid, lambda n: time.sleep((50 - n) / 10000) or f"{n}.jpg", fid)
+        queue.finish()
+        queue.close()
+
+        assert db.rows == [("media", fid, f"{fid}.jpg") for fid in range(50)]
+        assert db.threads == {threading.get_ident()}
+
+    def test_pending_work_is_bounded(self):
+        db = FakeThumbnailDB()
+        queue = import_thread.ThumbnailQueue(db, workers=2)
+        for fid in range(20):
+            queue.add("roi", fid, str, fid)
+            assert len(queue.pending) <= 2 * queue.PENDING_PER_WORKER
+        queue.finish()
+        queue.close()
+        assert len(db.rows) == 20
+
+    def test_worker_exception_raised_on_record(self):
+        def fail():
+            raise RuntimeError("bad image")
+
+        queue = import_thread.ThumbnailQueue(FakeThumbnailDB(), workers=1)
+        queue.add("media", 1, fail)
+        with pytest.raises(RuntimeError, match="bad image"):
+            queue.finish()
+        queue.close()
+
+    def test_work_runs_in_parallel(self):
+        barrier = threading.Barrier(3, timeout=5)
+        queue = import_thread.ThumbnailQueue(FakeThumbnailDB(), workers=3)
+        for fid in range(3):
+            # each worker waits for the other two, which deadlocks (and times out) if run one at a time
+            queue.add("media", fid, lambda: barrier.wait() and "t.jpg")
+        queue.finish()
+        queue.close()

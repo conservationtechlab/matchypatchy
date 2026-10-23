@@ -4,7 +4,8 @@ QThreads for Importing Data
 """
 import os
 import logging
-from collections import Counter
+from collections import Counter, deque
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 
 from pathlib import Path
@@ -28,6 +29,49 @@ def count_existing_rois(mpDB, media_id):
     rows = mpDB.select("roi", columns="frame, bbox_x, bbox_y, bbox_w, bbox_h",
                        row_cond=f'media_id={media_id}')
     return Counter(roi_key(*row) for row in rows or [])
+
+
+class ThumbnailQueue:
+    """
+    Make thumbnails on a pool of worker threads, recording each in the database once it is saved.
+
+    Used by CSVMigrateThread, CSVImportThread and FolderImportThread in place of calling
+    save_media_thumbnail/save_roi_thumbnail directly. Decoding images is nearly all the
+    time an import spends per file and OpenCV releases the GIL while decoding, so files
+    are decoded side by side. The database connection belongs to the import thread, so
+    workers only save files: add() queues the work and the add_thumbnail rows are written
+    from the import thread, as add() waits for the oldest work or when finish() is called.
+    Kept as a class rather than inlined so the three imports share the bounded queue and
+    the rule that finish() must run before the final commit.
+    """
+    # queued work per worker, enough to keep workers busy without decoding far ahead of the database
+    PENDING_PER_WORKER = 2
+
+    def __init__(self, mpDB, workers=None):
+        self.mpDB = mpDB
+        self.workers = workers or min(8, os.cpu_count() or 1)
+        self.pool = ThreadPoolExecutor(self.workers, thread_name_prefix="thumbnail")
+        self.pending = deque()
+
+    def add(self, table, fid, save, *args):
+        """Save a thumbnail with save(*args) in the background and record it for fid in table"""
+        self.pending.append((table, fid, self.pool.submit(save, *args)))
+        while len(self.pending) > self.workers * self.PENDING_PER_WORKER:
+            self._record_oldest()
+
+    def finish(self):
+        """Wait for all queued thumbnails and record them, call before the final commit"""
+        while self.pending:
+            self._record_oldest()
+
+    def close(self):
+        """Stop the workers, dropping thumbnails not yet started, eg. after an import fails"""
+        self.pool.shutdown(wait=True, cancel_futures=True)
+
+    def _record_oldest(self):
+        """Wait for the oldest queued thumbnail and add its row; a worker's exception is raised here"""
+        table, fid, future = self.pending.popleft()
+        self.mpDB.add_thumbnail(table, fid, future.result(), commit=False)
 
 
 # CSV MIGRATE ==================================================================
@@ -71,6 +115,7 @@ class CSVMigrateThread(QThread):
     def run(self):
         roi_counter = 0  # progressbar counter
         emitted_counter = 0  # last value emitted, to batch signal emission
+        thumbnails = ThumbnailQueue(self.mpDB)
 
         try:
             for row in self.data.itertuples(index=False):
@@ -127,8 +172,8 @@ class CSVMigrateThread(QThread):
                         self.existing_roi_ref[media_id] = count_existing_rois(self.mpDB, media_id)
                     else:
                         # save thumbnail for new media
-                        media_thumbnail = save_media_thumbnail(self.thumbnail_dir, row.filepath, row.ext)
-                        self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
+                        thumbnails.add("media", media_id, save_media_thumbnail,
+                                       self.thumbnail_dir, row.filepath, row.ext)
                         self.existing_roi_ref[media_id] = Counter()
                     self.media_ref[hash] = media_id
 
@@ -165,9 +210,8 @@ class CSVMigrateThread(QThread):
                                         commit=False)
                 # save thumbnail for new roi, a box-less one has nothing to crop
                 if bbox_w != -1:
-                    roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, row.filepath, row.ext,
-                                                       row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                    self.mpDB.add_thumbnail("roi", rid, roi_thumbnail, commit=False)
+                    thumbnails.add("roi", rid, save_roi_thumbnail, self.thumbnail_dir, row.filepath, row.ext,
+                                   row.frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     # a roi with a box was already detected, a box-less one still needs the detector
                     self.mpDB.mark_detection_done([media_id], commit=False)
 
@@ -179,6 +223,7 @@ class CSVMigrateThread(QThread):
                     emitted_counter = roi_counter
                     self.mpDB.db.commit()
 
+            thumbnails.finish()
             self.mpDB.db.commit()  # commit anything remaining
 
         except Exception as error:
@@ -187,6 +232,8 @@ class CSVMigrateThread(QThread):
             logger.exception("Import failed")
             self.import_failed.emit(str(error))
             return
+        finally:
+            thumbnails.close()
 
         # make sure the progress bar reaches its true final value
         if emitted_counter != roi_counter:
@@ -353,6 +400,7 @@ class CSVImportThread(QThread):
     def run(self):
         roi_counter = 0  # progressbar counter
         emitted_counter = 0  # last value emitted, to batch signal emission
+        thumbnails = ThumbnailQueue(self.mpDB)
         self.progress_message.emit("Starting import...")
 
         # get common base directory for all images
@@ -412,8 +460,7 @@ class CSVImportThread(QThread):
                 # save thumbnail for new media
                 else:
                     existing_rois = Counter()
-                    media_thumbnail = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
-                    self.mpDB.add_thumbnail("media", media_id, media_thumbnail, commit=False)
+                    thumbnails.add("media", media_id, save_media_thumbnail, self.thumbnail_dir, filepath, ext)
 
                 # add rois
                 for roi in group.itertuples(index=False):
@@ -474,9 +521,8 @@ class CSVImportThread(QThread):
                                                commit=False)
                     # save thumbnails
                     if bbox_w != -1:
-                        roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir, filepath, ext,
-                                                           frame, bbox_x, bbox_y, bbox_w, bbox_h)
-                        self.mpDB.add_thumbnail("roi", roi_id, str(roi_thumbnail), commit=False)
+                        thumbnails.add("roi", roi_id, save_roi_thumbnail, self.thumbnail_dir, filepath, ext,
+                                       frame, bbox_x, bbox_y, bbox_w, bbox_h)
                         # a roi with a box was already detected, a box-less one still needs the detector
                         self.mpDB.mark_detection_done([media_id], commit=False)
 
@@ -488,6 +534,7 @@ class CSVImportThread(QThread):
                         emitted_counter = roi_counter
                         self.mpDB.db.commit()
 
+            thumbnails.finish()
             self.mpDB.db.commit()  # commit anything remaining
 
         except Exception as error:
@@ -496,6 +543,8 @@ class CSVImportThread(QThread):
             logger.exception("Import failed")
             self.import_failed.emit(str(error))
             return
+        finally:
+            thumbnails.close()
 
         # make sure the progress bar reaches its true final value
         if emitted_counter != roi_counter:
@@ -750,6 +799,7 @@ class FolderImportThread(QThread):
     def run(self):
         file_counter = 0  # progressbar counter
         emitted_counter = 0  # last value emitted, to batch signal emission
+        thumbnails = ThumbnailQueue(self.mpDB)
 
         try:
             # get base directory for the files being imported
@@ -806,8 +856,7 @@ class FolderImportThread(QThread):
                     logger.warning(f"A different file is already in the project at {filepath}, skipping import...")
                 # save thumbnail, unless the file was already imported or failed to add
                 elif media_id not in ("duplicate_hash", None):
-                    thumbnail_path = save_media_thumbnail(self.thumbnail_dir, filepath, ext)
-                    self.mpDB.add_thumbnail("media", media_id, thumbnail_path, commit=False)
+                    thumbnails.add("media", media_id, save_media_thumbnail, self.thumbnail_dir, filepath, ext)
 
                 # bank progress updates and commit in batches
                 if file_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
@@ -815,6 +864,7 @@ class FolderImportThread(QThread):
                     emitted_counter = file_counter
                     self.mpDB.db.commit()
 
+            thumbnails.finish()
             self.mpDB.db.commit()  # commit anything remaining
 
         except Exception as error:
@@ -823,6 +873,8 @@ class FolderImportThread(QThread):
             logger.exception("Import failed")
             self.import_failed.emit(str(error))
             return
+        finally:
+            thumbnails.close()
 
         # make sure the progress bar reaches its true final value
         if emitted_counter != file_counter:
