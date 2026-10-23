@@ -403,6 +403,52 @@ class TestCSVImportThread:
         assert db.count("roi") == 2
         assert thread.progress_update.calls[-1] == (2,)
 
+    def _progress_run(self, parent, rows, monkeypatch):
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        thread = import_thread.CSVImportThread(parent, pd.DataFrame(rows).groupby("filepath", sort=False),
+                                               self._selected_columns(), "Default Survey")
+        thread.progress_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+        return thread
+
+    def _progress_row(self, path):
+        return {"filepath": str(path), "timestamp": "2024-01-01 10:00:00", "station": "Station A",
+                "bbox_x": 0.1, "bbox_y": 0.1, "bbox_w": 0.2, "bbox_h": 0.2}
+
+    def test_resume_moves_progress_over_existing_rois(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        rows = []
+        for n in range(12):
+            path = tmp_path / "imgs" / f"{n}.jpg"
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(str(n).encode())
+            rows.append(self._progress_row(path))
+        self._progress_run(parent, rows, monkeypatch)
+
+        # every roi is already in the project, the bar still has to reach the end
+        thread = self._progress_run(parent, rows, monkeypatch)
+
+        assert db.count("roi") == 12
+        assert thread.progress_update.calls == [(10,), (12,)]
+
+    def test_missing_files_move_progress(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        image = tmp_path / "imgs" / "a.jpg"
+        image.parent.mkdir()
+        image.write_bytes(b"a")
+        missing = tmp_path / "imgs" / "gone.jpg"
+        rows = [self._progress_row(missing)] * 3 + [self._progress_row(image)]
+
+        thread = self._progress_run(parent, rows, monkeypatch)
+
+        assert db.count("roi") == 1
+        assert thread.progress_update.calls == [(4,)]
+
     def test_rerun_without_bboxes_adds_only_missing_rois(self, tmp_db, null_logger, tmp_path, monkeypatch):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
