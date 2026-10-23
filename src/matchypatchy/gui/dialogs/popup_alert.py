@@ -29,21 +29,32 @@ class AlertPopup(QDialog):
             layout.addWidget(self.progress_bar)
 
         # buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttonBox.accepted.connect(self.accept)
-        buttonBox.rejected.connect(self.reject)
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
 
         # disable OK button if cancel_only
         if cancel_only:
-            ok_button = buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+            ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
             ok_button.setEnabled(False)  # Disable the OK button
 
-        layout.addWidget(buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.buttonBox, alignment=Qt.AlignmentFlag.AlignCenter)
         self.setLayout(layout)
 
     def update_prompt(self, prompt):
         """Update the prompt text"""
         self.prompt.setText(prompt)
+
+    def allow_ok(self):
+        """
+        Enable OK and disable Cancel once the work behind a cancel_only popup is done.
+
+        Called by DisplayBase._finish_processing when processing ends with errors: the popup
+        stays open to show them and is closed with OK, since Cancel would only try to
+        cancel work that has already finished.
+        """
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Cancel).setEnabled(False)
 
     def set_min(self, min):
         """Update the progress bar maximum value"""

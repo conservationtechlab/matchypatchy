@@ -934,6 +934,25 @@ class TestProcessingSteps:
         DisplayBase._start_reid(base)
         base.miew_thread.start.assert_called_once()
 
+    def test_errors_keep_popup_open_with_ok(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = {"a.jpg"}
+        base.miew_thread.failed = {"a.jpg", "b.jpg"}
+        DisplayBase._finish_processing(base)
+        assert "2 file(s)" in base._process_dialog.update_prompt.call_args[0][0]
+        base._process_dialog.allow_ok.assert_called_once()
+        base._process_dialog.accept.assert_not_called()
+
+    def test_no_errors_closes_popup(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = set()
+        base.miew_thread.failed = set()
+        DisplayBase._finish_processing(base)
+        base._process_dialog.accept.assert_called_once()
+        base._process_dialog.allow_ok.assert_not_called()
+
     def test_model_not_downloaded_stops_before_processing(self):
         from matchypatchy.gui.display_base import DisplayBase
         base = MagicMock()
