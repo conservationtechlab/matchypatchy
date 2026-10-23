@@ -22,8 +22,10 @@ THUMBNAIL_SIZE = 200
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
 JPEG_QUALITY = 75  # Qt's default, which thumbnails were saved with before
 # OpenCV flags that decode straight to 1/scale of the full size
-DECODE_FLAGS = {1: cv2.IMREAD_COLOR, 2: cv2.IMREAD_REDUCED_COLOR_2,
-                4: cv2.IMREAD_REDUCED_COLOR_4, 8: cv2.IMREAD_REDUCED_COLOR_8}
+DECODE_FLAGS = {1: cv2.IMREAD_COLOR,
+                2: cv2.IMREAD_REDUCED_COLOR_2,
+                4: cv2.IMREAD_REDUCED_COLOR_4,
+                8: cv2.IMREAD_REDUCED_COLOR_8}
 
 logger = logging.getLogger(__name__)
 

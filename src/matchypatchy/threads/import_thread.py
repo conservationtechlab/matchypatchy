@@ -412,12 +412,13 @@ class CSVImportThread(QThread):
     def run(self):
         roi_counter = 0  # progressbar counter
         emitted_counter = 0  # last value emitted, to batch signal emission
-        last_commit = time.monotonic()
+        last_commit = time.monotonic()  # time of last commit, to commit on an interval
         thumbnails = ThumbnailQueue(self.mpDB)
         self.progress_message.emit("Starting import...")
 
-        # get common base directory for all images
+        # group files by filepath, get exemplar and rois for each file
         files = self._files()
+        # get common base directory for all images
         base_dir = self._get_base_dir([filepath for filepath, _, _ in files])
         try:
             base_dir_id = self.mpDB.select("uploads", columns="id", row_cond=f'base_dir={sql_text(base_dir)}')[0][0]
