@@ -15,7 +15,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
 
 from matchypatchy.database.location import survey_names
-from matchypatchy.database.media import clear_project_data
+from matchypatchy.database.media import clear_project_data, rois_without_embeddings
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy.gui.dialogs.popup_individual import IndividualPopup
@@ -373,6 +373,13 @@ class DisplayBase(UsesProject, QWidget):
     # STEP 4: Match Button
     def match(self):
         """Open compare view to match ROIs"""
+        # check that the user has processed the images first
+        if len(rois_without_embeddings(self.mpDB)) > 0:
+            dialog = AlertPopup(self, "There are rois without embeddings. They will be ignored until processed.")
+            if dialog.exec() == QDialog.DialogCode.Rejected:
+                return
+            del dialog
+
         self.parent._set_compare_view()
 
     # STEP 5: Export Button
