@@ -946,6 +946,20 @@ class TestCSVMigrateRerun:
         assert tables.count("survey") == 1
 
 
+class CommitCounter:
+    """Wraps a sqlite connection, counting commits"""
+    def __init__(self, connection):
+        self._connection = connection
+        self.commits = 0
+
+    def commit(self):
+        self.commits += 1
+        self._connection.commit()
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
 class TestFolderImportCaching:
     def test_station_and_camera_are_looked_up_once(self, tmp_db, null_logger, tmp_path, monkeypatch):
         db, _ = tmp_db
@@ -985,6 +999,10 @@ class TestFolderImportCaching:
         data = pd.DataFrame({"filepath": paths, "datetime": ["2024-01-01 12:00:00"] * 12})
         thread = import_thread.FolderImportThread(parent, (1,), data, station_level=0, camera_level=0)
         monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        # no interval passes during the import, so only the setup rows and the final commit commit
+        monkeypatch.setattr(thread, "COMMIT_INTERVAL", 3600)
+        connection = CommitCounter(db.db)
+        monkeypatch.setattr(db.local, "db", connection)
         thread.progress_update = SignalSpy()
         thread.finished = SignalSpy()
         thread.isInterruptionRequested = lambda: False
@@ -993,6 +1011,7 @@ class TestFolderImportCaching:
 
         assert db.count("media") == 12
         assert thread.progress_update.calls == [(10,), (12,)]
+        assert connection.commits < 12
 
 
 class TestCSVMigrateInsertFailures:

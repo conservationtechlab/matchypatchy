@@ -4,6 +4,7 @@ QThreads for Importing Data
 """
 import os
 import logging
+import time
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
@@ -80,8 +81,12 @@ class CSVMigrateThread(QThread):
     error_update = pyqtSignal(list)  # Signal to update the error log
     import_failed = pyqtSignal(str)  # Signal to report a fatal import error
 
-    # How many ROIs to process between progress signal emissions and commits.
+    # How many ROIs to process between progress signal emissions.
     PROGRESS_BATCH_SIZE = 10
+    # Seconds between commits. Each commit waits for the disk (~15 ms), so committing with
+    # every progress update cost more than adding the rows; a short interval keeps the write
+    # lock from being held long. An interrupted import is resumed by importing again.
+    COMMIT_INTERVAL = 1.0
 
     EXPECTED_COLUMNS = {'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                         'reviewed', 'media_id', 'individual_id', 'emb', 'base_dir_id',
@@ -115,6 +120,7 @@ class CSVMigrateThread(QThread):
     def run(self):
         roi_counter = 0  # progressbar counter
         emitted_counter = 0  # last value emitted, to batch signal emission
+        last_commit = time.monotonic()
         thumbnails = ThumbnailQueue(self.mpDB)
 
         try:
@@ -217,11 +223,13 @@ class CSVMigrateThread(QThread):
 
                 roi_counter += 1
 
-                # bank progress updates and commit in batches
+                # bank progress updates in batches, commit on an interval
                 if roi_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
                     self.progress_update.emit(roi_counter)
                     emitted_counter = roi_counter
+                if time.monotonic() - last_commit >= self.COMMIT_INTERVAL:
                     self.mpDB.db.commit()
+                    last_commit = time.monotonic()
 
             thumbnails.finish()
             self.mpDB.db.commit()  # commit anything remaining
@@ -381,6 +389,10 @@ class CSVImportThread(QThread):
     # How many ROIs to process between progress signal emissions.
     # Raising this reduces cross-thread signal overhead on large imports.
     PROGRESS_BATCH_SIZE = 10
+    # Seconds between commits. Each commit waits for the disk (~15 ms), so committing with
+    # every progress update cost more than adding the rows; a short interval keeps the write
+    # lock from being held long. An interrupted import is resumed by importing again.
+    COMMIT_INTERVAL = 1.0
 
     def __init__(self, parent, unique_images, selected_columns, active_survey):
         super().__init__()
@@ -400,6 +412,7 @@ class CSVImportThread(QThread):
     def run(self):
         roi_counter = 0  # progressbar counter
         emitted_counter = 0  # last value emitted, to batch signal emission
+        last_commit = time.monotonic()
         thumbnails = ThumbnailQueue(self.mpDB)
         self.progress_message.emit("Starting import...")
 
@@ -527,11 +540,13 @@ class CSVImportThread(QThread):
 
                     roi_counter += 1
 
-                    # bank progress updates and commit in batches
+                    # bank progress updates in batches, commit on an interval
                     if roi_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
                         self.progress_update.emit(roi_counter)
                         emitted_counter = roi_counter
+                    if time.monotonic() - last_commit >= self.COMMIT_INTERVAL:
                         self.mpDB.db.commit()
+                        last_commit = time.monotonic()
 
             thumbnails.finish()
             self.mpDB.db.commit()  # commit anything remaining
@@ -810,8 +825,12 @@ class FolderImportThread(QThread):
     progress_update = pyqtSignal(int)  # Signal to update the progress bar
     import_failed = pyqtSignal(str)  # Signal to report a fatal import error
 
-    # How many files to process between progress signal emissions and commits.
+    # How many files to process between progress signal emissions.
     PROGRESS_BATCH_SIZE = 10
+    # Seconds between commits. Each commit waits for the disk (~15 ms), so committing with
+    # every progress update cost more than adding the rows; a short interval keeps the write
+    # lock from being held long. An interrupted import is resumed by importing again.
+    COMMIT_INTERVAL = 1.0
 
     def __init__(self, parent, active_survey, data, station_level, camera_level):
         super().__init__()
@@ -829,6 +848,7 @@ class FolderImportThread(QThread):
     def run(self):
         file_counter = 0  # progressbar counter
         emitted_counter = 0  # last value emitted, to batch signal emission
+        last_commit = time.monotonic()
         thumbnails = ThumbnailQueue(self.mpDB)
 
         try:
@@ -888,11 +908,13 @@ class FolderImportThread(QThread):
                 elif media_id not in ("duplicate_hash", None):
                     thumbnails.add("media", media_id, save_media_thumbnail, self.thumbnail_dir, filepath, ext)
 
-                # bank progress updates and commit in batches
+                # bank progress updates in batches, commit on an interval
                 if file_counter - emitted_counter >= self.PROGRESS_BATCH_SIZE:
                     self.progress_update.emit(file_counter)
                     emitted_counter = file_counter
+                if time.monotonic() - last_commit >= self.COMMIT_INTERVAL:
                     self.mpDB.db.commit()
+                    last_commit = time.monotonic()
 
             thumbnails.finish()
             self.mpDB.db.commit()  # commit anything remaining

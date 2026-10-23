@@ -435,6 +435,7 @@ class TestFolderImportCamera:
         thread.default_station = None
         thread._default_station = lambda survey_id: FolderImportThread._default_station(thread, survey_id)
         thread.PROGRESS_BATCH_SIZE = FolderImportThread.PROGRESS_BATCH_SIZE
+        thread.COMMIT_INTERVAL = FolderImportThread.COMMIT_INTERVAL
         thread.active_survey = (1, "S")
         thread.isInterruptionRequested.return_value = False
         thread.mpDB.select.return_value = [(1,)]
