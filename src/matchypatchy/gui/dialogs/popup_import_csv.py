@@ -282,6 +282,8 @@ class ImportCSVPopup(UsesProject, QDialog):
         """
         # one import at a time; re-enabled when it reports back
         self.okButton.setEnabled(False)
+        self._cancel_pending = False  # Cancel pressed once, waiting for a second press
+        self._cancelled = False  # stop requested, report it when the thread ends
         # assert bbox in manifest.columns
         self.progress_bar.show()
         self.progress_bar.setTextVisible(True)
@@ -294,6 +296,7 @@ class ImportCSVPopup(UsesProject, QDialog):
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.error_update.connect(self.show_errors)  # Connect error signal
             self.import_thread.import_failed.connect(self.show_import_failed)
+            self.import_thread.finished.connect(self.import_finished)
             self.import_thread.start()
             return
 
@@ -307,7 +310,7 @@ class ImportCSVPopup(UsesProject, QDialog):
             self.import_thread.progress_update.connect(self.progress_bar.setValue)
             self.import_thread.progress_message.connect(self.show_message)  # Connect progress message signal
             self.import_thread.import_failed.connect(self.show_import_failed)
-            self.import_thread.finished.connect(self.close)
+            self.import_thread.finished.connect(self.import_finished)
             self.import_thread.start()
 
     def show_import_failed(self, message):
@@ -316,9 +319,8 @@ class ImportCSVPopup(UsesProject, QDialog):
         This method is connected to the import_failed signal of the CSVImportThread.
         """
         # QThread.finished still fires when run() returns, keep the popup open
-        # (only the csv import closes on finished, not migrate)
         try:
-            self.import_thread.finished.disconnect(self.close)
+            self.import_thread.finished.disconnect(self.import_finished)
         except TypeError:
             pass
         self.progress_bar.hide()
@@ -352,11 +354,37 @@ class ImportCSVPopup(UsesProject, QDialog):
         self.progress_label.show()
         self.progress_label.setText(message)
 
+    def import_finished(self):
+        """
+        The import thread ended: close after a csv import, or say where a cancelled import stopped.
+
+        Connected to QThread.finished in import_manifest. A finished migrate is reported by
+        show_errors and a failed import by show_import_failed (which disconnects this), so
+        here only a cancel needs reporting; without it the bar just froze and the popup
+        looked stuck.
+        """
+        if getattr(self, "_cancelled", False):
+            self.label.setText(f"Import stopped after {self.progress_bar.value()} of {self.progress_bar.maximum()} "
+                               "rows. Rows imported so far are kept, import the same file again to resume.")
+            self.progress_label.hide()
+            self.buttonBox.accepted.disconnect(self.import_manifest)
+            self.buttonBox.accepted.connect(self.close)
+            self.okButton.setEnabled(True)
+        elif not self.migrate:
+            self.close()
+
     def reject(self):
-        """Handle the rejection of the dialog, interrupting any ongoing downloads."""
-        # interrupt download if in progress, otherwise just close
+        """Cancel: close, or while importing ask in the popup and stop on a second press"""
         if getattr(self, "import_thread", None) is not None and self.import_thread.isRunning():
+            # once OK is disabled, focus moves to Cancel and a stray space would press it
+            if not getattr(self, "_cancel_pending", False):
+                self._cancel_pending = True
+                self.label.setText("Press Cancel again to stop the import. Rows imported so far are kept, "
+                                   "and importing the same file again resumes where it stopped.")
+                return
+            self._cancelled = True
+            self.label.setText("Stopping the import...")
             self.import_thread.requestInterruption()
-            # optional: don't close immediately; wait for thread to finish
+            # import_finished reports where it stopped once the thread has ended
             return
         super().reject()

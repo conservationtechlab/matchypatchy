@@ -361,6 +361,58 @@ class TestImportFolderTimezone:
         assert self._timezone(db, db.add_survey("S", region, None, None)) == "America/Los_Angeles"
 
 
+class TestImportCSVCancel:
+    """Space can press Cancel once OK is disabled, so stopping takes a second press and is reported"""
+
+    def _popup(self, running=True):
+        popup = MagicMock()
+        popup.import_thread.isRunning.return_value = running
+        popup._cancel_pending = False
+        popup._cancelled = False
+        return popup
+
+    def test_first_cancel_only_asks(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup()
+        ImportCSVPopup.reject(popup)
+        popup.import_thread.requestInterruption.assert_not_called()
+        assert "Press Cancel again" in popup.label.setText.call_args[0][0]
+
+    def test_second_cancel_stops_the_import(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup()
+        ImportCSVPopup.reject(popup)
+        ImportCSVPopup.reject(popup)
+        popup.import_thread.requestInterruption.assert_called_once()
+        assert popup._cancelled is True
+
+    def test_stopped_import_is_reported_and_ok_closes(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup._cancelled = True
+        popup.progress_bar.value.return_value = 120
+        popup.progress_bar.maximum.return_value = 400
+        ImportCSVPopup.import_finished(popup)
+        assert "stopped after 120 of 400 rows" in popup.label.setText.call_args[0][0]
+        popup.buttonBox.accepted.connect.assert_called_once_with(popup.close)
+        popup.okButton.setEnabled.assert_called_once_with(True)
+        popup.close.assert_not_called()
+
+    def test_finished_csv_import_closes(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup.migrate = False
+        ImportCSVPopup.import_finished(popup)
+        popup.close.assert_called_once()
+
+    def test_finished_migrate_stays_open_for_its_report(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup.migrate = True
+        ImportCSVPopup.import_finished(popup)
+        popup.close.assert_not_called()
+
+
 class TestImportFolderCancel:
     def test_cancel_during_import_stops_it_and_waits(self):
         from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
