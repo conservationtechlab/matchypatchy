@@ -7,10 +7,11 @@ from pathlib import Path
 import uuid
 
 import cv2
+import numpy as np
 import pandas as pd
 
-from PyQt6.QtGui import QImage
-from PyQt6.QtCore import Qt, QRect
+from PyQt6.QtGui import QImage, QImageReader
+from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
 
 from matchypatchy.config import asset_path
 
@@ -19,49 +20,116 @@ THUMBNAIL_NOTFOUND = "graphics/thumbnail_notfound.png"
 THUMBNAIL_NOBBOX = "graphics/thumbnail_nobbox.png"
 THUMBNAIL_SIZE = 200
 VIDEO_EXT = ['.mp4', '.avi', '.mov', '.mkv', '.wmv']
+JPEG_QUALITY = 75  # Qt's default, which thumbnails were saved with before
+# OpenCV flags that decode straight to 1/scale of the full size
+DECODE_FLAGS = {1: cv2.IMREAD_COLOR,
+                2: cv2.IMREAD_REDUCED_COLOR_2,
+                4: cv2.IMREAD_REDUCED_COLOR_4,
+                8: cv2.IMREAD_REDUCED_COLOR_8}
 
 logger = logging.getLogger(__name__)
 
 
-def load_image(filepath):
+def read_bytes(filepath):
     """
-    Load an image file as QImage, reading the bytes with Python rather than
-    letting Qt open the path. Qt can fail to open files on Windows mapped or
-    network drives that Python reads fine, which returned a silent null image.
+    Read a file's bytes with Python rather than letting Qt or OpenCV open the path.
+    Both can fail to open files on Windows mapped or network drives that Python
+    reads fine, and OpenCV cannot open non-ASCII paths on Windows.
     """
     try:
         with open(filepath, "rb") as f:
-            data = f.read()
+            return f.read()
     except OSError as e:
         logger.error(f"Could not read {filepath} for thumbnail: {e}")
         return None
-    image = QImage.fromData(data)
-    if image.isNull():
-        logger.error(f"Could not decode {filepath} for thumbnail")
+
+
+def load_image(filepath, detail=(1.0, 1.0)):
+    """
+    Load the whole image file as a BGR array, decoded only as large as the thumbnail needs.
+
+    The image is never cropped here. detail is the (width, height) fraction of the image
+    that has to keep thumbnail resolution: (1, 1) for a media thumbnail, a roi's
+    (bbox_w, bbox_h) for its thumbnail, which the caller cuts out afterwards. JPEGs can
+    be decoded straight to 1/2, 1/4 or 1/8 size, far cheaper than a full decode, so the
+    smallest size that still leaves that region at least THUMBNAIL_SIZE pixels is used.
+    EXIF orientation is ignored, as it was with Qt, so stored bounding boxes still line
+    up with the pixels.
+    """
+    data = read_bytes(filepath)
+    if data is None:
         return None
+    width, height = _image_size(data)
+    scale = _decode_scale(width * detail[0], height * detail[1])
+    image = cv2.imdecode(np.frombuffer(data, np.uint8), DECODE_FLAGS[scale] | cv2.IMREAD_IGNORE_ORIENTATION)
+    if image is None:
+        logger.error(f"Could not decode {filepath} for thumbnail")
     return image
 
 
-def load_media(filepath, ext, frame=0):
-    """Load the given frame of a video, or the image itself, as QImage"""
+def _image_size(data):
+    """
+    (width, height) of an encoded image, read from its header without decoding it.
+
+    Called by load_image to pick a decode scale before decoding; (0, 0) if the header
+    cannot be read, which makes _decode_scale fall back to a full decode. Kept separate
+    so the Qt buffer plumbing stays out of load_image.
+    """
+    buffer = QBuffer()
+    buffer.setData(QByteArray(data))
+    buffer.open(QIODevice.OpenModeFlag.ReadOnly)
+    size = QImageReader(buffer).size()
+    return max(size.width(), 0), max(size.height(), 0)
+
+
+def _decode_scale(region_width, region_height):
+    """
+    Largest decode reduction that keeps a region of this many full-size pixels at least THUMBNAIL_SIZE.
+
+    Called by load_image; kept separate so the rule can be tested without decoding images.
+    """
+    longest = max(region_width, region_height)
+    for scale in (8, 4, 2):
+        if longest / scale >= THUMBNAIL_SIZE:
+            return scale
+    return 1
+
+
+def load_media(filepath, ext, frame=0, detail=(1.0, 1.0)):
+    """
+    Load the given frame of a video, or the whole image, as a BGR array
+
+    detail sizes the image decode, see load_image; video frames are always full size.
+    """
     if ext in VIDEO_EXT:
-        image = get_frame(filepath, frame=frame)
+        image = read_frame(filepath, frame=frame)
         if image is None:
             logger.error(f"Could not read frame {frame} of {filepath} for thumbnail")
         return image
-    return load_image(filepath)
+    return load_image(filepath, detail=detail)
 
 
 def save_thumbnail(thumbnail_dir, filepath, image):
-    """Scale image to thumbnail size and save it, returning the thumbnail filename"""
-    scaled_image = image.scaled(THUMBNAIL_SIZE, THUMBNAIL_SIZE,
-                                Qt.AspectRatioMode.KeepAspectRatio,
-                                Qt.TransformationMode.SmoothTransformation)
+    """Scale a BGR image to fit THUMBNAIL_SIZE and save it, returning the thumbnail filename"""
+    height, width = image.shape[:2]
+    if not width or not height:
+        logger.error(f"Nothing to save as a thumbnail for {filepath}")
+        return str(asset_path(THUMBNAIL_NOTFOUND))
+    factor = THUMBNAIL_SIZE / max(width, height)
+    size = (max(1, round(width * factor)), max(1, round(height * factor)))
+    interpolation = cv2.INTER_AREA if factor < 1 else cv2.INTER_LINEAR
+    scaled_image = cv2.resize(image, size, interpolation=interpolation)
     # unique suffix, camera trap filenames (e.g. IMG_0001) repeat across folders and
     # every roi of a media file shares its stem, so a short random number collides
     thumbnail_filepath = f"{str(Path(filepath).stem)}_{uuid.uuid4().hex}.jpg"
-    if not scaled_image.save(str(Path(thumbnail_dir) / thumbnail_filepath), format="JPG"):
-        logger.error(f"Could not save thumbnail for {filepath} to {thumbnail_dir}")
+    encoded, buffer = cv2.imencode(".jpg", scaled_image, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+    try:
+        if not encoded:
+            raise OSError("JPEG encoding failed")
+        with open(Path(thumbnail_dir) / thumbnail_filepath, "wb") as f:
+            f.write(buffer.tobytes())
+    except OSError as e:
+        logger.error(f"Could not save thumbnail for {filepath} to {thumbnail_dir}: {e}")
         return str(asset_path(THUMBNAIL_NOTFOUND))
     return thumbnail_filepath
 
@@ -76,34 +144,40 @@ def save_media_thumbnail(thumbnail_dir, filepath, ext):
 
 def save_roi_thumbnail(thumbnail_dir, filepath, ext, frame, bbox_x, bbox_y, bbox_w, bbox_h):
     """Save thumbnail for ROI given bbox coordinates"""
-    original = load_media(filepath, ext, frame=frame)
+    # load the whole image, decoded large enough that the box keeps thumbnail resolution
+    original = load_media(filepath, ext, frame=frame, detail=(bbox_w, bbox_h))
     if original is None:
         return str(asset_path(THUMBNAIL_NOTFOUND))
 
-    # crop for rois
-    left = original.width() * bbox_x
-    top = original.height() * bbox_y
-    width = original.width() * bbox_w
-    height = original.height() * bbox_h
-    image = original.copy(QRect(int(left), int(top), int(width), int(height)))
+    # crop for rois, clipped to the image so a box running off the edge still crops
+    height, width = original.shape[:2]
+    left = min(max(int(width * bbox_x), 0), width)
+    top = min(max(int(height * bbox_y), 0), height)
+    right = min(left + int(width * bbox_w), width)
+    bottom = min(top + int(height * bbox_h), height)
+    image = original[top:bottom, left:right]
     return save_thumbnail(thumbnail_dir, filepath, image)
+
+
+def read_frame(video_path, frame=0):
+    """Extract a given frame from video as a BGR array"""
+    cap = cv2.VideoCapture(str(video_path))
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
+    ret, still = cap.read()
+    cap.release()
+    return still if ret else None
 
 
 def get_frame(video_path, frame=0):
     """Extract a given frame from video as QImage"""
-    cap = cv2.VideoCapture(str(video_path))
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame)
-    ret, still = cap.read()  # Read the first frame
-    cap.release()
-
-    if ret:
-        rgb_frame = cv2.cvtColor(still, cv2.COLOR_BGR2RGB)
-        h, w, ch = rgb_frame.shape
-        bytes_per_line = ch * w
-        # copy so the QImage owns its pixels instead of pointing at the numpy buffer
-        qimg = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
-        return qimg
-    return None
+    still = read_frame(video_path, frame=frame)
+    if still is None:
+        return None
+    rgb_frame = cv2.cvtColor(still, cv2.COLOR_BGR2RGB)
+    h, w, ch = rgb_frame.shape
+    bytes_per_line = ch * w
+    # copy so the QImage owns its pixels instead of pointing at the numpy buffer
+    return QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
 
 
 def check_missing_thumbnails(mpDB, thumbnail_dir, data_type):

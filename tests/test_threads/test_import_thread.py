@@ -1,4 +1,6 @@
 """Tests for matchypatchy thread workers in import_thread.py."""
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -401,6 +403,52 @@ class TestCSVImportThread:
         assert db.count("roi") == 2
         assert thread.progress_update.calls[-1] == (2,)
 
+    def _progress_run(self, parent, rows, monkeypatch):
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        monkeypatch.setattr(import_thread, "save_roi_thumbnail", lambda *_: "roi-thumb.jpg")
+        thread = import_thread.CSVImportThread(parent, pd.DataFrame(rows).groupby("filepath", sort=False),
+                                               self._selected_columns(), "Default Survey")
+        thread.progress_update = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+        thread.run()
+        return thread
+
+    def _progress_row(self, path):
+        return {"filepath": str(path), "timestamp": "2024-01-01 10:00:00", "station": "Station A",
+                "bbox_x": 0.1, "bbox_y": 0.1, "bbox_w": 0.2, "bbox_h": 0.2}
+
+    def test_resume_moves_progress_over_existing_rois(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        rows = []
+        for n in range(12):
+            path = tmp_path / "imgs" / f"{n}.jpg"
+            path.parent.mkdir(exist_ok=True)
+            path.write_bytes(str(n).encode())
+            rows.append(self._progress_row(path))
+        self._progress_run(parent, rows, monkeypatch)
+
+        # every roi is already in the project, the bar still has to reach the end
+        thread = self._progress_run(parent, rows, monkeypatch)
+
+        assert db.count("roi") == 12
+        assert thread.progress_update.calls == [(10,), (12,)]
+
+    def test_missing_files_move_progress(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        image = tmp_path / "imgs" / "a.jpg"
+        image.parent.mkdir()
+        image.write_bytes(b"a")
+        missing = tmp_path / "imgs" / "gone.jpg"
+        rows = [self._progress_row(missing)] * 3 + [self._progress_row(image)]
+
+        thread = self._progress_run(parent, rows, monkeypatch)
+
+        assert db.count("roi") == 1
+        assert thread.progress_update.calls == [(4,)]
+
     def test_rerun_without_bboxes_adds_only_missing_rois(self, tmp_db, null_logger, tmp_path, monkeypatch):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
@@ -748,6 +796,24 @@ class TestImportFailuresAreReported:
         assert thread.import_failed.calls == [("boom",)]
         assert thread.finished.calls == []
 
+    def test_thumbnail_failure_rolls_back_import(self, tmp_db, null_logger, tmp_path, monkeypatch):
+        """An exception on a thumbnail worker reaches the import thread and fails the import"""
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        file_path = tmp_path / "a.jpg"
+        file_path.write_bytes(b"a")
+        data = pd.DataFrame([{"filepath": str(file_path), "datetime": "2024-01-01 12:00:00"}])
+        thread = import_thread.FolderImportThread(parent, (1,), data, station_level=0, camera_level=0)
+        monkeypatch.setattr(import_thread, "save_media_thumbnail", self._boom)
+        thread.import_failed = SignalSpy()
+        thread.finished = SignalSpy()
+        thread.isInterruptionRequested = lambda: False
+
+        thread.run()
+
+        assert thread.import_failed.calls == [("boom",)]
+        assert db.count("media") == 0
+
     def test_csv_migrate(self, tmp_db, null_logger, tmp_path, monkeypatch):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
@@ -852,6 +918,38 @@ class TestCSVMigrateRerun:
         path.write_bytes(b"a")
         return path
 
+    def test_resume_moves_progress_over_existing_rois(self, tmp_db, null_logger, tmp_path, image):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        rows = [self._row(image, n, box=0.01 * (n + 1)) for n in range(12)]
+        self._migrate(db, parent, rows)
+
+        # every roi is already in the project, the bar still has to reach the end
+        thread = self._migrate(db, parent, rows)
+
+        assert db.count("roi") == 12
+        assert thread.progress_update.calls == [(10,), (12,)]
+
+    def test_skipped_rows_move_progress(self, tmp_db, null_logger, tmp_path, image):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        missing = tmp_path / "imgs" / "gone.jpg"
+        rows = [self._row(missing, n) for n in range(3)] + [self._row(image, 3)]
+
+        thread = self._migrate(db, parent, rows)
+
+        assert thread.error_update.calls == [([str(missing)] * 3,)]
+        assert thread.progress_update.calls == [(4,)]
+
+    def test_windows_relative_path_gives_the_base_above_it(self, tmp_db, null_logger, tmp_path, image):
+        """An export from Windows has relative paths like "imgs\\a.jpg", which must split on Linux too"""
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+
+        self._migrate(db, parent, [self._row(image, 0, relative_path="imgs\\a.jpg")])
+
+        assert db.select("uploads", columns="base_dir") == [(str(tmp_path),)]
+
     def test_existing_upload_is_reused(self, tmp_db, null_logger, tmp_path, image):
         db, _ = tmp_db
         parent = _make_parent(db, null_logger, tmp_path / "thumbs")
@@ -926,6 +1024,20 @@ class TestCSVMigrateRerun:
         assert tables.count("survey") == 1
 
 
+class CommitCounter:
+    """Wraps a sqlite connection, counting commits"""
+    def __init__(self, connection):
+        self._connection = connection
+        self.commits = 0
+
+    def commit(self):
+        self.commits += 1
+        self._connection.commit()
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
 class TestFolderImportCaching:
     def test_station_and_camera_are_looked_up_once(self, tmp_db, null_logger, tmp_path, monkeypatch):
         db, _ = tmp_db
@@ -965,6 +1077,10 @@ class TestFolderImportCaching:
         data = pd.DataFrame({"filepath": paths, "datetime": ["2024-01-01 12:00:00"] * 12})
         thread = import_thread.FolderImportThread(parent, (1,), data, station_level=0, camera_level=0)
         monkeypatch.setattr(import_thread, "save_media_thumbnail", lambda *_: "media-thumb.jpg")
+        # no interval passes during the import, so only the setup rows and the final commit commit
+        monkeypatch.setattr(thread, "COMMIT_INTERVAL", 3600)
+        connection = CommitCounter(db.db)
+        monkeypatch.setattr(db.local, "db", connection)
         thread.progress_update = SignalSpy()
         thread.finished = SignalSpy()
         thread.isInterruptionRequested = lambda: False
@@ -973,6 +1089,7 @@ class TestFolderImportCaching:
 
         assert db.count("media") == 12
         assert thread.progress_update.calls == [(10,), (12,)]
+        assert connection.commits < 12
 
 
 class TestCSVMigrateInsertFailures:
@@ -1079,3 +1196,90 @@ class TestFileReplacedAtSamePath:
         assert thread.error_update.calls == [([str(a)],)]
         assert db.select("media", columns="relative_path") == [("a.jpg",), ("b.jpg",)]
         assert db.select("roi", columns="media_id, bbox_x") == [(1, 0.1), (2, 0.4)]
+
+
+class FakeThumbnailDB:
+    """Records add_thumbnail calls, noting which thread made them"""
+    def __init__(self):
+        self.rows = []
+        self.threads = set()
+
+    def add_thumbnail(self, table, fid, filepath, commit=True):
+        self.threads.add(threading.get_ident())
+        self.rows.append((table, fid, filepath))
+
+
+class TestThumbnailQueue:
+    def test_rows_recorded_in_order_from_calling_thread(self):
+        db = FakeThumbnailDB()
+        queue = import_thread.ThumbnailQueue(db, workers=4)
+        for fid in range(50):
+            # later work finishes first, rows must still be in order
+            queue.add("media", fid, lambda n: time.sleep((50 - n) / 10000) or f"{n}.jpg", fid)
+        queue.finish()
+        queue.close()
+
+        assert db.rows == [("media", fid, f"{fid}.jpg") for fid in range(50)]
+        assert db.threads == {threading.get_ident()}
+
+    def test_pending_work_is_bounded(self):
+        db = FakeThumbnailDB()
+        queue = import_thread.ThumbnailQueue(db, workers=2)
+        for fid in range(20):
+            queue.add("roi", fid, str, fid)
+            assert len(queue.pending) <= 2 * queue.PENDING_PER_WORKER
+        queue.finish()
+        queue.close()
+        assert len(db.rows) == 20
+
+    def test_worker_exception_raised_on_record(self):
+        def fail():
+            raise RuntimeError("bad image")
+
+        queue = import_thread.ThumbnailQueue(FakeThumbnailDB(), workers=1)
+        queue.add("media", 1, fail)
+        with pytest.raises(RuntimeError, match="bad image"):
+            queue.finish()
+        queue.close()
+
+    def test_work_runs_in_parallel(self):
+        barrier = threading.Barrier(3, timeout=5)
+        queue = import_thread.ThumbnailQueue(FakeThumbnailDB(), workers=3)
+        for fid in range(3):
+            # each worker waits for the other two, which deadlocks (and times out) if run one at a time
+            queue.add("media", fid, lambda: barrier.wait() and "t.jpg")
+        queue.finish()
+        queue.close()
+
+
+class TestCSVImportFiles:
+    """_files must give what iterating the groupby gave, it replaces that loop"""
+
+    def _data(self):
+        return pd.DataFrame({
+            "filepath": ["c.jpg", "a.jpg", "c.jpg", None, "b.jpg", "a.jpg"],
+            "station": ["S1", "S2", "S1", "S3", pd.NA, "S2"],
+            "frame": [0, 1, 2, 3, 4, 5],
+            "bbox_x": [0.1, float("nan"), 0.3, 0.4, 0.5, 0.6],
+            "timestamp": pd.to_datetime(["2024-01-01"] * 6),
+        })
+
+    def _expected(self, grouped):
+        return [(filepath, group.head(1).to_dict(orient="records")[0], list(group.itertuples(index=False)))
+                for filepath, group in grouped]
+
+    @pytest.mark.parametrize("sort", [True, False])
+    def test_matches_groupby(self, tmp_db, null_logger, tmp_path, sort):
+        db, _ = tmp_db
+        parent = _make_parent(db, null_logger, tmp_path / "thumbs")
+        grouped = self._data().groupby("filepath", sort=sort)
+        thread = import_thread.CSVImportThread(parent, grouped, {}, "Default Survey")
+
+        files = thread._files()
+
+        expected = self._expected(grouped)
+        assert [f[0] for f in files] == [e[0] for e in expected]
+        for (_, exemplar, rois), (_, expected_exemplar, expected_rois) in zip(files, expected):
+            # compare as strings so nan == nan
+            assert {k: str(v) for k, v in exemplar.items()} == {k: str(v) for k, v in expected_exemplar.items()}
+            assert [str(r) for r in rois] == [str(r) for r in expected_rois]
