@@ -72,7 +72,7 @@ class FilterBar(UsesProject, QWidget):
         self.favorites_only = False
         layout.addWidget(self.favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # MEDIA, only set by clicking a media's # of Rois, so hidden until then
-        self.media_only = QCheckBox("Clicked Media's ROIs")
+        self.media_only = QCheckBox("Selected Media's ROIs")
         self.media_only.toggled.connect(self.select_media_only)
         self.media_ids = False
         self.media_only.setVisible(False)
