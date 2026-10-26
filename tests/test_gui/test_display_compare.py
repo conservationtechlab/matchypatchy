@@ -154,12 +154,12 @@ class TestQueryNavigation:
         mo0 = MagicMock()
         mo0.get_ranked_query_rids.return_value = [10, 11]
         mo0.get_ranked_matches.return_value = [(12, 0.1), (13, 0.3)]
-        mo0.sequence_id = 1
+        mo0.query_sequence_id = 1
 
         mo1 = MagicMock()
         mo1.get_ranked_query_rids.return_value = [12]
         mo1.get_ranked_matches.return_value = [(10, 0.2)]
-        mo1.sequence_id = 2
+        mo1.query_sequence_id = 2
 
         self.qc.ranked_sequences = [mo0, mo1]
         self.qc.n_queries = 2
@@ -283,7 +283,7 @@ class TestFinishCalculating:
     def test_saves_and_finalizes_when_sequences_present(self):
         qc = _make_qc()
         seq = MagicMock()
-        seq.sequence_id = 1
+        seq.query_sequence_id = 1
         seq.neighbors = [(12, 0.1)]
         seq.og_ranked_query_rids = [10]
         seq.og_ranked_matches = [(12, 0.1)]

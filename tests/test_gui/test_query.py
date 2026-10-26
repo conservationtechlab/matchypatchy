@@ -378,12 +378,12 @@ class TestQueryNavigation:
         mo0 = MagicMock()
         mo0.get_ranked_query_rids.return_value = [10, 11]
         mo0.get_ranked_matches.return_value = [(12, 0.1), (13, 0.3)]
-        mo0.sequence_id = 1
+        mo0.query_sequence_id = 1
 
         mo1 = MagicMock()
         mo1.get_ranked_query_rids.return_value = [12]
         mo1.get_ranked_matches.return_value = [(10, 0.2)]
-        mo1.sequence_id = 2
+        mo1.query_sequence_id = 2
 
         qc.ranked_sequences = [mo0, mo1]
         qc.n_queries = 2
@@ -638,7 +638,7 @@ class TestFinalize:
         assert emitted == [True]
         assert qc_raw.n_queries == 1
         assert qc_raw.filter_matched is True
-        assert qc_raw.ranked_sequences[0].sequence_id == 1
+        assert qc_raw.ranked_sequences[0].query_sequence_id == 1
         assert len(qc_raw.data) == 4            # filter ran
 
     def test_filter_narrows_neighbors(self, qc_raw, fake_match_object):
@@ -705,7 +705,7 @@ class TestRestrictToData:
         out = self.qc._restrict_to_data([_raw(1, [10, 11], [(12, 0.1), (13, 0.3)])], strict=False)
         assert len(out) == 1
         mo = out[0]
-        assert mo.sequence_id == 1
+        assert mo.query_sequence_id == 1
         assert mo.filtered_neighbors == [(12, 0.1), (13, 0.3)]
         assert mo.og_ranked_query_rids == [10, 11]
         assert mo.ranked_matches == [(12, 0.1), (13, 0.3)]
@@ -1194,7 +1194,7 @@ class TestFavorites:
         self.qc = qc
         qc.data_raw = _sample_roi_df()          # only id 11 is a favorite
         self.knn = MagicMock()
-        self.knn.sequence_id = 1
+        self.knn.query_sequence_id = 1
         self.knn.query_data = pd.DataFrame({"id": [10]})
         self.knn.get_ranked_matches.return_value = [(12, 0.1)]
         qc.current_match_object = self.knn

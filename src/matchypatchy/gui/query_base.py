@@ -568,7 +568,7 @@ class QueryContainer(BaseQueryContainer):
     def get_query_sequence_id(self):
         """Get current query sequence ID from its match object"""
         if self.current_match_object:
-            return self.current_match_object.sequence_id
+            return self.current_match_object.query_sequence_id
         return None
 
     def update_sequences_in_place(self, query_seq_id, match_seq_id):
@@ -670,7 +670,7 @@ class QueryContainer(BaseQueryContainer):
 
             # Create favorite match object
             self.favorite_match_object = FavoriteMatchObject(
-                self.knn_match_object.sequence_id,
+                self.knn_match_object.query_sequence_id,
                 filtered_neighbors,
                 query_data=self.knn_match_object.query_data,
                 match_data=self._favorites_cache
@@ -714,7 +714,7 @@ class QueryContainer(BaseQueryContainer):
     # MATCH FUNCTIONS ----------------------------------------------------------
     def _merge_rois(self):
         """All ROIs of the query and match sequences"""
-        query_seq = self.current_match_object.sequence_id
+        query_seq = self.current_match_object.query_sequence_id
         match_seq = self._get_roi_field(self.current_match_rid, 'sequence_id')
         # the shown rois too, a match roi without a sequence is not in _seq_index
         return ({self.current_query_rid, self.current_match_rid}
@@ -726,7 +726,7 @@ class QueryContainer(BaseQueryContainer):
 
     def _unmatch_rois(self):
         """The whole query sequence, so Unmatch undoes Match"""
-        query_seq = self.current_match_object.sequence_id
+        query_seq = self.current_match_object.query_sequence_id
         return {self.current_query_rid} | set(self._seq_index.get(query_seq, []))
 
     # ==========================================================================
@@ -756,7 +756,7 @@ class QueryContainer(BaseQueryContainer):
         """
         seq_ids = self.data_raw['sequence_id'].to_dict() if 'sequence_id' in self.data_raw else {}
         return [{
-            'sequence_id': m.sequence_id,
+            'sequence_id': m.query_sequence_id,
             'neighbors': [(rid, d) for rid, d in m.neighbors],  # [(roi_id, distance), ...]
             # counted in candidate sequences, like the cut in _restrict_to_data
             'truncated': len(self._nearest_candidates(m.neighbors, seq_ids)) >= self.k_cache,
