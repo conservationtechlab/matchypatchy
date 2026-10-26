@@ -106,8 +106,8 @@ class MediaEditPopup(UsesProject, QDialog):
         self.reset_btn.clicked.connect(self.reset)
         button_layout.addWidget(self.reset_btn)
 
-        # Delete button
-        self.delete_btn = QPushButton("Delete Image")
+        # Delete button, deletes the roi in the roi view, the whole media otherwise
+        self.delete_btn = QPushButton("Delete ROI" if self.data_type == 1 else "Delete Media")
         self.delete_btn.clicked.connect(self.delete)
         button_layout.addWidget(self.delete_btn)
 
@@ -321,7 +321,7 @@ class MediaEditPopup(UsesProject, QDialog):
         self.image.reset()
 
     def delete(self):
-        """Delete the current roi, or the current image in the Full Images view"""
+        """Delete the current roi, or the current media in the Full Images view"""
         row = self.data.iloc[self.current_image_index]
         if self.data_type == 1:
             # the full video row has no roi to delete
@@ -329,7 +329,7 @@ class MediaEditPopup(UsesProject, QDialog):
                 return
             prompt = "Are you sure you want to delete this ROI? This action cannot be undone."
         else:
-            prompt = "Are you sure you want to delete this image and all of its ROIs? This action cannot be undone."
+            prompt = "Are you sure you want to delete this media and all of its ROIs? This action cannot be undone."
         dialog = AlertPopup(self, prompt=prompt)
         confirmed = dialog.exec()
         del dialog
