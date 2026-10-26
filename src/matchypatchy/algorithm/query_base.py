@@ -17,10 +17,10 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.media import assign_individual, clear_individual
 from matchypatchy.database.location import fetch_station_names_from_id
-from matchypatchy.algorithm.match_object import MatchObject, FavoriteMatchObject, toggle_viewpoint_value
-from matchypatchy.threads.model_download_thread import load_model
+from matchypatchy.algorithm.match_object import MatchObject, FavoriteMatchObject
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
 from matchypatchy.project import UsesProject
+from matchypatchy.models import load_model, toggle_viewpoint_value
 
 
 logger = logging.getLogger(__name__)

@@ -8,7 +8,8 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QGridLayout, QProgressBar,
                              QComboBox, QCheckBox, QLabel, QDialogButtonBox)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.threads import model_download_thread
+from matchypatchy import models
+from matchypatchy.threads.model_download_thread import DownloadMLThread
 
 
 logger = logging.getLogger(__name__)
@@ -22,10 +23,10 @@ class MLDownloadPopup(QDialog):
         super().__init__(parent)
         self.ml_dir = parent.cfg.ML_DIR
         # Update model yml
-        update_confirmed = model_download_thread.update_model_yml()
+        update_confirmed = models.update_model_yml()
         logger.info(f"Model yaml update attempt: {update_confirmed}")
         # Load the model configuration after updating the YAML
-        self.ml_cfg = model_download_thread.load_model()
+        self.ml_cfg = models.load_model()
         self.models = self.ml_cfg['MODELS']
         self.checked_models = set()
         self.available_models = self.discover_models()
@@ -64,7 +65,7 @@ class MLDownloadPopup(QDialog):
         layout.addWidget(self.warning_label)
 
         # Create thread ONCE, keep it running
-        self.build_thread = model_download_thread.DownloadMLThread(self.ml_dir)
+        self.build_thread = DownloadMLThread(self.ml_dir)
         self.build_thread.finished_ok.connect(self.on_download_result)
         self.build_thread.start()
 
@@ -75,7 +76,7 @@ class MLDownloadPopup(QDialog):
         """Models whose files are all downloaded, {key: path}"""
         models_dict = {}
         for m in self.models:
-            path = model_download_thread.get_path(self.ml_dir, m)
+            path = models.get_path(self.ml_dir, m)
             if path is not None:
                 models_dict[m] = path
         return models_dict
@@ -174,7 +175,7 @@ class MLOptionsPopup(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.ml_dir = parent.cfg.ML_DIR
-        self.ml_cfg = model_download_thread.load_model()
+        self.ml_cfg = models.load_model()
         self.available_models = self.discover_models()
 
         self.setWindowTitle('Model Options')
@@ -224,7 +225,7 @@ class MLOptionsPopup(QDialog):
         """Models whose files are all downloaded, {key: path to the main file}"""
         models_dict = {}
         for m in self.ml_cfg['MODELS']:
-            path = model_download_thread.get_path(self.ml_dir, m)
+            path = models.get_path(self.ml_dir, m)
             if path is not None:
                 models_dict[m] = path
         return models_dict

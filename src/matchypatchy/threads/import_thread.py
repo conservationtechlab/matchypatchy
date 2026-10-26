@@ -12,7 +12,7 @@ import pandas as pd
 from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail, THUMBNAIL_NOTFOUND
+from matchypatchy.database.thumbnails import save_media_thumbnail, save_roi_thumbnail
 from matchypatchy.database.media import get_sha256, native_relative_path
 from matchypatchy.database.mpdb import sql_text
 

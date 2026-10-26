@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QDialogButtonBox,
 from PyQt6.QtCore import Qt
 
 #from matchypatchy.algo.reid_thread import PairXThread
-from matchypatchy.threads.model_download_thread import get_path
+from matchypatchy.models import get_path
 from matchypatchy.gui.widgets.widget_media import ImageWidget
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.project import UsesProject

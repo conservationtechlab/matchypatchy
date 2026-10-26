@@ -1,57 +1,39 @@
-from matchypatchy.gui import dialogs
-from matchypatchy.gui import display_base
-from matchypatchy.gui import display_compare
-from matchypatchy.gui import display_media
-from matchypatchy.gui import main_gui
-from matchypatchy.gui import media_table
-from matchypatchy.gui import widgets
+from matchypatchy.gui.dialogs import popup_alert
+from matchypatchy.gui.dialogs import popup_config
+from matchypatchy.gui.dialogs import popup_import_csv
+from matchypatchy.gui.dialogs import popup_import_folder
+from matchypatchy.gui.dialogs import popup_individual
+from matchypatchy.gui.dialogs import popup_media_edit
+from matchypatchy.gui.dialogs import popup_ml
+from matchypatchy.gui.dialogs import popup_pairx
+from matchypatchy.gui.dialogs import popup_readme
+from matchypatchy.gui.dialogs import popup_station
+from matchypatchy.gui.dialogs import popup_survey
+from matchypatchy.gui.dialogs import popup_uploads
 
-from matchypatchy.gui.dialogs import (AlertPopup, ConfigPopup, ImportCSVPopup,
-                                      ImportFolderPopup, IndividualFillPopup,
-                                      IndividualPopup, MLDownloadPopup,
-                                      MLOptionsPopup, MediaEditPopup,
-                                      MetadataPanel, PairXPopup, READMEPopup,
-                                      StationFillPopup, StationPopup,
-                                      SurveyFillPopup, SurveyPopup,
-                                      UploadManagerPopup, popup_alert,
-                                      popup_config, popup_import_csv,
-                                      popup_import_folder, popup_individual,
-                                      popup_media_edit, popup_ml, popup_pairx,
-                                      popup_readme, popup_station,
-                                      popup_survey, popup_uploads,)
-from matchypatchy.gui.display_base import (DisplayBase, logger,)
-from matchypatchy.gui.display_compare import (DisplayCompare, logger,)
-from matchypatchy.gui.display_media import (DisplayMedia, logger,)
-from matchypatchy.gui.main_gui import (MainWindow, THEMES, logger,)
-from matchypatchy.gui.media_table import (MediaTable,)
-from matchypatchy.gui.widgets import (ClickableSlider, ComboBoxDelegate,
-                                      ComboBoxSeparator, FilterBar, FilterBox,
-                                      HorizontalSeparator, ImageAdjustBar,
-                                      ImageWidget, MediaWidget,
-                                      NoHoverDelegate, SequenceSelector,
-                                      SliderWithLabel, StandardButton,
-                                      TextEditWithSignal, ThreePointSlider,
-                                      VerticalSeparator, VideoPlayerBar,
-                                      VideoViewer, VideoWidget, gui_assets,
-                                      widget_filterbar,
-                                      widget_image_adjustment, widget_media,)
+from matchypatchy.gui.dialogs.popup_alert import (AlertPopup,)
+from matchypatchy.gui.dialogs.popup_config import (ConfigPopup, )
+from matchypatchy.gui.dialogs.popup_import_csv import (ImportCSVPopup, )
+from matchypatchy.gui.dialogs.popup_import_folder import (ImportFolderPopup, )
+from matchypatchy.gui.dialogs.popup_individual import (IndividualFillPopup,
+                                                       IndividualPopup,)
+from matchypatchy.gui.dialogs.popup_media_edit import (MediaEditPopup,
+                                                       MetadataPanel,)
+from matchypatchy.gui.dialogs.popup_ml import (MLDownloadPopup, MLOptionsPopup, )
+from matchypatchy.gui.dialogs.popup_pairx import (PairXPopup,)
+from matchypatchy.gui.dialogs.popup_readme import (READMEPopup,)
+from matchypatchy.gui.dialogs.popup_station import (StationFillPopup,
+                                                    StationPopup,)
+from matchypatchy.gui.dialogs.popup_survey import (SurveyFillPopup,
+                                                   SurveyPopup,)
+from matchypatchy.gui.dialogs.popup_uploads import (UploadManagerPopup, )
 
-__all__ = ['AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
-           'ComboBoxSeparator', 'ConfigPopup', 'DisplayBase', 'DisplayCompare',
-           'DisplayMedia', 'FilterBar', 'FilterBox', 'HorizontalSeparator',
-           'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
-           'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
-           'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow', 'MediaEditPopup',
-           'MediaTable', 'MediaWidget', 'MetadataPanel', 'NoHoverDelegate',
-           'PairXPopup', 'READMEPopup', 'SequenceSelector', 'SliderWithLabel',
-           'StandardButton', 'StationFillPopup', 'StationPopup',
-           'SurveyFillPopup', 'SurveyPopup', 'THEMES', 'TextEditWithSignal',
-           'ThreePointSlider', 'UploadManagerPopup', 'VerticalSeparator',
-           'VideoPlayerBar', 'VideoViewer', 'VideoWidget', 'dialogs',
-           'display_base', 'display_compare', 'display_media', 'gui_assets',
-           'logger', 'main_gui', 'media_table', 'popup_alert', 'popup_config',
-           'popup_import_csv', 'popup_import_folder', 'popup_individual',
-           'popup_media_edit', 'popup_ml', 'popup_pairx', 'popup_readme',
-           'popup_station', 'popup_survey', 'popup_uploads',
-           'widget_filterbar', 'widget_image_adjustment', 'widget_media',
-           'widgets']
+__all__ = ['AlertPopup', 'ConfigPopup', 'ImportCSVPopup', 'ImportFolderPopup',
+           'IndividualFillPopup', 'IndividualPopup', 'MLDownloadPopup',
+           'MLOptionsPopup', 'MediaEditPopup', 'MetadataPanel', 'PairXPopup',
+           'READMEPopup', 'StationFillPopup', 'StationPopup',
+           'SurveyFillPopup', 'SurveyPopup', 'UploadManagerPopup', 'logger',
+           'popup_alert', 'popup_config', 'popup_import_csv',
+           'popup_import_folder', 'popup_individual', 'popup_media_edit',
+           'popup_ml', 'popup_pairx', 'popup_readme', 'popup_station',
+           'popup_survey', 'popup_uploads']

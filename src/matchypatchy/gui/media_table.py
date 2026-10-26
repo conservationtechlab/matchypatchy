@@ -8,10 +8,10 @@ from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal, QAbstractTableModel
 
 from matchypatchy.database.media import EditObject
 from matchypatchy.database.thumbnails import THUMBNAIL_SIZE
-from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.location import fetch_stations, fetch_cameras
 from matchypatchy.database.media import fetch_individual
 from matchypatchy.project import UsesProject
+from matchypatchy.models import load_model
 
 
 class MediaTable(UsesProject, QAbstractTableModel):

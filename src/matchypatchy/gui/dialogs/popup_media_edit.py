@@ -12,7 +12,7 @@ from matchypatchy.gui.widgets.widget_media import MediaWidget
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, TextEditWithSignal
 
-from matchypatchy.threads.model_download_thread import load_model
+from matchypatchy.models import load_model
 from matchypatchy.database.media import (fetch_individual, get_roi_bbox, EditObject, delete_media, delete_rois,
                                          update_roi_box, boxless_roi)
 from matchypatchy.database.location import fetch_station_names_from_id

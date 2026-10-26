@@ -15,7 +15,7 @@ from matchypatchy import config
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
-from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
+from matchypatchy.models import get_path, is_valid_reid_model
 from matchypatchy.project import UsesProject
 
 

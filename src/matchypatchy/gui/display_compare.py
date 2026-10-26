@@ -18,7 +18,7 @@ from matchypatchy.gui.widgets.widget_image_adjustment import ImageAdjustBar
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_individual import IndividualFillPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
-from matchypatchy.gui.dialogs.popup_pairx import PairXPopup
+#from matchypatchy.gui.dialogs.popup_pairx import PairXPopup
 from matchypatchy.gui.widgets.gui_assets import (NoHoverDelegate, SequenceSelector, SliderWithLabel, VerticalSeparator, 
                                                  StandardButton, ThreePointSlider)
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar

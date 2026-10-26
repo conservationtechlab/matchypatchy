@@ -6,7 +6,7 @@ from PyQt6.QtCore import pyqtSignal
 
 import matchypatchy.database.media as db_roi
 from matchypatchy.algorithm.query_base import BaseQueryContainer
-from matchypatchy.threads.model_download_thread import load_model
+from matchypatchy.models import load_model
 
 
 class QC_QueryContainer(BaseQueryContainer):

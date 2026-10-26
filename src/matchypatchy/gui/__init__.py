@@ -19,10 +19,10 @@ from matchypatchy.gui.dialogs import (AlertPopup, ConfigPopup, ImportCSVPopup,
                                       popup_media_edit, popup_ml, popup_pairx,
                                       popup_readme, popup_station,
                                       popup_survey, popup_uploads,)
-from matchypatchy.gui.display_base import (DisplayBase,)
+from matchypatchy.gui.display_base import (DisplayBase,)    
 from matchypatchy.gui.display_compare import (DisplayCompare,)
 from matchypatchy.gui.display_media import (DisplayMedia,)
-from matchypatchy.gui.main_gui import (MainWindow,)
+from matchypatchy.gui.main_gui import (MainWindow, THEMES,)
 from matchypatchy.gui.media_table import (MediaTable,)
 from matchypatchy.gui.widgets import (ClickableSlider, ComboBoxDelegate,
                                       ComboBoxSeparator, FilterBar, FilterBox,
@@ -36,24 +36,22 @@ from matchypatchy.gui.widgets import (ClickableSlider, ComboBoxDelegate,
                                       widget_filterbar,
                                       widget_image_adjustment, widget_media,)
 
-__all__ = ['AlertPopup', 'BaseQueryContainer', 'ClickableSlider',
-           'ComboBoxDelegate', 'ComboBoxSeparator', 'ConfigPopup', 'DisplayBase', 'DisplayCompare',
+__all__ = ['AlertPopup', 'ClickableSlider', 'ComboBoxDelegate',
+           'ComboBoxSeparator', 'ConfigPopup', 'DisplayBase', 'DisplayCompare',
            'DisplayMedia', 'FilterBar', 'FilterBox', 'HorizontalSeparator',
            'ImageAdjustBar', 'ImageWidget', 'ImportCSVPopup',
            'ImportFolderPopup', 'IndividualFillPopup', 'IndividualPopup',
-           'KNN_OVERFETCH', 'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow',
-           'ManualQueryContainer', 'MediaEditPopup', 'MediaTable',
-           'MediaWidget', 'MetadataPanel', 'NoHoverDelegate', 'PairXPopup',
-           'QC_QueryContainer', 'QueryContainer', 'READMEPopup',
-           'SequenceSelector', 'SliderWithLabel', 'StandardButton',
-           'StationFillPopup', 'StationPopup', 'SurveyFillPopup',
-           'SurveyPopup', 'TextEditWithSignal', 'ThreePointSlider',
-           'UploadManagerPopup', 'VerticalSeparator', 'VideoPlayerBar',
-           'VideoViewer', 'VideoWidget', 'dialogs', 'display_base',
-           'display_compare', 'display_media', 'gui_assets', 'main_gui',
-           'media_table', 'popup_alert', 'popup_config',
+           'MLDownloadPopup', 'MLOptionsPopup', 'MainWindow', 'MediaEditPopup',
+           'MediaTable', 'MediaWidget', 'MetadataPanel', 'NoHoverDelegate',
+           'PairXPopup', 'READMEPopup', 'SequenceSelector', 'SliderWithLabel',
+           'StandardButton', 'StationFillPopup', 'StationPopup',
+           'SurveyFillPopup', 'SurveyPopup', 'THEMES', 'TextEditWithSignal',
+           'ThreePointSlider', 'UploadManagerPopup', 'VerticalSeparator',
+           'VideoPlayerBar', 'VideoViewer', 'VideoWidget', 'dialogs',
+           'display_base', 'display_compare', 'display_media', 'gui_assets',
+           'logger', 'main_gui', 'media_table', 'popup_alert', 'popup_config',
            'popup_import_csv', 'popup_import_folder', 'popup_individual',
            'popup_media_edit', 'popup_ml', 'popup_pairx', 'popup_readme',
-           'popup_station', 'popup_survey', 'popup_uploads', 'query_base',
-           'query_manual', 'query_qc', 'widget_filterbar', 'widget_image_adjustment',
-           'widget_media', 'widgets']
+           'popup_station', 'popup_survey', 'popup_uploads',
+           'widget_filterbar', 'widget_image_adjustment', 'widget_media',
+           'widgets',]

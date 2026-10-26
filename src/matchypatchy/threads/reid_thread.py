@@ -10,7 +10,7 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.threads.model_download_thread import get_path
+from matchypatchy.models import get_path
 from matchypatchy.database.media import fetch_roi, filepath_sql
 
 # from matchypatchy.pairx.core import explain
