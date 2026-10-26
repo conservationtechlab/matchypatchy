@@ -6,6 +6,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from PyQt6.QtCore import qInstallMessageHandler
 from PyQt6.QtWidgets import QApplication
 
 from matchypatchy.logging_config import setup_logger, get_logger
@@ -42,6 +43,32 @@ def setup_cuda_path(logger):
     return False
 
 
+# Qt messages dropped by quiet_qt_messages
+IGNORED_QT_MESSAGES = (
+    # once per packet of videos without packet timestamps (eg. h264 in avi); Qt
+    # plays them on decode timestamps instead, so it is noise, hundreds per clip
+    "QFFmpeg::Demuxer received AVPacket with pts == AV_NOPTS_VALUE",
+)
+
+
+def quiet_qt_messages():
+    """
+    Drop the Qt messages in IGNORED_QT_MESSAGES, printing the rest as Qt does
+
+    Called once from __main__ before the QApplication is made. The demuxer warning is
+    a plain qWarning, not in its own logging category, so QT_LOGGING_RULES can't turn
+    it off without hiding every uncategorized Qt warning too.
+    """
+    def handler(mode, context, message):
+        if message in IGNORED_QT_MESSAGES:
+            return
+        category = context.category
+        prefix = f"{category}: " if category and category != "default" else ""
+        print(f"{prefix}{message}", file=sys.stderr, flush=True)
+
+    qInstallMessageHandler(handler)
+
+
 if __name__ == "__main__":
     start_time = time.time()
     # Setup application-wide logging
@@ -54,6 +81,7 @@ if __name__ == "__main__":
 
     try:
         setup_cuda_path(logger)
+        quiet_qt_messages()
         app = QApplication(sys.argv)
         window = MainWindow()
         logger.info("Main window initialized")
