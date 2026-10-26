@@ -266,6 +266,20 @@ class FilterBar(UsesProject, QWidget):
         else:
             self.no_roi_mids = False
 
+    def requery_no_roi(self):
+        """
+        Query the media without rois again, returning the fresh list
+
+        Called by MediaDisplay.refresh_table before a reload, since rois drawn or deleted
+        in the edit popup change the list select_no_roi took when the box was ticked.
+        The box's own list is replaced only while it is ticked; the display decides
+        separately whether its applied filters use the result.
+        """
+        no_roi_mids = media_without_rois(self.mpDB)
+        if self.no_roi_mids is not False:
+            self.no_roi_mids = no_roi_mids
+        return no_roi_mids
+
     def filter_surveys(self):
         """Filter surveys based on active region"""
         # block signals while updating combobox

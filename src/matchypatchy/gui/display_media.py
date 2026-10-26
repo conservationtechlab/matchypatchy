@@ -412,6 +412,11 @@ class DisplayMedia(UsesProject, QWidget):
     def refresh_table(self, reload=False):
         """Refresh the table by reapplying edits and filters"""
         if reload:
+            # rois may have been added or removed, so the No ROI list is out of date
+            # (keeps self.filters otherwise as last applied, not the unapplied filterbar choices)
+            no_roi_mids = self.filterbar.requery_no_roi()
+            if self.filters['no_roi_mids'] is not False:
+                self.filters['no_roi_mids'] = no_roi_mids
             self.load_table()
         else:
             # keep ticked rows by id, their positions change when re-filtered and sorted
