@@ -41,6 +41,8 @@ class DisplayMedia(UsesProject, QWidget):
         self.data_type = data_type
         self.valid_stations = []
         self.selected_rows = []
+        # whether Missing/Unspecified ROI was applied when a # of Rois was clicked, for Back
+        self._back_to_no_roi = False
         # table loads, a newer load supersedes older ones still running
         self._load_id = 0
         self._loaders = []
@@ -350,19 +352,26 @@ class DisplayMedia(UsesProject, QWidget):
             return
         if not self._drop_edits_to_change_view():
             return
+        self._back_to_no_roi = self.filters['no_roi_mids'] is not False
         # switches the view to rois
         self.refresh_filters(prefilter={'media_ids': [int(row["id"])]})
         self.load_table()
 
     def back_to_media(self):
-        """Leave a clicked media's rois for all media, unfiltered"""
+        """
+        Leave a clicked media's rois for all media
+
+        Missing/Unspecified ROI is put back on if it was applied when the count was
+        clicked, its media looked up again since rois may have been drawn; the other
+        filters stay cleared
+        """
         if not self._drop_edits_to_change_view():
             return
         self.data_type = 0
         self.show_type.blockSignals(True)
         self.show_type.setCurrentIndex(self.data_type)
         self.show_type.blockSignals(False)
-        self.refresh_filters()
+        self.refresh_filters(prefilter={'no_roi_mids': True} if self._back_to_no_roi else None)
         self.load_table()
 
     # 1. RUN ON ENTRY

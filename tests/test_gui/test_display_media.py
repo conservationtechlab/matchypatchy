@@ -85,6 +85,7 @@ def _make_display_media():
         dm.count_label = MagicMock()
         dm.view = MagicMock()
         dm.button_back = MagicMock()
+        dm._back_to_no_roi = False
 
         dm.SAVE_STYLE = " QPushButton { background-color: #2a3e5e; color: white; }"
 
@@ -601,8 +602,19 @@ class TestBackToMedia:
         DisplayMedia.back_to_media(dm)
         assert dm.data_type == 0
         dm.show_type.setCurrentIndex.assert_called_once_with(0)
-        dm.refresh_filters.assert_called_once_with()
+        dm.refresh_filters.assert_called_once_with(prefilter=None)
         dm.load_table.assert_called_once()
+
+    def test_back_keeps_missing_roi_filter(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = TestMediaRois()._click(2)
+        dm.filters = dict(dm.filters, no_roi_mids=[7])  # was applied when clicked
+        dm.refresh_filters.reset_mock()
+        DisplayMedia.show_media_rois(dm, SimpleNamespace(row=lambda: 0, column=lambda: 2))
+        assert dm._back_to_no_roi is True
+        dm.refresh_filters.reset_mock()
+        DisplayMedia.back_to_media(dm)
+        dm.refresh_filters.assert_called_once_with(prefilter={'no_roi_mids': True})
 
     def test_back_kept_when_edits_not_dropped(self):
         from matchypatchy.gui.display_media import DisplayMedia
