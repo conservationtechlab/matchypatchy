@@ -738,7 +738,8 @@ class DisplayMedia(UsesProject, QWidget):
                            6: ["sequence_id", "Sequence ID"],
                            7: ["external_id", "External ID"],
                            8: ["comment", "Comment"],
-                           9: ["roi_count", "# of Rois"]}
+                           9: ["roi_count", "# of Rois"],
+                           10: ["ext", "Extension"]}
             return headers
 
     def _set_delegates(self):

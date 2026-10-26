@@ -634,3 +634,13 @@ class TestEditThumbnail:
         for col in (0, 2, 3):
             self.dm.edit_thumbnail(self._index(3, col))
         self.dm.edit_row.assert_not_called()
+
+
+class TestHeaders:
+    def test_media_view_shows_extension(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = 0
+        assert ["ext", "Extension"] in DisplayMedia._get_headers(dm).values()
+        dm.data_type = 1
+        assert ["ext", "Extension"] not in DisplayMedia._get_headers(dm).values()
