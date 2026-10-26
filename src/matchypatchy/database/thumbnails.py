@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from PyQt6.QtGui import QImage, QImageReader
+from PyQt6.QtGui import QImageReader
 from PyQt6.QtCore import QBuffer, QByteArray, QIODevice
 
 from matchypatchy.config import asset_path
@@ -166,18 +166,6 @@ def read_frame(video_path, frame=0):
     ret, still = cap.read()
     cap.release()
     return still if ret else None
-
-
-def get_frame(video_path, frame=0):
-    """Extract a given frame from video as QImage"""
-    still = read_frame(video_path, frame=frame)
-    if still is None:
-        return None
-    rgb_frame = cv2.cvtColor(still, cv2.COLOR_BGR2RGB)
-    h, w, ch = rgb_frame.shape
-    bytes_per_line = ch * w
-    # copy so the QImage owns its pixels instead of pointing at the numpy buffer
-    return QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888).copy()
 
 
 def check_missing_thumbnails(mpDB, thumbnail_dir, data_type):
