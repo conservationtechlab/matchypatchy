@@ -156,16 +156,7 @@ class MatchEmbeddingThread(QThread):
     
         # Apply ranking to all matches at once
         for match_object in self.match_object_list:
-            # Prioritize favorites over distance
-            if len(favorite_rids_set) > 0:
-                match_object.rank_neighbors_by_favorites(favorite_rids_set)
-            # Prioritize IDed status over distance
-            if len(ided_rids_set) > 0:
-                # then prioritize matches by IDed status over both
-                match_object.rank_neighbors_by_ided(ided_rids_set)
-
-            # pad sequences with remaining matches and order by viewpoint
-            match_object.pad_sequences(self.rois, self.sequences)
+            match_object.rank_sequences(self.rois, self.sequences, favorite_rids_set, ided_rids_set)
             match_object.order_matches_by_viewpoint()
 
         # prioritize by number of matches and ided status
