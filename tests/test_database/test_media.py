@@ -358,15 +358,24 @@ class TestMatchingAndLookups:
         empty, _ = self._media(db, "empty.jpg", rois=0)
         assert media_without_rois(db) == [empty]
 
-    def test_media_with_boxed_and_boxless_rois_is_not_without_rois(self, tmp_db):
+    def test_media_with_a_boxless_roi_is_without_rois(self, tmp_db):
         from matchypatchy.database.media import media_without_rois
         db, _ = tmp_db
         boxless, _ = self._media(db, "boxless.mp4", rois=0)
         db.add_roi(boxless, 0, -1, -1, -1, -1)
         assert media_without_rois(db) == [boxless]
-        # drawing a box on a frame leaves the placeholder roi in place
+        # still listed while any of its rois has no box
         db.add_roi(boxless, 12, 0.1, 0.1, 0.1, 0.1)
-        assert media_without_rois(db) == []
+        assert media_without_rois(db) == [boxless]
+
+    def test_boxless_roi(self, tmp_db):
+        from matchypatchy.database.media import boxless_roi
+        db, _ = tmp_db
+        mid, (boxed,) = self._media(db, "x.mp4", rois=1)
+        assert boxless_roi(db, mid) is None
+        first = db.add_roi(mid, 0, -1, -1, -1, -1)
+        db.add_roi(mid, 0, -1, -1, -1, -1)
+        assert boxless_roi(db, mid) == first
 
     def test_uploads_with_media_counts(self, tmp_db):
         from matchypatchy.database.media import uploads_with_media_counts
