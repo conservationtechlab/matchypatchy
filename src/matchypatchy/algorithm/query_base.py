@@ -864,7 +864,7 @@ class QueryContainer(BaseQueryContainer):
             neighbor_ids = {rid for rid, _ in neighbors}
             ranked_matches = [tuple(m) for m in s['og_ranked_matches'] if m[0] in neighbor_ids]
 
-            mo = MatchObject(sequence_id=s['sequence_id'],
+            mo = MatchObject(query_sequence_id=s['sequence_id'],
                              filtered_neighbors=neighbors,
                              query_data=self.data.loc[q_rids].reset_index(),
                              match_data=self.data.loc[[rid for rid, _ in neighbors]].reset_index())
