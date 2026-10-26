@@ -375,11 +375,15 @@ def clear_individual(mpDB, roi_ids):
 
 # LOOKUPS ======================================================================
 def media_without_rois(mpDB):
-    """Ids of media that have no rois"""
-    rows = mpDB.query("""SELECT DISTINCT media.id FROM media
-                         LEFT JOIN roi ON roi.media_id = media.id
-                         WHERE roi.media_id IS NULL
-                         OR roi.bbox_w = -1;""")
+    """
+    Ids of media that have no rois with a box
+
+    Rois imported without a box (bbox_w -1) don't count, so a video keeps its box-less
+    placeholder roi but leaves this list once a box is drawn on one of its frames
+    """
+    rows = mpDB.query("""SELECT media.id FROM media
+                         WHERE NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = media.id
+                                           AND roi.bbox_w != -1);""")
     return [row[0] for row in rows or []]
 
 
