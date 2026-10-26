@@ -19,13 +19,14 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_individual import IndividualFillPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.dialogs.popup_pairx import PairXPopup
-from matchypatchy.gui.widgets.gui_assets import SequenceSelector, SliderWithLabel, VerticalSeparator, StandardButton, ThreePointSlider
+from matchypatchy.gui.widgets.gui_assets import (NoHoverDelegate, SequenceSelector, SliderWithLabel, VerticalSeparator, 
+                                                 StandardButton, ThreePointSlider)
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
-from matchypatchy.gui.query_base import QueryContainer
-from matchypatchy.gui.query_qc import QC_QueryContainer
-from matchypatchy.gui.query_manual import ManualQueryContainer
-from matchypatchy.gui.widgets.gui_assets import NoHoverDelegate
+from matchypatchy.algorithm.query_base import QueryContainer
+from matchypatchy.algorithm.query_qc import QC_QueryContainer
+from matchypatchy.algorithm.query_manual import ManualQueryContainer
+
 
 from matchypatchy.database.media import VIDEO_EXT, IMAGE_EXT, fetch_individual, set_favorite, save_edits
 from matchypatchy.project import UsesProject

@@ -4,9 +4,6 @@ from matchypatchy.gui import display_compare
 from matchypatchy.gui import display_media
 from matchypatchy.gui import main_gui
 from matchypatchy.gui import media_table
-from matchypatchy.gui import query_base
-from matchypatchy.gui import query_manual
-from matchypatchy.gui import query_qc
 from matchypatchy.gui import widgets
 
 from matchypatchy.gui.dialogs import (AlertPopup, ConfigPopup, ImportCSVPopup,
@@ -27,10 +24,6 @@ from matchypatchy.gui.display_compare import (DisplayCompare,)
 from matchypatchy.gui.display_media import (DisplayMedia,)
 from matchypatchy.gui.main_gui import (MainWindow,)
 from matchypatchy.gui.media_table import (MediaTable,)
-from matchypatchy.gui.query_base import (BaseQueryContainer, KNN_OVERFETCH,
-                                         QueryContainer,)
-from matchypatchy.gui.query_manual import (ManualQueryContainer,)
-from matchypatchy.gui.query_qc import (QC_QueryContainer,)
 from matchypatchy.gui.widgets import (ClickableSlider, ComboBoxDelegate,
                                       ComboBoxSeparator, FilterBar, FilterBox,
                                       HorizontalSeparator, ImageAdjustBar,

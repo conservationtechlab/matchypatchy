@@ -1,30 +1,30 @@
 """
-Query container for manual mode (compare rois selected in the media view)
+Query container for QC mode (review the rois of each individual)
 """
 import pandas as pd
 from PyQt6.QtCore import pyqtSignal
 
 import matchypatchy.database.media as db_roi
-from matchypatchy.gui.query_base import BaseQueryContainer
+from matchypatchy.algorithm.query_base import BaseQueryContainer
 from matchypatchy.threads.model_download_thread import load_model
 
 
-class ManualQueryContainer(BaseQueryContainer):
+class QC_QueryContainer(BaseQueryContainer):
     """
     Alternate Query Container for QC Only
     """
     loaded_data = pyqtSignal(pd.DataFrame)
 
-    def __init__(self, parent, selected_ids):
+    def __init__(self, parent):
         super().__init__()
         self.project = parent.project
         self.parent = parent
-        self.selected_ids = selected_ids
         self.data_raw = pd.DataFrame()
         self.data = pd.DataFrame()
-        self.pair_table = pd.DataFrame()
+        self.individuals_raw = {}
+        self.individuals = {}
         self.filters = {}
-
+        self.ranked_sequences = []
         self.VIEWPOINT_DICT = load_model('VIEWPOINTS')
 
         self.current_query_rois = []
@@ -33,10 +33,9 @@ class ManualQueryContainer(BaseQueryContainer):
         self._all_query_rois = []
         self._all_match_rois = []
         self.current_query = 0
-        self.current_match = 1
+        self.current_match = 0
         self.current_query_sn = 0
         self.n_queries = 0
-        self.ranked_sequences = []
 
         # ROI REFERENCE
         self.current_query_rid = 0
@@ -53,14 +52,15 @@ class ManualQueryContainer(BaseQueryContainer):
         """
         Load ROI Table
         """
-        self.data_raw = db_roi.fetch_roi_media(self.mpDB, rids=self.selected_ids)
+        self.data_raw = db_roi.fetch_roi_media(self.mpDB)
         self.loaded_data.emit(self.data_raw)
         # no data
         if self.data_raw.empty:
             return False
 
-        # must have embeddings to continue
-        return not (self.data_raw["emb"] == 0).all()
+        self.individuals_raw = db_roi.individual_roi_dict(self.data_raw)
+        self.individuals_raw.pop(None, None)
+        return True
 
     # STEP 2
     def filter(self, filter_dict=None, valid_stations=None):
@@ -73,6 +73,7 @@ class ManualQueryContainer(BaseQueryContainer):
         """
         # create backups for filtering
         self.data = self.data_raw.copy()
+        self.individuals = self.individuals_raw.copy()
 
         if filter_dict is not None and valid_stations is not None:
             # Region Filter (depends on prefilterd stations from MediaDisplay)
@@ -91,40 +92,34 @@ class ManualQueryContainer(BaseQueryContainer):
             else:  # no valid stations, empty dataframe
                 return False
 
-        rois = self.data.index.tolist()
-        # set current query rois to all rois once
-        self.ranked_sequences = [[r] for r in rois]
-        # set number of queries to validate
-        self.n_queries = len(rois)
+            # Individual Filter
+            if filter_dict['active_individual'][0] > 0:
+                active_iid = filter_dict['active_individual'][0]
+                self.data = self.data[self.data['individual_id'] == int(active_iid)]
 
-        # need a second roi to compare against, a single roi would be its own match
-        if len(rois) > 1:
-            # set match to first entry
-            self._all_match_rois = list(rois)
-            self.current_match_rois = list(rois)
-            self.set_match(self.current_match)  # current_match default to 1
+        # create new dict of filtered individuals
+        self.individuals = db_roi.individual_roi_dict(self.data)
+        self.individuals.pop(None, None)
+
+        # Sort by Distance
+        # must have valid matches to continue
+        if self.individuals:
+            self.rank()
             return True
+        # filtered neighbor dict returns empty, all existing data must be from same individual
         else:
             return False
 
-    def calculate_neighbors(self):
-        """Calculate pairwise distances between all media in the current dataset."""
-        distances_list = []
-        for i in range(len(self.data.index.tolist())):
-            for j in range(i + 1, len(self.data.index.tolist())):  # Only j > i
-                id1, id2 = self.data.index.tolist()[i], self.data.index.tolist()[j]
-                similarity = self.mpDB.calculate_similarity(id1, id2)
-                # None if either roi has no embedding
-                distance = None if similarity is None else 1 - similarity
-
-                distances_list.append({
-                    'id1': id1,
-                    'id2': id2,
-                    'distance': distance
-                })
-
-        # explicit columns so lookups are safe when there are no pairs
-        self.pair_table = pd.DataFrame(distances_list, columns=['id1', 'id2', 'distance'])
+    def rank(self):
+        """
+        Rank the individuals by the number of ROIs they have.
+        The ranked list is stored in self.ranked_sequences.
+        Also sets the number of queries to validate.
+        """
+        # Rank by number of rois for each iid
+        self.ranked_sequences = sorted(self.individuals.items(), key=lambda x: len(x[1]), reverse=True)
+        # set number of queries to validate
+        self.n_queries = len(self.ranked_sequences)
 
     def set_query(self, n):
         """
@@ -138,18 +133,29 @@ class ManualQueryContainer(BaseQueryContainer):
 
         # set current query
         self.current_query = n
-        self._all_query_rois = list(self.ranked_sequences[self.current_query])
+        # get corresponding sequence_id and rois
+        current_sequence_id = self.ranked_sequences[self.current_query][0]
+        self._all_query_rois = list(self.individuals[current_sequence_id])
         self.current_query_rois = list(self._all_query_rois)
         # set view to first in sequence
         self.set_within_query_sequence(0)
         # update matches
-        # self.update_matches()  not necessary
+        self.update_matches()
+
+    # refresh match list
+    def update_matches(self):
+        """
+        Update match list if current_query changes
+        """
+        # get all matches for query
+        self._all_match_rois = list(self._all_query_rois)
+        self.current_match_rois = list(self.current_query_rois)
+
+        # set to top of matches, skip the first one which will be on the query side
+        self.set_match(1)
 
     # RETURN INFO --------------------------------------------------------------
     def current_distance(self):
-        """Return distance between current sequence and matchs"""
-        lower = min(self.current_query_rid, self.current_match_rid)
-        upper = max(self.current_query_rid, self.current_match_rid)
-        distance = self.pair_table.loc[(self.pair_table['id1'] == lower) & (self.pair_table['id2'] == upper), 'distance']
-        # None if the pair has no stored distance, 0 would display as a perfect match
-        return distance.values[0] if not distance.empty else None
+        """Distance between the query and match roi, None without embeddings"""
+        similarity = self.mpDB.calculate_similarity(self.current_query_rid, self.current_match_rid)
+        return None if similarity is None else 1 - similarity

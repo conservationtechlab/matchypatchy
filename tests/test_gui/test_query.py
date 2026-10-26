@@ -40,7 +40,7 @@ def _make_parent(db=None, cache_dir=None):
 
 def _make_qc(cache_dir, db=None):
     """Instantiate QueryContainer with a mocked parent and a temp cache dir."""
-    from matchypatchy.gui.query_base import QueryContainer
+    from matchypatchy.algorithm.query_base import QueryContainer
     parent = _make_parent(db, cache_dir)
     with patch(f"{QUERY}.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
         qc = QueryContainer(parent)
@@ -161,7 +161,7 @@ class TestQueryContainerInit:
         assert qc.threshold == 75
 
     def test_k_cache_is_overfetched(self, qc):
-        from matchypatchy.gui.query_base import KNN_OVERFETCH
+        from matchypatchy.algorithm.query_base import KNN_OVERFETCH
         assert qc.k == 3
         assert qc.k_cache == qc.k * KNN_OVERFETCH
 

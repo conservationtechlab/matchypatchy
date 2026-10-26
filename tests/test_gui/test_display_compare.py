@@ -27,10 +27,10 @@ def _make_parent(db=None):
 
 def _make_qc(db=None):
     """Instantiate QueryContainer with a mocked parent."""
-    from matchypatchy.gui.query_base import QueryContainer
+    from matchypatchy.algorithm.query_base import QueryContainer
     parent = _make_parent(db)
-    with patch("matchypatchy.gui.query_base.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
-        with patch("matchypatchy.gui.query_base.MatchEmbeddingThread"):
+    with patch("matchypatchy.algorithm.query_base.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
+        with patch("matchypatchy.algorithm.query_base.MatchEmbeddingThread"):
             qc = QueryContainer(parent)
     return qc
 

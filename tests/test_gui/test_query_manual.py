@@ -9,12 +9,12 @@ import pandas as pd
 
 def _make_mqc(similarities=None):
     """ManualQueryContainer with a mocked parent; similarities maps (id1, id2) -> similarity"""
-    from matchypatchy.gui.query_manual import ManualQueryContainer
+    from matchypatchy.algorithm.query_manual import ManualQueryContainer
 
     parent = MagicMock()
     similarities = similarities or {}
     parent.project.db.calculate_similarity.side_effect = lambda a, b: similarities.get((a, b))
-    with patch("matchypatchy.gui.query_manual.load_model", return_value={}):
+    with patch("matchypatchy.algorithm.query_manual.load_model", return_value={}):
         mqc = ManualQueryContainer(parent, selected_ids=[])
     return mqc
 
