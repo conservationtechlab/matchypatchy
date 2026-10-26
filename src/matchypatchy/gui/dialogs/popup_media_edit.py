@@ -228,7 +228,9 @@ class MediaEditPopup(UsesProject, QDialog):
     def toggle_edit_roi_button(self):
         """Enable or disable the edit ROI button based on whether the current image has an ROI."""
         has_roi = not pd.isna(self.data.iloc[self.current_image_index]["id"])
-        self.edit_btn.setEnabled(has_roi)
+        # in the roi view the full video row has no roi of its own, a box drawn on any of
+        # its frames replaces the video's placeholder roi, or else is added as a new roi
+        self.edit_btn.setEnabled(has_roi or self.data_type == 1)
         # in the roi view the full video row has no roi to delete
         self.delete_btn.setEnabled(has_roi or self.data_type == 0)
 
@@ -285,8 +287,15 @@ class MediaEditPopup(UsesProject, QDialog):
                                                        self.data.iloc[self.current_image_index]["ext"],
                                                        frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     self.mpDB.batch_update_thumbnails("roi_thumbnails", "fid", {rid: {"filepath": roi_thumbnail}})
-                    # update internal data
+                    # update internal data, the placeholder's own row if it is shown (drawn
+                    # from the full video row in the roi view), else the current row
                     row_label = self.data.index[self.current_image_index]
+                    if fills_boxless and self.data_type == 1:
+                        # the full video row's id is NA, which == can't compare
+                        placeholder = self.data.index[pd.to_numeric(self.data["id"], errors="coerce") == rid]
+                        if len(placeholder):
+                            row_label = placeholder[0]
+                            self.data.loc[row_label, "frame"] = frame
                     cols = ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]
                     self.data.loc[row_label, cols] = [bbox_x, bbox_y, bbox_w, bbox_h]
                     self.data.loc[row_label, "thumbnail_path"] = roi_thumbnail

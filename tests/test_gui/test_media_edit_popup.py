@@ -7,6 +7,7 @@ display is needed. PyQt6 is stubbed out in conftest.py.
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 POPUP = "matchypatchy.gui.dialogs.popup_media_edit"
 
@@ -158,7 +159,7 @@ class TestSaveRoi:
     def test_box_on_video_row_fills_its_boxless_roi(self):
         """The full video row in the roi view has no roi id of its own"""
         from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
-        data = pd.DataFrame({"id": [40, pd.NA], "media_id": [5, 5], "filepath": ["v.mp4"] * 2,
+        data = pd.DataFrame({"id": [40, pd.NA], "media_id": [5, 5], "frame": [0, pd.NA], "filepath": ["v.mp4"] * 2,
                              "ext": [".mp4"] * 2, "bbox_x": [-1, None], "bbox_y": [-1, None],
                              "bbox_w": [-1, None], "bbox_h": [-1, None], "thumbnail_path": ["a", "b"]})
         dialog = _popup(data, data_type=1, index=1)
@@ -173,6 +174,18 @@ class TestSaveRoi:
         dialog.mpDB.edit_row.assert_called_once_with(
             "roi", 40, {"frame": 12, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "emb": 0})
         dialog.mpDB.add_roi.assert_not_called()
+        # the placeholder's row shows the box, the full video row stays a video
+        assert dialog.data.loc[0, ["frame", "bbox_w", "thumbnail_path"]].tolist() == [12, 0.25, "new.jpg"]
+        assert pd.isna(dialog.data.loc[1, "bbox_w"])
+
+    @pytest.mark.parametrize("data_type, index, enabled", [(1, 0, True), (1, 2, True), (0, 0, True)])
+    def test_edit_roi_enabled_on_full_video_row(self, data_type, index, enabled):
+        from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+        dialog = _popup(_roi_rows(), data_type=data_type, index=index)
+        MediaEditPopup.toggle_edit_roi_button(dialog)
+        dialog.edit_btn.setEnabled.assert_called_once_with(enabled)
+        # still nothing to delete on the roi view's full video row
+        dialog.delete_btn.setEnabled.assert_called_once_with(not (data_type == 1 and index == 2))
 
     def test_box_on_media_without_boxless_roi_adds_one(self):
         dialog, prompt = self._draw_on_media(boxless=None)
