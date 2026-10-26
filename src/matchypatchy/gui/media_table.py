@@ -206,6 +206,11 @@ class MediaTable(UsesProject, QAbstractTableModel):
                     return None if pd.isna(iid) else 'Unknown'
                 return str(value)
 
+        # roi count, clicked to show those rois
+        if self._columns[col] == "roi_count" and self._data_filtered.at[row, "roi_count"]:
+            if role == Qt.ItemDataRole.ToolTipRole:
+                return "Click to show these ROIs"
+
         if role == Qt.ItemDataRole.DisplayRole:
             # Return the raw data directly from your memory structure
             if pd.isna(self._data_filtered.at[row, self._columns[col]]):

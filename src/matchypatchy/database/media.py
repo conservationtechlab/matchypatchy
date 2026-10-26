@@ -375,12 +375,23 @@ def clear_individual(mpDB, roi_ids):
 
 # LOOKUPS ======================================================================
 def media_without_rois(mpDB):
-    """Ids of media that have no rois"""
+    """
+    Ids of media that have no rois, or a roi without a box (bbox_w -1)
+
+    A box drawn on such media in the edit popup fills its box-less roi (boxless_roi),
+    so media leave this list once all of their rois have boxes
+    """
     rows = mpDB.query("""SELECT DISTINCT media.id FROM media
                          LEFT JOIN roi ON roi.media_id = media.id
                          WHERE roi.media_id IS NULL
                          OR roi.bbox_w = -1;""")
     return [row[0] for row in rows or []]
+
+
+def boxless_roi(mpDB, media_id):
+    """Id of a roi of media_id without a box (bbox_w -1), the lowest if several, else None"""
+    rows = mpDB.query("SELECT MIN(id) FROM roi WHERE media_id = ? AND bbox_w = -1;", (int(media_id),))
+    return rows[0][0] if rows else None
 
 
 def uploads_with_media_counts(mpDB):

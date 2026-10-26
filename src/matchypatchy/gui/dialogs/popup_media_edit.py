@@ -14,7 +14,7 @@ from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, TextEditWit
 
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.media import (fetch_individual, get_roi_bbox, EditObject, delete_media, delete_rois,
-                                         update_roi_box)
+                                         update_roi_box, boxless_roi)
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.project import UsesProject
@@ -106,8 +106,8 @@ class MediaEditPopup(UsesProject, QDialog):
         self.reset_btn.clicked.connect(self.reset)
         button_layout.addWidget(self.reset_btn)
 
-        # Delete button
-        self.delete_btn = QPushButton("Delete Image")
+        # Delete button, deletes the roi in the roi view, the whole media otherwise
+        self.delete_btn = QPushButton("Delete ROI" if self.data_type == 1 else "Delete Media")
         self.delete_btn.clicked.connect(self.delete)
         button_layout.addWidget(self.delete_btn)
 
@@ -228,7 +228,9 @@ class MediaEditPopup(UsesProject, QDialog):
     def toggle_edit_roi_button(self):
         """Enable or disable the edit ROI button based on whether the current image has an ROI."""
         has_roi = not pd.isna(self.data.iloc[self.current_image_index]["id"])
-        self.edit_btn.setEnabled(has_roi)
+        # in the roi view the full video row has no roi of its own, a box drawn on any of
+        # its frames replaces the video's placeholder roi, or else is added as a new roi
+        self.edit_btn.setEnabled(has_roi or self.data_type == 1)
         # in the roi view the full video row has no roi to delete
         self.delete_btn.setEnabled(has_roi or self.data_type == 0)
 
@@ -257,14 +259,23 @@ class MediaEditPopup(UsesProject, QDialog):
                 media_id = self.data.iloc[self.current_image_index]["media_id"]  # roi
                 rid = self.data.iloc[self.current_image_index]["id"]
                 if pd.isna(rid):
-                    rid = None
+                    rid = None  # the full video row of a video's rois
             except KeyError:
                 media_id = self.data.iloc[self.current_image_index]["id"]  # media only
                 rid = None
+            # a new box, on any frame, replaces a roi imported without a box rather than
+            # adding one beside it, so the media leaves the Missing/Unspecified ROI filter
+            fills_boxless = False
+            if rid is None:
+                rid = boxless_roi(self.mpDB, media_id)
+                fills_boxless = rid is not None
 
             # edit existing roi
             if rid is not None:
-                prompt = "This will update the existing ROI. You will need to rerun step 2. Process to get new embeddings."
+                if fills_boxless:
+                    prompt = "This will replace this media's placeholder ROI, which has no box. You will need to rerun step 2. Process to get new embeddings."
+                else:
+                    prompt = "This will update the existing ROI. You will need to rerun step 2. Process to get new embeddings."
                 dialog = AlertPopup(self, prompt=prompt)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     rid = int(rid)
@@ -276,8 +287,15 @@ class MediaEditPopup(UsesProject, QDialog):
                                                        self.data.iloc[self.current_image_index]["ext"],
                                                        frame, bbox_x, bbox_y, bbox_w, bbox_h)
                     self.mpDB.batch_update_thumbnails("roi_thumbnails", "fid", {rid: {"filepath": roi_thumbnail}})
-                    # update internal data
+                    # update internal data, the placeholder's own row if it is shown (drawn
+                    # from the full video row in the roi view), else the current row
                     row_label = self.data.index[self.current_image_index]
+                    if fills_boxless and self.data_type == 1:
+                        # the full video row's id is NA, which == can't compare
+                        placeholder = self.data.index[pd.to_numeric(self.data["id"], errors="coerce") == rid]
+                        if len(placeholder):
+                            row_label = placeholder[0]
+                            self.data.loc[row_label, "frame"] = frame
                     cols = ["bbox_x", "bbox_y", "bbox_w", "bbox_h"]
                     self.data.loc[row_label, cols] = [bbox_x, bbox_y, bbox_w, bbox_h]
                     self.data.loc[row_label, "thumbnail_path"] = roi_thumbnail
@@ -321,7 +339,7 @@ class MediaEditPopup(UsesProject, QDialog):
         self.image.reset()
 
     def delete(self):
-        """Delete the current roi, or the current image in the Full Images view"""
+        """Delete the current roi, or the current media in the Full Images view"""
         row = self.data.iloc[self.current_image_index]
         if self.data_type == 1:
             # the full video row has no roi to delete
@@ -329,7 +347,7 @@ class MediaEditPopup(UsesProject, QDialog):
                 return
             prompt = "Are you sure you want to delete this ROI? This action cannot be undone."
         else:
-            prompt = "Are you sure you want to delete this image and all of its ROIs? This action cannot be undone."
+            prompt = "Are you sure you want to delete this media and all of its ROIs? This action cannot be undone."
         dialog = AlertPopup(self, prompt=prompt)
         confirmed = dialog.exec()
         del dialog
