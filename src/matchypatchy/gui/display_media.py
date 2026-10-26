@@ -118,6 +118,11 @@ class DisplayMedia(UsesProject, QWidget):
         button_clear_filter.clicked.connect(self.clear_filters)
         second_layer.addWidget(button_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         second_layer.addWidget(button_clear_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # leaves the rois of a clicked # of Rois, only shown there
+        self.button_back = QPushButton("Back to All Media")
+        self.button_back.clicked.connect(self.back_to_media)
+        self.button_back.setVisible(False)
+        second_layer.addWidget(self.button_back, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         second_layer.addStretch()
         layout.addLayout(second_layer)
 
@@ -285,6 +290,7 @@ class DisplayMedia(UsesProject, QWidget):
         self.filterbar.viewpoint_visible(self.data_type == 1)
         self.filterbar.no_roi_visible(self.data_type == 0)
         self.filterbar.media_only_visible(self.data_type == 1)
+        self.button_back.setVisible(self.data_type == 1 and self.filters['media_ids'] is not False)
 
     def clear_filters(self):
         """Clear all filters and refresh the table"""
@@ -345,6 +351,17 @@ class DisplayMedia(UsesProject, QWidget):
             return
         # switches the view to rois
         self.refresh_filters(prefilter={'media_ids': [int(row["id"])]})
+        self.load_table()
+
+    def back_to_media(self):
+        """Leave a clicked media's rois for all media, unfiltered"""
+        if not self._drop_edits_to_change_view():
+            return
+        self.data_type = 0
+        self.show_type.blockSignals(True)
+        self.show_type.setCurrentIndex(self.data_type)
+        self.show_type.blockSignals(False)
+        self.refresh_filters()
         self.load_table()
 
     # 1. RUN ON ENTRY

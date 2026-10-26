@@ -84,6 +84,7 @@ def _make_display_media():
         dm.button_select = MagicMock()
         dm.count_label = MagicMock()
         dm.view = MagicMock()
+        dm.button_back = MagicMock()
 
         dm.SAVE_STYLE = " QPushButton { background-color: #2a3e5e; color: white; }"
 
@@ -572,6 +573,39 @@ class TestMediaRois:
         dm.filters = dict(dm.filters, media_ids=[1])
         DisplayMedia.filter_data(dm)  # the helper mocks filter_data
         assert dm._data_filtered["id"].tolist() == [10, 11]
+
+
+class TestBackToMedia:
+    def test_back_shows_all_media(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.refresh_filters = MagicMock()
+        dm.load_table = MagicMock()
+        dm._drop_edits_to_change_view = MagicMock(return_value=True)
+        DisplayMedia.back_to_media(dm)
+        assert dm.data_type == 0
+        dm.show_type.setCurrentIndex.assert_called_once_with(0)
+        dm.refresh_filters.assert_called_once_with()
+        dm.load_table.assert_called_once()
+
+    def test_back_kept_when_edits_not_dropped(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.load_table = MagicMock()
+        dm._drop_edits_to_change_view = MagicMock(return_value=False)
+        DisplayMedia.back_to_media(dm)
+        assert dm.data_type == 1
+        dm.load_table.assert_not_called()
+
+    @pytest.mark.parametrize("data_type, media_ids, shown", [(1, [7], True), (1, False, False),
+                                                             (0, [7], False)])
+    def test_back_button_only_on_clicked_media_rois(self, data_type, media_ids, shown):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = data_type
+        dm.filters = dict(dm.filters, media_ids=media_ids)
+        DisplayMedia.toggle_filterbar_datatype(dm)
+        dm.button_back.setVisible.assert_called_with(shown)
 
 
 class TestSupersededLoad:

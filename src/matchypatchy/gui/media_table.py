@@ -2,8 +2,7 @@
 Widget for displaying list of Media
 """
 import pandas as pd
-from PyQt6.QtGui import QFont, QPalette, QPixmap, QPixmapCache
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtGui import QPixmap, QPixmapCache
 
 from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal, QAbstractTableModel
 
@@ -209,12 +208,6 @@ class MediaTable(UsesProject, QAbstractTableModel):
 
         # roi count, clicked to show those rois
         if self._columns[col] == "roi_count" and self._data_filtered.at[row, "roi_count"]:
-            if role == Qt.ItemDataRole.ForegroundRole:
-                return QApplication.palette().color(QPalette.ColorRole.Link)
-            if role == Qt.ItemDataRole.FontRole:
-                font = QFont()
-                font.setUnderline(True)
-                return font
             if role == Qt.ItemDataRole.ToolTipRole:
                 return "Click to show these ROIs"
 
