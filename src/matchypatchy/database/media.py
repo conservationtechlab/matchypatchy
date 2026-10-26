@@ -234,9 +234,30 @@ def _group_roi_ids(roi_media, column):
     return roi_dict
 
 
+def _capture_order(roi_media):
+    """
+    Sort rois by capture: timestamp, then filepath and frame for bursts/video
+    sharing a timestamp, then roi id.
+
+    Called by sequence_roi_dict. Timestamps are parsed because they
+    are stored as text in mixed formats (see sequence_thread).
+    """
+    if roi_media.empty:
+        return roi_media
+    keys = pd.DataFrame({
+        'timestamp': pd.to_datetime(roi_media['timestamp'], format='mixed', errors='coerce'),
+        'filepath': roi_media['filepath'],
+        'frame': roi_media['frame'],
+        'roi_id': roi_media.index,
+    }, index=roi_media.index)
+    order = keys.sort_values(['timestamp', 'filepath', 'frame', 'roi_id'],
+                             kind='stable', na_position='last').index
+    return roi_media.loc[order]
+
+
 def sequence_roi_dict(roi_media):
     """Return dict of sequence_id: [roi.ids]"""
-    return _group_roi_ids(roi_media, "sequence_id")
+    return _group_roi_ids(_capture_order(roi_media), "sequence_id")
 
 
 def individual_roi_dict(roi_media):
