@@ -136,6 +136,7 @@ class DisplayMedia(UsesProject, QWidget):
         self.view.horizontalHeader().setDefaultSectionSize(100)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.view.doubleClicked.connect(self.edit_thumbnail)
+        self.view.clicked.connect(self.show_media_rois)
         self.view.setColumnWidth(0, 50)  # Set the width of the select column
         self.view.setColumnWidth(1, THUMBNAIL_SIZE + 10)  # Set the width of the thumbnail column
         self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
@@ -252,8 +253,9 @@ class DisplayMedia(UsesProject, QWidget):
         """
         # wipe previous selections
         self.filterbar.refresh_filters(prefilter=prefilter)
-        # individual and unidentified filters only apply to rois
-        if prefilter and ('individual_id' in prefilter or prefilter.get('unidentified_only')):
+        # individual, unidentified and clicked media filters only apply to rois
+        if prefilter and ('individual_id' in prefilter or prefilter.get('unidentified_only')
+                          or prefilter.get('media_ids')):
             if self.data_type != 1:
                 self.data_type = 1
                 # change_type would load the table again
@@ -282,6 +284,7 @@ class DisplayMedia(UsesProject, QWidget):
         self.filterbar.favorites_visible(self.data_type == 1)
         self.filterbar.viewpoint_visible(self.data_type == 1)
         self.filterbar.no_roi_visible(self.data_type == 0)
+        self.filterbar.media_only_visible(self.data_type == 1)
 
     def clear_filters(self):
         """Clear all filters and refresh the table"""
@@ -293,25 +296,55 @@ class DisplayMedia(UsesProject, QWidget):
     # =========================================================================
 
     # CHANGE VIEW TYPE (FULL IMAGE / ROI)
-    def change_type(self):
-        """Change between full image and ROI view"""
+    def _drop_edits_to_change_view(self):
+        """
+        Ask before discarding unsaved edits for a change of view, False if the user declines
+
+        Called by change_type and show_media_rois, which both reload the table as the other
+        data type, so the edit stack's rows no longer apply. Kept separate so both ask the
+        same question and clear the undo button the same way.
+        """
         if len(self.edit_stack) > 0:
             dialog = AlertPopup(self, prompt="Are you sure you want to change view? There are unsaved changes that will be lost.")
             cont = dialog.exec()
             del dialog
             if cont == QDialog.DialogCode.Rejected:
-                self.show_type.blockSignals(True)
-                self.show_type.setCurrentIndex(self.data_type)
-                self.show_type.blockSignals(False)
-                return
+                return False
         # Clear unsaved edits since user confirmed they want to change view
         self.edit_stack.clear()
         self.check_undo_button()
-            
+        return True
+
+    def change_type(self):
+        """Change between full image and ROI view"""
+        if not self._drop_edits_to_change_view():
+            self.show_type.blockSignals(True)
+            self.show_type.setCurrentIndex(self.data_type)
+            self.show_type.blockSignals(False)
+            return
+
         # change type to selected
         self.data_type = self.show_type.currentIndex()
         # reload table
         self.toggle_filterbar_datatype()
+        self.load_table()
+
+    def show_media_rois(self, index):
+        """
+        Show the rois of the media whose # of Rois cell was clicked
+
+        Connected to the view's clicked signal; other cells, the roi view and media
+        without rois are ignored. The other filters are cleared so every roi shows.
+        """
+        if self.data_type != 0 or self.media_table._columns[index.column()] != "roi_count":
+            return
+        row = self.media_table._data_filtered.iloc[index.row()]
+        if pd.isna(row["roi_count"]) or int(row["roi_count"]) == 0:
+            return
+        if not self._drop_edits_to_change_view():
+            return
+        # switches the view to rois
+        self.refresh_filters(prefilter={'media_ids': [int(row["id"])]})
         self.load_table()
 
     # 1. RUN ON ENTRY
@@ -488,6 +521,9 @@ class DisplayMedia(UsesProject, QWidget):
             # Favorites Filter
             if self.filters['favorites_only']:
                 self._data_filtered = self._data_filtered[self._data_filtered['favorite'] == 1]
+            # Clicked Media Filter
+            if self.filters['media_ids'] is not False:
+                self._data_filtered = self._data_filtered[self._data_filtered['media_id'].isin(self.filters['media_ids'])]
         else:
             if self.filters['no_roi_mids'] is not False:
                 self._data_filtered = self._data_filtered[self._data_filtered['id'].isin(self.filters['no_roi_mids'])]

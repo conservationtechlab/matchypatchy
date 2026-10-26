@@ -65,6 +65,7 @@ def _make_display_media():
             "unidentified_only": False,
             "favorites_only": False,
             "no_roi_mids": False,
+            "media_ids": False,
         }
         dm.filterbar.get_valid_stations.return_value = {1: "S1", 2: "S2"}
         dm.filters = dm.filterbar.get_filters()
@@ -519,7 +520,7 @@ class TestIndividualPrefilter:
         return dm
 
     @pytest.mark.parametrize("prefilter", [{"individual_id": 5}, {"individual_id": 0},
-                                           {"unidentified_only": True}])
+                                           {"unidentified_only": True}, {"media_ids": [1]}])
     def test_switches_to_rois(self, prefilter):
         dm = self._refresh(prefilter)
         assert dm.data_type == 1
@@ -533,6 +534,44 @@ class TestIndividualPrefilter:
         dm = self._refresh(prefilter)
         assert dm.data_type == 0
         dm.show_type.setCurrentIndex.assert_not_called()
+
+
+class TestMediaRois:
+    """Clicking a media's # of Rois shows only that media's rois"""
+
+    def _click(self, column, roi_count=2, data_type=0, edits_ok=True):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.data_type = data_type
+        dm.media_table._columns = ["select", "thumbnail_path", "roi_count"]
+        dm.media_table._data_filtered = pd.DataFrame({"id": [7], "roi_count": [roi_count]})
+        dm.refresh_filters = MagicMock()
+        dm.load_table = MagicMock()
+        dm._drop_edits_to_change_view = MagicMock(return_value=edits_ok)
+        DisplayMedia.show_media_rois(dm, SimpleNamespace(row=lambda: 0, column=lambda: column))
+        return dm
+
+    def test_count_click_filters_to_media_rois(self):
+        dm = self._click(2)
+        dm.refresh_filters.assert_called_once_with(prefilter={'media_ids': [7]})
+        dm.load_table.assert_called_once()
+
+    @pytest.mark.parametrize("kwargs", [{"column": 1}, {"column": 2, "roi_count": 0},
+                                        {"column": 2, "data_type": 1},
+                                        {"column": 2, "edits_ok": False}])
+    def test_ignored(self, kwargs):
+        dm = self._click(**kwargs)
+        dm.refresh_filters.assert_not_called()
+        dm.load_table.assert_not_called()
+
+    def test_filter_keeps_only_clicked_media(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.mpDB.select.return_value = []
+        dm._data_filtered = _sample_roi_data()
+        dm.filters = dict(dm.filters, media_ids=[1])
+        DisplayMedia.filter_data(dm)  # the helper mocks filter_data
+        assert dm._data_filtered["id"].tolist() == [10, 11]
 
 
 class TestSupersededLoad:

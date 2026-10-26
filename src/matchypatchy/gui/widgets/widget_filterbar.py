@@ -71,6 +71,12 @@ class FilterBar(UsesProject, QWidget):
         self.favorites.toggled.connect(self.select_favorites)
         self.favorites_only = False
         layout.addWidget(self.favorites, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # MEDIA, only set by clicking a media's # of Rois, so hidden until then
+        self.media_only = QCheckBox("Clicked Media's ROIs")
+        self.media_only.toggled.connect(self.select_media_only)
+        self.media_ids = False
+        self.media_only.setVisible(False)
+        layout.addWidget(self.media_only, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.setLayout(layout)
         self.project.data_changed.connect(self.lists_written)
@@ -147,6 +153,7 @@ class FilterBar(UsesProject, QWidget):
         self.unidentified.blockSignals(True)
         self.favorites.blockSignals(True)
         self.no_roi.blockSignals(True)
+        self.media_only.blockSignals(True)
 
         # reset all filter selections to default, reload region, survey and individual lists in case they have changed
         self.region_select.clear()
@@ -175,6 +182,9 @@ class FilterBar(UsesProject, QWidget):
         self.unidentified.setChecked(False)
         self.favorites.setChecked(False)
         self.no_roi.setChecked(False)
+        self.media_ids = False
+        self.media_only.setChecked(False)
+        self.media_only.setVisible(False)
 
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
@@ -183,7 +193,8 @@ class FilterBar(UsesProject, QWidget):
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only,
-                        'no_roi_mids': self.no_roi_mids}
+                        'no_roi_mids': self.no_roi_mids,
+                        'media_ids': self.media_ids}
 
         if prefilter:
             # TODO: Implement prefiltering for other filter types as needed
@@ -193,6 +204,11 @@ class FilterBar(UsesProject, QWidget):
                     self.no_roi.setChecked(True)
                 else:
                     self.no_roi.setChecked(False)
+
+            if 'media_ids' in prefilter.keys():
+                self.media_ids = prefilter['media_ids']
+                self.media_only.setChecked(self.media_ids is not False)
+                self.media_only.setVisible(self.media_ids is not False)
 
             if 'unidentified_only' in prefilter.keys():
                 self.unidentified_only = prefilter['unidentified_only']
@@ -221,6 +237,7 @@ class FilterBar(UsesProject, QWidget):
         self.unidentified.blockSignals(False)
         self.favorites.blockSignals(False)
         self.no_roi.blockSignals(False)
+        self.media_only.blockSignals(False)
 
     def select_region(self):
         """Handle selection of a region from the region combobox."""
@@ -265,6 +282,11 @@ class FilterBar(UsesProject, QWidget):
             self.no_roi_mids = media_without_rois(self.mpDB)
         else:
             self.no_roi_mids = False
+
+    def select_media_only(self):
+        """Turn off the clicked media filter; it can only be turned back on by clicking again"""
+        if not self.media_only.isChecked():
+            self.media_ids = False
 
     def requery_no_roi(self):
         """
@@ -326,7 +348,8 @@ class FilterBar(UsesProject, QWidget):
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only,
-                        'no_roi_mids': self.no_roi_mids}
+                        'no_roi_mids': self.no_roi_mids,
+                        'media_ids': self.media_ids}
         return self.filters
 
     def get_valid_stations(self):
@@ -352,6 +375,10 @@ class FilterBar(UsesProject, QWidget):
     def no_roi_visible(self, visible: bool):
         """Set no ROI checkbox visibility"""
         self.no_roi.setVisible(visible)
+
+    def media_only_visible(self, visible: bool):
+        """Set clicked media checkbox visibility, only shown while that filter is set"""
+        self.media_only.setVisible(visible and self.media_ids is not False)
 
 
 class FilterBox(QComboBox):
