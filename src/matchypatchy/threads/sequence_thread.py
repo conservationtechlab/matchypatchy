@@ -13,11 +13,6 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.database.media import fetch_media
 
 
-def same_camera(a, b):
-    """Two images are from the same camera, never true without a camera since they can't be compared"""
-    return not pd.isna(a) and a == b
-
-
 class SequenceThread(QThread):
     """Thread for processing media sequences based on station, camera, and timestamp."""
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
@@ -47,8 +42,7 @@ class SequenceThread(QThread):
                     # station and camera are the same, timestamp under threshold
                     # images without a camera each get their own sequence
                     if (image['station_id'] == current_sequence[0]['station_id']) and \
-                        same_camera(image['camera_id'], current_sequence[0]['camera_id']) and \
-                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time):
+                       (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time):
                         current_sequence.append(image)
                     else:
                         # bank the current sequence and start a new group
