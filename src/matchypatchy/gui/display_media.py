@@ -29,6 +29,12 @@ class DisplayMedia(UsesProject, QWidget):
     """GUI class for displaying and managing media content."""
 
     SAVE_STYLE = """ QPushButton { background-color: #2a3e5e; color: white; }"""
+    # widths of the columns that don't use the default, by column name
+    COLUMN_WIDTHS = {"select": 50,
+                     "thumbnail_path": THUMBNAIL_SIZE + 10,
+                     "filepath": 50,  # stretches to fill the rest
+                     "ext": 80,
+                     "timestamp": 180}
     edit_stack_signal = pyqtSignal(list)  # Signal to send edit stack to main GUI
 
     def __init__(self, parent, data_type=1):
@@ -136,10 +142,7 @@ class DisplayMedia(UsesProject, QWidget):
         self.view.horizontalHeader().setDefaultSectionSize(100)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
         self.view.doubleClicked.connect(self.edit_thumbnail)
-        self.view.setColumnWidth(0, 50)  # Set the width of the select column
-        self.view.setColumnWidth(1, THUMBNAIL_SIZE + 10)  # Set the width of the thumbnail column
-        self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
-        self.view.setColumnWidth(3, 180)  # Set the width of the timestamp column
+        self._set_column_widths()
 
         self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
@@ -401,10 +404,14 @@ class DisplayMedia(UsesProject, QWidget):
         self.apply_edits()  # Apply any pending edits to the raw data before filtering
         self.filter_data()  # Apply filters to the raw data to get the filtered data
         headers = self._get_headers()
+        # widths set by hand are kept until the view type swaps the columns
+        columns_changed = self.media_table._columns != [h[0] for h in headers.values()]
         self.media_table.receiveData(self._data_filtered, headers=headers) # Send the filtered data to the media table for display
         # reloaded rows come back unticked
         self.button_select.setChecked(False)
         self._apply_sort()
+        if columns_changed:
+            self._set_column_widths()
         self._set_delegates()
         self.update_count_label()
         self.update_edd_buttons()
@@ -732,15 +739,27 @@ class DisplayMedia(UsesProject, QWidget):
                 headers = {0: ["select", "Select"],
                            1: ["thumbnail_path", "Thumbnail"],
                            2: ["filepath", "Filepath"],
-                           3: ["timestamp", "Timestamp"],
-                           4: ["station_id", "Station"],
-                           5: ["camera_id", "Camera"],
-                           6: ["sequence_id", "Sequence ID"],
-                           7: ["external_id", "External ID"],
-                           8: ["comment", "Comment"],
-                           9: ["roi_count", "# of Rois"],
-                           10: ["ext", "Extension"]}
+                           3: ["ext", "Extension"],
+                           4: ["timestamp", "Timestamp"],
+                           5: ["station_id", "Station"],
+                           6: ["camera_id", "Camera"],
+                           7: ["sequence_id", "Sequence ID"],
+                           8: ["external_id", "External ID"],
+                           9: ["comment", "Comment"],
+                           10: ["roi_count", "# of Rois"]}
             return headers
+
+    def _set_column_widths(self):
+        """
+        Size the table's columns by name, the rest at the header's default width
+
+        Called from __init__ and by handle_data_loaded when the headers change, since
+        the view keeps widths by position and the two data types put different columns
+        at the same position (eg. Extension is only in the media view).
+        """
+        default = self.view.horizontalHeader().defaultSectionSize()
+        for i, column in enumerate(self.media_table._columns):
+            self.view.setColumnWidth(i, self.COLUMN_WIDTHS.get(column, default))
 
     def _set_delegates(self):
         """Set delegates for the table based on the data type"""

@@ -642,5 +642,15 @@ class TestHeaders:
         dm = _make_display_media()
         dm.data_type = 0
         assert ["ext", "Extension"] in DisplayMedia._get_headers(dm).values()
+        assert DisplayMedia._get_headers(dm)[3] == ["ext", "Extension"]  # after filepath
         dm.data_type = 1
         assert ["ext", "Extension"] not in DisplayMedia._get_headers(dm).values()
+
+    def test_widths_follow_column_names(self):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.media_table._columns = ["select", "filepath", "ext", "timestamp", "comment"]
+        dm.view.horizontalHeader.return_value.defaultSectionSize.return_value = 100
+        DisplayMedia._set_column_widths(dm)
+        assert [c.args for c in dm.view.setColumnWidth.call_args_list] == [
+            (0, 50), (1, 50), (2, 80), (3, 180), (4, 100)]
