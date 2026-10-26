@@ -127,6 +127,59 @@ class TestSaveRoi:
         assert dialog.data.loc[0, "bbox_x"] == 0.3
         assert dialog.roi_updated is True
 
+    def _draw_on_media(self, boxless):
+        """Draw a box in the Full Images view, on media 5 whose box-less roi is boxless"""
+        from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+        data = pd.DataFrame({"id": [5], "filepath": ["v.mp4"], "ext": [".mp4"],
+                             "bbox_x": [None], "bbox_y": [None], "bbox_w": [None], "bbox_h": [None],
+                             "thumbnail_path": ["old.jpg"]})
+        dialog = _popup(data, data_type=0)
+        dialog.new_bbox = {"bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "frame": 12}
+        dialog.mpDB.add_roi.return_value = 99
+        confirm = MagicMock()
+        with patch(f"{POPUP}.QDialog") as qdialog, \
+                patch(f"{POPUP}.AlertPopup", return_value=confirm) as alert, \
+                patch(f"{POPUP}.boxless_roi", return_value=boxless) as lookup, \
+                patch(f"{POPUP}.save_roi_thumbnail", return_value="new.jpg"):
+            confirm.exec.return_value = qdialog.DialogCode.Accepted
+            MediaEditPopup.save_roi(dialog)
+        lookup.assert_called_once_with(dialog.mpDB, 5)
+        return dialog, alert.call_args.kwargs["prompt"]
+
+    def test_box_on_media_fills_its_boxless_roi(self):
+        dialog, prompt = self._draw_on_media(boxless=40)
+        dialog.mpDB.edit_row.assert_called_once_with(
+            "roi", 40, {"frame": 12, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "emb": 0})
+        dialog.mpDB.batch_update_thumbnails.assert_called_once_with(
+            "roi_thumbnails", "fid", {40: {"filepath": "new.jpg"}})
+        dialog.mpDB.add_roi.assert_not_called()
+        assert "placeholder" in prompt
+
+    def test_box_on_video_row_fills_its_boxless_roi(self):
+        """The full video row in the roi view has no roi id of its own"""
+        from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
+        data = pd.DataFrame({"id": [40, pd.NA], "media_id": [5, 5], "filepath": ["v.mp4"] * 2,
+                             "ext": [".mp4"] * 2, "bbox_x": [-1, None], "bbox_y": [-1, None],
+                             "bbox_w": [-1, None], "bbox_h": [-1, None], "thumbnail_path": ["a", "b"]})
+        dialog = _popup(data, data_type=1, index=1)
+        dialog.new_bbox = {"bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "frame": 12}
+        confirm = MagicMock()
+        with patch(f"{POPUP}.QDialog") as qdialog, \
+                patch(f"{POPUP}.AlertPopup", return_value=confirm), \
+                patch(f"{POPUP}.boxless_roi", return_value=40), \
+                patch(f"{POPUP}.save_roi_thumbnail", return_value="new.jpg"):
+            confirm.exec.return_value = qdialog.DialogCode.Accepted
+            MediaEditPopup.save_roi(dialog)
+        dialog.mpDB.edit_row.assert_called_once_with(
+            "roi", 40, {"frame": 12, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "emb": 0})
+        dialog.mpDB.add_roi.assert_not_called()
+
+    def test_box_on_media_without_boxless_roi_adds_one(self):
+        dialog, prompt = self._draw_on_media(boxless=None)
+        dialog.mpDB.add_roi.assert_called_once_with(5, 12, 0.3, 0.4, 0.25, 0.5)
+        dialog.mpDB.edit_row.assert_not_called()
+        assert "create a new ROI" in prompt
+
 
 def _panel(data):
     """MagicMock standing in for a MetadataPanel over the given rows"""

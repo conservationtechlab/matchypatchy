@@ -14,7 +14,7 @@ from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, TextEditWit
 
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.media import (fetch_individual, get_roi_bbox, EditObject, delete_media, delete_rois,
-                                         update_roi_box)
+                                         update_roi_box, boxless_roi)
 from matchypatchy.database.location import fetch_station_names_from_id
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.project import UsesProject
@@ -257,14 +257,23 @@ class MediaEditPopup(UsesProject, QDialog):
                 media_id = self.data.iloc[self.current_image_index]["media_id"]  # roi
                 rid = self.data.iloc[self.current_image_index]["id"]
                 if pd.isna(rid):
-                    rid = None
+                    rid = None  # the full video row of a video's rois
             except KeyError:
                 media_id = self.data.iloc[self.current_image_index]["id"]  # media only
                 rid = None
+            # a new box, on any frame, replaces a roi imported without a box rather than
+            # adding one beside it, so the media leaves the Missing/Unspecified ROI filter
+            fills_boxless = False
+            if rid is None:
+                rid = boxless_roi(self.mpDB, media_id)
+                fills_boxless = rid is not None
 
             # edit existing roi
             if rid is not None:
-                prompt = "This will update the existing ROI. You will need to rerun step 2. Process to get new embeddings."
+                if fills_boxless:
+                    prompt = "This will replace this media's placeholder ROI, which has no box. You will need to rerun step 2. Process to get new embeddings."
+                else:
+                    prompt = "This will update the existing ROI. You will need to rerun step 2. Process to get new embeddings."
                 dialog = AlertPopup(self, prompt=prompt)
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     rid = int(rid)
