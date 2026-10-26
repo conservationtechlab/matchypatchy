@@ -575,6 +575,22 @@ class TestMediaRois:
         assert dm._data_filtered["id"].tolist() == [10, 11]
 
 
+class TestNoRoiReload:
+    """A reload after drawing rois looks the No ROI media up again, but only if that filter is on"""
+
+    @pytest.mark.parametrize("applied, expected", [([1, 2], [2]), (False, False)])
+    def test_reload_requeries_applied_no_roi(self, applied, expected):
+        from matchypatchy.gui.display_media import DisplayMedia
+        dm = _make_display_media()
+        dm.load_table = MagicMock()
+        dm.filters = dict(dm.filters, no_roi_mids=applied)
+        with patch("matchypatchy.gui.display_media.media_without_rois", return_value=[2]) as query:
+            DisplayMedia.refresh_table(dm, reload=True)
+        assert dm.filters['no_roi_mids'] == expected
+        assert query.called == (applied is not False)
+        dm.load_table.assert_called_once()
+
+
 class TestBackToMedia:
     def test_back_shows_all_media(self):
         from matchypatchy.gui.display_media import DisplayMedia

@@ -8,7 +8,8 @@ from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBo
                              QHBoxLayout, QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.database.media import IMAGE_EXT, fetch_individual, delete_media, delete_rois, save_edits
+from matchypatchy.database.media import (IMAGE_EXT, fetch_individual, delete_media, delete_rois, save_edits,
+                                         media_without_rois)
 from matchypatchy.database.location import camera_names
 from matchypatchy.database.thumbnails import THUMBNAIL_SIZE
 from matchypatchy.gui.media_table import MediaTable
@@ -464,9 +465,8 @@ class DisplayMedia(UsesProject, QWidget):
         if reload:
             # rois may have been added or removed, so the No ROI list is out of date
             # (keeps self.filters otherwise as last applied, not the unapplied filterbar choices)
-            no_roi_mids = self.filterbar.requery_no_roi()
             if self.filters['no_roi_mids'] is not False:
-                self.filters['no_roi_mids'] = no_roi_mids
+                self.filters['no_roi_mids'] = media_without_rois(self.mpDB)
             self.load_table()
         else:
             # keep ticked rows by id, their positions change when re-filtered and sorted

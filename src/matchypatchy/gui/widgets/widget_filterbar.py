@@ -58,7 +58,7 @@ class FilterBar(UsesProject, QWidget):
         # No ROI Filter
         self.no_roi = QCheckBox("Missing/Unspecified ROI")
         self.no_roi.toggled.connect(self.select_no_roi)
-        self.no_roi_mids = False
+        self.no_roi_only = False
         layout.addWidget(self.no_roi, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # UNIDENTIFIED
@@ -178,7 +178,7 @@ class FilterBar(UsesProject, QWidget):
         # Reset unidentified and favorites checkboxes
         self.unidentified_only = False
         self.favorites_only = False
-        self.no_roi_mids = False
+        self.no_roi_only = False
         self.unidentified.setChecked(False)
         self.favorites.setChecked(False)
         self.no_roi.setChecked(False)
@@ -193,17 +193,15 @@ class FilterBar(UsesProject, QWidget):
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only,
-                        'no_roi_mids': self.no_roi_mids,
+                        'no_roi_mids': False,
                         'media_ids': self.media_ids}
 
         if prefilter:
             # TODO: Implement prefiltering for other filter types as needed
             if 'no_roi_mids' in prefilter.keys():
-                self.no_roi_mids = prefilter['no_roi_mids']
-                if self.no_roi_mids is not False:
-                    self.no_roi.setChecked(True)
-                else:
-                    self.no_roi.setChecked(False)
+                # the ids are looked up again by get_filters
+                self.no_roi_only = prefilter['no_roi_mids'] is not False
+                self.no_roi.setChecked(self.no_roi_only)
 
             if 'media_ids' in prefilter.keys():
                 self.media_ids = prefilter['media_ids']
@@ -277,30 +275,13 @@ class FilterBar(UsesProject, QWidget):
         self.favorites_only = not self.favorites_only
 
     def select_no_roi(self):
-        """Toggle the No ROI filter."""
-        if self.no_roi.isChecked():
-            self.no_roi_mids = media_without_rois(self.mpDB)
-        else:
-            self.no_roi_mids = False
+        """Toggle the No ROI filter, its media are looked up when filters are applied"""
+        self.no_roi_only = self.no_roi.isChecked()
 
     def select_media_only(self):
         """Turn off the clicked media filter; it can only be turned back on by clicking again"""
         if not self.media_only.isChecked():
             self.media_ids = False
-
-    def requery_no_roi(self):
-        """
-        Query the media without rois again, returning the fresh list
-
-        Called by MediaDisplay.refresh_table before a reload, since rois drawn or deleted
-        in the edit popup change the list select_no_roi took when the box was ticked.
-        The box's own list is replaced only while it is ticked; the display decides
-        separately whether its applied filters use the result.
-        """
-        no_roi_mids = media_without_rois(self.mpDB)
-        if self.no_roi_mids is not False:
-            self.no_roi_mids = no_roi_mids
-        return no_roi_mids
 
     def filter_surveys(self):
         """Filter surveys based on active region"""
@@ -340,7 +321,12 @@ class FilterBar(UsesProject, QWidget):
         self.station_select.blockSignals(False)
 
     def get_filters(self):
-        """Return current filter selections as a dictionary"""
+        """
+        Return current filter selections as a dictionary
+
+        The media without rois are queried here rather than when their box is ticked,
+        so the query runs once per Apply Filters and sees rois drawn since
+        """
         self.filters = {'active_region': self.region_list_ordered[self.region_select.currentIndex()],
                         'active_survey': self.survey_list_ordered[self.survey_select.currentIndex()],
                         'active_station': self.station_list_ordered[self.station_select.currentIndex()],
@@ -348,7 +334,7 @@ class FilterBar(UsesProject, QWidget):
                         'active_individual': self.individual_list_ordered[self.individual_select.currentIndex()],
                         'unidentified_only': self.unidentified_only,
                         'favorites_only': self.favorites_only,
-                        'no_roi_mids': self.no_roi_mids,
+                        'no_roi_mids': media_without_rois(self.mpDB) if self.no_roi_only else False,
                         'media_ids': self.media_ids}
         return self.filters
 
