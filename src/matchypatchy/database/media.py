@@ -379,11 +379,13 @@ def media_without_rois(mpDB):
     Ids of media that have no rois with a box
 
     Rois imported without a box (bbox_w -1) don't count, so a video keeps its box-less
-    placeholder roi but leaves this list once a box is drawn on one of its frames
+    placeholder roi but leaves this list once a box is drawn on one of its frames.
+    A join rather than NOT EXISTS: roi.media_id has no index, and sqlite only builds
+    a temporary one for the join, the subquery rescans roi for every media
     """
     rows = mpDB.query("""SELECT media.id FROM media
-                         WHERE NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = media.id
-                                           AND roi.bbox_w != -1);""")
+                         LEFT JOIN roi ON roi.media_id = media.id AND roi.bbox_w != -1
+                         WHERE roi.id IS NULL;""")
     return [row[0] for row in rows or []]
 
 
