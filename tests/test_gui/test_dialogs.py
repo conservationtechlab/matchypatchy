@@ -361,6 +361,58 @@ class TestImportFolderTimezone:
         assert self._timezone(db, db.add_survey("S", region, None, None)) == "America/Los_Angeles"
 
 
+class TestImportCSVCancel:
+    """Space can press Cancel once OK is disabled, so stopping takes a second press and is reported"""
+
+    def _popup(self, running=True):
+        popup = MagicMock()
+        popup.import_thread.isRunning.return_value = running
+        popup._cancel_pending = False
+        popup._cancelled = False
+        return popup
+
+    def test_first_cancel_only_asks(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup()
+        ImportCSVPopup.reject(popup)
+        popup.import_thread.requestInterruption.assert_not_called()
+        assert "Press Cancel again" in popup.label.setText.call_args[0][0]
+
+    def test_second_cancel_stops_the_import(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup()
+        ImportCSVPopup.reject(popup)
+        ImportCSVPopup.reject(popup)
+        popup.import_thread.requestInterruption.assert_called_once()
+        assert popup._cancelled is True
+
+    def test_stopped_import_is_reported_and_ok_closes(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup._cancelled = True
+        popup.progress_bar.value.return_value = 120
+        popup.progress_bar.maximum.return_value = 400
+        ImportCSVPopup.import_finished(popup)
+        assert "stopped after 120 of 400 rows" in popup.label.setText.call_args[0][0]
+        popup.buttonBox.accepted.connect.assert_called_once_with(popup.close)
+        popup.okButton.setEnabled.assert_called_once_with(True)
+        popup.close.assert_not_called()
+
+    def test_finished_csv_import_closes(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup.migrate = False
+        ImportCSVPopup.import_finished(popup)
+        popup.close.assert_called_once()
+
+    def test_finished_migrate_stays_open_for_its_report(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup.migrate = True
+        ImportCSVPopup.import_finished(popup)
+        popup.close.assert_not_called()
+
+
 class TestImportFolderCancel:
     def test_cancel_during_import_stops_it_and_waits(self):
         from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
@@ -435,6 +487,7 @@ class TestFolderImportCamera:
         thread.default_station = None
         thread._default_station = lambda survey_id: FolderImportThread._default_station(thread, survey_id)
         thread.PROGRESS_BATCH_SIZE = FolderImportThread.PROGRESS_BATCH_SIZE
+        thread.COMMIT_INTERVAL = FolderImportThread.COMMIT_INTERVAL
         thread.active_survey = (1, "S")
         thread.isInterruptionRequested.return_value = False
         thread.mpDB.select.return_value = [(1,)]
@@ -932,6 +985,25 @@ class TestProcessingSteps:
         base.animl_thread.start.assert_called_once()
         DisplayBase._start_reid(base)
         base.miew_thread.start.assert_called_once()
+
+    def test_errors_keep_popup_open_with_ok(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = {"a.jpg"}
+        base.miew_thread.failed = {"a.jpg", "b.jpg"}
+        DisplayBase._finish_processing(base)
+        assert "2 file(s)" in base._process_dialog.update_prompt.call_args[0][0]
+        base._process_dialog.allow_ok.assert_called_once()
+        base._process_dialog.accept.assert_not_called()
+
+    def test_no_errors_closes_popup(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = set()
+        base.miew_thread.failed = set()
+        DisplayBase._finish_processing(base)
+        base._process_dialog.accept.assert_called_once()
+        base._process_dialog.allow_ok.assert_not_called()
 
     def test_model_not_downloaded_stops_before_processing(self):
         from matchypatchy.gui.display_base import DisplayBase

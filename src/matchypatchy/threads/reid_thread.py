@@ -85,6 +85,8 @@ class ReIDThread(QThread):
             for i in range(n_rois):
                 if self.isInterruptionRequested():
                     break
+                # every roi moves the bar, also ones skipped below (no box, unreadable file)
+                self.progress_update.emit(round(100 * i / n_rois))
                 # no box to crop yet
                 if filtered_rois.at[i, 'bbox_x'] == -1:
                     continue
@@ -107,7 +109,8 @@ class ReIDThread(QThread):
                 # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
                 roi_id = filtered_rois.at[i, 'roi_id']
                 self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                self.progress_update.emit(round(100 * i / n_rois))
+            if not self.isInterruptionRequested():
+                self.progress_update.emit(100)
 
     def get_embeddings(self):
         """Process embeddings for ROIs"""
@@ -124,6 +127,8 @@ class ReIDThread(QThread):
 
             for i in range(len(filtered_rois)):
                 if not self.isInterruptionRequested():
+                    # every roi moves the bar, also ones skipped below (no box, unreadable file)
+                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
                     row = filtered_rois.iloc[i].to_frame().T
                     if row.at[i, 'bbox_x'] == -1:
                         continue
@@ -137,8 +142,8 @@ class ReIDThread(QThread):
 
                     self.mpDB.add_emb(roi_id, emb)
                     self.mpDB.edit_row("roi", roi_id, {"emb": 1})
-
-                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
+            if not self.isInterruptionRequested():
+                self.progress_update.emit(100)
 
     def _file_failed(self, filepath):
         """Log a file that couldn't be read and carry on with the rest"""

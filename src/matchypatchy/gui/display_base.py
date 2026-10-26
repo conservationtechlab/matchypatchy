@@ -356,6 +356,7 @@ class DisplayBase(UsesProject, QWidget):
         if failed:
             self._process_dialog.update_prompt(f"Processing finished, but {len(failed)} file(s) "
                                                "could not be read. See the log for which.")
+            self._process_dialog.allow_ok()
         else:
             self._process_dialog.accept()
 
