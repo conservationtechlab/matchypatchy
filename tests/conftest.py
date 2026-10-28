@@ -105,7 +105,7 @@ class _MockModule(types.ModuleType):
             return _QThreadStub
         if name == 'QObject':
             return _QObjectStub
-        if name in ('QWidget', 'QAbstractScrollArea', 'QFrame'):
+        if name in ('QWidget', 'QAbstractScrollArea', 'QFrame', 'QMainWindow'):
             return _QWidgetStub
         if name in ('QDialog', 'QAbstractDialog'):
             return _QDialogStub
@@ -165,7 +165,7 @@ def null_logger():
 
 
 @pytest.fixture
-def tmp_db(tmp_path, null_logger):
+def tmp_db(tmp_path):
     """
     Create a fresh MatchyPatchyDB in a temporary directory.
 
@@ -173,7 +173,7 @@ def tmp_db(tmp_path, null_logger):
     The database is closed and the temporary directory is cleaned up
     automatically when the test finishes.
     """
-    db = MatchyPatchyDB(str(tmp_path), null_logger)
+    db = MatchyPatchyDB(str(tmp_path))
     yield db, tmp_path
     db.close()
 
@@ -191,7 +191,7 @@ def populated_db(tmp_db):
     # "Default Survey" (id=1).  Add a dedicated station and media.
     station_id = db.add_station("Test Station", 1.0, 2.0, 1)
     camera_id = db.add_camera("Test Camera", station_id) 
-    individual_id = db.add_individual("Ind-1", "M", "Adult")
+    individual_id = db.add_individual("Ind-1", "M")
     upload_id = db.add_upload("/tmp")
     media_id = db.add_media(
         base_dir_id=upload_id,

@@ -2,6 +2,8 @@
 Thread Class for Processing Viewpoint and Miew Embedding
 
 """
+import logging
+
 import animl
 from numpy import argmax
 import pandas as pd
@@ -9,10 +11,12 @@ import pandas as pd
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.threads.model_download_thread import get_path
-from matchypatchy.database.media import fetch_roi
+from matchypatchy.database.media import fetch_roi, filepath_sql
 
 # from matchypatchy.pairx.core import explain
 # from matchypatchy.pairx import xai_dataset
+
+logger = logging.getLogger(__name__)
 
 
 class ReIDThread(QThread):
@@ -28,7 +32,8 @@ class ReIDThread(QThread):
         self.batch_size = 1  # set to 1 for now
         self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
         self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
-        
+        self.failed = set()  # files that couldn't be read
+
     def run(self):
         """Process viewpoint and embeddings for ROIs"""
         # ROIS must be fetched after start() to chain with animl
@@ -40,9 +45,9 @@ class ReIDThread(QThread):
             return
 
         # need only media that has corresponding ROIs
-        media = self.mpDB._command("""
+        media = self.mpDB._command(f"""
             SELECT roi.id, roi.media_id,
-                uploads.base_dir || '/' || media.relative_path AS filepath,
+                {filepath_sql('uploads.base_dir', 'media.relative_path')} AS filepath,
                 media.external_id, media.camera_id, media.sequence_id
             FROM roi
             JOIN media ON roi.media_id = media.id
@@ -76,24 +81,36 @@ class ReIDThread(QThread):
             filtered_rois.reset_index(drop=True, inplace=True)
 
             model, classes = animl.load_classifier(self.viewpoint_filepath, device=self.device)
-            dataloader = animl.ManifestGenerator(filtered_rois, 
-                                                  resize_width=480,
-                                                  resize_height=480,
-                                                  crop=True,
-                                                  batch_size=self.batch_size)
 
-            for i, batch in enumerate(dataloader):
+            for i in range(n_rois):
                 if self.isInterruptionRequested():
                     break
-                image = batch[0]
-                output = model.run(None, {model.get_inputs()[0].name: image})[0]
+                # every roi moves the bar, also ones skipped below (no box, unreadable file)
+                self.progress_update.emit(round(100 * i / n_rois))
+                # no box to crop yet
+                if filtered_rois.at[i, 'bbox_x'] == -1:
+                    continue
+                # one ROI per generator: it silently drops files it can't load,
+                # so results can't be paired with ROIs by position in a longer manifest
+                dataloader = animl.ManifestGenerator(filtered_rois.iloc[[i]],
+                                                      resize_width=480,
+                                                      resize_height=480,
+                                                      crop=True,
+                                                      batch_size=1,
+                                                      num_workers=0)
+                batch = next(iter(dataloader), None)
+                if batch is None:
+                    self._file_failed(filtered_rois.at[i, 'filepath'])
+                    continue
+                output = model.run(None, {model.get_inputs()[0].name: batch[0]})[0]
                 value = argmax(animl.softmax(output), axis=1)[0]
 
                 # TODO process by sequence
                 # sequence = self.media[self.media['sequence_id'] == self.rois.loc[roi_id, "sequence_id"]]
                 roi_id = filtered_rois.at[i, 'roi_id']
                 self.mpDB.edit_row("roi", roi_id, {"viewpoint": int(value)})
-                self.progress_update.emit(round(100 * i / len(filtered_rois)))
+            if not self.isInterruptionRequested():
+                self.progress_update.emit(100)
 
     def get_embeddings(self):
         """Process embeddings for ROIs"""
@@ -110,16 +127,29 @@ class ReIDThread(QThread):
 
             for i in range(len(filtered_rois)):
                 if not self.isInterruptionRequested():
+                    # every roi moves the bar, also ones skipped below (no box, unreadable file)
+                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
                     row = filtered_rois.iloc[i].to_frame().T
                     if row.at[i, 'bbox_x'] == -1:
                         continue
                     roi_id = row.at[i, 'roi_id']
-                    emb = animl.extract_miew_embeddings(model, row)[0]
+                    try:
+                        emb = animl.extract_miew_embeddings(model, row)[0]
+                    except ValueError:
+                        # nothing to stack: the file couldn't be loaded
+                        self._file_failed(row.at[i, 'filepath'])
+                        continue
 
                     self.mpDB.add_emb(roi_id, emb)
                     self.mpDB.edit_row("roi", roi_id, {"emb": 1})
+            if not self.isInterruptionRequested():
+                self.progress_update.emit(100)
 
-                    self.progress_update.emit(round(100 * i / len(filtered_rois)))
+    def _file_failed(self, filepath):
+        """Log a file that couldn't be read and carry on with the rest"""
+        if filepath not in self.failed:
+            logger.warning("Could not read %s, skipping it", filepath)
+            self.failed.add(filepath)
 
 
 """

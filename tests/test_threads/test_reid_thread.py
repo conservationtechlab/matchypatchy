@@ -1,4 +1,4 @@
-"""Tests for matchypatchy.threads.reid_thread — viewpoint batching regression."""
+"""Tests for matchypatchy.threads.reid_thread"""
 import sys
 import types
 from types import SimpleNamespace
@@ -26,18 +26,16 @@ class SignalSpy:
 
 
 class FakeModel:
-    """Stand-in ONNX model: returns one row of "logits" per image in the batch."""
+    """Stand-in ONNX model: the predicted class is the number stored in each image."""
 
     def get_inputs(self):
         return [SimpleNamespace(name="input")]
 
     def run(self, _output_names, feed):
         images = feed["input"]
-        n = len(images)
-        # class index == position in the batch, so we can tell results apart
-        logits = np.zeros((n, n if n > 0 else 1))
-        for i in range(n):
-            logits[i, i % logits.shape[1]] = 10.0
+        logits = np.zeros((len(images), 10))
+        for i, image in enumerate(images):
+            logits[i, int(image)] = 10.0
         return [logits]
 
 
@@ -51,40 +49,44 @@ class FakeDB:
 
 
 class FakeManifestGenerator:
-    """Mimics animl.ManifestGenerator: yields (images, filepaths, frames, hw) batches."""
+    """Mimics animl.ManifestGenerator: yields (images, filepaths, frames, hw) batches
+    and, like animl, silently drops files it can't load"""
+    unreadable = set()
 
     def __init__(self, manifest, **kwargs):
         self.manifest = manifest.reset_index(drop=True)
         self.batch_size = kwargs.get("batch_size", 16)
 
     def __iter__(self):
-        n = len(self.manifest)
-        for start in range(0, n, self.batch_size):
-            end = min(start + self.batch_size, n)
-            batch = self.manifest.iloc[start:end]
-            images = list(range(len(batch)))  # placeholder "images"
-            filepaths = batch["filepath"].tolist()
-            yield images, filepaths, None, None
+        readable = self.manifest[~self.manifest["filepath"].isin(self.unreadable)]
+        for start in range(0, len(readable), self.batch_size):
+            batch = readable.iloc[start:start + self.batch_size]
+            # the "image" is the digit in the file name, so results show which file they came from
+            images = [int(f.split("_")[1][0]) for f in batch["filepath"]]
+            yield images, batch["filepath"].tolist(), None, None
 
 
-def _make_thread(monkeypatch, n_rois, batch_size):
+def _make_thread(monkeypatch, n_rois, unreadable=()):
     db = FakeDB()
     monkeypatch.setattr(reid_thread, "get_path", lambda *_a, **_k: "/fake/model.onnx")
     monkeypatch.setattr(reid_thread.animl, "load_classifier", lambda *_a, **_k: (FakeModel(), None))
+    monkeypatch.setattr(FakeManifestGenerator, "unreadable", set(unreadable))
     monkeypatch.setattr(reid_thread.animl, "ManifestGenerator", FakeManifestGenerator, raising=False)
 
     thread = reid_thread.ReIDThread.__new__(reid_thread.ReIDThread)
     thread.mpDB = db
     thread.device = "cpu"
-    thread.batch_size = batch_size
+    thread.batch_size = 1
     thread.viewpoint_filepath = "/fake/viewpoint.onnx"
     thread.reid_filepath = None
     thread.isInterruptionRequested = lambda: False
     thread.progress_update = SignalSpy()
+    thread.failed = set()
 
     thread.rois = pd.DataFrame({
         "roi_id": list(range(n_rois)),
         "viewpoint": [None] * n_rois,
+        "bbox_x": [0.1] * n_rois,
         "filepath": [f"/img_{i}.jpg" for i in range(n_rois)],
     })
     return thread, db
@@ -96,30 +98,67 @@ class TestGetViewpointBatching:
         package; the fix must reference ManifestGenerator instead."""
         assert not hasattr(reid_thread.animl, "ManifestDataloader")
 
-    def test_processes_every_roi_across_multiple_batches(self, monkeypatch):
-        # 7 ROIs needing a viewpoint, batch_size=4 -> batches of 4 and 3.
-        # Every ROI must get exactly one edit_row call, attached to the
-        # correct roi_id (not just the first item of each batch).
-        thread, db = _make_thread(monkeypatch, n_rois=7, batch_size=1)
+    def test_each_roi_gets_its_own_viewpoint(self, monkeypatch):
+        thread, db = _make_thread(monkeypatch, n_rois=7)
 
         thread.get_viewpoint()
 
-        processed_roi_ids = [call[1] for call in db.edit_row_calls]
-        assert processed_roi_ids == list(range(7))
-        assert len(db.edit_row_calls) == 7
+        # the fake model's answer is the ROI's own image number
+        assert [(call[1], call[2]["viewpoint"]) for call in db.edit_row_calls] == [(i, i) for i in range(7)]
 
-    def test_single_item_batch_still_works(self, monkeypatch):
-        thread, db = _make_thread(monkeypatch, n_rois=3, batch_size=1)
+    def test_unreadable_file_does_not_shift_later_viewpoints(self, monkeypatch):
+        thread, db = _make_thread(monkeypatch, n_rois=4, unreadable={"/img_1.jpg"})
 
         thread.get_viewpoint()
 
-        processed_roi_ids = [call[1] for call in db.edit_row_calls]
-        assert processed_roi_ids == [0, 1, 2]
+        assert [(call[1], call[2]["viewpoint"]) for call in db.edit_row_calls] == [(0, 0), (2, 2), (3, 3)]
+        assert thread.failed == {"/img_1.jpg"}
+
+    def test_roi_without_box_is_skipped(self, monkeypatch):
+        thread, db = _make_thread(monkeypatch, n_rois=3)
+        thread.rois.loc[1, "bbox_x"] = -1
+
+        thread.get_viewpoint()
+
+        assert [call[1] for call in db.edit_row_calls] == [0, 2]
+
+    def test_progress_reaches_end_when_last_files_fail(self, monkeypatch):
+        """Skipped rois still move the bar, it stalled below 100 when the last files were unreadable"""
+        thread, db = _make_thread(monkeypatch, n_rois=4, unreadable={"/img_2.jpg", "/img_3.jpg"})
+        thread.rois.loc[0, "bbox_x"] = -1
+
+        thread.get_viewpoint()
+
+        assert thread.progress_update.calls == [(0,), (25,), (50,), (75,), (100,)]
 
     def test_skips_when_no_viewpoint_model_selected(self, monkeypatch):
-        thread, db = _make_thread(monkeypatch, n_rois=3, batch_size=1)
+        thread, db = _make_thread(monkeypatch, n_rois=3)
         thread.viewpoint_filepath = None
 
         thread.get_viewpoint()
 
         assert db.edit_row_calls == []
+
+
+class TestGetEmbeddings:
+    def test_unreadable_file_is_skipped(self, monkeypatch):
+        thread, db = _make_thread(monkeypatch, n_rois=3, unreadable={"/img_1.jpg"})
+        thread.reid_filepath = "/fake/miew.onnx"
+        thread.rois["emb"] = 0
+        db.add_emb_calls = []
+        db.add_emb = lambda roi_id, emb: db.add_emb_calls.append(roi_id)
+        monkeypatch.setattr(reid_thread.animl, "load_miew", lambda *_a, **_k: None, raising=False)
+
+        def _extract(_model, manifest):
+            # like animl: stacking no results raises
+            images = [batch[0] for batch in FakeManifestGenerator(manifest)]
+            return np.vstack(images)
+
+        monkeypatch.setattr(reid_thread.animl, "extract_miew_embeddings", _extract, raising=False)
+
+        thread.get_embeddings()
+
+        assert db.add_emb_calls == [0, 2]
+        assert thread.failed == {"/img_1.jpg"}
+        # the unreadable roi still moved the bar, and it ends full
+        assert thread.progress_update.calls == [(0,), (33,), (67,), (100,)]

@@ -86,6 +86,11 @@ class TestFetchMedia:
         df = fetch_media(db, ids=[99999])
         assert df.empty
 
+    def test_filter_by_empty_ids_returns_nothing(self, populated_db):
+        db, _, ids = populated_db
+        df = fetch_media(db, ids=[])
+        assert df.empty
+
     def test_counts_mode(self, populated_db):
         db, _, ids = populated_db
         df = fetch_media(db, counts=True)
@@ -148,6 +153,17 @@ class TestFetchRoiMedia:
         df = fetch_roi_media(db, rids=[ids["roi_id"]])
         assert len(df) == 1
 
+    def test_filter_by_empty_rids_returns_nothing(self, populated_db):
+        db, _, ids = populated_db
+        df = fetch_roi_media(db, rids=[])
+        assert df.empty
+        assert df.index.name == "id"
+
+    def test_filter_by_empty_sequence_ids_returns_nothing(self, populated_db):
+        db, _, ids = populated_db
+        df = fetch_roi_media(db, sequence_ids=[])
+        assert df.empty
+
     def test_no_reset_index(self, populated_db):
         db, _, ids = populated_db
         df = fetch_roi_media(db, reset_index=False)
@@ -175,10 +191,10 @@ class TestFetchIndividual:
         df = fetch_individual(db)
         assert df.empty
 
-    def test_has_name_sex_age_columns(self, populated_db):
+    def test_has_name_sex_column(self, populated_db):
         db, _, ids = populated_db
         df = fetch_individual(db)
-        for col in ["name", "sex", "age"]:
+        for col in ["name", "sex"]:
             assert col in df.columns
 
 
@@ -216,3 +232,182 @@ class TestMediaCount:
         result = media_count(db, 1)
         _, count = result
         assert count == 0
+
+
+class TestEditsAndDeletes:
+    def _roi(self, db, name="x.jpg"):
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload(f"/{name}"), name, name, ".jpg", "2024-01-01 10:00:00", station)
+        rid = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        db.add_emb(rid, [0.1, 0.2, 0.3])
+        return mid, rid
+
+    def _has_emb(self, db, rid):
+        return db.collection.get(ids=[str(rid)])["ids"] != []
+
+    def test_delete_rois_removes_rows_and_embeddings(self, tmp_db):
+        from matchypatchy.database.media import delete_rois
+        db, _ = tmp_db
+        _, a = self._roi(db, "a.jpg")
+        _, b = self._roi(db, "b.jpg")
+        assert delete_rois(db, [a]) is True
+        assert db.select("roi", "id") == [(b,)]
+        assert not self._has_emb(db, a)
+        assert self._has_emb(db, b)
+
+    def test_delete_media_removes_its_rois_and_embeddings(self, tmp_db):
+        from matchypatchy.database.media import delete_media
+        db, _ = tmp_db
+        mid, rid = self._roi(db)
+        assert delete_media(db, [mid]) is True
+        assert db.count("media") == 0
+        assert db.count("roi") == 0
+        assert not self._has_emb(db, rid)
+
+    def test_deleting_nothing_succeeds(self, tmp_db):
+        from matchypatchy.database.media import delete_media, delete_rois
+        db, _ = tmp_db
+        assert delete_rois(db, []) is True
+        assert delete_media(db, []) is True
+
+    def test_update_roi_box_drops_the_embedding(self, tmp_db):
+        from matchypatchy.database.media import update_roi_box
+        db, _ = tmp_db
+        _, rid = self._roi(db)
+        db.edit_row("roi", rid, {"emb": 1, "favorite": 1})
+        assert update_roi_box(db, rid, 2, 0.123456, 0.2, 0.3, 0.4) is True
+        assert db.select("roi", "frame, bbox_x, bbox_w, emb, favorite", row_cond="id=?", params=(rid,)) == [(2, 0.1235, 0.3, 0, 1)]
+        assert not self._has_emb(db, rid)
+
+    def test_set_favorite(self, tmp_db):
+        from matchypatchy.database.media import set_favorite
+        db, _ = tmp_db
+        _, rid = self._roi(db)
+        assert set_favorite(db, rid, True) is True
+        assert db.select("roi", "favorite", row_cond="id=?", params=(rid,)) == [(1,)]
+
+    def test_clear_project_data_keeps_locations(self, tmp_db):
+        from matchypatchy.database.media import clear_project_data
+        db, _ = tmp_db
+        _, rid = self._roi(db)
+        db.add_individual("A")
+        assert clear_project_data(db) is True
+        assert [db.count(t) for t in ("media", "roi", "individual")] == [0, 0, 0]
+        assert db.count("station") == 1
+        assert not self._has_emb(db, rid)
+
+
+class TestSaveEdits:
+    def _edit(self, rid, mid, reference, new_value):
+        from matchypatchy.database.media import EditObject
+        return EditObject(rid=rid, mid=mid, reference=reference, previous_value=None, new_value=new_value)
+
+    def test_sex_follows_a_name_change_in_the_same_save(self, tmp_db):
+        from matchypatchy.database.media import save_edits
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h", ".jpg", "2024-01-01 10:00:00", station)
+        old, new = db.add_individual("Old", "Male"), db.add_individual("New")
+        rid = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1, individual_id=old)
+        failed = save_edits(db, [self._edit(rid, mid, "individual_id", new), self._edit(rid, mid, "sex", "Female"),
+                                 self._edit(rid, mid, "comment", "O'Neil saw it")],
+                            individual_of=lambda r: old)
+        assert failed == []
+        assert db.select("individual", "id, sex") == [(old, "Male"), (new, "Female")]
+        assert db.select("media", "comment") == [("O'Neil saw it",)]
+
+    def test_name_change_sets_reviewed(self, tmp_db):
+        from matchypatchy.database.media import save_edits
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h", ".jpg", "2024-01-01 10:00:00", station)
+        iid = db.add_individual("New")
+        named, unknown = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1), db.add_roi(mid, 0, 0.2, 0.1, 0.1, 0.1, individual_id=iid, reviewed=1)
+        failed = save_edits(db, [self._edit(named, mid, "individual_id", iid), self._edit(unknown, mid, "individual_id", None)],
+                            individual_of=lambda r: None)
+        assert failed == []
+        assert db.select("roi", "id, individual_id, reviewed") == [(named, iid, 1), (unknown, None, 0)]
+
+    def test_failed_edit_is_returned(self, tmp_db):
+        from matchypatchy.database.media import save_edits
+        db, _ = tmp_db
+        bad_column = self._edit(1, 1, "not_a_column", 1)
+        assert save_edits(db, [bad_column], individual_of=lambda r: None) == [bad_column]
+
+
+class TestMatchingAndLookups:
+    def _media(self, db, name, rois=1):
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload(f"/{name}"), name, name, ".jpg", "2024-01-01 10:00:00", station)
+        return mid, [db.add_roi(mid, 0, 0.1 * (i + 1), 0.1, 0.1, 0.1) for i in range(rois)]
+
+    def test_assign_and_clear_individual(self, tmp_db):
+        from matchypatchy.database.media import assign_individual, clear_individual
+        db, _ = tmp_db
+        _, (a, b) = self._media(db, "x.jpg", rois=2)
+        iid = db.add_individual("A")
+        assert assign_individual(db, [a, b], iid) is True
+        assert db.select("roi", "individual_id, reviewed") == [(iid, 1), (iid, 1)]
+        assert clear_individual(db, [a]) is True
+        assert db.select("roi", "id, individual_id, reviewed") == [(a, None, 0), (b, iid, 1)]
+
+    def test_media_without_rois(self, tmp_db):
+        from matchypatchy.database.media import media_without_rois
+        db, _ = tmp_db
+        self._media(db, "with.jpg", rois=1)
+        empty, _ = self._media(db, "empty.jpg", rois=0)
+        assert media_without_rois(db) == [empty]
+
+    def test_media_with_a_boxless_roi_is_without_rois(self, tmp_db):
+        from matchypatchy.database.media import media_without_rois
+        db, _ = tmp_db
+        boxless, _ = self._media(db, "boxless.mp4", rois=0)
+        db.add_roi(boxless, 0, -1, -1, -1, -1)
+        assert media_without_rois(db) == [boxless]
+        # still listed while any of its rois has no box
+        db.add_roi(boxless, 12, 0.1, 0.1, 0.1, 0.1)
+        assert media_without_rois(db) == [boxless]
+
+    def test_boxless_roi(self, tmp_db):
+        from matchypatchy.database.media import boxless_roi
+        db, _ = tmp_db
+        mid, (boxed,) = self._media(db, "x.mp4", rois=1)
+        assert boxless_roi(db, mid) is None
+        first = db.add_roi(mid, 0, -1, -1, -1, -1)
+        db.add_roi(mid, 0, -1, -1, -1, -1)
+        assert boxless_roi(db, mid) == first
+
+    def test_uploads_with_media_counts(self, tmp_db):
+        from matchypatchy.database.media import uploads_with_media_counts
+        db, _ = tmp_db
+        self._media(db, "x.jpg")
+        unused = db.add_upload("/unused")
+        counts = {base_dir: n for _, base_dir, _, n in uploads_with_media_counts(db)}
+        assert counts == {"/x.jpg": 1, "/unused": 0}
+        assert unused in [row[0] for row in uploads_with_media_counts(db)]
+
+
+class TestFilepathSeparators:
+    """relative_path keeps the importing OS's separators, filepaths use the current OS's"""
+
+    @pytest.mark.parametrize("base_dir", ["H:\\Images", "H:/Images"])
+    @pytest.mark.parametrize("relative_path", ["7\\a.jpg", "7/a.jpg"])
+    def test_filepath_uses_current_separator(self, tmp_db, base_dir, relative_path):
+        import os
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        mid = db.add_media(db.add_upload(base_dir), relative_path, "h", ".jpg", "2024-01-01 10:00:00", station)
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        expected = os.sep.join(["H:", "Images", "7", "a.jpg"])
+        assert fetch_media(db).loc[0, "filepath"] == expected
+        assert fetch_media(db, counts=True).loc[0, "filepath"] == expected
+        assert fetch_roi(db).loc[0, "filepath"] == expected
+        assert db.get_full_path(mid) == expected
+        rows, columns = db.all_media()
+        assert rows[0][columns.index("filepath")] == expected
+
+    @pytest.mark.parametrize("relative_path", ["7\\a.jpg", "7/a.jpg"])
+    def test_native_relative_path(self, relative_path):
+        import os
+        from matchypatchy.database.media import native_relative_path
+        assert native_relative_path(relative_path) == os.sep.join(["7", "a.jpg"])

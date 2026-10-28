@@ -2,6 +2,7 @@
 QThread Class for Processing BBox, Frames, BuildFileManifest with ANIML
 
 """
+import logging
 from pathlib import Path
 import animl
 import pandas as pd
@@ -9,11 +10,13 @@ import pandas as pd
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
-from matchypatchy.database.media import fetch_roi_media, get_sha256
+from matchypatchy.database.media import get_sha256, native_relative_path
 from matchypatchy.threads.model_download_thread import get_path
 
 
 MEGADETECTORv1000_SIZE = 960
+
+logger = logging.getLogger(__name__)
 
 
 class BuildManifestThread(QThread):
@@ -40,11 +43,11 @@ class VerifyNewBaseDirsThread(QThread):
     not_in_new_directory = pyqtSignal(list)
     finished = pyqtSignal()
 
-    def __init__(self, parent):
+    def __init__(self, parent, updates):
         super().__init__()
         self.mpDB = parent.mpDB
         self.base_dirs = parent.base_dirs
-        self.updates = parent.updates
+        self.updates = updates
         self.not_found_in_db = []
         self.not_found_in_new_directory = []
 
@@ -53,20 +56,21 @@ class VerifyNewBaseDirsThread(QThread):
             if not self.isInterruptionRequested():
                 base_dir_id = update[0]
                 directory = update[1]
-                # Flatten the list of media hashes for easier comparison
                 media = self.mpDB.select("media", columns="relative_path, sha256", row_cond=f"base_dir_id = {base_dir_id}")
-                media_hashes = set([h[1] for h in media])
-
-                # Build the file manifest for the new directory
-                new_data = animl.build_file_manifest(directory, exif=False)
-                new_hashes = [get_sha256(filepath) for filepath in new_data['filepath']]
-                new_data = list(zip(new_data['filepath'], new_hashes))
-
-                hash_not_found_in_db = [h[0] for h in new_data if h[1] not in set(media_hashes)]
-                self.not_found_in_db.append(hash_not_found_in_db)
-
-                hash_not_found_in_new_directory = [h[0] for h in media if h[1] not in set(new_hashes)]
+                # Saving only swaps base_dir, so each file must sit at its relative path under the new directory
+                expected = set()
+                hash_not_found_in_new_directory = []
+                for relative_path, sha256 in media:
+                    filepath = Path(directory, native_relative_path(relative_path))
+                    expected.add(filepath)
+                    if get_sha256(filepath) != sha256:
+                        hash_not_found_in_new_directory.append(relative_path)
                 self.not_found_in_new_directory.append(hash_not_found_in_new_directory)
+
+                # Files in the new directory that no media of this upload would point to
+                new_data = animl.build_file_manifest(directory, exif=False)
+                hash_not_found_in_db = [f for f in new_data.get('filepath', []) if Path(f) not in expected]
+                self.not_found_in_db.append(hash_not_found_in_db)
 
         # Emit signals if the thread was not interrupted
         if not self.isInterruptionRequested():
@@ -93,26 +97,24 @@ class AnimlThread(QThread):
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
 
-        # select media that do not have rois
-        media, column_names = self.mpDB.get_media_with_filepath(row_cond="NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
-        self.media = pd.DataFrame(media, columns=column_names)
-
-        # select rois that do not have bbox
-        rois = fetch_roi_media(mpDB, reset_index=False)
-        self.rois = rois[rois['bbox_x'] == -1]  # imported without bbox
-        self.rois = self.rois.drop(columns=['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
-
+        self.media = None  # loaded in run(), off the GUI thread
+        self.rois = None
         self.images = None
         self.video = None
         self.to_process = 0
         self.progress_count = 0
-
-        if self.DETECTOR_KEY is None:
-            self.detector = None
-        else:
-            self.detector = animl.load_detector(self.md_filepath, device=self.device)
+        self.failed = set()  # files that couldn't be read
+        self.detector = None  # loaded in run(), off the GUI thread
 
     def run(self):
+        self.prompt_update.emit("Loading media...")
+        self._load_media()
+        if self.DETECTOR_KEY is not None:
+            self.prompt_update.emit("Loading detector...")
+            self.detector = animl.load_detector(self.md_filepath, device=self.device)
+        # imported ROIs without a box stay as they are when there's no detector to find one
+        if self.detector is None:
+            self.rois = self.rois.iloc[0:0]
         # pull out images and videos from media
         self.prompt_update.emit("Extracting frames...")
         self.images = animl.get_images(self.media)
@@ -146,8 +148,6 @@ class AnimlThread(QThread):
             batch_end = min(batch_start + self.batch_size, len(self.images))
             image_batch = self.images.iloc[batch_start:batch_end]
 
-            print(image_batch)
-
             # if no detector is selected, use the full image as the ROI
             if self.detector is None:
                 detections = pd.DataFrame([{
@@ -163,20 +163,13 @@ class AnimlThread(QThread):
 
             # run detector
             else:
-                detections = animl.detect(self.detector,
-                                          image_batch,
-                                          MEGADETECTORv1000_SIZE,
-                                          MEGADETECTORv1000_SIZE,
-                                          confidence_threshold=self.confidence_threshold,
-                                          batch_size=self.batch_size,
-                                          use_progress_bar=False)
-
-                print(detections)
-
+                detections = self._detect(image_batch, batch_size=self.batch_size)
+                if detections is None:
+                    self.progress_count += len(image_batch)
+                    self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+                    continue
                 detections = animl.parse_detections(detections, manifest=image_batch)
                 detections = animl.get_animals(detections)
-
-                print(detections)
 
             for _, roi in detections.iterrows():
                 frame = roi['frame'] if 'frame' in roi.index else 0
@@ -201,6 +194,7 @@ class AnimlThread(QThread):
                                                    bbox_x, bbox_y, bbox_w, bbox_h)
                 self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
 
+            self._mark_done(image_batch, 'id')
             self.progress_count += len(image_batch)
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
 
@@ -212,16 +206,15 @@ class AnimlThread(QThread):
             batch_end = min(batch_start + self.batch_size, len(self.rois))
             roi_batch = self.rois.iloc[batch_start:batch_end]
 
-            detections = animl.detect(self.detector,
-                                      roi_batch,
-                                      MEGADETECTORv1000_SIZE,
-                                      MEGADETECTORv1000_SIZE,
-                                      confidence_threshold=self.confidence_threshold,
-                                      batch_size=self.batch_size,
-                                      use_progress_bar=False)
-
+            detections = self._detect(roi_batch, batch_size=self.batch_size)
+            if detections is None:
+                self.progress_count += len(roi_batch)
+                self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+                continue
             detections = animl.parse_detections(detections, manifest=roi_batch)
             detections = animl.get_animals(detections)
+            # each ROI takes its most confident detection (writing them all left the last one)
+            detections = detections.sort_values('conf', ascending=False).drop_duplicates('id')
 
             for _, roi in detections.iterrows():
                 frame = roi['frame'] if 'frame' in roi.index else 0
@@ -237,6 +230,7 @@ class AnimlThread(QThread):
                                     {"bbox_x": bbox_x, "bbox_y": bbox_y,
                                      "bbox_w": bbox_w, "bbox_h": bbox_h})
 
+            self._mark_done(roi_batch, 'media_id')
             self.progress_count += len(roi_batch)
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
 
@@ -247,17 +241,22 @@ class AnimlThread(QThread):
         for media_id, video in self.videos.groupby('id'):
             if not self.isInterruptionRequested():
 
-                results = animl.detect(self.detector,
-                                       video,
-                                       MEGADETECTORv1000_SIZE,
-                                       MEGADETECTORv1000_SIZE,
-                                       confidence_threshold=self.confidence_threshold,
-                                       calculate_clarity=True)
-                results = animl.parse_detections(results, manifest=video, score=True)
-                detections = animl.get_animals(results)
+                # if no detector is selected, use the whole first frame as the ROI, as for images
+                if self.detector is None:
+                    top_frames = video.iloc[[0]].assign(bbox_x=0, bbox_y=0, bbox_w=1, bbox_h=1)
+                else:
+                    # one frame at a time: MegaDetector v1000 only returns detections
+                    # for the first image of a batch
+                    results = self._detect(video, batch_size=self.batch_size, calculate_clarity=True)
+                    if results is None:
+                        self.progress_count += 1
+                        self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+                        continue
+                    results = animl.parse_detections(results, manifest=video, score=True)
+                    detections = animl.get_animals(results)
 
-                # get best frames based on score, if there are fewer than n_frames, take all
-                top_frames = detections.nlargest(self.n_frames, 'score')
+                    # get best frames based on score, if there are fewer than n_frames, take all
+                    top_frames = detections.nlargest(self.n_frames, 'score')
 
                 for _, roi in top_frames.iterrows():
                     frame = roi['frame'] if 'frame' in roi.index else 0
@@ -277,5 +276,45 @@ class AnimlThread(QThread):
                                                        roi['filepath'], roi['ext'], frame,
                                                        bbox_x, bbox_y, bbox_w, bbox_h)
                     self.mpDB.add_thumbnail("roi", roi_id, roi_thumbnail)
+                self._mark_done(video.iloc[[0]], 'id')
             self.progress_count += 1
             self.progress_update.emit(round(100 * (self.progress_count / self.to_process)))
+
+    def _load_media(self):
+        """
+        Select the media and ROIs still waiting on detection
+
+        Called at the start of run() rather than in __init__: the thread is built on the
+        GUI thread, where these queries froze the progress popup on large databases,
+        and by run() sequencing has finished so the rows are current.
+        """
+        # select media that haven't been through detection and have no rois
+        media, column_names = self.mpDB.get_media_with_filepath(
+            row_cond="m.detection_done = 0 AND NOT EXISTS (SELECT 1 FROM roi WHERE roi.media_id = m.id)")
+        self.media = pd.DataFrame(media or [], columns=column_names)
+
+        # select rois imported without a bbox whose media hasn't been through detection
+        rois, column_names = self.mpDB.all_media(row_cond="roi.bbox_x = -1 AND media.detection_done = 0")
+        self.rois = pd.DataFrame(rois or [], columns=column_names)
+        self.rois = self.rois.drop(columns=['bbox_x', 'bbox_y', 'bbox_w', 'bbox_h'])
+
+    def _mark_done(self, manifest, media_column):
+        """Mark the manifest's media as through detection, except files that couldn't be read"""
+        read = manifest[~manifest['filepath'].isin(self.failed)]
+        self.mpDB.mark_detection_done(read[media_column].unique())
+
+    def _detect(self, manifest, **kwargs):
+        """Run the detector on the manifest's files, None if none of them could be read"""
+        results = animl.detect(self.detector,
+                               manifest,
+                               MEGADETECTORv1000_SIZE,
+                               MEGADETECTORv1000_SIZE,
+                               confidence_threshold=self.confidence_threshold,
+                               use_progress_bar=False,
+                               **kwargs)
+        # animl.detect silently leaves out files it can't load
+        read = {result['filepath'] for result in results}
+        for filepath in set(manifest['filepath']) - read:
+            logger.warning("Could not read %s, skipping it", filepath)
+            self.failed.add(filepath)
+        return results if results else None

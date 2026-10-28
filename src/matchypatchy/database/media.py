@@ -2,6 +2,7 @@
 Functions for Manipulating and Processing ROIs
 """
 import hashlib
+import os
 from pathlib import Path
 from dataclasses import dataclass
 import pandas as pd
@@ -15,8 +16,7 @@ COLUMNS = [
     'id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
     'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
     'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id',
-    'sequence_id', 'external_id', 'comment', 'name', 'sex', 'age',
-]
+    'sequence_id', 'external_id', 'comment', 'name', 'sex', ]
 
 
 @dataclass
@@ -43,12 +43,39 @@ def get_sha256(path: str | Path,
     return h.hexdigest()
 
 
+
+def filepath_sql(base_dir, relative_path):
+    """
+    SQL expression joining an upload's base_dir and a media relative_path into a full path.
+
+    Used by every query that selects a media filepath (mpdb, fetch_media, fetch_roi,
+    reid_thread). base_dir and relative_path keep the separators of the OS that imported
+    them, so a project imported on Windows has "H:\\Images" and "7\\a.jpg"; the other
+    OS's separator is swapped for os.sep in both so the whole path uses the current OS's
+    separator. Kept as one function so all those queries build the same path.
+    """
+    other = '/' if os.sep == '\\' else '\\'
+    return (f"REPLACE({base_dir}, '{other}', '{os.sep}') || '{os.sep}' || "
+            f"REPLACE({relative_path}, '{other}', '{os.sep}')")
+
+
+def native_relative_path(relative_path):
+    """
+    relative_path with the current OS's separators, the Python twin of filepath_sql.
+
+    Used by VerifyNewBaseDirsThread, which joins relative paths onto a new base
+    directory in Python rather than SQL.
+    """
+    other = '/' if os.sep == '\\' else '\\'
+    return str(relative_path).replace(other, os.sep)
+
+
 def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     Fetches all media info with full paths, converts to dataframe
     """
-    # select ids
-    if ids:
+    # select ids, an empty list selects nothing (not everything)
+    if ids is not None:
         ids_str = ', '.join(map(str, ids))
         row_cond = f"WHERE m.id IN ({ids_str})"
     else:
@@ -62,7 +89,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
                 m.external_id, m.comment,
                 COUNT(roi.id) AS roi_count,
-                u.base_dir || '/' || m.relative_path AS filepath
+                {filepath_sql('u.base_dir', 'm.relative_path')} AS filepath
             FROM media m
             LEFT JOIN uploads u ON m.base_dir_id = u.id
             LEFT JOIN roi ON roi.media_id = m.id
@@ -83,7 +110,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                 m.id, m.base_dir_id, m.relative_path, m.sha256, m.ext,
                 m.timestamp, m.station_id, m.camera_id, m.sequence_id,
                 m.external_id, m.comment,
-                u.base_dir || '/' || m.relative_path AS filepath
+                {filepath_sql('u.base_dir', 'm.relative_path')} AS filepath
             FROM media m
             LEFT JOIN uploads u ON m.base_dir_id = u.id
             {row_cond if row_cond else ''}
@@ -108,11 +135,11 @@ def fetch_roi(mpDB, media_id=None):
     """
     Fetches roi table with media filepaths, converts to dataframe
     """
-    query = """
+    query = f"""
         SELECT
             r.id, r.media_id, r.frame, r.bbox_x, r.bbox_y, r.bbox_w, r.bbox_h,
             r.viewpoint, r.reviewed, r.favorite, r.individual_id, r.emb,
-            u.base_dir || '/' || m.relative_path AS filepath
+            {filepath_sql('u.base_dir', 'm.relative_path')} AS filepath
         FROM roi r
         JOIN media m ON r.media_id = m.id
         LEFT JOIN uploads u ON m.base_dir_id = u.id
@@ -134,18 +161,19 @@ def fetch_roi(mpDB, media_id=None):
     return pd.DataFrame()
 
 
-def fetch_roi_media(mpDB, rids=None, sequence_ids=None,reset_index=True):
+def fetch_roi_media(mpDB, rids=None, sequence_ids=None, reset_index=True):
     """
     Fetch Combined Roi and Media Info for Media Table
     columns = ['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'viewpoint',
                 'reviewed', 'favorite', 'media_id', 'individual_id', 'emb',
                 'filepath', 'sha256', 'ext', 'timestamp', 'station_id', 'camera_id', 'sequence_id', 'external_id',
-                'comment', 'name', 'sex', 'age']
+                'comment', 'name', 'sex']
     """
-    if rids:
+    # an empty list selects nothing (not everything)
+    if rids is not None:
         ids_str = ', '.join(map(str, rids))
         media, column_names = mpDB.all_media(row_cond=f"roi.id IN ({ids_str})")
-    elif sequence_ids:
+    elif sequence_ids is not None:
         sequence_ids_str = ', '.join(map(str, sequence_ids))
         media, column_names = mpDB.all_media(row_cond=f"media.sequence_id IN ({sequence_ids_str})")
     else:
@@ -163,9 +191,9 @@ def fetch_individual(mpDB):
     """Fetches Individual Table, Converts to DataFrame"""
     individual = mpDB.select("individual")
     if individual:
-        return pd.DataFrame(individual, columns=["id", "name", "sex", "age"]).set_index("id")
+        return pd.DataFrame(individual, columns=["id", "name", "sex"]).set_index("id")
     # return empty dataframe if no individual found
-    return pd.DataFrame(columns=["id", "name", "sex", "age"]).set_index("id")
+    return pd.DataFrame(columns=["id", "name", "sex"]).set_index("id")
 
 
 def get_roi_bbox(roi):
@@ -190,42 +218,190 @@ def get_sequence(rid, roi_media):
     return sequence.index.to_list()
 
 
-def sequence_roi_dict(roi_media):
+def _group_roi_ids(roi_media, column):
     """
-    Return two lists of roi.ids
+    Map each value of column to the list of roi.ids (index) with that value
 
-    Group by capture, order by frame number
+    Keys keep first-appearance order. Null values map to an empty list.
+    Uses one groupby instead of filtering the whole frame once per row.
     """
-    sequence_dict = {}
-    sequence_ids = roi_media["sequence_id"].to_list()
-    for s in sequence_ids:
-        sequence = roi_media[roi_media['sequence_id'] == s]
-        sequence_dict[s] = sequence.index.to_list()
-    return sequence_dict
+    groups = roi_media.groupby(column, sort=False).indices
+    ids = roi_media.index
+    roi_dict = {}
+    for key in dict.fromkeys(roi_media[column].to_list()):
+        positions = groups.get(key)
+        roi_dict[key] = ids[positions].to_list() if positions is not None else []
+    return roi_dict
+
+
+def sequence_roi_dict(roi_media):
+    """Return dict of sequence_id: [roi.ids]"""
+    return _group_roi_ids(roi_media, "sequence_id")
 
 
 def individual_roi_dict(roi_media):
-    """
-    Return two lists of roi.ids
-
-    Group by capture, order by frame number
-    """
-    individual_dict = {}
-    individual_ids = roi_media["individual_id"].to_list()
-    for iid in individual_ids:
-        individual = roi_media[roi_media['individual_id'] == iid]
-        individual_dict[iid] = individual.index.to_list()
-    return individual_dict
+    """Return dict of individual_id: [roi.ids]"""
+    return _group_roi_ids(roi_media, "individual_id")
 
 
 def media_count(mpDB, survey_id):
     """
     Get number of media files associated with a given survey_id
     """
-    station_rows = mpDB.select("station", columns="id", row_cond=f'survey_id={survey_id}')
-    if not station_rows:
-        return [], 0
-    valid_stations = [row[0] for row in station_rows]
-    survey_list = ",".join([str(s) for s in valid_stations])
-    media = mpDB.select("media", columns="id", row_cond=f'station_id IN ({survey_list})')
+    media = mpDB.query("""SELECT media.id FROM media
+                         JOIN station ON station.id = media.station_id
+                         WHERE station.survey_id=?;""", (survey_id,)) or []
     return media, len(media)
+
+
+# EDITS AND DELETES ============================================================
+def _in_ids(ids):
+    """ids as ints, with the placeholders for an IN (...) of them"""
+    ids = [int(i) for i in ids]
+    return ids, ", ".join("?" * len(ids))
+
+
+def delete_rois(mpDB, roi_ids):
+    """Delete rois with their thumbnails and embeddings, False if it failed"""
+    roi_ids, placeholders = _in_ids(roi_ids)
+    if not roi_ids:
+        return True
+    return mpDB.delete("roi", f"id IN ({placeholders})", roi_ids)
+
+
+def delete_media(mpDB, media_ids):
+    """Delete media with their rois, thumbnails and embeddings, False if it failed"""
+    media_ids, placeholders = _in_ids(media_ids)
+    if not media_ids:
+        return True
+    return mpDB.delete("media", f"id IN ({placeholders})", media_ids)
+
+
+def update_roi_box(mpDB, roi_id, frame, bbox_x, bbox_y, bbox_w, bbox_h):
+    """
+    Move a roi's box, keeping its id, individual, viewpoint and favorite
+
+    Its embedding no longer matches the box, so it is dropped and emb set to 0,
+    which the next Process run picks up. False if the box couldn't be saved.
+    """
+    saved = mpDB.edit_row("roi", roi_id, {"frame": frame,
+                                          "bbox_x": round(bbox_x, 4), "bbox_y": round(bbox_y, 4),
+                                          "bbox_w": round(bbox_w, 4), "bbox_h": round(bbox_h, 4),
+                                          "emb": 0})
+    if saved:
+        mpDB.delete_emb(roi_id)
+    return saved
+
+
+def set_favorite(mpDB, roi_id, favorite):
+    """Mark a roi as a favorite (1) or not (0), False if it couldn't be saved"""
+    return mpDB.edit_row("roi", roi_id, {"favorite": int(favorite)})
+
+
+def clear_project_data(mpDB):
+    """
+    Delete every media, roi, sequence and individual, their thumbnails and all embeddings
+
+    Regions, surveys, stations and uploads are kept. False if any table couldn't be cleared.
+    """
+    cleared = all([mpDB.clear(table) for table in
+                   ("media", "media_thumbnails", "roi", "roi_thumbnails", "sequence", "individual")])
+    mpDB.clear_emb()
+    return cleared
+
+
+# media columns, the rest of an EditObject's references are roi columns or sex
+MEDIA_COLUMNS = {'station_id', 'sequence_id', 'external_id', 'comment'}
+
+
+def save_edits(mpDB, edits, individual_of, media_only=False):
+    """
+    Save EditObjects in the order they were made, return the ones that failed
+
+    individual_of(rid) gives a roi's individual from before these edits. A sex
+    edit changes the individual of its roi, using an individual_id edit earlier
+    in the same save when there is one. media_only (the media view) saves
+    every edit to the media, by mid.
+    """
+    failed = []
+    # individual_id edits applied so far, so a later sex edit targets the new individual
+    assigned_iids = {}
+    for edit in edits:
+        if not _save_edit(mpDB, edit, individual_of, assigned_iids, media_only):
+            failed.append(edit)
+    return failed
+
+
+def _save_edit(mpDB, edit, individual_of, assigned_iids, media_only):
+    """
+    Write one EditObject, return False if it failed
+
+    Called only by save_edits, which keeps assigned_iids across the edits of one save.
+    """
+    replace_dict = {edit.reference: edit.new_value}
+    if media_only or edit.reference in MEDIA_COLUMNS:
+        return mpDB.edit_row("media", int(edit.mid), replace_dict, allow_none=True)
+    # rows without a roi id (eg. the full video row) have nothing to update
+    if edit.rid is None or pd.isna(edit.rid):
+        return True
+    rid = int(edit.rid)
+    if edit.reference == 'sex':
+        iid = assigned_iids[rid] if rid in assigned_iids else individual_of(rid)
+        if iid is None or pd.isna(iid):
+            return True  # no individual to update
+        return mpDB.edit_row("individual", int(iid), replace_dict, allow_none=True)
+    # naming a roi reviews it, Unknown unreviews it, same as assign_individual/clear_individual
+    if edit.reference == 'individual_id':
+        replace_dict['reviewed'] = 0 if edit.new_value is None or pd.isna(edit.new_value) else 1
+    # roi columns; individual_id and viewpoint may be cleared (Unknown / None)
+    saved = mpDB.edit_row("roi", rid, replace_dict, allow_none=True)
+    if saved and edit.reference == 'individual_id':
+        assigned_iids[rid] = edit.new_value
+    return saved
+
+
+# MATCHING =====================================================================
+def assign_individual(mpDB, roi_ids, individual_id):
+    """Give rois an individual and mark them reviewed, False if it couldn't be saved"""
+    updates = {int(r): {"individual_id": individual_id, "reviewed": 1} for r in roi_ids}
+    return mpDB.batch_edit("roi", updates, quiet=True)
+
+
+def clear_individual(mpDB, roi_ids):
+    """Remove the individual from rois and mark them unreviewed, False if it couldn't be saved"""
+    updates = {int(r): {"individual_id": None, "reviewed": 0} for r in roi_ids}
+    return mpDB.batch_edit("roi", updates, allow_none=True, quiet=True)
+
+
+# LOOKUPS ======================================================================
+def media_without_rois(mpDB):
+    """
+    Ids of media that have no rois, or a roi without a box (bbox_w -1)
+
+    A box drawn on such media in the edit popup fills its box-less roi (boxless_roi),
+    so media leave this list once all of their rois have boxes
+    """
+    rows = mpDB.query("""SELECT DISTINCT media.id FROM media
+                         LEFT JOIN roi ON roi.media_id = media.id
+                         WHERE roi.media_id IS NULL
+                         OR roi.bbox_w = -1;""")
+    return [row[0] for row in rows or []]
+
+
+def boxless_roi(mpDB, media_id):
+    """Id of a roi of media_id without a box (bbox_w -1), the lowest if several, else None"""
+    rows = mpDB.query("SELECT MIN(id) FROM roi WHERE media_id = ? AND bbox_w = -1;", (int(media_id),))
+    return rows[0][0] if rows else None
+
+
+def uploads_with_media_counts(mpDB):
+    """(id, base_dir, created_at, number of media) of every upload directory"""
+    return mpDB.query("""SELECT uploads.id, uploads.base_dir, uploads.created_at, COUNT(media.id)
+                         FROM uploads LEFT JOIN media ON media.base_dir_id = uploads.id
+                         GROUP BY uploads.id;""") or []
+
+def rois_without_embeddings(mpDB):
+    """Ids of rois that have no embeddings"""
+    rows = mpDB.query("""SELECT DISTINCT roi.id FROM roi
+                         WHERE roi.emb = 0;""")
+    return [row[0] for row in rows or []]

@@ -8,7 +8,6 @@ import tempfile
 import httpx
 import yaml
 import logging
-logger = logging.getLogger(__name__)
 import urllib.request
 from pathlib import Path
 from queue import Queue, Empty
@@ -17,6 +16,8 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.config import asset_path
 
+
+logger = logging.getLogger(__name__)
 
 MODELS_YML_URL = "https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml"
 
@@ -94,20 +95,25 @@ def is_valid_reid_model(basename):
         return False
 
 
+def _as_list(value):
+    """models.yml lists file names / urls, a single one may be a plain string"""
+    return [value] if isinstance(value, str) else list(value)
+
+
 def get_path(ML_DIR, key):
-    """Gets path to ML model in ML_DIR"""
-    MODELS = load_model('MODELS')
+    """
+    Path to the ML model's main (first) file in ML_DIR, None if not downloaded
+
+    A model is only usable when all of its files are present (eg. a .onnx and
+    its .onnx.data), so an interrupted download doesn't count as downloaded
+    """
     if key is None:
         return None
-    names = MODELS[key][0]
-    if len(names) > 0:
-        path = Path(ML_DIR) / names[0]
-    else:
-        path = Path(ML_DIR) / names
-    if path.exists():
-        return path
-    else:
-        return None
+    MODELS = load_model('MODELS')
+    paths = [Path(ML_DIR) / name for name in _as_list(MODELS[key][0])]
+    if paths and all(path.exists() for path in paths):
+        return paths[0]
+    return None
 
 
 def delete(ML_DIR, key):
@@ -118,59 +124,52 @@ def delete(ML_DIR, key):
 
 
 class DownloadMLThread(QThread):
-    """Thread for downloading ML models"""
-    finished_ok = pyqtSignal(bool, str)
+    """Thread for downloading ML models, keeps running to take queued downloads"""
+    # model key, success, message; emitted once per queued model
+    finished_ok = pyqtSignal(str, bool, str)
 
     def __init__(self, ml_dir, parent=None):
         super().__init__(parent)
         self.ml_dir = Path(ml_dir)
         self.download_queue = Queue()  # thread-safe queue
-        self._shutdown = False  # flag to signal thread to exit gracefully
-
-        model_yml_path = asset_path("models.yml")
-        with open(model_yml_path, 'r') as cfg_file:
-            ml_cfg = yaml.safe_load(cfg_file)
-            self.models = ml_cfg['MODELS']
+        # the same models.yml the dialogs read (the downloaded copy if there is one)
+        self.models = load_model('MODELS')
 
     def queue_download(self, model_key: str):
         """Call from UI thread to queue a model for download"""
         self.download_queue.put(model_key)
 
-    def shutdown(self):
-        """Signal thread to exit gracefully"""
-        self._shutdown = True
-
     def run(self):
-        try:
-            while not self.isInterruptionRequested():
-                try:
-                    # Non-blocking: raises Empty if queue is empty
-                    key = self.download_queue.get(timeout=0.5)
+        while not self.isInterruptionRequested():
+            try:
+                key = self.download_queue.get(timeout=0.5)
+            except Empty:
+                continue
+            # report each model; a failed download must not end the thread
+            try:
+                self.download_model(key)
+            except InterruptedError:
+                self.finished_ok.emit(key, False, "Download cancelled")
+            except urllib.error.URLError:
+                logging.exception("Unable to connect to server.")
+                self.finished_ok.emit(key, False, "Network error")
+            except Exception:
+                logging.exception("Download failed.")
+                self.finished_ok.emit(key, False, "Download failed")
+            else:
+                self.finished_ok.emit(key, True, "Download Complete")
 
-                    names = self.models[key][0]
-                    urls = self.models[key][1]
-
-                    for i, url in enumerate(urls):
-                        name = names[i]
-                        final_path = self.ml_dir / name
-
-                        if final_path.exists():
-                            continue
-
-                        self.download_one(url=url,
-                                          final_path=final_path,
-                                          should_cancel=self.isInterruptionRequested)
-                except Empty:
-                    self.finished_ok.emit(True, "Download Complete")
-
-        except InterruptedError:
-            self.finished_ok.emit(False, "Download cancelled")
-        except urllib.error.URLError:
-            logging.exception("Unable to connect to server.")
-            self.finished_ok.emit(False, "Network error")
-        except Exception:
-            logging.exception("Download failed.")
-            self.finished_ok.emit(False, "Download failed")
+    def download_model(self, key):
+        """Download every file of a model that isn't there yet"""
+        names = _as_list(self.models[key][0])
+        urls = _as_list(self.models[key][1])
+        for name, url in zip(names, urls):
+            final_path = self.ml_dir / name
+            if final_path.exists():
+                continue
+            self.download_one(url=url,
+                              final_path=final_path,
+                              should_cancel=self.isInterruptionRequested)
 
     def download_one(self, url: str, final_path: Path, should_cancel) -> None:
         """

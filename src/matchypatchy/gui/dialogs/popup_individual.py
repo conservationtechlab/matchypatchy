@@ -3,15 +3,18 @@ Create a new Individual Fillable Form
 
 individual (id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
-            sex TEXT,
-            age TEXT);'''
+            sex TEXT);'''
 """
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QComboBox, QTableWidget, QTableWidgetItem,
                              QLabel, QLineEdit, QDialogButtonBox, QPushButton)
 from PyQt6 import QtWidgets
 
+from matchypatchy.database.individual import (individual_roi_counts, unidentified_roi_count, get_individual,
+                                              individual_name_exists, update_individual)
+from matchypatchy.project import UsesProject
 
-class IndividualPopup(QDialog):
+
+class IndividualPopup(UsesProject, QDialog):
     """
     Popup for managing individuals in the database.
     Triggered from display_base
@@ -21,7 +24,7 @@ class IndividualPopup(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Manage Individuals")
         self.parent = parent
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.selected_ind = None
 
         layout = QVBoxLayout()
@@ -70,19 +73,17 @@ class IndividualPopup(QDialog):
         self.list.clearContents()
         self.list.setRowCount(0)
         # Fetch individuals from the database
-        self.individuals = self.mpDB._command("""SELECT individual.name, individual.id, COUNT(roi.individual_id) AS count
-                                                 FROM individual LEFT JOIN roi ON roi.individual_id = individual.id
-                                                 GROUP BY roi.individual_id;""")
+        self.individuals = individual_roi_counts(self.mpDB)
         # get unidentified count
-        self.nulls = self.mpDB.select("roi", "COUNT(*)", row_cond="individual_id IS NULL")[0][0]
+        self.nulls = unidentified_roi_count(self.mpDB)
         self.list.setRowCount(len(self.individuals) + 1)
         # Add unidentified row
         self.list.setItem(0, 0, QTableWidgetItem("Unidentified"))
         self.list.setItem(0, 1, QTableWidgetItem(str(self.nulls)))
         # Add data to rows
-        for row, individual in enumerate(self.individuals):
-            self.list.setItem(row + 1, 0, QTableWidgetItem(individual[0]))
-            self.list.setItem(row + 1, 1, QTableWidgetItem(str(individual[2])))
+        for row, (_, name, count) in enumerate(self.individuals):
+            self.list.setItem(row + 1, 0, QTableWidgetItem(name))
+            self.list.setItem(row + 1, 1, QTableWidgetItem(str(count)))
 
     def edit(self):
         """Edit selected individual"""
@@ -91,15 +92,12 @@ class IndividualPopup(QDialog):
             return
 
         self.selected_ind = self.individuals[self.list.currentRow() - 1]
-        iid, name, sex, age = self.mpDB.select('individual', row_cond=f'id={self.selected_ind[1]}')[0]
+        iid = self.selected_ind[0]
+        name, sex = get_individual(self.mpDB, iid)
         # open edit dialog with current values
-        dialog = IndividualFillPopup(self, name=name, sex=sex, age=age)
+        dialog = IndividualFillPopup(self, name=name, sex=sex)
         if dialog.exec():
-            replace_dict = {"name": dialog.get_name(),
-                            "sex": dialog.get_sex(),
-                            "age": dialog.get_age()}
-            # update database
-            self.mpDB.edit_row("individual", iid, replace_dict, allow_none=True)
+            update_individual(self.mpDB, iid, dialog.get_name(), dialog.get_sex())
         del dialog
         # refetch data
         self.update()
@@ -110,24 +108,23 @@ class IndividualPopup(QDialog):
             filters = {"individual_id": 0}
         else:
             self.selected_ind = self.individuals[self.list.currentRow() - 1]
-            filters = {"individual_id": self.selected_ind[1]}
+            filters = {"individual_id": self.selected_ind[0]}
         self.parent.set_filtered_view(filters)
         self.accept()
 
 
-class IndividualFillPopup(QDialog):
+class IndividualFillPopup(UsesProject, QDialog):
     """
     Popup for adding or editing an individual.
     """
-    def __init__(self, parent, name=None, sex=None, age=None):
+    def __init__(self, parent, name=None, sex=None):
         super().__init__(parent)
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.setWindowTitle("Edit Individual")
         layout = QVBoxLayout()
 
         self.existing_name = name
         self.existing_sex = sex
-        self.existing_age = age
 
         # Name
         layout.addWidget(QLabel('Name'))
@@ -141,13 +138,6 @@ class IndividualFillPopup(QDialog):
         if sex is not None:
             self.sex.setCurrentText(sex)
         layout.addWidget(self.sex)
-        # Age
-        layout.addWidget(QLabel('Age'))
-        self.age = QComboBox()
-        self.age.addItems(['Unknown', 'Juvenile', 'Subadult', 'Adult'])
-        if age is not None:
-            self.age.setCurrentText(age)
-        layout.addWidget(self.age)
 
         self.secret_text = QLabel('')
         self.secret_text.setStyleSheet("QLabel { color : red; }")
@@ -156,7 +146,6 @@ class IndividualFillPopup(QDialog):
 
         self.name.textChanged.connect(self.checkInput)
         self.sex.currentIndexChanged.connect(self.checkInput)
-        self.age.currentIndexChanged.connect(self.checkInput)
 
         # Ok/Cancel Buttons
         buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -182,10 +171,6 @@ class IndividualFillPopup(QDialog):
         """Return the currently selected sex."""
         return self.sex.currentText()
 
-    def get_age(self):
-        """Return the currently selected age."""
-        return self.age.currentText()
-
     def accept_verify(self):
         """Verify input before accepting."""
         if self.get_name():
@@ -196,8 +181,7 @@ class IndividualFillPopup(QDialog):
         if self.get_name() == self.existing_name:  # if name is same as current name, allow it
             self.secret_text.hide()
             return True
-        existing_names = [ind[0] for ind in self.mpDB.select('individual', 'name')]
-        if self.get_name() in existing_names:
+        if individual_name_exists(self.mpDB, self.get_name()):
             self.secret_text.setText("Name already exists.\nPlease choose a different name.")
             self.secret_text.show()
             return False

@@ -6,6 +6,7 @@ import, process, validate, match, and export data
 Also contains database management options for
 surveys, stations, individuals, and downloading ML models
 """
+import logging
 import os
 
 from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
@@ -13,6 +14,8 @@ from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QImage
 
+from matchypatchy.database.location import survey_names
+from matchypatchy.database.media import clear_project_data, rois_without_embeddings
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy.gui.dialogs.popup_individual import IndividualPopup
@@ -24,11 +27,16 @@ from matchypatchy.gui.dialogs.popup_ml import MLOptionsPopup
 from matchypatchy.threads.sequence_thread import SequenceThread
 from matchypatchy.threads.animl_thread import AnimlThread
 from matchypatchy.threads.reid_thread import ReIDThread
+from matchypatchy.threads.model_download_thread import get_path
 
 from matchypatchy import config
+from matchypatchy.project import UsesProject
 
 
-class DisplayBase(QWidget):
+logger = logging.getLogger(__name__)
+
+
+class DisplayBase(UsesProject, QWidget):
     """Base class for the main dashboard view in the MatchyPatchy GUI."""
 
     LOGO = str(config.asset_path("graphics/logo.png"))
@@ -36,9 +44,7 @@ class DisplayBase(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         padding = 120
         # Initialize threads for sequence, animl, and reid processing
         self.active_survey = None
@@ -161,30 +167,44 @@ class DisplayBase(QWidget):
         self.setLayout(main_layout)
         
         self.update_survey()
-
-    def update_project(self, cfg, mpDB):
-        """Update database object"""
-        self.cfg = cfg
-        self.mpDB = mpDB
+        # the survey list belongs to the open project, start from its first survey
+        self.project.changed.connect(lambda: self.update_survey(keep_selection=False))
+        self.project.data_changed.connect(self.surveys_written)
 
     # ==========================================================================
     # Database Management Functions
     # ==========================================================================
-    def update_survey(self):
-        """Update survey dropdown list"""
+    def update_survey(self, keep_selection=True):
+        """Update survey dropdown list, keeping the selected survey unless it was deleted"""
+        selected = self.active_survey[0] if keep_selection and self.active_survey else None
+        self.survey_select.blockSignals(True)
         self.survey_select.clear()
-        survey_names = self.mpDB.select('survey', columns='id, name')
-        self.survey_list = dict(survey_names)
-        self.survey_list_ordered = list(survey_names)
+        surveys = survey_names(self.mpDB)
+        self.survey_list = dict(surveys)
+        self.survey_list_ordered = list(surveys)
         if self.survey_list_ordered:
-            self.survey_select.addItems([el[1] for el in survey_names])
+            self.survey_select.addItems([el[1] for el in surveys])
+        position = next((i for i, (sid, _) in enumerate(self.survey_list_ordered) if sid == selected), 0)
+        self.survey_select.setCurrentIndex(position)
+        self.survey_select.blockSignals(False)
+        self.select_survey()
+
+    def surveys_written(self, table):
+        """
+        Reload the survey list after a write to the survey table
+
+        Connected to project.data_changed in __init__, so surveys added by an
+        import or edited in Manage Surveys show up without the caller refreshing.
+        """
+        if table == "survey":
+            self.update_survey()
 
     def manage_survey(self):
         """Launch Survey Management Popup"""
         dialog = SurveyPopup(self)
-        if dialog.exec():
-            self.update_survey()
-            del dialog
+        # the survey list refreshes itself as surveys are written
+        dialog.exec()
+        del dialog
 
     def select_survey(self):
         """Set active survey based on dropdown selection"""
@@ -229,7 +249,7 @@ class DisplayBase(QWidget):
                                                    os.path.expanduser('~'),
                                                    ("CSV Files (*.csv)"))[0]
             if manifest:
-                self.logger.info(f"Importing from manifest: {manifest}")
+                logger.info(f"Importing from manifest: {manifest}")
                 dialog = ImportCSVPopup(self, manifest)
                 dialog.exec()
                 del dialog
@@ -249,10 +269,13 @@ class DisplayBase(QWidget):
                                                          QFileDialog.Option.ShowDirsOnly)
             if directory:
                 dialog = ImportFolderPopup(self, directory)
-                self.logger.info(f"Importing from directory: {directory}")
-                if dialog.exec() == QDialog.DialogCode.Rejected:
-                    self.import_folder()
+                logger.info(f"Importing from directory: {directory}")
+                dialog.exec()
+                # ask for another directory only if this one had no images, not on Cancel
+                no_images = dialog.no_images
                 del dialog
+                if no_images:
+                    self.import_folder()
 
     # STEP 2: Process Button
     def select_models(self):
@@ -270,7 +293,13 @@ class DisplayBase(QWidget):
 
     def process_images(self, mloptions):
         """Process images using selected machine learning options"""
-        if self.mpDB.count("media") > 0:
+        # a chosen model's files can be deleted before processing starts
+        missing = [key for key in (mloptions['DETECTOR_KEY'], mloptions['REID_KEY'], mloptions['VIEWPOINT_KEY'])
+                   if key is not None and get_path(self.cfg.ML_DIR, key) is None]
+        if missing:
+            dialog = AlertPopup(self, f"Model(s) not downloaded: {', '.join(missing)}")
+            dialog.show()
+        elif self.mpDB.count("media") > 0:
             self.cfg.update(mloptions)
             dialog = AlertPopup(self, "Processing Images...",
                                 title="Processing Images",
@@ -281,34 +310,61 @@ class DisplayBase(QWidget):
             dialog.set_max(0)
             self.sequence_thread = SequenceThread(self.mpDB, self.cfg, mloptions['sequence_checked'])
             self.sequence_thread.prompt_update.connect(dialog.update_prompt)
-            self.sequence_thread.start()
             # 2. ANIML (BBOX)
-            dialog.set_max(100)
-            dialog.set_counter(0)
             self.animl_thread = AnimlThread(self.mpDB, self.cfg, mloptions['DETECTOR_KEY'])
             self.animl_thread.prompt_update.connect(dialog.update_prompt)
             self.animl_thread.progress_update.connect(dialog.set_value)
             # 3. REID AND VIEWPOINT
-            dialog.set_max(100)
-            dialog.set_counter(0)
             self.miew_thread = ReIDThread(self.mpDB, self.cfg, mloptions)
             self.miew_thread.prompt_update.connect(dialog.update_prompt)
             self.miew_thread.progress_update.connect(dialog.set_value)
-            # chain threads
-            self.animl_thread.finished.connect(self.miew_thread.start)
-            self.animl_thread.finished.connect(dialog.reset_counter)
-            self.miew_thread.done.connect(dialog.accept)
-            self.animl_thread.start()
+            self.miew_thread.done.connect(self._finish_processing)
+            # run one step after the other, so only one thread writes to the database at a time
+            self._process_dialog = dialog
+            self._process_cancelled = False
+            self.sequence_thread.finished.connect(self._start_animl)
+            self.animl_thread.finished.connect(self._start_reid)
             # allow cancellation
-            dialog.rejected.connect(self.sequence_thread.requestInterruption)
-            dialog.rejected.connect(self.animl_thread.requestInterruption)
-            dialog.rejected.connect(self.miew_thread.requestInterruption)
+            dialog.rejected.connect(self._cancel_processing)
+            self.sequence_thread.start()
         else:
             dialog = AlertPopup(self, "No images to process.")
             dialog.show()
 
         if dialog.exec():
             del dialog
+
+    def _start_animl(self):
+        """Step 2 once sequencing is done, unless processing was cancelled"""
+        if self._process_cancelled:
+            return
+        self._process_dialog.set_max(100)
+        self._process_dialog.set_counter(0)
+        self.animl_thread.start()
+
+    def _start_reid(self):
+        """Step 3 once detection is done, unless processing was cancelled"""
+        # QThread.start() clears an earlier interruption request, so check before starting
+        if self._process_cancelled:
+            return
+        self._process_dialog.reset_counter()
+        self.miew_thread.start()
+
+    def _finish_processing(self):
+        """Close the popup, or keep it open to say how many files couldn't be read"""
+        failed = self.animl_thread.failed | self.miew_thread.failed
+        if failed:
+            self._process_dialog.update_prompt(f"Processing finished, but {len(failed)} file(s) "
+                                               "could not be read. See the log for which.")
+            self._process_dialog.allow_ok()
+        else:
+            self._process_dialog.accept()
+
+    def _cancel_processing(self):
+        """Stop the running step and don't start the ones after it"""
+        self._process_cancelled = True
+        for thread in (self.sequence_thread, self.animl_thread, self.miew_thread):
+            thread.requestInterruption()
 
     # STEP 3: Validate/Manage Media Button
     def validate(self):
@@ -318,6 +374,13 @@ class DisplayBase(QWidget):
     # STEP 4: Match Button
     def match(self):
         """Open compare view to match ROIs"""
+        # check that the user has processed the images first
+        if len(rois_without_embeddings(self.mpDB)) > 0:
+            dialog = AlertPopup(self, "There are rois without embeddings. They will be ignored until processed.")
+            if dialog.exec() == QDialog.DialogCode.Rejected:
+                return
+            del dialog
+
         self.parent._set_compare_view()
 
     # STEP 5: Export Button
@@ -331,9 +394,10 @@ class DisplayBase(QWidget):
                 if not file_path.endswith(".csv"):
                     file_path += ".csv"
 
-                with open(file_path, 'w') as file:
-                    data.to_csv(file, index=False)
-                self.logger.info(f"Data exported to: {file_path}")
+                # without the index, so the file can be imported (migrated) again; pandas
+                # handles line endings (text mode on Windows added blank lines)
+                data.to_csv(file_path, index=False, encoding="utf-8")
+                logger.info(f"Data exported to: {file_path}")
         else:
             dialog = AlertPopup(self, prompt="No data to export.")
             if dialog.exec():
@@ -350,12 +414,6 @@ class DisplayBase(QWidget):
         dialog = AlertPopup(self, "This will delete all media and ROIs. Are you sure you want continue?")
         if dialog.exec():
             self.mpDB.info()
-            self.logger.warning("DELETING DATA")
-            self.mpDB.clear("media")
-            self.mpDB.clear("media_thumbnails")
-            self.mpDB.clear("roi")
-            self.mpDB.clear("roi_thumbnails")
-            self.mpDB.clear("sequence")
-            self.mpDB.clear("individual")
-            self.mpDB.clear_emb()
+            logger.warning("DELETING DATA")
+            clear_project_data(self.mpDB)
         del dialog

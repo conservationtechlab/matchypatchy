@@ -7,6 +7,8 @@ Unit tests for matchypatchy GUI dialog classes:
 PyQt6 is stubbed out in conftest.py.  All dialog classes are instantiated
 via __new__ so we can exercise their pure-Python logic without a real display.
 """
+from types import SimpleNamespace
+
 import pytest
 from unittest.mock import MagicMock, patch, call
 
@@ -15,7 +17,7 @@ from unittest.mock import MagicMock, patch, call
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_individual_fill_popup(name=None, sex=None, age=None, existing_names=None):
+def _make_individual_fill_popup(name=None, sex=None, existing_names=None):
     """
     Build an IndividualFillPopup bypassing __init__ and injecting stubs.
     """
@@ -23,14 +25,14 @@ def _make_individual_fill_popup(name=None, sex=None, age=None, existing_names=No
 
     parent = MagicMock()
     mpDB = MagicMock()
-    mpDB.select.return_value = [(n,) for n in (existing_names or [])]
+    names = set(existing_names or [])
+    mpDB.query.side_effect = lambda sql, params=(): [(1,)] if params and params[0] in names else []
     parent.mpDB = mpDB
 
     popup = IndividualFillPopup.__new__(IndividualFillPopup)
-    popup.mpDB = mpDB
+    popup.project = SimpleNamespace(db=mpDB, cfg=MagicMock())
     popup.existing_name = name
     popup.existing_sex = sex
-    popup.existing_age = age
 
     # Stub Qt widgets
     name_widget = MagicMock()
@@ -40,10 +42,6 @@ def _make_individual_fill_popup(name=None, sex=None, age=None, existing_names=No
     sex_widget = MagicMock()
     sex_widget.currentText.return_value = sex or "Unknown"
     popup.sex = sex_widget
-
-    age_widget = MagicMock()
-    age_widget.currentText.return_value = age or "Unknown"
-    popup.age = age_widget
 
     secret = MagicMock()
     popup.secret_text = secret
@@ -74,14 +72,6 @@ class TestIndividualFillPopupGetters:
     def test_get_sex_default_unknown(self):
         popup = _make_individual_fill_popup()
         assert popup.get_sex() == "Unknown"
-
-    def test_get_age_returns_selected(self):
-        popup = _make_individual_fill_popup(age="Adult")
-        assert popup.get_age() == "Adult"
-
-    def test_get_age_default_unknown(self):
-        popup = _make_individual_fill_popup()
-        assert popup.get_age() == "Unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +172,7 @@ class TestIndividualPopupSetEditview:
 
         popup = IndividualPopup.__new__(IndividualPopup)
         popup.parent = parent
-        popup.mpDB = parent.mpDB
+        popup.project = SimpleNamespace(db=parent.mpDB, cfg=MagicMock())
         popup.selected_ind = None
 
         list_widget = MagicMock()
@@ -218,12 +208,12 @@ class TestIndividualPopupUpdate:
 
         parent = MagicMock()
         parent.mpDB = MagicMock()
-        parent.mpDB._command.return_value = individuals or []
-        parent.mpDB.select.return_value = [(null_count,)]
+        rows = individuals or []
+        parent.mpDB.query.side_effect = lambda sql, params=(): [(null_count,)] if "IS NULL" in sql else rows
 
         popup = IndividualPopup.__new__(IndividualPopup)
         popup.parent = parent
-        popup.mpDB = parent.mpDB
+        popup.project = SimpleNamespace(db=parent.mpDB, cfg=MagicMock())
         popup.selected_ind = None
 
         list_widget = MagicMock()
@@ -234,7 +224,7 @@ class TestIndividualPopupUpdate:
 
     def test_update_sets_correct_row_count(self):
         """Row count = number of individuals + 1 (unidentified row)."""
-        individuals = [("Tiger-01", 1, 5), ("Leopard-02", 2, 3)]
+        individuals = [(1, "Tiger-01", 5), (2, "Leopard-02", 3)]
         popup = self._make_individual_popup(individuals=individuals, null_count=2)
         popup.update()
         popup.list.setRowCount.assert_called_with(3)  # 2 named + 1 unidentified
@@ -246,7 +236,7 @@ class TestIndividualPopupUpdate:
         popup.list.setRowCount.assert_called_with(1)
 
     def test_update_stores_individuals(self):
-        individuals = [("Tiger-01", 1, 5)]
+        individuals = [(1, "Tiger-01", 5)]
         popup = self._make_individual_popup(individuals=individuals)
         popup.update()
         assert popup.individuals == individuals
@@ -261,3 +251,1093 @@ class TestAlertPopup:
         """AlertPopup should be importable (not raise ImportError)."""
         from matchypatchy.gui.dialogs.popup_alert import AlertPopup
         assert AlertPopup is not None
+
+
+# ---------------------------------------------------------------------------
+# ImportCSVPopup
+# ---------------------------------------------------------------------------
+
+def _csv_popup(tmp_path):
+    import pandas as pd
+    from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+    manifest = tmp_path / "manifest.csv"
+    pd.DataFrame({"filepath": ["a.jpg"], "timestamp": ["2024-01-01"], "station": ["S1"]}).to_csv(manifest, index=False)
+    parent = MagicMock()
+    parent.active_survey = (1, "Default Survey")
+    # the shared widget stub runs out of side effects when built repeatedly
+    with patch("matchypatchy.gui.dialogs.popup_import_csv.ComboBoxSeparator"):
+        return ImportCSVPopup(parent, str(manifest))
+
+
+class TestImportCSVSurvey:
+    def test_defaults_to_the_active_survey_not_a_column(self, tmp_path):
+        """The thread reads a non-None survey selection as a CSV column name"""
+        popup = _csv_popup(tmp_path)
+        assert popup.selections["survey"] is None
+
+    def test_switching_back_to_active_survey_rechecks_ok(self, tmp_path):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = MagicMock()
+        popup.selections = {"survey": "None"}
+        popup.survey.currentIndex.return_value = 0
+        ImportCSVPopup.select_survey(popup)
+        assert popup.selections["survey"] is None
+        popup.check_ok_button.assert_called_once()
+
+    def test_thread_uses_active_survey_for_none_selection(self):
+        """With the active survey selected, no survey named 'None' is created"""
+        from matchypatchy.threads.import_thread import CSVImportThread
+        thread = MagicMock()
+        thread.selected_columns = {"survey": None}
+        thread.active_survey = "Default Survey"
+        thread.survey_ref = {}
+        thread.mpDB.select.return_value = [(1,)]
+        assert CSVImportThread.survey(thread, {"filepath": "a.jpg"}) == 1
+        thread.mpDB.add_survey.assert_not_called()
+
+
+class TestImportCSVOkButton:
+    def test_ok_disabled_while_importing(self, tmp_path):
+        popup = _csv_popup(tmp_path)
+        popup.okButton = MagicMock()
+        popup.selections.update(filepath="filepath", timestamp="timestamp", station="station")
+        with patch("matchypatchy.gui.dialogs.popup_import_csv.CSVImportThread"):
+            popup.import_manifest()
+        popup.okButton.setEnabled.assert_called_with(False)
+
+
+class TestImportCSVUnreadable:
+    """A csv pandas can't read is reported in the popup instead of crashing the app"""
+    def _popup(self, manifest):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        parent = MagicMock()
+        parent.active_survey = (1, "Default Survey")
+        with patch("matchypatchy.gui.dialogs.popup_import_csv.ComboBoxSeparator"), \
+                patch("matchypatchy.gui.dialogs.popup_import_csv.QLabel") as label_cls, \
+                patch("matchypatchy.gui.dialogs.popup_import_csv.QDialogButtonBox") as box_cls:
+            popup = ImportCSVPopup(parent, str(manifest))
+        return popup, label_cls.return_value, box_cls.return_value.button.return_value
+
+    def test_cp1252_csv_is_read(self, tmp_path):
+        """Excel on Windows saves accented filenames as cp1252"""
+        manifest = tmp_path / "manifest.csv"
+        manifest.write_bytes("filepath,timestamp,station\ncaf\u00e9.jpg,2024-01-01,S1\n".encode("cp1252"))
+        popup, _, _ = self._popup(manifest)
+        assert popup.read_error is None
+        assert popup.data.loc[0, "filepath"] == "caf\u00e9.jpg"
+
+    @pytest.mark.parametrize("content", [b"", b'filepath,timestamp\n"a.jpg,2024\n'], ids=["empty", "malformed"])
+    def test_unreadable_csv_shows_error_and_keeps_ok_disabled(self, tmp_path, content):
+        manifest = tmp_path / "manifest.csv"
+        manifest.write_bytes(content)
+        popup, label, ok_button = self._popup(manifest)
+        assert popup.read_error is not None
+        assert popup.data.empty
+        assert any("Could not read manifest.csv" in c.args[0] for c in label.setText.call_args_list)
+        assert call(True) not in ok_button.setEnabled.call_args_list
+
+
+# ---------------------------------------------------------------------------
+# ImportFolderPopup / FolderImportThread
+# ---------------------------------------------------------------------------
+
+FOLDER = "matchypatchy.gui.dialogs.popup_import_folder"
+
+
+class TestImportFolderTimezone:
+    def _timezone(self, db, survey_id):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        popup = MagicMock()
+        popup.mpDB = db
+        return ImportFolderPopup._survey_timezone(popup, survey_id)
+
+    def test_survey_without_region_uses_local_time(self, tmp_db):
+        db, _ = tmp_db
+        assert self._timezone(db, db.add_survey("No region", None, None, None)) is None
+
+    def test_region_timezone(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("West", "America/Los_Angeles")
+        assert self._timezone(db, db.add_survey("S", region, None, None)) == "America/Los_Angeles"
+
+
+class TestImportCSVCancel:
+    """Space can press Cancel once OK is disabled, so stopping takes a second press and is reported"""
+
+    def _popup(self, running=True):
+        popup = MagicMock()
+        popup.import_thread.isRunning.return_value = running
+        popup._cancel_pending = False
+        popup._cancelled = False
+        return popup
+
+    def test_first_cancel_only_asks(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup()
+        ImportCSVPopup.reject(popup)
+        popup.import_thread.requestInterruption.assert_not_called()
+        assert "Press Cancel again" in popup.label.setText.call_args[0][0]
+
+    def test_second_cancel_stops_the_import(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup()
+        ImportCSVPopup.reject(popup)
+        ImportCSVPopup.reject(popup)
+        popup.import_thread.requestInterruption.assert_called_once()
+        assert popup._cancelled is True
+
+    def test_stopped_import_is_reported_and_ok_closes(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup._cancelled = True
+        popup.progress_bar.value.return_value = 120
+        popup.progress_bar.maximum.return_value = 400
+        ImportCSVPopup.import_finished(popup)
+        assert "stopped after 120 of 400 rows" in popup.label.setText.call_args[0][0]
+        popup.buttonBox.accepted.connect.assert_called_once_with(popup.close)
+        popup.okButton.setEnabled.assert_called_once_with(True)
+        popup.close.assert_not_called()
+
+    def test_finished_csv_import_closes(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup.migrate = False
+        ImportCSVPopup.import_finished(popup)
+        popup.close.assert_called_once()
+
+    def test_finished_migrate_stays_open_for_its_report(self):
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        popup = self._popup(running=False)
+        popup.migrate = True
+        ImportCSVPopup.import_finished(popup)
+        popup.close.assert_not_called()
+
+
+class TestImportFolderCancel:
+    def test_cancel_during_import_stops_it_and_waits(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        popup = MagicMock()
+        popup.import_thread.isRunning.return_value = True
+        ImportFolderPopup.reject(popup)
+        popup.import_thread.requestInterruption.assert_called_once()
+
+    def test_manifest_after_cancel_is_ignored(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        import pandas as pd
+        popup = MagicMock()
+        popup._closed = True
+        ImportFolderPopup.get_manifest(popup, pd.DataFrame({"filepath": ["a.jpg"]}))
+        popup.get_options.assert_not_called()
+
+    def test_no_images_shown_in_popup(self):
+        """Reported in this popup's label, not a second dialog on top of it"""
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        import pandas as pd
+        popup = MagicMock()
+        popup._closed = False
+        popup.no_images = False
+        with patch(f"{FOLDER}.AlertPopup", create=True) as alert:
+            ImportFolderPopup.get_manifest(popup, pd.DataFrame())
+        alert.assert_not_called()
+        popup.station_label.setText.assert_called_once_with("No images found! Choose another directory.")
+        popup.buttonBox.accepted.connect.assert_called_once_with(popup.choose_another_directory)
+        popup.buttonBox.show.assert_called_once()
+        # waits for the user instead of closing straight away
+        assert popup.no_images is False
+        popup.reject.assert_not_called()
+
+    def test_ok_on_no_images_flags_for_another_directory(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        popup = MagicMock()
+        popup.no_images = False
+        ImportFolderPopup.choose_another_directory(popup)
+        assert popup.no_images is True
+        popup.reject.assert_called_once()
+
+    def _import_folder(self, no_images):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.select_survey.return_value = True
+        with patch("matchypatchy.gui.display_base.QFileDialog.getExistingDirectory", return_value="/data"), \
+                patch("matchypatchy.gui.display_base.ImportFolderPopup") as popup_cls:
+            popup_cls.return_value.no_images = no_images
+            DisplayBase.import_folder(base)
+        return base
+
+    def test_user_cancel_does_not_reopen_picker(self):
+        base = self._import_folder(no_images=False)
+        base.import_folder.assert_not_called()
+
+    def test_no_images_reopens_picker(self):
+        base = self._import_folder(no_images=True)
+        base.import_folder.assert_called_once()
+
+
+class TestFolderImportCamera:
+    def test_camera_level_without_station_level(self, tmp_path):
+        """Camera under the default station instead of UnboundLocalError"""
+        import pandas as pd
+        from matchypatchy.threads.import_thread import FolderImportThread
+        image = tmp_path / "cam1" / "a.jpg"
+        image.parent.mkdir()
+        image.write_bytes(b"x")
+        thread = MagicMock()
+        thread.data = pd.DataFrame({"filepath": [str(image)], "datetime": ["2024-01-01 10:00:00"]})
+        thread.station_level, thread.camera_level = 0, 2
+        thread.default_station = None
+        thread._default_station = lambda survey_id: FolderImportThread._default_station(thread, survey_id)
+        thread.PROGRESS_BATCH_SIZE = FolderImportThread.PROGRESS_BATCH_SIZE
+        thread.COMMIT_INTERVAL = FolderImportThread.COMMIT_INTERVAL
+        thread.active_survey = (1, "S")
+        thread.isInterruptionRequested.return_value = False
+        thread.mpDB.select.return_value = [(1,)]
+        thread.mpDB.add_station.return_value = 3
+        thread.camera.return_value = 7
+        with patch("matchypatchy.threads.import_thread.get_sha256", return_value="h"), \
+                patch("matchypatchy.threads.import_thread.save_media_thumbnail", return_value="t.jpg"):
+            FolderImportThread.run(thread)
+        # run() reports exceptions instead of raising them
+        thread.import_failed.emit.assert_not_called()
+        thread.camera.assert_called_once_with(str(image), 3)
+        assert thread.mpDB.add_media.call_args.kwargs["camera_id"] == 7
+
+
+# ---------------------------------------------------------------------------
+# UploadManagerPopup
+# ---------------------------------------------------------------------------
+
+UPLOADS = "matchypatchy.gui.dialogs.popup_uploads"
+
+
+def _uploads_popup(updates=(), errors=(), verified=True, contains_errors=False):
+    popup = MagicMock()
+    popup.updates = list(updates)
+    popup.errors = list(errors)
+    popup.verified = verified
+    popup.contains_errors = contains_errors
+    return popup
+
+
+class TestUploadManagerList:
+    def test_uploads_without_media_are_listed(self, tmp_db):
+        """Grouping on the media side folded every empty upload into one row"""
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        a, b, c = db.add_upload("/a"), db.add_upload("/b"), db.add_upload("/c")
+        db.add_media(a, "x.jpg", "h1", ".jpg", "2024", station)
+        popup = MagicMock()
+        popup.mpDB = db
+        UploadManagerPopup.update(popup)
+        assert sorted((row[1], row[3]) for row in popup.base_dirs) == [("/a", 1), ("/b", 0), ("/c", 0)]
+
+
+class TestUploadManagerSave:
+    def _save(self, popup, confirm):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.AlertPopup") as alert:
+            alert.return_value.exec.return_value = confirm
+            UploadManagerPopup.save(popup)
+
+    def test_cancel_on_unverified_warning_saves_nothing(self):
+        popup = _uploads_popup(updates=[(1, "/new")], verified=False)
+        self._save(popup, confirm=0)
+        popup.mpDB.update_base_dir.assert_not_called()
+
+    def test_cancel_on_missing_files_warning_saves_nothing(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg"]], contains_errors=True)
+        self._save(popup, confirm=0)
+        popup.mpDB.update_base_dir.assert_not_called()
+
+    def test_save_without_verify(self):
+        popup = _uploads_popup(updates=[(1, "/new")], verified=False)
+        self._save(popup, confirm=1)
+        popup.mpDB.update_base_dir.assert_called_once_with(1, "/new")
+        assert popup.updates == []
+
+    def _status(self, popup):
+        return popup.status_label.setText.call_args.args[0]
+
+    def test_failed_update_is_reported(self):
+        """update_base_dir returning False (e.g. directory already another upload's) was ignored"""
+        popup = _uploads_popup(updates=[(1, "/taken"), (2, "/ok")], errors=[[], []])
+        popup.mpDB.update_base_dir.side_effect = lambda base_dir_id, _: base_dir_id != 1
+        popup.base_dirs = [(1, "/old1", "2024", 1), (2, "/ok", "2024", 1)]
+        self._save(popup, confirm=1)
+        text = self._status(popup)
+        assert "Saved 1 of 2" in text
+        assert "/taken" in text and "/ok" not in text
+        popup.list.item.assert_any_call(0, 0)
+
+    def test_skipped_update_is_reported(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg", "b.jpg"]], contains_errors=True)
+        popup.base_dirs = [(1, "/old", "2024", 2)]
+        self._save(popup, confirm=1)
+        popup.mpDB.update_base_dir.assert_not_called()
+        text = self._status(popup)
+        assert "Saved 0 of 1" in text
+        assert "/new (2 files missing)" in text
+
+    def test_choosing_another_directory_needs_verifying_again(self):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = _uploads_popup(verified=True)
+        popup.base_dirs = [(1, "/old", "2024", 0)]
+        popup.list.currentRow.return_value = 0
+        with patch(f"{UPLOADS}.QFileDialog.getExistingDirectory", return_value="/new"):
+            UploadManagerPopup.edit(popup)
+        assert popup.verified is False
+
+
+class TestUploadManagerVerify:
+    def _popup(self, updates=((1, "/new"),)):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = _uploads_popup(updates=updates, verified=False)
+        popup.verifying = False
+        popup.build_thread = None
+        popup.list.currentRow.return_value = 0
+        popup.set_verifying = lambda v: UploadManagerPopup.set_verifying(popup, v)
+        popup.set_editdel = lambda: UploadManagerPopup.set_editdel(popup)
+        return popup
+
+    def _verify(self, popup):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.VerifyNewBaseDirsThread") as thread:
+            UploadManagerPopup.verify(popup)
+        return thread
+
+    def test_verify_while_running_is_ignored(self):
+        """Replacing a running thread aborted the app"""
+        popup = self._popup()
+        thread = self._verify(popup)
+        running = popup.build_thread
+        running.isRunning.return_value = True
+        thread = self._verify(popup)
+        thread.assert_not_called()
+        assert popup.build_thread is running
+
+    def test_buttons_disabled_and_progress_shown_while_verifying(self):
+        popup = self._popup()
+        self._verify(popup)
+        popup.button_verify.setEnabled.assert_called_with(False)
+        popup.button_save.setEnabled.assert_called_with(False)
+        popup.button_edit.setEnabled.assert_called_with(False)
+        popup.progress_bar.show.assert_called_once()
+
+    def test_buttons_enabled_when_verification_finishes(self):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        popup = self._popup()
+        self._verify(popup)
+        UploadManagerPopup.on_verify_finished(popup)
+        popup.button_verify.setEnabled.assert_called_with(True)
+        popup.button_save.setEnabled.assert_called_with(True)
+        popup.button_edit.setEnabled.assert_called_with(True)
+        popup.progress_bar.hide.assert_called()
+
+    def test_thread_gets_a_copy_of_updates(self):
+        popup = self._popup()
+        thread = self._verify(popup)
+        passed = thread.call_args.args[1]
+        assert passed == [(1, "/new")]
+        assert passed is not popup.updates
+
+
+class TestUploadManagerLog:
+    def _log(self, popup):
+        from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
+        with patch(f"{UPLOADS}.AlertPopup") as alert:
+            UploadManagerPopup.log(popup)
+        return alert
+
+    def test_missing_files_reported_in_popup_label(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[["a.jpg", "b.jpg"]], contains_errors=True)
+        alert = self._log(popup)
+        alert.assert_not_called()
+        text = popup.status_label.setText.call_args.args[0]
+        assert "2 files" in text
+
+    def test_all_found_reported_in_popup_label(self):
+        popup = _uploads_popup(updates=[(1, "/new")], errors=[[]])
+        alert = self._log(popup)
+        alert.assert_not_called()
+        assert "All files were found" in popup.status_label.setText.call_args.args[0]
+
+
+class TestIndividualPopupList:
+    def test_individuals_without_rois_are_listed(self, tmp_db):
+        """Grouping on the roi side folded every individual without rois into one row"""
+        from matchypatchy.gui.dialogs.popup_individual import IndividualPopup
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        up = db.add_upload("/a")
+        mid = db.add_media(up, "x.jpg", "h1", ".jpg", "2024", station)
+        a, b, c = db.add_individual("A"), db.add_individual("B"), db.add_individual("C")
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1, individual_id=a)
+        popup = MagicMock()
+        popup.mpDB = db
+        IndividualPopup.update(popup)
+        assert sorted((name, count) for _, name, count in popup.individuals) == [("A", 1), ("B", 0), ("C", 0)]
+
+
+class TestViewIndividualPrefilter:
+    """Manage Individuals > View sends the individual's database id"""
+
+    def _refresh(self, individual_id):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = MagicMock()
+        import re
+        tables = {"region": [], "survey": [], "individual": [(4, "Spot"), (9, "Dot")]}
+        bar.mpDB.query.side_effect = lambda sql, params=(): tables.get(re.search(r"FROM (\w+)", sql).group(1), [])
+        bar.region_select.currentIndex.return_value = 0
+        bar.survey_select.currentIndex.return_value = 0
+        bar.station_select.currentIndex.return_value = 0
+        bar.viewpoint_select.currentIndex.return_value = 0
+        bar.individual_select.currentIndex.return_value = 0
+        bar.station_list_ordered = [(0, "Station")]
+        bar.viewpoint_list_ordered = [(0, "Viewpoint")]
+        FilterBar.refresh_filters(bar, prefilter={"individual_id": individual_id})
+        return bar
+
+    def test_selects_individual_by_id(self):
+        bar = self._refresh(9)
+        assert bar.filters["active_individual"] == (9, "Dot")
+        bar.individual_select.setCurrentIndex.assert_called_with(2)
+
+    def test_unidentified_row_filters_unidentified(self):
+        bar = self._refresh(0)
+        assert bar.unidentified_only is True
+        bar.unidentified.setChecked.assert_called_with(True)
+
+
+# ---------------------------------------------------------------------------
+# FilterBar survey / region station lists
+# ---------------------------------------------------------------------------
+
+class TestFilterBarStations:
+    def _bar(self):
+        bar = MagicMock()
+        bar.mpDB.query.return_value = [(1, "S1"), (2, "S2")]
+        return bar
+
+    def test_survey_placeholder_without_region_shows_all_stations(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = self._bar()
+        bar.survey_list_ordered = [(0, "Survey"), (5, "A")]
+        bar.survey_select.currentIndex.return_value = 0
+        bar.region_select.currentIndex.return_value = 0
+        FilterBar.select_survey(bar)
+        bar.filter_stations.assert_called_once_with()
+
+    def test_survey_placeholder_with_region_shows_region_stations(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = self._bar()
+        bar.survey_list_ordered = [(0, "Survey"), (5, "A")]
+        bar.valid_surveys = {5: "A", 6: "B"}
+        bar.survey_select.currentIndex.return_value = 0
+        bar.region_select.currentIndex.return_value = 1
+        FilterBar.select_survey(bar)
+        bar.filter_stations.assert_called_once_with(survey_ids=[(5, "A"), (6, "B")])
+
+    def test_region_without_surveys_has_no_stations(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = self._bar()
+        FilterBar.filter_stations(bar, survey_ids=[])
+        assert bar.valid_stations == {}
+
+    def test_no_survey_filter_has_all_stations(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = self._bar()
+        FilterBar.filter_stations(bar)
+        assert bar.valid_stations == {1: "S1", 2: "S2"}
+
+
+class TestThresholdInput:
+    @pytest.mark.parametrize("text", ["", ".", "-", "abc"])
+    def test_partial_input_is_ignored(self, text):
+        from matchypatchy.gui.widgets.gui_assets import SliderWithLabel
+        slider = MagicMock()
+        SliderWithLabel.value_edit_changed(slider, text)
+        slider.slider_value_changed.emit.assert_not_called()
+
+    def test_value_sets_slider_once(self):
+        from matchypatchy.gui.widgets.gui_assets import SliderWithLabel
+        slider = MagicMock()
+        SliderWithLabel.value_edit_changed(slider, "0.35")
+        slider.slider.setValue.assert_called_once_with(35)
+        slider.slider_value_changed.emit.assert_called_once_with(35)
+
+
+# ---------------------------------------------------------------------------
+# SurveyPopup
+# ---------------------------------------------------------------------------
+
+SURVEY = "matchypatchy.gui.dialogs.popup_survey"
+
+
+def _survey_popup(db):
+    from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+    popup = MagicMock()
+    popup.mpDB = db
+    popup._year = SurveyPopup._year
+    popup._region_id = lambda name, tz: SurveyPopup._region_id(popup, name, tz)
+    return popup
+
+
+def _fill(name, region, start="", end=""):
+    fill = MagicMock()
+    fill.exec.return_value = True
+    fill.get_name.return_value = name
+    fill.get_region.return_value = region
+    fill.get_timezone.return_value = "UTC"
+    fill.get_year_start.return_value = start
+    fill.get_year_end.return_value = end
+    return fill
+
+
+class TestSurveyPopup:
+    def _add(self, db, name, region, **years):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        popup = _survey_popup(db)
+        with patch(f"{SURVEY}.SurveyFillPopup", return_value=_fill(name, region, **years)):
+            SurveyPopup.add(popup)
+        return popup
+
+    def test_region_name_with_quote_is_reused(self, tmp_db):
+        db, _ = tmp_db
+        self._add(db, "A", "O'Brien")
+        popup = self._add(db, "B", "O'Brien")
+        regions = {r for (r,) in db.select("survey", "region_id", "name IN ('A', 'B')")}
+        assert len(regions) == 1 and None not in regions
+        popup._warn.assert_not_called()
+
+    def test_duplicate_survey_name_warns(self, tmp_db):
+        db, _ = tmp_db
+        self._add(db, "A", "R")
+        popup = self._add(db, "A", "R")
+        popup._warn.assert_called_once()
+
+    def test_empty_years_are_null(self, tmp_db):
+        db, _ = tmp_db
+        self._add(db, "A", "R", start="2020", end="")
+        assert db.select("survey", "year_start, year_end", "name='A'") == [(2020, None)]
+
+    def test_edit_survey_without_region(self, tmp_db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        db, _ = tmp_db
+        sid = db.add_survey("No Region", None, None, None)
+        popup = _survey_popup(db)
+        popup.survey_list_ordered = [(sid, "No Region")]
+        popup.list.currentRow.return_value = 0
+        with patch(f"{SURVEY}.SurveyFillPopup", return_value=_fill("No Region", "R")) as fill_cls:
+            SurveyPopup.edit(popup)
+        assert fill_cls.call_args.kwargs["region_name"] == ""
+        assert db.select("survey", "region_id", f"id={sid}")[0][0] is not None
+
+    def test_rename_to_existing_name_warns(self, tmp_db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        db, _ = tmp_db
+        sid = db.add_survey("A", 1, None, None)
+        db.add_survey("B", 1, None, None)
+        popup = _survey_popup(db)
+        popup.survey_list_ordered = [(sid, "A")]
+        popup.list.currentRow.return_value = 0
+        with patch(f"{SURVEY}.SurveyFillPopup", return_value=_fill("B", "Default Region")):
+            SurveyPopup.edit(popup)
+        popup._warn.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# StationPopup / StationFillPopup
+# ---------------------------------------------------------------------------
+
+STATION = "matchypatchy.gui.dialogs.popup_station"
+
+
+def _station_fill(name="S1", lat="", long=""):
+    from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+    fill = MagicMock()
+    fill.name.text.return_value = name
+    fill.lat.text.return_value = lat
+    fill.long.text.return_value = long
+    fill.get_name = lambda: name
+    fill._coordinate = StationFillPopup._coordinate
+    fill._valid = lambda: StationFillPopup._valid(fill)
+    return fill
+
+
+class TestStationCoordinates:
+    def test_empty_coordinates_are_none(self):
+        from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+        fill = _station_fill()
+        assert StationFillPopup.get_lat(fill) is None
+        assert StationFillPopup.get_long(fill) is None
+
+    def test_coordinates_are_floats(self):
+        from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+        fill = _station_fill(lat="32.7", long="-117.1")
+        assert StationFillPopup.get_lat(fill) == 32.7
+        assert StationFillPopup.get_long(fill) == -117.1
+
+    @pytest.mark.parametrize("lat,long,ok", [("", "", True), ("32.7", "-117.1", True),
+                                             ("abc", "", False), ("95", "", False), ("", "-181", False)])
+    def test_ok_button(self, lat, long, ok):
+        from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+        fill = _station_fill(lat=lat, long=long)
+        StationFillPopup.checkInput(fill)
+        fill.okButton.setEnabled.assert_called_once_with(ok)
+
+    def test_missing_coordinates_shown_empty_not_none(self):
+        """Folder import creates stations without coordinates; they were shown (and saved) as 'None'"""
+        from matchypatchy.gui.dialogs.popup_station import StationFillPopup
+        parent = MagicMock()
+        parent.survey_id = (1, "Survey")
+        with patch(f"{STATION}.QLineEdit") as line_edit:
+            StationFillPopup(parent, name="S", lat=None, long=None)
+        texts = [c.args[0] for c in line_edit.return_value.setText.call_args_list]
+        assert texts == ["S", "", ""]
+
+
+class TestStationPopup:
+    def test_failed_add_warns(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = MagicMock()
+        popup.survey_id = (1, "Survey")
+        popup.mpDB.add_station.return_value = None
+        with patch(f"{STATION}.StationFillPopup") as fill_cls:
+            fill_cls.return_value.exec.return_value = True
+            StationPopup.add(popup)
+        popup._warn.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Export
+# ---------------------------------------------------------------------------
+
+class TestExport:
+    def test_export_can_be_migrated_back(self, tmp_db, tmp_path):
+        """The CSV has exactly the migrate columns (no index column) and UTF-8 names"""
+        import pandas as pd
+        from matchypatchy.gui.display_base import DisplayBase
+        from matchypatchy.threads.import_thread import CSVMigrateThread
+        from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
+        db, _ = tmp_db
+        station = db.add_station("Estación Ñ", 1.0, 2.0, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h1", ".jpg", "2024-01-01 10:00:00", station)
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        base = MagicMock()
+        base.mpDB = db
+        out = tmp_path / "export"
+        with patch("matchypatchy.gui.display_base.QFileDialog.getSaveFileName", return_value=(str(out), "")):
+            DisplayBase.export(base)
+        data = pd.read_csv(f"{out}.csv")
+        assert set(data.columns) == ImportCSVPopup.EXPECTED_COLUMNS == CSVMigrateThread.EXPECTED_COLUMNS
+        assert data.loc[0, "station_name"] == "Estación Ñ"
+
+
+# ---------------------------------------------------------------------------
+# ConfigPopup
+# ---------------------------------------------------------------------------
+
+class TestConfigRefresh:
+    def test_shows_every_value_of_the_new_project(self, tmp_path):
+        """After switching project, video/device fields and the models folder came from the old one"""
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = MagicMock()
+        popup.DEVICE_OPTIONS = ConfigPopup.DEVICE_OPTIONS
+        popup.cfg.ML_DIR = tmp_path / "new" / "Models"
+        popup.cfg.SMART_FRAMES = False
+        popup.cfg.VIDEO_FPS = 5
+        popup.cfg.N_FRAMES = 7
+        popup.cfg.DEVICE = "CUDAExecutionProvider"
+        with patch("matchypatchy.gui.dialogs.popup_config.get_path", return_value=None) as get_path:
+            ConfigPopup.refresh(popup)
+        assert popup.ml_dir == tmp_path / "new" / "Models"
+        get_path.assert_called_once_with(tmp_path / "new" / "Models", popup.cfg.REID_KEY)
+        popup.smart_frames.setCurrentIndex.assert_called_once_with(1)
+        popup.video_fps.setText.assert_called_once_with("5")
+        popup.n_frames.setText.assert_called_once_with("7")
+        popup.device.setCurrentText.assert_called_once_with("CUDA-enabled GPU")
+        # filling the fields doesn't re-save the config through their handlers
+        popup.video_fps.blockSignals.assert_any_call(True)
+
+
+# ---------------------------------------------------------------------------
+# Processing steps (DisplayBase)
+# ---------------------------------------------------------------------------
+
+class TestProcessingSteps:
+    def test_cancel_stops_later_steps(self):
+        """QThread.start() clears an earlier interruption request, so later steps check a flag"""
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        DisplayBase._cancel_processing(base)
+        assert base._process_cancelled is True
+        base.animl_thread.requestInterruption.assert_called_once()
+        DisplayBase._start_animl(base)
+        DisplayBase._start_reid(base)
+        base.animl_thread.start.assert_not_called()
+        base.miew_thread.start.assert_not_called()
+
+    def test_steps_start_in_turn(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base._process_cancelled = False
+        DisplayBase._start_animl(base)
+        base.animl_thread.start.assert_called_once()
+        DisplayBase._start_reid(base)
+        base.miew_thread.start.assert_called_once()
+
+    def test_errors_keep_popup_open_with_ok(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = {"a.jpg"}
+        base.miew_thread.failed = {"a.jpg", "b.jpg"}
+        DisplayBase._finish_processing(base)
+        assert "2 file(s)" in base._process_dialog.update_prompt.call_args[0][0]
+        base._process_dialog.allow_ok.assert_called_once()
+        base._process_dialog.accept.assert_not_called()
+
+    def test_no_errors_closes_popup(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = set()
+        base.miew_thread.failed = set()
+        DisplayBase._finish_processing(base)
+        base._process_dialog.accept.assert_called_once()
+        base._process_dialog.allow_ok.assert_not_called()
+
+    def test_model_not_downloaded_stops_before_processing(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        mloptions = {"sequence_checked": True, "DETECTOR_KEY": "md", "REID_KEY": "miew", "VIEWPOINT_KEY": None}
+        with patch("matchypatchy.gui.display_base.get_path", side_effect=lambda _d, key: None if key == "md" else "/m"), \
+             patch("matchypatchy.gui.display_base.AlertPopup") as popup, \
+             patch("matchypatchy.gui.display_base.SequenceThread") as sequence_thread:
+            DisplayBase.process_images(base, mloptions)
+        assert popup.call_args[0][1] == "Model(s) not downloaded: md"
+        sequence_thread.assert_not_called()
+
+    def test_popup_closes_when_every_file_was_read(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = set()
+        base.miew_thread.failed = set()
+        DisplayBase._finish_processing(base)
+        base._process_dialog.accept.assert_called_once()
+
+    def test_popup_stays_open_to_report_unreadable_files(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.animl_thread.failed = {"/a.jpg"}
+        base.miew_thread.failed = {"/b.jpg"}
+        DisplayBase._finish_processing(base)
+        base._process_dialog.accept.assert_not_called()
+        assert "2 file(s)" in base._process_dialog.update_prompt.call_args[0][0]
+
+
+class TestConfigSaveCancel:
+    def _popup(self):
+        from types import SimpleNamespace
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        # a real instance (accept/reject call super()), without building the widgets
+        popup = ConfigPopup.__new__(ConfigPopup)
+        popup.nummatches = MagicMock()
+        cfg = SimpleNamespace(**{name: f"old-{name}" for name in ConfigPopup.SETTINGS}, save=MagicMock())
+        popup.project = SimpleNamespace(db=MagicMock(), cfg=cfg)
+        popup._original = popup._settings()
+        popup.parent = MagicMock()
+        popup.font_size = MagicMock()
+        popup._original_font_size = 12
+        popup.theme = MagicMock()
+        popup._original_theme = "System"
+        return popup
+
+    def test_editing_doesnt_save(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        popup.nummatches.text.return_value = "7"
+        ConfigPopup.update_nummatches(popup)
+        assert popup.cfg.KNN == 7
+        popup.cfg.save.assert_not_called()
+
+    def test_cancel_restores_settings(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        popup.cfg.KNN = 7
+        popup.cfg.DEVICE = "CUDAExecutionProvider"
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.reject", create=True):
+            ConfigPopup.reject(popup)
+        assert popup.cfg.KNN == "old-KNN"
+        assert popup.cfg.DEVICE == "old-DEVICE"
+        popup.cfg.save.assert_not_called()
+
+    def test_save_writes_config(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
+            ConfigPopup.accept(popup)
+        popup.cfg.save.assert_called_once()
+
+    def test_save_keeps_font_size(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        popup.font_size.value.return_value = 15
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
+            ConfigPopup.accept(popup)
+        popup.parent.save_font_size.assert_called_once_with(15)
+
+    def test_cancel_restores_font_size(self):
+        """The size is previewed while it's edited, so Cancel puts the old one back"""
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.reject", create=True):
+            ConfigPopup.reject(popup)
+        popup.parent.apply_font_size.assert_called_once_with(12)
+        popup.parent.save_font_size.assert_not_called()
+
+    def test_save_keeps_theme(self):
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        popup.theme.currentText.return_value = "Dark"
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.accept", create=True):
+            ConfigPopup.accept(popup)
+        popup.parent.save_theme.assert_called_once_with("Dark")
+
+    def test_cancel_restores_theme(self):
+        """The theme is previewed while it's chosen, so Cancel puts the old one back"""
+        from matchypatchy.gui.dialogs.popup_config import ConfigPopup
+        popup = self._popup()
+        with patch("matchypatchy.gui.dialogs.popup_config.QDialog.reject", create=True):
+            ConfigPopup.reject(popup)
+        popup.parent.apply_theme.assert_called_once_with("System")
+        popup.parent.save_theme.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# SurveyPopup
+# ---------------------------------------------------------------------------
+
+SURVEY = "matchypatchy.gui.dialogs.popup_survey"
+
+
+class TestSurveyRegionTimezone:
+    def _popup(self, db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        popup = MagicMock()
+        popup.mpDB = db
+        popup._year = SurveyPopup._year
+        popup._region_id =lambda *args: SurveyPopup._region_id(popup, *args)
+        popup._set_region_timezone = lambda *args: SurveyPopup._set_region_timezone(popup, *args)
+        return popup
+
+    def _region_id(self, db, name, timezone, confirm=1):
+        with patch(f"{SURVEY}.AlertPopup") as alert:
+            alert.return_value.exec.return_value = confirm
+            region_id = self._popup(db)._region_id(name, timezone)
+        return region_id, alert
+
+    def _timezone(self, db, region_id):
+        return db.select("region", columns="timezone", row_cond=f"id={region_id}")[0][0]
+
+    def test_existing_region_without_timezone_is_set(self, tmp_db):
+        """CSV import leaves the timezone NULL, choosing one fills it in without asking"""
+        db, _ = tmp_db
+        region = db.add_region("R", None)
+        db.edit_row("region", region, {"timezone": None}, allow_none=True)
+        region_id, alert = self._region_id(db, "R", "America/Los_Angeles")
+        assert region_id == region
+        assert self._timezone(db, region) == "America/Los_Angeles"
+        alert.assert_not_called()
+
+    def test_existing_region_different_timezone_confirmed(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "America/Los_Angeles", confirm=1)
+        alert.assert_called_once()
+        assert self._timezone(db, region) == "America/Los_Angeles"
+
+    def test_existing_region_different_timezone_declined(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "America/Los_Angeles", confirm=0)
+        alert.assert_called_once()
+        assert self._timezone(db, region) == "Europe/Berlin"
+
+    def test_existing_region_same_timezone_does_not_ask(self, tmp_db):
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        _, alert = self._region_id(db, "R", "Europe/Berlin")
+        alert.assert_not_called()
+        assert self._timezone(db, region) == "Europe/Berlin"
+
+    def test_edit_shows_and_saves_region_timezone(self, tmp_db):
+        from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
+        db, _ = tmp_db
+        region = db.add_region("R", "Europe/Berlin")
+        survey = db.add_survey("S", region, None, None)
+        popup = self._popup(db)
+        popup.list.currentRow.return_value = 0
+        popup.survey_list_ordered = [(survey, "S")]
+        with patch(f"{SURVEY}.SurveyFillPopup") as fill, patch(f"{SURVEY}.AlertPopup") as alert:
+            fill.return_value.exec.return_value = 1
+            fill.return_value.get_name.return_value = "S"
+            fill.return_value.get_region.return_value = "R"
+            fill.return_value.get_timezone.return_value = "Asia/Tokyo"
+            fill.return_value.get_year_start.return_value = ""
+            fill.return_value.get_year_end.return_value = ""
+            alert.return_value.exec.return_value = 1
+            SurveyPopup.edit(popup)
+        assert fill.call_args.kwargs["timezone"] == "Europe/Berlin"
+        assert self._timezone(db, region) == "Asia/Tokyo"
+
+
+class _Combo:
+    """Just enough of a QComboBox to check which item is chosen"""
+    def __init__(self, items=(), index=0):
+        self.items, self.index = list(items), index
+
+    def clear(self):
+        self.items, self.index = [], -1
+
+    def addItems(self, items):
+        self.items += list(items)
+        if self.index < 0 and self.items:
+            self.index = 0
+
+    def setCurrentIndex(self, index):
+        self.index = index
+
+    def currentIndex(self):
+        return self.index
+
+    def currentText(self):
+        return self.items[self.index]
+
+    def blockSignals(self, blocked):
+        pass
+
+
+class TestHomeSurveyList:
+    def _base(self, db, surveys, chosen):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        base.mpDB = db
+        base.survey_list_ordered = surveys
+        base.survey_select = _Combo([name for _, name in surveys], surveys.index(chosen))
+        base.active_survey = chosen
+        base.select_survey = lambda: DisplayBase.select_survey(base)
+        return base
+
+    def test_survey_write_refreshes_and_keeps_the_selection(self, tmp_db):
+        from matchypatchy.gui.display_base import DisplayBase
+        db, _ = tmp_db
+        b = db.add_survey("B", None, None, None)
+        surveys = db.query("SELECT id, name FROM survey")
+        base = self._base(db, surveys, (b, "B"))
+        db.add_survey("A new one", None, None, None)
+        DisplayBase.update_survey(base)
+        assert "A new one" in base.survey_select.items
+        assert base.survey_select.currentText() == "B"
+        assert base.active_survey == (b, "B")
+
+    def test_deleted_selection_falls_back_to_the_first_survey(self, tmp_db):
+        from matchypatchy.gui.display_base import DisplayBase
+        db, _ = tmp_db
+        b = db.add_survey("B", None, None, None)
+        base = self._base(db, db.query("SELECT id, name FROM survey"), (b, "B"))
+        db.delete("survey", "id=?", (b,))
+        DisplayBase.update_survey(base)
+        assert base.survey_select.currentIndex() == 0
+        assert base.active_survey == db.query("SELECT id, name FROM survey")[0]
+
+    def test_only_survey_writes_refresh_the_list(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        DisplayBase.surveys_written(base, "station")
+        base.update_survey.assert_not_called()
+        DisplayBase.surveys_written(base, "survey")
+        base.update_survey.assert_called_once_with()
+
+    def test_manage_surveys_leaves_refreshing_to_the_writes(self):
+        from matchypatchy.gui.display_base import DisplayBase
+        base = MagicMock()
+        with patch("matchypatchy.gui.display_base.SurveyPopup"):
+            DisplayBase.manage_survey(base)
+        base.update_survey.assert_not_called()
+
+
+class TestFilterBarListsWritten:
+    def _bar(self, db):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = MagicMock()
+        bar.mpDB = db
+        bar._chosen_id = FilterBar._chosen_id
+        bar._fill = FilterBar._fill
+        bar.region_list_ordered = [(0, "Region")] + db.query("SELECT id, name FROM region")
+        bar.survey_list_ordered = [(0, "Survey")] + db.query("SELECT id, name FROM survey")
+        bar.station_list_ordered = [(0, "Station")] + db.query("SELECT id, name FROM station")
+        bar.individual_list_ordered = [(0, "Individual")] + db.query("SELECT id, name FROM individual")
+        for name in ("region", "survey", "station", "individual"):
+            items = getattr(bar, f"{name}_list_ordered")
+            setattr(bar, f"{name}_select", _Combo([n for _, n in items]))
+        return bar
+
+    def _choose(self, combo, items, item_id):
+        combo.setCurrentIndex([i for i, _ in items].index(item_id))
+
+    def test_new_names_appear_and_choices_stay(self, tmp_db):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        db, _ = tmp_db
+        survey = db.add_survey("S2", None, None, None)
+        station = db.add_station("St", None, None, survey)
+        spot = db.add_individual("Spot")
+        bar = self._bar(db)
+        self._choose(bar.survey_select, bar.survey_list_ordered, survey)
+        self._choose(bar.individual_select, bar.individual_list_ordered, spot)
+        FilterBar.lists_written(bar, "survey")
+        self._choose(bar.station_select, bar.station_list_ordered, station)
+
+        db.add_individual("Dot")
+        db.add_station("St2", None, None, survey)
+        FilterBar.lists_written(bar, "individual")
+
+        assert "Dot" in bar.individual_select.items
+        assert bar.individual_select.currentText() == "Spot"
+        assert bar.survey_select.currentText() == "S2"
+        assert bar.station_select.currentText() == "St"
+        # stations listed for the chosen survey only
+        assert bar.station_select.items == ["Station", "St", "St2"]
+
+    def test_deleted_choice_goes_back_to_all(self, tmp_db):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        db, _ = tmp_db
+        survey = db.add_survey("S2", None, None, None)
+        bar = self._bar(db)
+        self._choose(bar.survey_select, bar.survey_list_ordered, survey)
+        db.delete("survey", "id=?", (survey,))
+        FilterBar.lists_written(bar, "survey")
+        assert bar.survey_select.currentIndex() == 0
+        assert "S2" not in bar.survey_select.items
+
+    def test_other_tables_are_ignored(self):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        bar = MagicMock()
+        FilterBar.lists_written(bar, "camera")
+        bar.mpDB.query.assert_not_called()
+
+
+class TestMediaTableNamesWritten:
+    def test_individual_write_reloads_names(self, tmp_db):
+        from matchypatchy.gui.media_table import MediaTable
+        db, _ = tmp_db
+        mt = MagicMock()
+        mt.mpDB = db
+        iid = db.add_individual("Spot")
+        MediaTable.names_written(mt, "individual")
+        assert mt.INDIVIDUALS.at[iid, "name"] == "Spot"
+        mt.layoutChanged.emit.assert_called_once()
+
+    def test_survey_write_is_ignored(self):
+        from matchypatchy.gui.media_table import MediaTable
+        mt = MagicMock()
+        MediaTable.names_written(mt, "survey")
+        mt.layoutChanged.emit.assert_not_called()

@@ -1,6 +1,28 @@
 """
 Class definition for MatchObject and FavoriteMatchObject
 """
+from matchypatchy.threads.model_download_thread import load_model
+
+# Compare view viewpoint toggle positions
+VIEWPOINT_TOGGLE = {0: 'Left', 1: 'Any', 2: 'Right'}
+
+
+def viewpoint_value(label):
+    """
+    Stored viewpoint value for a viewpoint label (eg. 'Left'), None if not a model class
+
+    Stored values are viewpoint model classes, labelled in models.yml VIEWPOINTS
+    (eg. '0': Left, '1': Right), so filtering by side must go through the labels
+    """
+    for value, name in load_model('VIEWPOINTS').items():
+        if name == label and value.isdigit():
+            return int(value)
+    return None
+
+
+def toggle_viewpoint_value(selected):
+    """Stored viewpoint value for a compare view toggle position, None for Any"""
+    return viewpoint_value(VIEWPOINT_TOGGLE.get(selected))
 
 
 class MatchObject():
@@ -72,7 +94,8 @@ class MatchObject():
         distances = {}
         for i, match in enumerate(matched_rois):
             match_sequence_id = rois.loc[rois['id'] == match, 'sequence_id'].values[0]
-            match_sequence_rois[match] = sequences[match_sequence_id]
+            # a roi without a sequence (null sequence_id) stands alone
+            match_sequence_rois[match] = sequences.get(match_sequence_id) or [match]
             distances[match] = self.neighbors[i][1]
             for roi in match_sequence_rois[match]:
                 # check if match sequence appears later in match stack
@@ -129,7 +152,7 @@ class MatchObject():
             self.ranked_query_rids = self.og_ranked_query_rids
             return True
         else:
-            selected_viewpoint = 1 if selected_viewpoint == 2 else selected_viewpoint  # adjust for 1:any indexing in GUI
+            selected_viewpoint = toggle_viewpoint_value(selected_viewpoint)
             available_queries = [rid for rid in self.og_ranked_query_rids if self.query_viewpoint_map[rid] == selected_viewpoint]
             available_matches = [match for match in self.og_ranked_matches if self.match_viewpoint_map[match[0]] == selected_viewpoint]
 
@@ -216,7 +239,7 @@ class FavoriteMatchObject():
             self.ranked_query_rids = self.og_ranked_query_rids
             return True
         else:
-            selected_viewpoint = 1 if selected_viewpoint == 2 else selected_viewpoint  # adjust for 1:any indexing in GUI
+            selected_viewpoint = toggle_viewpoint_value(selected_viewpoint)
             available_queries = [rid for rid in self.og_ranked_query_rids if self.query_viewpoint_map[rid] == selected_viewpoint]
             available_matches = [match for match in self.og_ranked_matches if self.match_viewpoint_map[match[0]] == selected_viewpoint]
 

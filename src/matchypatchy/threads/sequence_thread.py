@@ -13,6 +13,11 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from matchypatchy.database.media import fetch_media
 
 
+def same_camera(a, b):
+    """Two images are from the same camera, never true without a camera since they can't be compared"""
+    return not pd.isna(a) and a == b
+
+
 class SequenceThread(QThread):
     """Thread for processing media sequences based on station, camera, and timestamp."""
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
@@ -23,13 +28,11 @@ class SequenceThread(QThread):
         self.mpDB = mpDB
         self.flag = flag
         self.max_time = timedelta(seconds=int(cfg.SEQUENCE_DURATION))
-        self.max_n = int(cfg.SEQUENCE_N)
-
-        self.media = fetch_media(self.mpDB)
-        self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')
-        self.media = self.media.sort_values(by=['station_id', 'camera_id', 'timestamp'])
+        self.media = None  # loaded in run(), off the GUI thread
 
     def run(self):
+        self.prompt_update.emit("Loading media...")
+        self._load_media()
         # if process sequence option is checked, will rewrite sequence_id
         if self.flag:
             self.prompt_update.emit("Processing sequences...")
@@ -37,27 +40,31 @@ class SequenceThread(QThread):
             sequences = []
             current_sequence = []
             for _, image in self.media.iterrows():
-                if not self.isInterruptionRequested():
-                    if current_sequence:
-                        # station is the same, timestamp under threshold, n under threshold
-                        if (image['station_id'] == current_sequence[0]['station_id']) and \
-                            (image['camera_id'] == current_sequence[0]['camera_id']) and \
-                            (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time) and \
-                            (len(current_sequence) < self.max_n):
-                            current_sequence.append(image)
-                        else:
-                            # bank the current sequence and start a new group
-                            sequences.append(current_sequence)
-                            current_sequence = [image]
+                # cancelled: leave the existing sequences untouched
+                if self.isInterruptionRequested():
+                    return
+                if current_sequence:
+                    # station and camera are the same, timestamp under threshold
+                    # images without a camera each get their own sequence
+                    if (image['station_id'] == current_sequence[0]['station_id']) and \
+                        same_camera(image['camera_id'], current_sequence[0]['camera_id']) and \
+                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time):
+                        current_sequence.append(image)
                     else:
+                        # bank the current sequence and start a new group
+                        sequences.append(current_sequence)
                         current_sequence = [image]
+                else:
+                    current_sequence = [image]
 
             # Append the last group
             if current_sequence:
                 sequences.append(current_sequence)
 
             # update media entries
-            for _, group in enumerate(sequences):
+            for group in sequences:
+                if self.isInterruptionRequested():
+                    return
                 # create a sequence id
                 sequence_id = self.mpDB.add_sequence()
                 for image in group:
@@ -68,8 +75,22 @@ class SequenceThread(QThread):
             # only add sequence_id where blank
             self.media = self.media[self.media['sequence_id'].isna()]
             for _, image in self.media.iterrows():
+                if self.isInterruptionRequested():
+                    return
                 sequence_id = self.mpDB.add_sequence()
                 self.mpDB.edit_row('media', image['id'], {"sequence_id": sequence_id})
 
         if not self.isInterruptionRequested():
             self.done.emit()
+
+    def _load_media(self):
+        """
+        Fetch all media sorted by station, camera and time
+
+        Called at the start of run() rather than in __init__: the thread is built on the
+        GUI thread, where fetching and parsing every timestamp froze the progress popup
+        on large databases.
+        """
+        self.media = fetch_media(self.mpDB)
+        self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')
+        self.media = self.media.sort_values(by=['station_id', 'camera_id', 'timestamp'])

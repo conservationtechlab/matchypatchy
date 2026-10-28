@@ -69,6 +69,8 @@ class MediaWidget(QWidget):
 
         # IMAGE
         if Path(self.filepath).suffix.lower() in IMAGE_EXT:
+            # stop a video still playing from a previous item
+            self.player.stop()
             self.playbackbar.setVisible(False)
             self.image_widget.load(self.filepath, bbox=bbox, frame=None, crop=crop)
             self.stacked.setCurrentWidget(self.image_widget)
@@ -78,6 +80,7 @@ class MediaWidget(QWidget):
             if frame is not None:
                 print(f"Loading video frame {frame} for {self.filepath}")
                 # display frame instead of video
+                self.player.stop()
                 self.playbackbar.setVisible(False)
                 self.image_widget.load(self.filepath, bbox=bbox, frame=frame, crop=crop)
                 self.stacked.setCurrentWidget(self.image_widget)
@@ -140,6 +143,7 @@ class ImageWidget(QLabel):
         self.bbox = None
         self.drawn_bbox = None  # The bounding box drawn by the user
         self.crop_to_bbox = False
+        self.original_image = None  # as loaded, adjustments always start from it
         self.pil_image = None
         self.qimage = None
         self.scaled_image = None
@@ -173,6 +177,11 @@ class ImageWidget(QLabel):
             frame (int, optional): Frame number to load from video
             crop (bool, optional): Whether to crop to bbox
         """
+        # a different image or video frame opens unzoomed and centered
+        if (image_path is not None and image_path != self.image_path) or frame != self.frame:
+            self.zoom_factor = 1.0
+            self.image_offset = QPointF(0, 0)
+
         # load new image if path is different
         if image_path is not None:
             self.image_path = image_path
@@ -184,9 +193,9 @@ class ImageWidget(QLabel):
         self.frame = frame
 
         if self.frame is not None:
-            self.pil_image = self.load_from_video(self.frame)
+            self.original_image = self.load_from_video(self.frame)
         else:
-            self.pil_image = Image.open(self.image_path)
+            self.original_image = Image.open(self.image_path)
 
         self.drawn_bbox = None
         self.rel_bbox = bbox
@@ -204,7 +213,7 @@ class ImageWidget(QLabel):
         """
 
         self.image_path = None
-        self.pil_image = Image.fromarray(img_array)
+        self.original_image = Image.fromarray(img_array)
         self.adjust()
 
     def load_from_video(self, selected_frame):
@@ -229,9 +238,14 @@ class ImageWidget(QLabel):
         """
         Adjust image values, convert to qimage, crop, display
 
-        Connected to sliders in imageadjustmentbar widget
+        Connected to sliders in imageadjustmentbar widget. The factors are absolute,
+        so they are applied to the original image, not on top of earlier adjustments
         """
-        enhancer = ImageEnhance.Brightness(self.pil_image)
+        # kept so reset() can redraw with them
+        self.brightness_factor = brightness
+        self.contrast_factor = contrast
+        self.sharpness_factor = sharpness
+        enhancer = ImageEnhance.Brightness(self.original_image)
         self.pil_image = enhancer.enhance(brightness)
         enhancer = ImageEnhance.Contrast(self.pil_image)
         self.pil_image = enhancer.enhance(contrast)
@@ -312,12 +326,22 @@ class ImageWidget(QLabel):
 
     # IMAGE ADJUSTMENTS ========================================================
     def reset(self):
-        """Reset image adjustments and reload"""
+        """
+        Reset zoom, pan and drawn box
+
+        Brightness, contrast and sharpness stay as set, they belong to the
+        adjustment bar sliders (its reset sets them back to 1 first)
+        """
         self.zoom_factor = 1.0
         self.image_offset = QPointF(0, 0)
         self.rel_bbox = self.loaded_bbox  # reset to original bbox
-        # reload image
-        self.load(image_path=self.image_path, bbox=self.rel_bbox, frame=self.frame, crop=self.crop_to_bbox)
+        self.drawn_bbox = None
+        # nothing loaded yet
+        if self.original_image is None:
+            return
+        self.adjust(brightness=self.brightness_factor,
+                    contrast=self.contrast_factor,
+                    sharpness=self.sharpness_factor)
 
     def enable_drawing_mode(self, enable):
         """Enable or disable drawing mode for the image widget."""
@@ -424,7 +448,8 @@ class ImageWidget(QLabel):
         """
         # Handle zoom mode
         if self.adjust_mode == 'zoom':
-            if hasattr(self, "drag_start_position"):
+            # only while dragging with the left button
+            if self.drag_start_position is not None:
                 drag_delta = event.position() - self.drag_start_position
                 self.image_offset += drag_delta
                 self.drag_start_position = event.position()
@@ -444,7 +469,7 @@ class ImageWidget(QLabel):
         """
         if self.adjust_mode == 'zoom':
             if event.button() == Qt.MouseButton.LeftButton:
-                del self.drag_start_position
+                self.drag_start_position = None
         # Handle bounding box drawing mode
         elif self.adjust_mode == 'bbox':
             if event.button() == Qt.MouseButton.LeftButton and self.drawing:
@@ -570,7 +595,8 @@ class VideoPlayerBar(QWidget):
 
     def get_frame(self):
         """Get current frame number based on position"""
-        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate))
+        # None before the metadata loads, or when the video has no frame rate
+        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate) or 0)
         if fps <= 0:
             fps = 30
         return int(self.player.position() / 1000 * fps)

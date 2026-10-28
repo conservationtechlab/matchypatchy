@@ -1,12 +1,13 @@
 '''
 Popup to add or edit config settings
 '''
+import logging
 import os
 from pathlib import Path
 import animl
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFileDialog, QComboBox, QInputDialog,
-                             QPushButton, QLineEdit, QLabel, QDialogButtonBox)
+                             QPushButton, QLineEdit, QLabel, QDialogButtonBox, QSpinBox)
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt
 
@@ -15,24 +16,28 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_uploads import UploadManagerPopup
 from matchypatchy.gui.widgets.gui_assets import HorizontalSeparator, VerticalSeparator
 from matchypatchy.threads.model_download_thread import get_path, is_valid_reid_model
+from matchypatchy.project import UsesProject
 
 
-class ConfigPopup(QDialog):
+logger = logging.getLogger(__name__)
+
+
+class ConfigPopup(UsesProject, QDialog):
     """
     Popup for adding or editing configuration settings.
     """
 
     ICON_PENCIL = str(config.resource_path("assets/graphics/fluent_pencil_icon.png"))
     DEVICE_OPTIONS = {"CPUExecutionProvider": "CPU", "CUDAExecutionProvider": "CUDA-enabled GPU"}
+    FONT_SIZE_MIN = 8
+    FONT_SIZE_MAX = 24
 
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
         self.setWindowTitle("Edit Config")
         self.setMinimumWidth(600)
-        self.logger = parent.logger
-        self.mpDB = parent.mpDB
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.ml_dir = Path(self.cfg.ML_DIR)
         self.label_width = 130
         self.edit_width = 150
@@ -101,16 +106,6 @@ class ConfigPopup(QDialog):
         self.sequence_duration.setText(str(self.cfg.SEQUENCE_DURATION))
         self.sequence_duration.textChanged.connect(self.update_sequence)
         sequence_layout.addWidget(self.sequence_duration, alignment=Qt.AlignmentFlag.AlignLeft)
-        sequence_layout.addWidget(VerticalSeparator())
-        sequence_n_label = QLabel("Images per Sequence:")
-        sequence_n_label.setFixedWidth(self.label_width)
-        sequence_n_label.setToolTip("Max number of images in each sequence.")
-        sequence_layout.addWidget(sequence_n_label)
-        self.sequence_n = QLineEdit()
-        self.sequence_n.setFixedWidth(self.edit_width)
-        self.sequence_n.setText(str(self.cfg.SEQUENCE_N))
-        self.sequence_n.textChanged.connect(self.update_sequence)
-        sequence_layout.addWidget(self.sequence_n, alignment=Qt.AlignmentFlag.AlignLeft)
         sequence_layout.addStretch()
         layout.addLayout(sequence_layout)
 
@@ -188,6 +183,44 @@ class ConfigPopup(QDialog):
         cuda_layout.addWidget(self.device, alignment=Qt.AlignmentFlag.AlignLeft)
         layout.addLayout(cuda_layout)
 
+        # FONT SIZE ------------------------------------------------------------
+        font_layout = QHBoxLayout()
+        font_label = QLabel("Font Size:")
+        font_label.setToolTip(f"Default text size in points, for all projects. "
+                              f"The system's size is {self.parent.system_font_size} pt.")
+        font_label.setFixedWidth(self.label_width)
+        font_layout.addWidget(font_label)
+        self.font_size = QSpinBox()
+        self.font_size.setFixedWidth(self.edit_width)
+        self.font_size.setRange(self.FONT_SIZE_MIN, self.FONT_SIZE_MAX)
+        self.font_size.setSuffix(" pt")
+        self._original_font_size = self.parent.font_size()
+        self.font_size.setValue(self._original_font_size)
+        self.font_size.valueChanged.connect(self.parent.apply_font_size)
+        font_layout.addWidget(self.font_size, alignment=Qt.AlignmentFlag.AlignLeft)
+        button_font_reset = QPushButton("System Default")
+        button_font_reset.setToolTip("Go back to the system's text size.")
+        button_font_reset.clicked.connect(lambda: self.font_size.setValue(self.parent.system_font_size))
+        font_layout.addWidget(button_font_reset, alignment=Qt.AlignmentFlag.AlignLeft)
+        font_layout.addStretch()
+        layout.addLayout(font_layout)
+
+        # THEME ----------------------------------------------------------------
+        theme_layout = QHBoxLayout()
+        theme_label = QLabel("Theme:")
+        theme_label.setToolTip("Light or dark colors for all projects. System follows the computer's setting.")
+        theme_label.setFixedWidth(self.label_width)
+        theme_layout.addWidget(theme_label)
+        self.theme = QComboBox()
+        self.theme.setFixedWidth(self.edit_width)
+        self.theme.addItems(list(self.parent.THEMES))
+        self._original_theme = self.parent.theme()
+        self.theme.setCurrentText(self._original_theme)
+        self.theme.currentTextChanged.connect(self.parent.apply_theme)
+        theme_layout.addWidget(self.theme, alignment=Qt.AlignmentFlag.AlignLeft)
+        theme_layout.addStretch()
+        layout.addLayout(theme_layout)
+
         # MPDB KEY -------------------------------------------------------------
         mpdbkey_layout = QHBoxLayout()
         mpdbkey_label = QLabel("Database Key:")
@@ -228,14 +261,40 @@ class ConfigPopup(QDialog):
         button_advanced = QPushButton("Advanced")
         button_advanced.clicked.connect(self.show_advanced)
         button_layout.addWidget(button_advanced)
-        # Ok/Cancel Buttons
-        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        # Save/Cancel Buttons: settings are only written on Save
+        buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         button_layout.addWidget(buttonBox)
         buttonBox.accepted.connect(self.accept)
         buttonBox.rejected.connect(self.reject)
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
+        # values to restore on Cancel; fields edit the shared config in memory, OK saves it
+        self._original = self._settings()
+
+    # settings this dialog edits
+    SETTINGS = ("KNN", "SEQUENCE_DURATION", "SMART_FRAMES",
+                "VIDEO_FPS", "N_FRAMES", "DEVICE", "REID_KEY")
+
+    def _settings(self):
+        """Current values of the settings this dialog edits"""
+        return {name: getattr(self.cfg, name) for name in self.SETTINGS}
+
+    def accept(self):
+        """Save: write the settings to the project's config file, and the font size and theme to the app's settings"""
+        self.cfg.save()
+        self.parent.save_font_size(self.font_size.value())
+        self.parent.save_theme(self.theme.currentText())
+        logger.info("Configuration saved")
+        super().accept()
+
+    def reject(self):
+        """Cancel: put back the settings, font size and theme as they were when the dialog opened"""
+        for name, value in self._original.items():
+            setattr(self.cfg, name, value)
+        self.parent.apply_font_size(self._original_font_size)
+        self.parent.apply_theme(self._original_theme)
+        super().reject()
 
     def show_advanced(self):
         """Show/hide advanced options."""
@@ -251,14 +310,29 @@ class ConfigPopup(QDialog):
         self.mpDB._command(new_cmd, quiet=False)
 
     def refresh(self):
-        """Refresh the config popup with updated values."""
+        """Show the current project's values, eg. after switching project"""
+        self.ml_dir = Path(self.cfg.ML_DIR)
+        fields = (self.home_dir, self.visualizer_model, self.nummatches, self.sequence_duration,
+                  self.smart_frames, self.video_fps, self.n_frames, self.device)
+        # filling the fields must not trigger their save handlers
+        for field in fields:
+            field.blockSignals(True)
         self.home_dir.setText(str(self.cfg.HOME_DIR))
         reid_path = get_path(self.ml_dir, self.cfg.REID_KEY)
         self.visualizer_model.setText(str(reid_path))
         self.nummatches.setText(str(self.cfg.KNN))
         self.sequence_duration.setText(str(self.cfg.SEQUENCE_DURATION))
-        self.sequence_n.setText(str(self.cfg.SEQUENCE_N))
-        self.mpdbkey_valid.setText(f"{self.mpDB.validate()}")
+        self.smart_frames.setCurrentIndex(0 if self.cfg.SMART_FRAMES else 1)
+        self.video_fps.setText(str(self.cfg.VIDEO_FPS))
+        self.n_frames.setText(str(self.cfg.N_FRAMES))
+        self.device.setCurrentText(self.DEVICE_OPTIONS.get(self.cfg.DEVICE, "CPU"))
+        for field in fields:
+            field.blockSignals(False)
+        self.video_fps_label.setVisible(self.cfg.SMART_FRAMES)
+        self.video_fps.setVisible(self.cfg.SMART_FRAMES)
+        mpdbkey = self.mpDB.validate()
+        self.mpdbkey_valid.setText(f"{mpdbkey}")
+        self.mpdbkey_valid.setStyleSheet("color: red;" if not mpdbkey else "")
 
     def set_home_dir(self):
         """Change Home directory"""
@@ -268,9 +342,7 @@ class ConfigPopup(QDialog):
             valid = self.parent.change_project(new_project)
             if not valid:
                 return
-            # Update local references to the new project's database and config
-            self.mpDB = self.parent.mpDB
-            self.cfg = self.parent.cfg
+            self._original = self._settings()
             self.refresh()
 
     def new_project(self):
@@ -289,9 +361,7 @@ class ConfigPopup(QDialog):
         if parent_dir and project_name:
             new_project_path = Path(parent_dir) / project_name
             self.parent.new_project(new_project_path)
-            # Update local references to the new project's database and config
-            self.mpDB = self.parent.mpDB
-            self.cfg = self.parent.cfg
+            self._original = self._settings()
             self.refresh()
 
     def set_visualizer_model(self):
@@ -306,9 +376,7 @@ class ConfigPopup(QDialog):
                 # Update config
                 self.visualizer_model.setText(new_model[0])
                 self.cfg.REID_KEY = str(Path(new_model[0]).stem)
-                # save changes to yml
-                self.logger.info(f"Re-ID model updated to {self.cfg.REID_KEY}")
-                self.cfg.save()
+                logger.info(f"Re-ID model updated to {self.cfg.REID_KEY}")
             else:
                 dialog = AlertPopup(self, prompt="Model not recognized. Please select a valid Re-ID model.")
                 dialog.exec()
@@ -320,8 +388,7 @@ class ConfigPopup(QDialog):
             nummatches = int(self.nummatches.text())
             if nummatches > 0:
                 self.cfg.KNN = nummatches
-                self.logger.info(f"Max number of matches updated to {nummatches}")
-                self.cfg.save()
+                logger.info(f"Max number of matches updated to {nummatches}")
         except ValueError:
             pass
 
@@ -329,12 +396,9 @@ class ConfigPopup(QDialog):
         """Update sequence settings"""
         try:
             duration = int(self.sequence_duration.text())
-            n = int(self.sequence_n.text())
             if duration > 0:
                 self.cfg.SEQUENCE_DURATION = duration
-                self.cfg.SEQUENCE_N = n
-                self.logger.info(f"Sequence settings updated: duration={duration}, n={n}")
-                self.cfg.save()
+                logger.info(f"Sequence settings updated: duration={duration}")
         except ValueError:
             pass
 
@@ -343,7 +407,6 @@ class ConfigPopup(QDialog):
         self.cfg.SMART_FRAMES = True if self.smart_frames.currentText() == "Enabled" else False
         self.video_fps_label.setVisible(self.cfg.SMART_FRAMES)
         self.video_fps.setVisible(self.cfg.SMART_FRAMES)
-        self.cfg.save()
 
     def update_video_fps(self):
         """Update video fps setting"""
@@ -351,7 +414,6 @@ class ConfigPopup(QDialog):
             fps = int(self.video_fps.text())
             if fps > 0:
                 self.cfg.VIDEO_FPS = fps
-                self.cfg.save()
         except ValueError:
             pass
 
@@ -361,21 +423,19 @@ class ConfigPopup(QDialog):
             n_frames = int(self.n_frames.text())
             if n_frames > 0:
                 self.cfg.N_FRAMES = n_frames
-                self.cfg.save()
         except ValueError:
             pass
 
     def change_device(self):
         """Change hardware device for running models between CPU and CUDA-enabled GPU"""
-        self.logger.info(f"Device changed to {self.device.currentText()}")
+        logger.info(f"Device changed to {self.device.currentText()}")
         """Change hardware device for running models"""
         selected_device = self.device.currentText()
         if selected_device == "CPU":
             self.cfg.DEVICE = "CPUExecutionProvider"
         elif selected_device == "CUDA-enabled GPU":
             self.cfg.DEVICE = "CUDAExecutionProvider"
-        self.logger.info(f"Device changed to {self.cfg.DEVICE}")
-        self.cfg.save()
+        logger.info(f"Device changed to {self.cfg.DEVICE}")
 
     def edit_uploads(self):
         """Open the upload directories manager popup."""
