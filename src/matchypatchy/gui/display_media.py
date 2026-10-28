@@ -5,8 +5,8 @@ import logging
 from pathlib import Path
 import pandas as pd
 from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBoxLayout,
-                             QHBoxLayout, QLabel, QComboBox, QDialog)
-from PyQt6.QtCore import Qt, pyqtSignal
+                             QHBoxLayout, QLabel, QDialog, QFrame, QLineEdit, QCheckBox, QComboBox)
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 from matchypatchy.database.media import (IMAGE_EXT, fetch_individual, delete_media, delete_rois, save_edits,
                                          media_without_rois)
@@ -15,7 +15,8 @@ from matchypatchy.database.thumbnails import THUMBNAIL_SIZE
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
-from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButton, ComboBoxDelegate
+from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, ComboBoxDelegate, SegmentedControl
+from matchypatchy.gui.widgets.styles import ACCENT, label, set_variant, icon
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 from matchypatchy.threads.table_thread import FetchTableThread
 from matchypatchy.threads.model_download_thread import load_model
@@ -29,13 +30,21 @@ logger = logging.getLogger(__name__)
 class DisplayMedia(UsesProject, QWidget):
     """GUI class for displaying and managing media content."""
 
-    SAVE_STYLE = """ QPushButton { background-color: #2a3e5e; color: white; }"""
+    # Save turns green while there are unsaved edits
+    SAVE_STYLE = f""" QPushButton {{ background-color: {ACCENT}; color: white; border-color: {ACCENT}; font-weight: 600; }}"""
+    # columns that share the width left over by the others, by column name
+    STRETCH_COLUMNS = ("filepath", "comment")
     # widths of the columns that don't use the default, by column name
     COLUMN_WIDTHS = {"select": 50,
                      "thumbnail_path": THUMBNAIL_SIZE + 10,
                      "filepath": 50,  # stretches to fill the rest
                      "ext": 80,
-                     "timestamp": 180}
+                     "timestamp": 180,
+                     "individual_id": 110,
+                     "viewpoint": 100,
+                     "favorite": 72,
+                     "sex": 80,
+                     "camera_id": 90}
     edit_stack_signal = pyqtSignal(list)  # Signal to send edit stack to main GUI
 
     def __init__(self, parent, data_type=1):
@@ -59,73 +68,62 @@ class DisplayMedia(UsesProject, QWidget):
         self.edit_stack = []
         
         layout = QVBoxLayout()
-        # First Layer ----------------------------------------------------------
-        first_layer = QHBoxLayout()
-        # Change Views
-        first_layer.addSpacing(10)
-        button_return = StandardButton("Home")
-        button_return.clicked.connect(self.home)
-        first_layer.addWidget(button_return, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        button_compare = StandardButton("Compare")
-        button_compare.clicked.connect(self.compare)
-        first_layer.addWidget(button_compare, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        first_layer.addWidget(VerticalSeparator())
-
-        # Show Type
-        first_layer.addWidget(QLabel("Show:"), 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.show_type = QComboBox()
-        self.show_type.addItems(["Full Images", "ROIs"])
-        self.show_type.setCurrentIndex(self.data_type)
-        self.show_type.currentIndexChanged.connect(self.change_type)
-        first_layer.addWidget(self.show_type, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        first_layer.addWidget(VerticalSeparator())
-
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        # TOOLBAR --------------------------------------------------------------
+        toolbar = QFrame()
+        toolbar.setObjectName("TopBar")
+        first_layer = QHBoxLayout(toolbar)
+        first_layer.setContentsMargins(20, 12, 20, 12)
+        first_layer.setSpacing(10)
+        title = QLabel("Media")
+        title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        first_layer.addWidget(title)
         # Save
-        self.button_save = StandardButton("Save")
+        self.button_save = QPushButton("Save")
         self.button_save.clicked.connect(self.save)
-        first_layer.addWidget(self.button_save, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(self.button_save)
         # Undo
-        self.button_undo = StandardButton("Undo")
+        self.button_undo = QPushButton("Undo")
         self.button_undo.clicked.connect(self.undo)
         self.button_undo.setEnabled(False)
-        first_layer.addWidget(self.button_undo, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addWidget(self.button_undo)
+        self.unsaved_label = QLabel("")
+        self.unsaved_label.setObjectName("UnsavedNotice")
+        self.unsaved_label.setVisible(False)
+        first_layer.addWidget(self.unsaved_label)
         first_layer.addWidget(VerticalSeparator())
 
-        # Select All
-        self.button_select = StandardButton("Select All")
-        self.button_select.setCheckable(True)
-        self.button_select.pressed.connect(self.set_button_select)
-        first_layer.addWidget(self.button_select, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Edit Rows
-        self.button_edit = StandardButton("Edit Rows")
-        self.button_edit.clicked.connect(self.edit_row_multiple)
-        self.button_edit.setEnabled(False)
-        first_layer.addWidget(self.button_edit, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Duplicate
-        self.button_duplicate = StandardButton("Duplicate Rows")
-        self.button_duplicate.clicked.connect(self.duplicate)
-        self.button_duplicate.setEnabled(False)
-        first_layer.addWidget(self.button_duplicate, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-        # Delete
-        self.button_delete = StandardButton("Delete Rows")
-        self.button_delete.clicked.connect(self.delete)
-        self.button_delete.setEnabled(False)
-        first_layer.addWidget(self.button_delete, 0, alignment=Qt.AlignmentFlag.AlignLeft)
-
+        # Show Type, with how many of each there are
+        self.show_type = SegmentedControl(["Full Images", "ROIs"])
+        self.show_type.setCurrentIndex(self.data_type)
+        self.show_type.currentIndexChanged.connect(self.change_type)
+        first_layer.addWidget(self.show_type)
         first_layer.addStretch()
-        layout.addLayout(first_layer)
 
-        # FILTERS --------------------------------------------------------------
+        # Search filepath, individual and comment as you type
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Search filepath, individual, comment…")
+        self.search.setClearButtonEnabled(True)
+        self.search.addAction(icon("search", "#8A8F8B"), QLineEdit.ActionPosition.LeadingPosition)
+        self.search.setMinimumWidth(280)
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(250)
+        self._search_timer.timeout.connect(self.refresh_table)
+        self.search.textChanged.connect(lambda _text: self._search_timer.start())
+        first_layer.addWidget(self.search)
+        layout.addWidget(toolbar)
+
+        # FILTERS: apply as they change ----------------------------------------
         second_layer = QHBoxLayout()
-        second_layer.addSpacing(5)
-        self.filterbar = FilterBar(self, 180)
+        second_layer.setContentsMargins(20, 8, 20, 8)
+        self.filterbar = FilterBar(self, 150)
         second_layer.addWidget(self.filterbar, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         self.filters = self.filterbar.get_filters()  # get initial filters
-        button_filter = QPushButton("Apply Filters")
-        button_filter.clicked.connect(self.filter_table)
+        self._connect_filter_changes()
         button_clear_filter = QPushButton("Clear Filters")
         button_clear_filter.clicked.connect(self.clear_filters)
-        second_layer.addWidget(button_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         second_layer.addWidget(button_clear_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         # leaves the rois of a clicked # of Rois, only shown there
         self.button_back = QPushButton("Back to All Media")
@@ -134,6 +132,38 @@ class DisplayMedia(UsesProject, QWidget):
         second_layer.addWidget(self.button_back, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         second_layer.addStretch()
         layout.addLayout(second_layer)
+
+        # SELECTION ACTIONS: only shown while rows are ticked -------------------
+        self.selection_bar = QFrame()
+        self.selection_bar.setObjectName("SelectionBar")
+        selection_layout = QHBoxLayout(self.selection_bar)
+        selection_layout.setContentsMargins(20, 6, 20, 6)
+        selection_layout.setSpacing(8)
+        self.selection_label = QLabel("")
+        selection_layout.addWidget(self.selection_label)
+        selection_layout.addSpacing(8)
+        # Edit Rows
+        self.button_edit = QPushButton("Edit Rows…")
+        self.button_edit.clicked.connect(self.edit_row_multiple)
+        self.button_edit.setEnabled(False)
+        # Compare the ticked rois against each other
+        self.button_compare_selected = QPushButton("Compare Selected")
+        self.button_compare_selected.clicked.connect(self.compare)
+        # Duplicate
+        self.button_duplicate = QPushButton("Duplicate Rows")
+        self.button_duplicate.clicked.connect(self.duplicate)
+        self.button_duplicate.setEnabled(False)
+        for button in (self.button_edit, self.button_compare_selected, self.button_duplicate):
+            set_variant(button, "selbar")
+            selection_layout.addWidget(button)
+        selection_layout.addStretch()
+        # Delete
+        self.button_delete = QPushButton("Delete Rows")
+        self.button_delete.clicked.connect(self.delete)
+        self.button_delete.setEnabled(False)
+        set_variant(self.button_delete, "danger")
+        selection_layout.addWidget(self.button_delete)
+        self.selection_bar.setVisible(False)
 
         # display rois or media
         self._data_raw = pd.DataFrame()
@@ -149,20 +179,36 @@ class DisplayMedia(UsesProject, QWidget):
         self.view.verticalHeader().setDefaultSectionSize(THUMBNAIL_SIZE + 10)  # row size = thumbnail with
         self.view.horizontalHeader().setDefaultSectionSize(100)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
+        self.view.setShowGrid(False)
+        # one line per cell, long paths are shortened in the middle (hover shows them whole)
+        self.view.setWordWrap(False)
+        self.view.setTextElideMode(Qt.TextElideMode.ElideMiddle)
+        self.view.setAlternatingRowColors(True)
         self.view.doubleClicked.connect(self.edit_thumbnail)
         self.view.clicked.connect(self.show_media_rois)
         self._set_column_widths()
 
-        self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-
-
         # Connect the selection changed signal from the media table to a handler
         self.media_table.user_edit.connect(self.add_edit_to_stack)
-        layout.addWidget(self.view, stretch=1)
+        table_box = QVBoxLayout()
+        table_box.setContentsMargins(20, 0, 20, 0)
+        table_box.setSpacing(0)
+        table_box.addWidget(self.selection_bar)
+        table_box.addWidget(self.view, stretch=1)
+        layout.addLayout(table_box, stretch=1)
 
-        # Count Label at Bottom
-        self.count_label = QLabel("")
-        layout.addWidget(self.count_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # Count and Select All at Bottom
+        bottom = QHBoxLayout()
+        bottom.setContentsMargins(20, 6, 20, 10)
+        # Select All
+        self.button_select = QPushButton("Select All")
+        self.button_select.setCheckable(True)
+        self.button_select.pressed.connect(self.set_button_select)
+        bottom.addWidget(self.button_select)
+        self.count_label = label("", "muted")
+        bottom.addWidget(self.count_label)
+        bottom.addStretch()
+        layout.addLayout(bottom)
 
         self.setLayout(layout)
         self.project.changed.connect(self.drop_edits)
@@ -180,6 +226,19 @@ class DisplayMedia(UsesProject, QWidget):
     # ==========================================================================
     # NAVIGATION
     # ==========================================================================
+
+    def confirm_leave(self):
+        """
+        Whether the user is fine leaving the view, asking if there are unsaved edits
+
+        Called by the main window before the sidebar switches to another page.
+        """
+        if len(self.edit_stack) == 0:
+            return True
+        dialog = AlertPopup(self, prompt="There are unsaved changes. Are you sure you want to leave this page?")
+        leave = dialog.exec() == QDialog.DialogCode.Accepted
+        del dialog
+        return leave
 
     def home(self):
         """Return to Base View"""
@@ -277,6 +336,21 @@ class DisplayMedia(UsesProject, QWidget):
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
         self.toggle_filterbar_datatype()
+
+    def _connect_filter_changes(self):
+        """
+        Refilter when the user changes a filter, so there is no Apply button
+
+        Uses activated and clicked, which only fire for the user's own changes,
+        not when refresh_filters resets the filters on entering the view.
+        """
+        bar = self.filterbar
+        for combo in (bar.region_select, bar.survey_select, bar.station_select,
+                      bar.viewpoint_select, bar.individual_select):
+            # after the filterbar's own slot has narrowed the dependent lists
+            combo.activated.connect(lambda _i: QTimer.singleShot(0, self.filter_table))
+        for checkbox in (bar.unidentified, bar.favorites, bar.no_roi, bar.media_only):
+            checkbox.clicked.connect(lambda _c: QTimer.singleShot(0, self.filter_table))
 
     def filter_table(self):
         """
@@ -386,6 +460,7 @@ class DisplayMedia(UsesProject, QWidget):
         self.set_progress_max(0)
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
+        self.update_type_counts()
 
         if media_n == 0:
             self.close_alert()
@@ -561,6 +636,15 @@ class DisplayMedia(UsesProject, QWidget):
             if self.filters['no_roi_mids'] is not False:
                 self._data_filtered = self._data_filtered[self._data_filtered['id'].isin(self.filters['no_roi_mids'])]
 
+        # Search box: filepath, comment or individual name contains the text
+        text = self.search.text().strip().lower() if hasattr(self, 'search') else ""
+        if text:
+            match = pd.Series(False, index=self._data_filtered.index)
+            for column in ("filepath", "comment", "name"):
+                if column in self._data_filtered.columns:
+                    match |= self._data_filtered[column].astype(str).str.lower().str.contains(text, regex=False)
+            self._data_filtered = self._data_filtered[match]
+
         # no valid stations, empty dataframe
         self._data_filtered.reset_index(drop=True, inplace=True)
         # ensure the index is reset after filtering
@@ -568,6 +652,7 @@ class DisplayMedia(UsesProject, QWidget):
     def update_count_label(self):
         """Set count label at bottom of media table"""
         self.selected_rows = self.media_table.selectedRows()
+        self.update_selection_bar()
         if len(self.selected_rows) > 0:
             self.count_label.setText(f"Selected: {len(self.selected_rows)} / {self.media_table.rowCount()}")
         else:
@@ -609,9 +694,29 @@ class DisplayMedia(UsesProject, QWidget):
     # BUTTONS
     # ==========================================================================
 
+    def update_selection_bar(self):
+        """Show the selection actions while rows are ticked, with how many"""
+        bar = getattr(self, 'selection_bar', None)
+        if bar is None:
+            return
+        n = len(self.media_table.selectedRows())
+        self.selection_label.setText(f"{n:,} selected")
+        # comparing needs at least two rois
+        self.button_compare_selected.setVisible(self.data_type == 1)
+        self.button_compare_selected.setEnabled(n > 1)
+        bar.setVisible(n > 0)
+
+    def update_type_counts(self):
+        """Show how many media and rois there are on the Full Images / ROIs toggle"""
+        if self.mpDB is None:
+            return
+        self.show_type.setItemText(0, f"Full Images · {self.mpDB.count('media'):,}")
+        self.show_type.setItemText(1, f"ROIs · {self.mpDB.count('roi'):,}")
+
     def update_edd_buttons(self):
         """Enable/Disable Edit, Duplicate, Delete buttons based on selection and mode"""
         has_selection = len(self.media_table.selectedRows()) > 0
+        self.update_selection_bar()
         # Only allow edit in ROI mode
         self.button_edit.setEnabled(has_selection)
         # self.button_duplicate.setEnabled(has_selection)
@@ -625,6 +730,11 @@ class DisplayMedia(UsesProject, QWidget):
         else:
             self.button_undo.setEnabled(False)
             self.button_save.setStyleSheet("")
+        notice = getattr(self, 'unsaved_label', None)
+        if notice is not None:
+            n = len(self.edit_stack)
+            notice.setText(f"{n} unsaved edit{'s' if n != 1 else ''}")
+            notice.setVisible(n > 0)
 
     def set_button_select(self):
         """Handle Select All button press, invert selection"""
@@ -788,20 +898,20 @@ class DisplayMedia(UsesProject, QWidget):
     def _get_headers(self):
             """Return the headers for the media table based on the current data type"""
             if self.data_type == 1:
+                # what is checked while validating comes first, beside the thumbnail
                 headers = {0: ["select", "Select"],
                            1: ["thumbnail_path", "Thumbnail"],
-                           2: ["filepath", "Filepath"],
-                           3: ["timestamp", "Timestamp"],
-                           4: ["station_id", "Station"],
-                           5: ["camera_id", "Camera"],
-                           6: ["sequence_id", "Sequence ID"],
-                           7: ["external_id", "External ID"],
-                           8: ["viewpoint", "Viewpoint"],
-                           9: ["individual_id", "Individual"],
-                           10: ["sex", "Sex"],
-                           11: ["reviewed", "Reviewed"],
-                           12: ["favorite", "Favorite"],
-                           13: ["comment", "Comment"]}
+                           2: ["individual_id", "Individual"],
+                           3: ["viewpoint", "Viewpoint"],
+                           4: ["favorite", "Favorite"],
+                           5: ["sex", "Sex"],
+                           6: ["filepath", "Filepath"],
+                           7: ["timestamp", "Timestamp"],
+                           8: ["station_id", "Station"],
+                           9: ["camera_id", "Camera"],
+                           10: ["sequence_id", "Sequence ID"],
+                           11: ["external_id", "External ID"],
+                           12: ["comment", "Comment"]}
             else:
                 headers = {0: ["select", "Select"],
                            1: ["thumbnail_path", "Thumbnail"],
@@ -824,14 +934,20 @@ class DisplayMedia(UsesProject, QWidget):
         the view keeps widths by position and the two data types put different columns
         at the same position (eg. Extension is only in the media view).
         """
-        default = self.view.horizontalHeader().defaultSectionSize()
+        header = self.view.horizontalHeader()
+        default = header.defaultSectionSize()
         for i, column in enumerate(self.media_table._columns):
             self.view.setColumnWidth(i, self.COLUMN_WIDTHS.get(column, default))
+            # filepath and comment share the leftover width, the rest are resizable
+            stretch = column in self.STRETCH_COLUMNS
+            header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch if stretch
+                                        else QHeaderView.ResizeMode.Interactive)
 
     def _set_delegates(self):
         """Set delegates for the table based on the data type"""
-        VIEWPOINT_COLUMN = 8
-        SEX_COLUMN = 10
+        columns = [h[0] for h in self._get_headers().values()]
+        VIEWPOINT_COLUMN = columns.index("viewpoint") if "viewpoint" in columns else 8
+        SEX_COLUMN = columns.index("sex") if "sex" in columns else 10
 
         if self.data_type == 1:  # ROI view
             combo_items = list(self.VIEWPOINTS.values())[1:]
@@ -841,5 +957,6 @@ class DisplayMedia(UsesProject, QWidget):
             self.view.setItemDelegateForColumn(SEX_COLUMN, ComboBoxDelegate(combo_items, self))
 
         else:
-            self.view.setItemDelegateForColumn(VIEWPOINT_COLUMN, None)
-            self.view.setItemDelegateForColumn(SEX_COLUMN, None)
+            # the roi view's combo columns sit at other positions, clear them all
+            for column in range(max(len(columns), 13)):
+                self.view.setItemDelegateForColumn(column, None)

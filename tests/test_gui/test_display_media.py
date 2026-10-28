@@ -35,7 +35,7 @@ def _make_display_media():
          patch("matchypatchy.gui.display_media.QTableView"), \
          patch("matchypatchy.gui.display_media.QHeaderView"), \
          patch("matchypatchy.gui.display_media.FilterBar"), \
-         patch("matchypatchy.gui.display_media.StandardButton"), \
+         patch("matchypatchy.gui.display_media.SegmentedControl"), \
          patch("matchypatchy.gui.display_media.VerticalSeparator"), \
          patch("matchypatchy.gui.display_media.MediaTable"), \
          patch("matchypatchy.gui.display_media.load_model", 

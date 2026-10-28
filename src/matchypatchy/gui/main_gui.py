@@ -3,10 +3,11 @@ MAIN GUI
 
 Functions for MenuBar
 
-Display Pages:
-    0. DisplayBase
+Display Pages, beside a sidebar:
+    0. DisplayBase (overview)
     1. DisplayMedia
     2. DisplayCompare
+    3. DisplayProcess
 """
 import logging
 import os
@@ -14,13 +15,16 @@ from pathlib import Path
 from typing import Optional
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
-                             QMenuBar, QStackedLayout, QMenu)
-from PyQt6.QtGui import QAction, QGuiApplication
-from PyQt6.QtCore import Qt, QEvent, QSettings, QTimer
+                             QMenuBar, QStackedLayout, QMenu, QHBoxLayout)
+from PyQt6.QtGui import QAction, QGuiApplication, QDesktopServices
+from PyQt6.QtCore import Qt, QEvent, QSettings, QTimer, QUrl
 
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
 from matchypatchy.gui.display_compare import DisplayCompare
+from matchypatchy.gui.display_process import DisplayProcess
+from matchypatchy.gui.widgets.widget_sidebar import Sidebar
+from matchypatchy.gui.widgets.styles import STYLESHEET
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_config import ConfigPopup
 from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
@@ -33,6 +37,9 @@ from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy import __version__
 from matchypatchy.project import Project
 from matchypatchy.database.filesystem import _is_network_path
+from matchypatchy.database.media import workflow_counts
+
+MANUAL_URL = "https://conservationtechlab.github.io/matchypatchy/"
 
 
 logger = logging.getLogger(__name__)
@@ -61,6 +68,7 @@ class MainWindow(QMainWindow):
         # before the views are built, so they lay out at the saved size
         self.apply_font_size(self.font_size())
         self.apply_theme(self.theme())
+        QApplication.instance().setStyleSheet(STYLESHEET)
         # the open project, kept for the life of the window; views read cfg and db through it
         self.project = Project()
         # load previous home dir or start fresh, falling back to a default project
@@ -73,22 +81,42 @@ class MainWindow(QMainWindow):
 
         # Create Menu Bar
         self._createMenuBar()
-        # Create container
+        # Create container: sidebar on the left, pages on the right
         container = QWidget(self)
+        row = QHBoxLayout(container)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(0)
+        self.sidebar = Sidebar(self)
+        self.sidebar.navigate.connect(self.navigate)
+        row.addWidget(self.sidebar)
+        pages_widget = QWidget()
         # Create Page Views
         self.Base = DisplayBase(self)
         self.Media = DisplayMedia(self)
         self.Compare = DisplayCompare(self)
+        self.Process = DisplayProcess(self)
         self.pages = QStackedLayout()
         self.pages.addWidget(self.Base)
         self.pages.addWidget(self.Media)
         self.pages.addWidget(self.Compare)
-        # Set the layout for the window
-        container.setLayout(self.pages)
+        self.pages.addWidget(self.Process)
+        pages_widget.setLayout(self.pages)
+        row.addWidget(pages_widget, 1)
+        # the survey selector belongs to the overview but lives in the sidebar
+        self.sidebar.set_survey_widget(self.Base.survey_select)
+        self.Base.survey_select.currentIndexChanged.connect(lambda _i: self.refresh_counts())
         self._set_base_view()
         self.setCentralWidget(container)
         # views show the previous project's data until they reload, which they do on entry
         self.project.changed.connect(self._set_base_view)
+        # sidebar counts follow writes, batched so an import doesn't recount per row
+        self._count_timer = QTimer(self)
+        self._count_timer.setSingleShot(True)
+        self._count_timer.setInterval(500)
+        self._count_timer.timeout.connect(self.refresh_counts)
+        self.project.data_changed.connect(lambda _table: self._count_timer.start())
+        self.project.changed.connect(self.refresh_counts)
+        self.refresh_counts()
 
     @property
     def mpDB(self):
@@ -288,15 +316,65 @@ class MainWindow(QMainWindow):
         self.settings.setValue("preferred_height", str(preferred_height))
 
 
+    # NAVIGATION ---------------------------------------------------------------
+    def navigate(self, key):
+        """Open the page or dialog for a sidebar item"""
+        actions = {"overview": self._set_base_view,
+                   "media": self._set_media_view,
+                   "match": self.Base.match,
+                   "process": self._set_process_view,
+                   "individuals": self.Base.manage_individual,
+                   "manage_surveys": self.Base.manage_survey,
+                   "manage_stations": self.manage_station,
+                   "settings": self.edit_config,
+                   "manual": lambda: QDesktopServices.openUrl(QUrl(MANUAL_URL))}
+        # unsaved table edits would be lost on another page, as the Home button used to ask
+        leaving_media = self.pages.currentIndex() == 1 and key in ("overview", "match", "process")
+        if leaving_media and not self.Media.confirm_leave():
+            self._sync_sidebar()
+            return
+        action = actions.get(key)
+        if action is not None:
+            action()
+        # a cancelled dialog leaves the current page, so check its button again
+        self._sync_sidebar()
+
+    def _sync_sidebar(self):
+        """Check the sidebar button of the page on screen, full sidebar only on the overview"""
+        keys = {0: "overview", 1: "media", 2: "match", 3: "process"}
+        key = keys.get(self.pages.currentIndex(), "overview")
+        self.sidebar.set_current(key)
+        self.sidebar.set_collapsed(key != "overview")
+
+    def refresh_counts(self):
+        """Badge counts in the sidebar and the project shown there"""
+        if self.mpDB is None:
+            return
+        self.sidebar.set_project(self.cfg.HOME_DIR if self.cfg else None)
+        survey_id = (self.Base.active_survey or (0, None))[0]
+        counts = workflow_counts(self.mpDB, survey_id)
+        self.sidebar.set_badge("media", counts.missing_viewpoint)
+        self.sidebar.set_badge("match", counts.unidentified)
+        if self.pages.currentIndex() == 0:
+            self.Base.refresh()
+
     def _set_base_view(self):
         """Switch to the base view page.""" 
         self.pages.setCurrentIndex(0)
         self.Base.setFocus()
+        self._sync_sidebar()
+
+    def _set_process_view(self):
+        """Switch to the process page"""
+        self.pages.setCurrentIndex(3)
+        self.Process.setFocus()
+        self._sync_sidebar()
 
     def _set_media_view(self, filters: Optional[dict] = None):
         """Switch to the media view page and apply optional filters.""" 
         self.pages.setCurrentIndex(1)
         self.Media.setFocus()
+        self._sync_sidebar()
         # wait to load
         QTimer.singleShot(100, lambda: self.Media.refresh_filters(filters))
         QTimer.singleShot(100, self.Media.load_table)
@@ -305,6 +383,7 @@ class MainWindow(QMainWindow):
         """Switch to the compare view page.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
+        self._sync_sidebar()
         # wait to load
         QTimer.singleShot(100, self.Compare.refresh_filters)
         self.Compare.initialize()
@@ -313,6 +392,7 @@ class MainWindow(QMainWindow):
         """Switch to the manual comparison view page with selected IDs.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
+        self._sync_sidebar()
         # wait to load, reset filters before comparing so stale filters are not applied
         QTimer.singleShot(100, lambda: self._load_manual_view(selected_ids))
 

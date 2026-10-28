@@ -2,7 +2,7 @@
 Widget for displaying list of Media
 """
 import pandas as pd
-from PyQt6.QtGui import QPixmap, QPixmapCache
+from PyQt6.QtGui import QPixmap, QPixmapCache, QColor
 
 from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal, QAbstractTableModel
 
@@ -12,6 +12,7 @@ from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.location import fetch_stations, fetch_cameras
 from matchypatchy.database.media import fetch_individual
 from matchypatchy.project import UsesProject
+from matchypatchy.gui.widgets.styles import WARN_SOFT, WARN_INK
 
 
 class MediaTable(UsesProject, QAbstractTableModel):
@@ -178,12 +179,17 @@ class MediaTable(UsesProject, QAbstractTableModel):
                     name = None
                 return name
 
-        # viewpoint 
+        # viewpoint, a missing one is highlighted so it stands out while validating
         if self._columns[col] == "viewpoint":
+            value = self._data_filtered.at[row, self._columns[col]]
             if role == Qt.ItemDataRole.DisplayRole:
-                value = self._data_filtered.at[row, self._columns[col]]
                 value = str(value) if not pd.isna(value) else 'None'
                 return self.VIEWPOINTS.get(value, value)
+            if pd.isna(value):
+                if role == Qt.ItemDataRole.BackgroundRole:
+                    return QColor(WARN_SOFT)
+                if role == Qt.ItemDataRole.ForegroundRole:
+                    return QColor(WARN_INK)
 
         # individual
         if self._columns[col] == "individual_id":

@@ -318,6 +318,71 @@ class SliderWithLabel(QWidget):
             self.slider_value_changed.emit(value)
 
 
+class SegmentedControl(QWidget):
+    """
+    Row of joined toggle buttons where exactly one is checked
+
+    Has the parts of QComboBox's interface the views use (currentIndex,
+    setCurrentIndex, currentIndexChanged, setItemText), so it can stand in for
+    one, e.g. the media view's Full Images / ROIs choice.
+    """
+    currentIndexChanged = pyqtSignal(int)
+
+    def __init__(self, items, parent=None):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        self.buttons = []
+        self._index = 0
+        for i, text in enumerate(items):
+            button = QPushButton(text)
+            button.setCheckable(True)
+            if len(items) == 1:
+                variant = ""
+            elif i == 0:
+                variant = "segment-first"
+            elif i == len(items) - 1:
+                variant = "segment-last"
+            else:
+                variant = "segment"
+            button.setProperty("variant", variant)
+            button.clicked.connect(lambda _checked=False, i=i: self._clicked(i))
+            layout.addWidget(button)
+            self.buttons.append(button)
+        self._sync()
+
+    def _clicked(self, index):
+        if index == self._index:
+            self._sync()  # a click on the checked button would uncheck it
+            return
+        self._index = index
+        self._sync()
+        if not self.signalsBlocked():
+            self.currentIndexChanged.emit(index)
+
+    def _sync(self):
+        for i, button in enumerate(self.buttons):
+            button.setChecked(i == self._index)
+
+    def currentIndex(self):
+        return self._index
+
+    def setCurrentIndex(self, index):
+        """Check a segment, emitting currentIndexChanged when it changes (unless signals are blocked)"""
+        if 0 <= index < len(self.buttons) and index != self._index:
+            self._clicked(index)
+        else:
+            self._sync()
+
+    def setItemText(self, index, text):
+        if 0 <= index < len(self.buttons):
+            self.buttons[index].setText(text)
+
+    def count(self):
+        return len(self.buttons)
+
+
 class NoHoverDelegate(QStyledItemDelegate):
     """Custom delegate that disables hover/selection highlighting"""
     def paint(self, painter, option, index):

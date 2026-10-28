@@ -961,77 +961,64 @@ class TestConfigRefresh:
 
 
 # ---------------------------------------------------------------------------
-# Processing steps (DisplayBase)
+# Processing steps (DisplayProcess)
 # ---------------------------------------------------------------------------
 
 class TestProcessingSteps:
     def test_cancel_stops_later_steps(self):
         """QThread.start() clears an earlier interruption request, so later steps check a flag"""
-        from matchypatchy.gui.display_base import DisplayBase
-        base = MagicMock()
-        DisplayBase._cancel_processing(base)
-        assert base._process_cancelled is True
-        base.animl_thread.requestInterruption.assert_called_once()
-        DisplayBase._start_animl(base)
-        DisplayBase._start_reid(base)
-        base.animl_thread.start.assert_not_called()
-        base.miew_thread.start.assert_not_called()
+        from matchypatchy.gui.display_process import DisplayProcess
+        page = MagicMock()
+        page._stopped_if_cancelled = lambda: DisplayProcess._stopped_if_cancelled(page)
+        DisplayProcess.cancel(page)
+        assert page._process_cancelled is True
+        page.animl_thread.requestInterruption.assert_called_once()
+        DisplayProcess._start_animl(page)
+        DisplayProcess._start_reid(page)
+        page.animl_thread.start.assert_not_called()
+        page.miew_thread.start.assert_not_called()
+        # another run is allowed once the cancelled step has stopped
+        assert page.running is False
 
     def test_steps_start_in_turn(self):
-        from matchypatchy.gui.display_base import DisplayBase
-        base = MagicMock()
-        base._process_cancelled = False
-        DisplayBase._start_animl(base)
-        base.animl_thread.start.assert_called_once()
-        DisplayBase._start_reid(base)
-        base.miew_thread.start.assert_called_once()
+        from matchypatchy.gui.display_process import DisplayProcess
+        page = MagicMock()
+        page._process_cancelled = False
+        page._stopped_if_cancelled = lambda: DisplayProcess._stopped_if_cancelled(page)
+        DisplayProcess._start_animl(page)
+        page.animl_thread.start.assert_called_once()
+        DisplayProcess._start_reid(page)
+        page.miew_thread.start.assert_called_once()
 
-    def test_errors_keep_popup_open_with_ok(self):
-        from matchypatchy.gui.display_base import DisplayBase
-        base = MagicMock()
-        base.animl_thread.failed = {"a.jpg"}
-        base.miew_thread.failed = {"a.jpg", "b.jpg"}
-        DisplayBase._finish_processing(base)
-        assert "2 file(s)" in base._process_dialog.update_prompt.call_args[0][0]
-        base._process_dialog.allow_ok.assert_called_once()
-        base._process_dialog.accept.assert_not_called()
+    def test_unreadable_files_are_reported(self):
+        from matchypatchy.gui.display_process import DisplayProcess
+        page = MagicMock()
+        page.animl_thread.failed = {"a.jpg"}
+        page.miew_thread.failed = {"a.jpg", "b.jpg"}
+        DisplayProcess._finish_processing(page)
+        assert "2 file(s)" in page.failed_notice.setText.call_args[0][0]
+        page.failed_notice.setVisible.assert_called_once_with(True)
+        assert page.running is False
 
-    def test_no_errors_closes_popup(self):
-        from matchypatchy.gui.display_base import DisplayBase
-        base = MagicMock()
-        base.animl_thread.failed = set()
-        base.miew_thread.failed = set()
-        DisplayBase._finish_processing(base)
-        base._process_dialog.accept.assert_called_once()
-        base._process_dialog.allow_ok.assert_not_called()
+    def test_no_errors_reports_nothing(self):
+        from matchypatchy.gui.display_process import DisplayProcess
+        page = MagicMock()
+        page.animl_thread.failed = set()
+        page.miew_thread.failed = set()
+        DisplayProcess._finish_processing(page)
+        page.failed_notice.setVisible.assert_not_called()
+        page.parent.refresh_counts.assert_called_once()
 
     def test_model_not_downloaded_stops_before_processing(self):
-        from matchypatchy.gui.display_base import DisplayBase
-        base = MagicMock()
-        mloptions = {"sequence_checked": True, "DETECTOR_KEY": "md", "REID_KEY": "miew", "VIEWPOINT_KEY": None}
-        with patch("matchypatchy.gui.display_base.get_path", side_effect=lambda _d, key: None if key == "md" else "/m"), \
-             patch("matchypatchy.gui.display_base.AlertPopup") as popup, \
-             patch("matchypatchy.gui.display_base.SequenceThread") as sequence_thread:
-            DisplayBase.process_images(base, mloptions)
-        assert popup.call_args[0][1] == "Model(s) not downloaded: md"
+        from matchypatchy.gui.display_process import DisplayProcess
+        page = MagicMock()
+        page.return_selections.return_value = {"sequence_checked": True, "DETECTOR_KEY": "md",
+                                               "REID_KEY": "miew", "VIEWPOINT_KEY": None}
+        with patch("matchypatchy.gui.display_process.get_path", side_effect=lambda _d, key: None if key == "md" else "/m"), \
+             patch("matchypatchy.gui.display_process.SequenceThread") as sequence_thread:
+            DisplayProcess.run(page)
+        assert page.prompt.setText.call_args[0][0] == "Model(s) not downloaded: md"
         sequence_thread.assert_not_called()
-
-    def test_popup_closes_when_every_file_was_read(self):
-        from matchypatchy.gui.display_base import DisplayBase
-        base = MagicMock()
-        base.animl_thread.failed = set()
-        base.miew_thread.failed = set()
-        DisplayBase._finish_processing(base)
-        base._process_dialog.accept.assert_called_once()
-
-    def test_popup_stays_open_to_report_unreadable_files(self):
-        from matchypatchy.gui.display_base import DisplayBase
-        base = MagicMock()
-        base.animl_thread.failed = {"/a.jpg"}
-        base.miew_thread.failed = {"/b.jpg"}
-        DisplayBase._finish_processing(base)
-        base._process_dialog.accept.assert_not_called()
-        assert "2 file(s)" in base._process_dialog.update_prompt.call_args[0][0]
 
 
 class TestConfigSaveCancel:

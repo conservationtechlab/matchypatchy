@@ -1,175 +1,265 @@
 """
-Base Gui View
-Contains main dashboard with options to
-import, process, validate, match, and export data
+Overview page (the home view)
 
-Also contains database management options for
-surveys, stations, individuals, and downloading ML models
+Shows the active survey, the next workflow step to take and the five steps
+(import, process, validate, match, export) with how much each has left to do.
+
+Also owns the survey selector, which the main window places in the sidebar,
+and the survey, station and individual management popups.
 """
 import logging
 import os
 
-from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog,
-                             QVBoxLayout, QHBoxLayout, QComboBox, QLabel)
+from PyQt6.QtWidgets import (QPushButton, QWidget, QFileDialog, QDialog, QFrame, QMenu,
+                             QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QSizePolicy)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QImage
 
 from matchypatchy.database.location import survey_names
-from matchypatchy.database.media import clear_project_data, rois_without_embeddings
+from matchypatchy.database.media import clear_project_data, rois_without_embeddings, workflow_counts
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 from matchypatchy.gui.dialogs.popup_individual import IndividualPopup
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
-from matchypatchy.gui.dialogs.popup_ml import MLOptionsPopup
+from matchypatchy.gui.widgets.styles import label, set_variant, ACCENT, ACCENT_SOFT, ACCENT_INK
 
-from matchypatchy.threads.sequence_thread import SequenceThread
-from matchypatchy.threads.animl_thread import AnimlThread
-from matchypatchy.threads.reid_thread import ReIDThread
-from matchypatchy.threads.model_download_thread import get_path
-
-from matchypatchy import config
 from matchypatchy.project import UsesProject
 
 
 logger = logging.getLogger(__name__)
 
+# workflow steps: key, button text, description of what the count means
+STEPS = [("import", "Import", "media from {stations} stations"),
+         ("process", "Process", "new ROIs need embeddings"),
+         ("validate", "Validate", "ROIs missing a viewpoint"),
+         ("match", "Match", "unidentified ROIs"),
+         ("export", "Export", "individuals ready to export as CSV")]
+
+
+def next_step(counts):
+    """
+    The first workflow step that still has work, as a key of STEPS
+
+    Import when the survey is empty, then process (detection or embeddings),
+    validate (missing viewpoints), match (unidentified rois), else export.
+    """
+    if counts.media == 0:
+        return "import"
+    if counts.undetected or counts.unembedded:
+        return "process"
+    if counts.missing_viewpoint:
+        return "validate"
+    if counts.unidentified:
+        return "match"
+    return "export"
+
+
+class StepRow(QWidget):
+    """One workflow step: status dot, step button, count and what it counts"""
+    def __init__(self, number, text):
+        super().__init__()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(24, 10, 24, 10)
+        layout.setSpacing(20)
+        self.number = number
+        self.dot = QLabel(str(number))
+        self.dot.setFixedSize(34, 34)
+        self.dot.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.dot)
+        self.button = QPushButton(text)
+        self.button.setFixedSize(140, 46)
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.button.setStyleSheet("font-size: 16px; font-weight: 600;")
+        layout.addWidget(self.button)
+        self.count = QLabel("")
+        self.count.setStyleSheet("font-size: 26px; font-weight: 600;")
+        layout.addWidget(self.count)
+        self.status = label("", "muted")
+        self.status.setStyleSheet("font-size: 17px;")
+        layout.addWidget(self.status, 1)
+
+    def set_state(self, count, status, done, current):
+        """Show the count and status; a check when done, filled when it is the next step"""
+        self.count.setText(f"{count:,}" if count is not None else "")
+        self.status.setText(status)
+        base = "border-radius: 17px; font-weight: 700; font-size: 14px;"
+        if current:
+            self.dot.setText(str(self.number))
+            self.dot.setStyleSheet(base + f"background: {ACCENT}; color: white;")
+        elif done:
+            self.dot.setText("✓")
+            self.dot.setStyleSheet(base + f"background: {ACCENT_SOFT}; color: {ACCENT_INK};")
+        else:
+            self.dot.setText(str(self.number))
+            self.dot.setStyleSheet(base + "background: palette(midlight); color: palette(text);")
+        set_variant(self.button, "primary" if current else "")
+
 
 class DisplayBase(UsesProject, QWidget):
-    """Base class for the main dashboard view in the MatchyPatchy GUI."""
-
-    LOGO = str(config.asset_path("graphics/logo.png"))
+    """Overview page of the MatchyPatchy GUI."""
 
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.project = parent.project
-        padding = 120
-        # Initialize threads for sequence, animl, and reid processing
         self.active_survey = None
-        self.sequence_thread = None
-        self.animl_thread = None
-        self.reid_thread = None
+        self.counts = None
 
-        container = QWidget()
-        container.setObjectName("mainBorderWidget")
-        layout = QVBoxLayout()
-
-        label = QLabel("Welcome To MatchyPatchy")
-        label.setObjectName("Title")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        label.setFixedHeight(25)
-        label.setStyleSheet("""#Title {font-size: 22px;}""")
-        layout.addWidget(label)
-        layout.addSpacing(10)
-        layout.addStretch()
-
-        logo = QLabel("Logo", alignment=Qt.AlignmentFlag.AlignCenter)
-        logo.setFixedSize(600, 400)
-        logo.setObjectName("borderWidget")
-        logo_img = QImage(self.LOGO)
-        logo.setPixmap(QPixmap.fromImage(logo_img))
-        layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignCenter)
-        layout.addSpacing(10)
-        layout.addStretch()
-
-        column_layout = QHBoxLayout()
-        column_layout.addSpacing(padding)  # add padding to left side
-        column_layout.addStretch()
-
-        # MAIN PROCESS ---------------------------------------------------------
-        border_import = QWidget()
-        border_import.setObjectName("borderWidget")
-        border_import.setStyleSheet("#borderWidget { border: 1px solid gray; }")
-        import_layer = QVBoxLayout()
-        import_label = QLabel("Import and Process Data")
-        import_label.setObjectName("QLabel_Base")
-        import_layer.addWidget(import_label, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        button_load_csv = QPushButton("1. Import from CSV")
-        button_load_folder = QPushButton("1. Import from Folder")
-        button_process = QPushButton("2. Process")
-        button_validate = QPushButton("3. Validate")
-        button_match = QPushButton("4. Match")
-        button_export = QPushButton("5.Export")
-
-        button_load_csv.clicked.connect(self.import_csv)
-        button_load_folder.clicked.connect(self.import_folder)
-        button_process.clicked.connect(self.select_models)
-        button_validate.clicked.connect(self.validate)
-        button_match.clicked.connect(self.match)
-        button_export.clicked.connect(self.export)
-
-        load_layout = QHBoxLayout()
-        load_layout.addWidget(button_load_csv)
-        load_layout.addWidget(button_load_folder)
-        import_layer.addLayout(load_layout)
-        import_layer.addWidget(button_process)
-        import_layer.addWidget(button_validate)
-        import_layer.addWidget(button_match)
-        import_layer.addWidget(button_export)
-
-        border_import.setLayout(import_layer)
-        column_layout.addWidget(border_import, 1)
-        column_layout.addSpacing(40)
-
-        # DB MANAGEMENT --------------------------------------------------------
-        border_db = QWidget()
-        border_db.setObjectName("borderWidget")
-        border_db.setStyleSheet("#borderWidget { border: 1px solid gray; }")
-        db_layer = QVBoxLayout()
-        db_label = QLabel("Database Management")
-        db_label.setObjectName("QLabel_Base")
-        db_layer.addWidget(db_label, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Survey
-        survey_layout = QHBoxLayout()
-        survey_label = QLabel("Survey:")
-        survey_label.setStyleSheet("font-size: 16px;")
-        survey_layout.addWidget(survey_label, 0)
+        # survey selector, placed in the sidebar by the main window
         self.survey_select = QComboBox()
         self.survey_select.currentIndexChanged.connect(self.select_survey)
-        survey_layout.addWidget(self.survey_select, 1)
-        button_survey_new = QPushButton("Manage Surveys")
-        button_survey_new.clicked.connect(self.manage_survey)
-        survey_layout.addWidget(button_survey_new, 1)
-        db_layer.addLayout(survey_layout)
+        self.survey_select.currentIndexChanged.connect(lambda _i: self.refresh())
 
-        button_station_manage = QPushButton("Manage Stations")
-        button_media_manage = QPushButton("Manage Media")
-        button_individual_manage = QPushButton("Manage Individuals")
-        button_download_models = QPushButton("Download ML Models")
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(40, 48, 40, 40)
+        outer.addStretch(1)
+        column = QVBoxLayout()
+        column.setSpacing(28)
+        outer.addLayout(column, 12)
+        outer.addStretch(1)
 
-        button_station_manage.clicked.connect(self.manage_station)
-        button_media_manage.clicked.connect(self.validate)
-        button_individual_manage.clicked.connect(self.manage_individual)
-        button_download_models.clicked.connect(self.parent.download_ml)
+        # HEADER
+        header = QVBoxLayout()
+        header.setSpacing(4)
+        self.title = label("", "title")
+        header.addWidget(self.title)
+        self.subtitle = label("", "muted")
+        self.subtitle.setStyleSheet("font-size: 14px;")
+        header.addWidget(self.subtitle)
+        column.addLayout(header)
 
-        db_layer.addWidget(button_station_manage)
-        db_layer.addWidget(button_media_manage)
-        db_layer.addWidget(button_individual_manage)
-        db_layer.addWidget(button_download_models)
+        # NEXT STEP
+        card = QFrame()
+        card.setObjectName("Card")
+        card_layout = QHBoxLayout(card)
+        card_layout.setContentsMargins(28, 24, 28, 24)
+        card_layout.setSpacing(20)
+        card_text = QVBoxLayout()
+        card_text.setSpacing(4)
+        card_text.addWidget(label("NEXT STEP", "eyebrow"))
+        self.next_title = QLabel("")
+        self.next_title.setStyleSheet("font-size: 21px; font-weight: 600;")
+        card_text.addWidget(self.next_title)
+        self.next_text = label("", "muted")
+        self.next_text.setWordWrap(True)
+        card_text.addWidget(self.next_text)
+        card_layout.addLayout(card_text, 1)
+        self.next_button = QPushButton("")
+        self.next_button.setMinimumSize(170, 46)
+        self.next_button.setStyleSheet("font-size: 15px;")
+        set_variant(self.next_button, "primary")
+        self.next_button.clicked.connect(lambda: self.run_step(self._next))
+        card_layout.addWidget(self.next_button, 0, Qt.AlignmentFlag.AlignVCenter)
+        column.addWidget(card)
 
-        border_db.setLayout(db_layer)
-        column_layout.addWidget(border_db, 1)
-        column_layout.addSpacing(padding)  # add spacing to right side
-        column_layout.addStretch()
-        layout.addLayout(column_layout)
-        layout.addSpacing(40)  # add spacing to bottom
-        layout.addStretch()
+        # WORKFLOW
+        workflow = QFrame()
+        workflow.setObjectName("Card")
+        workflow.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        workflow_layout = QVBoxLayout(workflow)
+        workflow_layout.setContentsMargins(0, 6, 0, 6)
+        workflow_layout.setSpacing(0)
+        self.rows = {}
+        for i, (key, text, _status) in enumerate(STEPS, start=1):
+            if i > 1:
+                line = QFrame()
+                line.setFixedHeight(1)
+                line.setStyleSheet("background: palette(midlight);")
+                workflow_layout.addWidget(line)
+            row = StepRow(i, text)
+            row.button.clicked.connect(lambda _c=False, k=key: self.run_step(k))
+            workflow_layout.addWidget(row, 1)
+            self.rows[key] = row
+        column.addWidget(workflow, 1)
 
-        self.setStyleSheet("QPushButton, QComboBox { height: 40px; font-size: 16px;}"
-                           "#QLabel_Base { font-size: 16px; }")
-        container.setLayout(layout)
-        main_layout = QVBoxLayout()
-        main_layout.addWidget(container)
-        self.setLayout(main_layout)
-        
+        # Import offers a folder or a csv manifest
+        self.import_menu = QMenu(self)
+        self.import_menu.addAction("From a folder…", self.import_folder)
+        self.import_menu.addAction("From a CSV manifest…", self.import_csv)
+
+        self._next = "import"
         self.update_survey()
         # the survey list belongs to the open project, start from its first survey
         self.project.changed.connect(lambda: self.update_survey(keep_selection=False))
         self.project.data_changed.connect(self.surveys_written)
+
+    def showEvent(self, event):
+        """Recount on every visit, imports and matching change the numbers elsewhere"""
+        self.refresh()
+        super().showEvent(event)
+
+    # ==========================================================================
+    # Overview
+    # ==========================================================================
+    def refresh(self):
+        """Recount the active survey and update the header, next step and workflow rows"""
+        if self.mpDB is None:
+            return
+        survey_id, survey_name = self.active_survey or (0, None)
+        counts = workflow_counts(self.mpDB, survey_id)
+        self.counts = counts
+
+        self.title.setText(survey_name or "No survey")
+        details = self.survey_details(survey_id)
+        details += [f"{counts.media:,} media", f"{counts.individuals:,} individuals"]
+        self.subtitle.setText(" · ".join(details))
+
+        self._next = next_step(counts)
+        pending = {"import": counts.media,
+                   "process": counts.unembedded + counts.undetected,
+                   "validate": counts.missing_viewpoint,
+                   "match": counts.unidentified,
+                   "export": counts.individuals}
+        order = [key for key, _t, _s in STEPS]
+        for key, _text, status in STEPS:
+            if key == "process" and counts.undetected:
+                status = "media and ROIs still to process"
+            self.rows[key].set_state(pending[key], status.format(stations=counts.stations),
+                                     done=order.index(key) < order.index(self._next),
+                                     current=key == self._next)
+
+        titles = {"import": ("Import media", "Add a folder of images or a CSV manifest to this survey.", "Import media"),
+                  "process": (f"Process {pending['process']:,} new items",
+                              "Run detection and re-identification so new ROIs can be matched.", "Process"),
+                  "validate": (f"Check {counts.missing_viewpoint:,} ROIs missing a viewpoint",
+                               "Fix viewpoints and boxes before matching.", "Review media"),
+                  "match": (f"Match {counts.unidentified:,} unidentified ROIs",
+                            "Review ranked candidates and link each ROI to an individual.", "Start matching"),
+                  "export": ("Export results", "Every ROI has an individual. Save the survey as a CSV.", "Export CSV")}
+        title, text, button = titles[self._next]
+        self.next_title.setText(title)
+        self.next_text.setText(text)
+        self.next_button.setText(button)
+
+    def survey_details(self, survey_id):
+        """Region and years of the survey, for the header"""
+        rows = self.mpDB.query("""SELECT region.name, survey.year_start, survey.year_end FROM survey
+                                  LEFT JOIN region ON region.id = survey.region_id
+                                  WHERE survey.id = ?;""", (survey_id,))
+        if not rows:
+            return []
+        region, start, end = rows[0]
+        details = [region] if region else []
+        if start and end and start != end:
+            details.append(f"{start}–{end}")
+        elif start or end:
+            details.append(str(start or end))
+        return details
+
+    def run_step(self, key):
+        """Do what a workflow step's button says"""
+        if key == "import":
+            button = self.rows["import"].button
+            self.import_menu.popup(button.mapToGlobal(button.rect().bottomLeft()))
+        elif key == "process":
+            self.select_models()
+        elif key == "validate":
+            self.validate()
+        elif key == "match":
+            self.match()
+        elif key == "export":
+            self.export()
 
     # ==========================================================================
     # Database Management Functions
@@ -188,6 +278,7 @@ class DisplayBase(UsesProject, QWidget):
         self.survey_select.setCurrentIndex(position)
         self.survey_select.blockSignals(False)
         self.select_survey()
+        self.refresh()
 
     def surveys_written(self, table):
         """
@@ -253,6 +344,7 @@ class DisplayBase(UsesProject, QWidget):
                 dialog = ImportCSVPopup(self, manifest)
                 dialog.exec()
                 del dialog
+                self.refresh()
 
     # STEP 1: Import from FOLDER
     def import_folder(self):
@@ -276,95 +368,12 @@ class DisplayBase(UsesProject, QWidget):
                 del dialog
                 if no_images:
                     self.import_folder()
+                self.refresh()
 
-    # STEP 2: Process Button
+    # STEP 2: Process
     def select_models(self):
-        """
-        Processes Sequence, MD, Animl, Viewpoint, Miew
-        For any image/roi that doesn't have values for those already
-        """
-        ml_options_dialog = MLOptionsPopup(self)
-        result = ml_options_dialog.exec()
-        if result == QDialog.DialogCode.Accepted:
-            mloptions = ml_options_dialog.return_selections()
-            self.process_images(mloptions)
-
-        del ml_options_dialog
-
-    def process_images(self, mloptions):
-        """Process images using selected machine learning options"""
-        # a chosen model's files can be deleted before processing starts
-        missing = [key for key in (mloptions['DETECTOR_KEY'], mloptions['REID_KEY'], mloptions['VIEWPOINT_KEY'])
-                   if key is not None and get_path(self.cfg.ML_DIR, key) is None]
-        if missing:
-            dialog = AlertPopup(self, f"Model(s) not downloaded: {', '.join(missing)}")
-            dialog.show()
-        elif self.mpDB.count("media") > 0:
-            self.cfg.update(mloptions)
-            dialog = AlertPopup(self, "Processing Images...",
-                                title="Processing Images",
-                                progressbar=True, cancel_only=True)
-            dialog.show()
-
-            # 1. SEQUENCE
-            dialog.set_max(0)
-            self.sequence_thread = SequenceThread(self.mpDB, self.cfg, mloptions['sequence_checked'])
-            self.sequence_thread.prompt_update.connect(dialog.update_prompt)
-            # 2. ANIML (BBOX)
-            self.animl_thread = AnimlThread(self.mpDB, self.cfg, mloptions['DETECTOR_KEY'])
-            self.animl_thread.prompt_update.connect(dialog.update_prompt)
-            self.animl_thread.progress_update.connect(dialog.set_value)
-            # 3. REID AND VIEWPOINT
-            self.miew_thread = ReIDThread(self.mpDB, self.cfg, mloptions)
-            self.miew_thread.prompt_update.connect(dialog.update_prompt)
-            self.miew_thread.progress_update.connect(dialog.set_value)
-            self.miew_thread.done.connect(self._finish_processing)
-            # run one step after the other, so only one thread writes to the database at a time
-            self._process_dialog = dialog
-            self._process_cancelled = False
-            self.sequence_thread.finished.connect(self._start_animl)
-            self.animl_thread.finished.connect(self._start_reid)
-            # allow cancellation
-            dialog.rejected.connect(self._cancel_processing)
-            self.sequence_thread.start()
-        else:
-            dialog = AlertPopup(self, "No images to process.")
-            dialog.show()
-
-        if dialog.exec():
-            del dialog
-
-    def _start_animl(self):
-        """Step 2 once sequencing is done, unless processing was cancelled"""
-        if self._process_cancelled:
-            return
-        self._process_dialog.set_max(100)
-        self._process_dialog.set_counter(0)
-        self.animl_thread.start()
-
-    def _start_reid(self):
-        """Step 3 once detection is done, unless processing was cancelled"""
-        # QThread.start() clears an earlier interruption request, so check before starting
-        if self._process_cancelled:
-            return
-        self._process_dialog.reset_counter()
-        self.miew_thread.start()
-
-    def _finish_processing(self):
-        """Close the popup, or keep it open to say how many files couldn't be read"""
-        failed = self.animl_thread.failed | self.miew_thread.failed
-        if failed:
-            self._process_dialog.update_prompt(f"Processing finished, but {len(failed)} file(s) "
-                                               "could not be read. See the log for which.")
-            self._process_dialog.allow_ok()
-        else:
-            self._process_dialog.accept()
-
-    def _cancel_processing(self):
-        """Stop the running step and don't start the ones after it"""
-        self._process_cancelled = True
-        for thread in (self.sequence_thread, self.animl_thread, self.miew_thread):
-            thread.requestInterruption()
+        """Open the process page, which chooses models and runs them"""
+        self.parent._set_process_view()
 
     # STEP 3: Validate/Manage Media Button
     def validate(self):

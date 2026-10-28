@@ -254,6 +254,49 @@ def media_count(mpDB, survey_id):
     return media, len(media)
 
 
+@dataclass
+class WorkflowCounts:
+    """What is left to do in a survey, for the overview page and sidebar badges"""
+    media: int = 0
+    stations: int = 0
+    rois: int = 0
+    undetected: int = 0          # media not yet through detection
+    unembedded: int = 0          # rois without a re-id embedding
+    missing_viewpoint: int = 0   # rois with no viewpoint
+    unidentified: int = 0        # rois with no individual
+    individuals: int = 0         # individuals with at least one roi in the survey
+
+
+def workflow_counts(mpDB, survey_id):
+    """
+    Count what each workflow step still has to do in a survey
+
+    One query, so the overview can refresh on every visit. Returns all zeros if
+    the survey has no stations or the query fails (already logged by query).
+    """
+    rows = mpDB.query("""
+        SELECT
+            (SELECT COUNT(*) FROM station WHERE survey_id = :s),
+            COUNT(DISTINCT m.id),
+            COUNT(DISTINCT CASE WHEN m.detection_done = 0 THEN m.id END),
+            COUNT(r.id),
+            COUNT(CASE WHEN r.id IS NOT NULL AND (r.emb IS NULL OR r.emb = 0) THEN 1 END),
+            COUNT(CASE WHEN r.id IS NOT NULL AND r.viewpoint IS NULL THEN 1 END),
+            COUNT(CASE WHEN r.id IS NOT NULL AND r.individual_id IS NULL THEN 1 END),
+            COUNT(DISTINCT r.individual_id)
+        FROM media m
+        JOIN station st ON st.id = m.station_id
+        LEFT JOIN roi r ON r.media_id = m.id
+        WHERE st.survey_id = :s;""", {"s": survey_id})
+    if not rows:
+        return WorkflowCounts()
+    (stations, media, undetected, rois, unembedded,
+     missing_viewpoint, unidentified, individuals) = (value or 0 for value in rows[0])
+    return WorkflowCounts(media=media, stations=stations, rois=rois, undetected=undetected,
+                          unembedded=unembedded, missing_viewpoint=missing_viewpoint,
+                          unidentified=unidentified, individuals=individuals)
+
+
 # EDITS AND DELETES ============================================================
 def _in_ids(ids):
     """ids as ints, with the placeholders for an IN (...) of them"""
