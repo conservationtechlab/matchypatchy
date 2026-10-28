@@ -8,9 +8,15 @@ the sidebar, which is dark in both themes, are fixed.
 Widgets opt into a variant with set_variant(widget, "primary"), which sets the
 "variant" property the stylesheet selects on.
 """
+from pathlib import Path
+
 from PyQt6.QtCore import Qt, QByteArray, QSize
-from PyQt6.QtGui import QIcon, QPixmap, QPainter
+from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtWidgets import QLabel
+
+from matchypatchy.config import asset_path
+
+CHEVRON = Path(asset_path("graphics/chevron-down.svg")).as_posix()
 
 # accents, the same in both themes
 ACCENT = "#2E7031"          # match green, the app's existing Match button color
@@ -20,6 +26,7 @@ ACCENT_INK = "#1F5222"
 WARN_SOFT = "#FBF0DC"
 WARN_INK = "#7A4700"
 DANGER = "#B51B32"
+MISSING_HIGHLIGHT = "#5AE8A33C"   # translucent amber (#AARRGGBB), marks missing values in tables
 FAVORITE = "#D6334B"
 
 # sidebar, dark in both themes
@@ -74,6 +81,11 @@ QComboBox, QLineEdit {{
     color: palette(text);
     min-height: 22px;
 }}
+QComboBox::drop-down {{ border: 0px; width: 26px; subcontrol-origin: padding; subcontrol-position: center right; }}
+QComboBox::down-arrow {{ image: url("{CHEVRON}"); width: 12px; height: 12px; }}
+QComboBox QAbstractItemView {{ border: 1px solid palette(mid); background: palette(base); selection-background-color: palette(highlight); }}
+QProgressBar {{ border: 1px solid palette(mid); border-radius: 6px; background: palette(window); text-align: center; min-height: 14px; }}
+QProgressBar::chunk {{ background: {ACCENT}; border-radius: 5px; }}
 
 QFrame#Card {{ background: palette(base); border: 1px solid palette(mid); border-radius: 14px; }}
 QLabel[role="muted"] {{ color: palette(placeholder-text); }}

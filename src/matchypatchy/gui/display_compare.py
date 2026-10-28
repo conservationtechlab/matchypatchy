@@ -8,8 +8,8 @@ import os
 from pathlib import Path
 from PIL import Image
 
-from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QHeaderView, QTableWidget, QTableWidgetItem)
+from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QGridLayout,
+                             QHeaderView, QTableWidget, QTableWidgetItem, QComboBox, QProgressBar)
 from PyQt6.QtCore import Qt, QEvent, QTimer
 from PyQt6.QtGui import QPalette, QColor
 
@@ -19,7 +19,11 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_individual import IndividualFillPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.dialogs.popup_pairx import PairXPopup
-from matchypatchy.gui.widgets.gui_assets import SequenceSelector, SliderWithLabel, VerticalSeparator, StandardButton, ThreePointSlider
+from matchypatchy.gui.widgets.gui_assets import SliderWithLabel, CounterNav, ViewpointToggle
+from matchypatchy.gui.widgets.widget_candidates import CandidateStrip
+from matchypatchy.gui.widgets.styles import (ACCENT, ACCENT_SOFT, ACCENT_INK, IMAGE_WELL, icon, label,
+                                             set_variant, set_role)
+from matchypatchy.database.thumbnails import fetch_roi_thumbnails
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 
 from matchypatchy.gui.query_base import QueryContainer
@@ -38,6 +42,9 @@ class DisplayCompare(UsesProject, QWidget):
     """GUI class for displaying and managing match comparisons."""
 
     MATCH_STYLE = """ QPushButton { background-color: #2e7031; color: white; }"""
+    MODES = {'default': 0, 'qc': 1, 'manual': 2}
+    # Match button once query and candidate are the same individual
+    MATCHED_STYLE = f""" QPushButton {{ background-color: {ACCENT_SOFT}; color: {ACCENT_INK}; border-color: {ACCENT_SOFT}; }}"""
     FAVORITE_STYLE = """ QPushButton { background-color: #b51b32; color: white; }"""
     VIEWPOINT_DICT = {0: 'Left', 1: 'Any', 2: 'Right'}
 
@@ -55,188 +62,218 @@ class DisplayCompare(UsesProject, QWidget):
         self.QueryContainer = QueryContainer(self)
         self.edit_stack = []  # placeholder for media edit stack
 
-        # Options Bar ==============================================================
+        # TOP BAR ==============================================================
         layout = QVBoxLayout()
-        first_layer = QHBoxLayout()
-        button_home = StandardButton("Home", width=80)
-        button_home.clicked.connect(lambda: self.home(warn=False))
-        first_layer.addWidget(button_home)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        top = QFrame()
+        top.setObjectName("TopBar")
+        first_layer = QHBoxLayout(top)
+        first_layer.setContentsMargins(20, 10, 20, 10)
+        first_layer.setSpacing(14)
+        title = QLabel("Match")
+        title.setStyleSheet("font-size: 18px; font-weight: 600;")
+        first_layer.addWidget(title)
 
-        button_validate = QPushButton("View Data")
-        button_validate.pressed.connect(self.validate)
-        first_layer.addWidget(button_validate)
-        first_layer.addWidget(VerticalSeparator())
+        # Query Selector: previous/next query, W S or up/down
+        self.query_selector = CounterNav("Query")
+        self.query_selector.button_previous.setToolTip("Previous query (W / ↑)")
+        self.query_selector.button_next.setToolTip("Next query (S / ↓)")
+        self.query_selector.button_previous.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query - 1))
+        self.query_selector.button_next.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query + 1))
+        query_nav = QVBoxLayout()
+        query_nav.setSpacing(4)
+        query_nav.addWidget(self.query_selector)
+        self.query_progress = QProgressBar()
+        self.query_progress.setTextVisible(False)
+        self.query_progress.setFixedHeight(4)
+        self.query_progress.setStyleSheet(f"QProgressBar {{ border: 0px; background: palette(midlight); border-radius: 2px; }}"
+                                          f"QProgressBar::chunk {{ background: {ACCENT}; border-radius: 2px; }}")
+        query_nav.addWidget(self.query_progress)
+        first_layer.addLayout(query_nav)
 
-        self.threshold_slider = SliderWithLabel("Similarity Threshold", min_val=0, max_val=100, initial=self.threshold)
+        # Mode: ranked candidates, quality control by individual, or the rois picked in the media view
+        first_layer.addWidget(label("Mode", "muted"))
+        self.mode_select = QComboBox()
+        self.mode_select.addItems(["Ranked candidates", "QC by individual", "Manual selection"])
+        self.mode_select.setItemData(2, 0, Qt.ItemDataRole.UserRole - 1)  # only entered from the media view
+        self.mode_select.activated.connect(self.change_mode)
+        self.mode_select.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        first_layer.addWidget(self.mode_select)
+
+        # Viewpoint Toggle, L R V
+        self.button_viewpoint = ViewpointToggle(initial=1)
+        self.button_viewpoint.state_changed.connect(self.toggle_viewpoint)
+        first_layer.addWidget(self.button_viewpoint)
+
+        self.threshold_slider = SliderWithLabel("Similarity ≥", min_val=0, max_val=100, initial=self.threshold)
+        self.threshold_slider.label.setText("Similarity ≥")
         self.threshold_slider.slider_value_changed.connect(self.change_threshold)
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        first_layer.addStretch()
 
-        button_recalc = QPushButton("Recalculate Matches")
-        button_recalc.clicked.connect(lambda: self.initialize(clear_cache=True))
-        first_layer.addWidget(button_recalc)
-
-        button_recalc = QPushButton("Quality Control by Individual")
-        button_recalc.clicked.connect(self.compare_by_individual)
-        first_layer.addWidget(button_recalc)
-
-        # FILTERBAR --------------------------------------------------------------
-        first_layer.addSpacing(10)
-        first_layer.addWidget(VerticalSeparator())
-        self.filterbar = FilterBar(self, 100)
+        # FILTERBAR: rematches as a filter changes
+        self.filterbar = FilterBar(self, 120)
         self.filterbar.viewpoint_visible(False)
         self.filterbar.individual_visible(False)
         self.filterbar.unidentified_visible(False)
         self.filterbar.favorites_visible(False)
         self.filterbar.no_roi_visible(False)
-
+        for combo in (self.filterbar.region_select, self.filterbar.survey_select,
+                      self.filterbar.station_select, self.filterbar.individual_select):
+            combo.activated.connect(lambda _i: QTimer.singleShot(0, self.filter_neighbors))
         first_layer.addWidget(self.filterbar)
         # get initial filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
 
-        button_filter = QPushButton("Apply Filters")
-        button_filter.clicked.connect(self.filter_neighbors)
-        first_layer.addWidget(button_filter)
-
-        first_layer.addStretch()
-        layout.addLayout(first_layer)
+        button_recalc = QPushButton()
+        button_recalc.setIcon(icon("recalc", "#7A807B"))
+        button_recalc.setToolTip("Recalculate matches")
+        button_recalc.clicked.connect(lambda: self.initialize(clear_cache=True))
+        first_layer.addWidget(button_recalc)
+        layout.addWidget(top)
 
         # IMAGE COMPARISON =====================================================
         image_layout = QHBoxLayout()
+        image_layout.setContentsMargins(20, 12, 20, 0)
+        image_layout.setSpacing(16)
         # QUERY ----------------------------------------------------------------
         query_layout = QVBoxLayout()
-        query_layout.setSpacing(4)
-        query_label = QLabel("Query")
-        query_label.setStyleSheet("font-size: 18px;")
-        query_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        query_layout.addWidget(query_label)
-        # Options
+        query_layout.setSpacing(6)
         query_options = QHBoxLayout()
-        query_options.setContentsMargins(0, 0, 0, 0)
-        query_options.setSpacing(6)
-        query_options.addStretch()
-        # # Query Number
-
-        # Query Selector for selecting the current query image within a sequence
-        self.query_selector = SequenceSelector("Query Image:")
-        query_options.addWidget(self.query_selector)
-        self.query_selector.button_previous.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query - 1))
-        self.query_selector.button_next.clicked.connect(lambda: self.change_query(self.QueryContainer.current_query + 1))
-    
-        # Sequence Selector for selecting the current sequence within a set of sequences
-        self.sequence_selector = SequenceSelector("Sequence:")
+        query_options.setSpacing(10)
+        query_options.addWidget(label("QUERY", "eyebrow"))
+        self.query_name = QLabel("")
+        self.query_name.setStyleSheet("font-weight: 600;")
+        self.query_name.setMinimumWidth(40)
+        query_options.addWidget(self.query_name, 1)
+        self.query_status = label("Unidentified", "pill-warn")
+        query_options.addWidget(self.query_status)
+        # Sequence Selector for the query image within its sequence, A D
+        self.sequence_selector = CounterNav("Sequence")
+        self.sequence_selector.button_previous.setToolTip("Previous image in sequence (A)")
+        self.sequence_selector.button_next.setToolTip("Next image in sequence (D)")
         self.sequence_selector.button_previous.clicked.connect(lambda: self.change_query_in_sequence(self.QueryContainer.current_query_sn - 1))
         self.sequence_selector.button_next.clicked.connect(lambda: self.change_query_in_sequence(self.QueryContainer.current_query_sn + 1))
         query_options.addWidget(self.sequence_selector)
-
-        query_options.addStretch()
-        query_options_widget = QWidget()
-        query_options_widget.setContentsMargins(0, 0, 0, 0)
-        query_options_widget.setLayout(query_options)
-        query_layout.addWidget(query_options_widget)
-        # Query Image
+        query_layout.addLayout(query_options)
+        # Query Image, with its toolbar floating over it
         self.query_image = MediaWidget()
-        self.query_image.setStyleSheet("border: 1px solid black;")
+        self.query_image.setMinimumHeight(300)
+        self.query_image.setStyleSheet(f"background: {IMAGE_WELL};")
         query_layout.addWidget(self.query_image, 1)
-        # Query Image Tools
         self.query_image_bar = ImageAdjustBar(self, self.query_image, 'query')
-        query_layout.addWidget(self.query_image_bar)
 
         # MetaData
         self.query_info = QTableWidget()
         self._set_table(self.query_info)
-        query_layout.addWidget(self.query_info, 1)
-        image_layout.addLayout(query_layout)
-
-        # MIDDLE COLUMN --------------------------------------------------------
-        middle_column = QVBoxLayout()
-        middle_column.addStretch()
-
-        self.match_counter = QLabel("/9")
-        middle_column.addWidget(self.match_counter, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        self.button_match = QPushButton("Match")
-        self.button_match.pressed.connect(self.press_match_button)
-        self.button_match.setCheckable(True)
-        self.button_match.setChecked(False)
-        self.button_match.setFixedSize(50, 50)
-        middle_column.addWidget(self.button_match,
-                                alignment=Qt.AlignmentFlag.AlignCenter)
-        middle_column.addStretch()
-        image_layout.addLayout(middle_column)
+        query_layout.addWidget(self.query_info)
+        image_layout.addLayout(query_layout, 1)
 
         # MATCH ----------------------------------------------------------------
         match_layout = QVBoxLayout()
-        match_layout.setSpacing(4)
-        match_label = QLabel("Match")
-        match_label.setStyleSheet("font-size: 18px;")
-        match_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        match_layout.addWidget(match_label)
-        # OptionsVIEWPOINT_DICT
+        match_layout.setSpacing(6)
         match_options = QHBoxLayout()
-        match_options.setContentsMargins(0, 0, 0, 0)
-        match_options.setSpacing(6)
-        match_options.addStretch()
-
-        # Viewpoint Toggle
-        self.button_viewpoint = ThreePointSlider(initial=1)
-        self.button_viewpoint.state_changed.connect(self.toggle_viewpoint)
-        match_options.addWidget(self.button_viewpoint)
-        match_options.addSpacing(20)
-
-        # # Match Number
-        self.match_selector = SequenceSelector("Match Image:")
+        match_options.setSpacing(10)
+        # # Match Number, left/right arrows
+        self.match_selector = CounterNav("CANDIDATE", buttons=False)
+        self.match_selector.label.setStyleSheet("color: palette(placeholder-text); font-size: 11px; font-weight: 600;")
         self.match_selector.button_previous.clicked.connect(lambda: self.change_match(self.QueryContainer.current_match - 1))
         self.match_selector.button_next.clicked.connect(lambda: self.change_match(self.QueryContainer.current_match + 1))
         match_options.addWidget(self.match_selector)
-
-        # Similarity Label
-        self.match_distance = QLabel("Similarity: ")
-        self.match_distance.setFixedHeight(25)
-        self.match_distance.setStyleSheet("border: 1px solid black;")
-        match_options.addWidget(self.match_distance)
-
-        # Toggle match favorites button
-        self.button_match_favorites = QPushButton("Show ♥")
-        self.button_match_favorites.setCheckable(True)
-        self.button_match_favorites.setChecked(False)
-        self.button_match_favorites.clicked.connect(self.toggle_match_favorites_button)
-        match_options.addWidget(self.button_match_favorites)
-
+        self.match_name = label("", "pill-ok")
+        match_options.addWidget(self.match_name)
         match_options.addStretch()
-        match_options_widget = QWidget()
-        match_options_widget.setContentsMargins(0, 0, 0, 0)
-        match_options_widget.setLayout(match_options)
-        match_layout.addWidget(match_options_widget)
+        # Similarity
+        self.similarity_bar = QProgressBar()
+        self.similarity_bar.setRange(0, 100)
+        self.similarity_bar.setTextVisible(False)
+        self.similarity_bar.setFixedSize(110, 8)
+        self.similarity_bar.setStyleSheet(f"QProgressBar {{ border: 0px; background: palette(midlight); border-radius: 4px; }}"
+                                          f"QProgressBar::chunk {{ background: {ACCENT}; border-radius: 4px; }}")
+        match_options.addWidget(self.similarity_bar)
+        self.match_distance = QLabel("Similarity: ")
+        self.match_distance.setStyleSheet("font-weight: 600;")
+        match_options.addWidget(self.match_distance)
+        match_layout.addLayout(match_options)
 
-        options_row_height = max(query_options_widget.sizeHint().height(), match_options_widget.sizeHint().height())
-        query_options_widget.setFixedHeight(options_row_height)
-        match_options_widget.setFixedHeight(options_row_height)
-
-        # Match Image
+        # Match Image, with its toolbar floating over it
         self.match_image = MediaWidget()
-        self.match_image.setStyleSheet("border: 1px solid black;")
+        self.match_image.setMinimumHeight(300)
+        self.match_image.setStyleSheet(f"background: {IMAGE_WELL};")
         match_layout.addWidget(self.match_image, 1)
-        # Match Image Tools
         self.match_image_bar = ImageAdjustBar(self, self.match_image, 'match')
-        match_layout.addWidget(self.match_image_bar)
 
         # MetaData
         self.match_info = QTableWidget()
         self._set_table(self.match_info)
-        match_layout.addWidget(self.match_info, 1)
-        image_layout.addLayout(match_layout)
+        match_layout.addWidget(self.match_info)
+        image_layout.addLayout(match_layout, 1)
         # Add image block to layout
-        layout.addLayout(image_layout)
+        layout.addLayout(image_layout, 1)
 
-        # BOTTOM LAYER =========================================================
-        # PAIRX DEACTIVATED
-        # Buttons
-        # bottom_layer = QHBoxLayout()
-        # button_visualize = QPushButton("Visualize Match")
-        # button_visualize.pressed.connect(self.press_visualize_button)
-        # bottom_layer.addWidget(button_visualize)
-        # layout.addLayout(bottom_layer)
+        # RANKED CANDIDATES ====================================================
+        strip_header = QHBoxLayout()
+        strip_header.setContentsMargins(20, 10, 20, 4)
+        strip_header.setSpacing(12)
+        strip_title = QLabel("Ranked candidates")
+        strip_title.setStyleSheet("font-weight: 600;")
+        strip_header.addWidget(strip_title)
+        strip_header.addWidget(label("← → to browse", "muted"))
+        self.match_counter = label("", "muted")
+        strip_header.addWidget(self.match_counter)
+        strip_header.addStretch()
+        # Toggle match favorites button
+        self.button_match_favorites = QPushButton("Show ♥")
+        self.button_match_favorites.setCheckable(True)
+        self.button_match_favorites.setChecked(False)
+        self.button_match_favorites.setToolTip("Show the query's favorite candidates instead of its nearest neighbors")
+        self.button_match_favorites.clicked.connect(self.toggle_match_favorites_button)
+        strip_header.addWidget(self.button_match_favorites)
+        layout.addLayout(strip_header)
+        self.candidates = CandidateStrip()
+        self.candidates.candidate_clicked.connect(self.change_match)
+        strip_box = QHBoxLayout()
+        strip_box.setContentsMargins(20, 0, 20, 0)
+        strip_box.addWidget(self.candidates)
+        layout.addLayout(strip_box)
+
+        # DECISION BAR =========================================================
+        bottom = QFrame()
+        bottom.setObjectName("DecisionBar")
+        bottom_layer = QGridLayout(bottom)
+        bottom_layer.setContentsMargins(20, 12, 20, 12)
+        hints = QHBoxLayout()
+        hints.setSpacing(12)
+        for keys, what in (("← →", "candidate"), ("↑ ↓", "query"), ("A D", "sequence"), ("L R V", "viewpoint")):
+            hint = QHBoxLayout()
+            hint.setSpacing(4)
+            kbd = QLabel(keys)
+            kbd.setObjectName("Kbd")
+            kbd.setFixedHeight(22)
+            hint.addWidget(kbd, 0, Qt.AlignmentFlag.AlignVCenter)
+            hint.addWidget(label(what, "muted"))
+            hints.addLayout(hint)
+        hints.addStretch()
+        self.button_unmatch = QPushButton("Unmatch (U)")
+        self.button_unmatch.setMinimumHeight(44)
+        self.button_unmatch.clicked.connect(self.unmatch)
+        hints.addWidget(self.button_unmatch)
+        bottom_layer.addLayout(hints, 0, 0)
+        # Match: names a new individual when neither side has one
+        self.button_match = QPushButton("Match (M)")
+        self.button_match.clicked.connect(self.press_match_button)
+        self.button_match.setCheckable(True)
+        self.button_match.setChecked(False)
+        self.button_match.setMinimumSize(220, 48)
+        set_variant(self.button_match, "primary")
+        bottom_layer.addWidget(self.button_match, 0, 1)
+        bottom_layer.addWidget(QWidget(), 0, 2)
+        # Match stays centered between equal side columns
+        bottom_layer.setColumnStretch(0, 1)
+        bottom_layer.setColumnStretch(2, 1)
+        layout.addWidget(bottom)
         self.setLayout(layout)
 
         # remove focus from buttons to keep keyboard shortcuts working
@@ -348,6 +385,10 @@ class DisplayCompare(UsesProject, QWidget):
         # Disable individual select until feature is implemented on QC
         self.k = self.cfg.KNN  # default knn
         self.compare_type = 'default'
+        self._sync_mode()
+        # thumbnails and candidates are looked up again, rois may have changed
+        self._roi_thumbnails = None
+        self._candidate_key = None
         # show favorite toggle and reset its state
         self.button_match_favorites.setVisible(True)
         self.button_match_favorites.setChecked(False)
@@ -472,6 +513,7 @@ class DisplayCompare(UsesProject, QWidget):
 
         if not fetch_individual(self.mpDB).empty:
             self.compare_type = 'qc'
+            self._sync_mode()
             self.button_match_favorites.setVisible(False)  # hide favorite toggle
             self._teardown_query_container()
             self.QueryContainer = QC_QueryContainer(self)
@@ -493,6 +535,7 @@ class DisplayCompare(UsesProject, QWidget):
         Does not require a cache
         """
         self.compare_type = 'manual'
+        self._sync_mode()
         self.button_match_favorites.setVisible(False)  # hide favorite toggle
         self.filterbar.individual_visible(False)
         self._teardown_query_container()
@@ -503,6 +546,28 @@ class DisplayCompare(UsesProject, QWidget):
             self.change_query(0)
         else:
             self.notify("No data to compare within filter.")
+
+    def change_mode(self, index):
+        """Switch between ranked candidates and QC by individual from the Mode dropdown"""
+        mode = {v: k for k, v in self.MODES.items()}.get(index)
+        if mode == self.compare_type:
+            return
+        if mode == 'default':
+            self.initialize()
+        elif mode == 'qc':
+            self.compare_by_individual()
+        else:
+            # manual compares the rois ticked in the media view, it can't be entered from here
+            self._sync_mode()
+
+    def _sync_mode(self):
+        """Show the current comparison type in the Mode dropdown"""
+        select = getattr(self, "mode_select", None)
+        if select is None:
+            return
+        select.blockSignals(True)
+        select.setCurrentIndex(self.MODES.get(self.compare_type, 0))
+        select.blockSignals(False)
 
     def toggle_match_favorites_button(self):
         """
@@ -566,10 +631,17 @@ class DisplayCompare(UsesProject, QWidget):
         else:
             self.button_match.setChecked(False)
 
+        name = (self.QueryContainer.get_info(self.QueryContainer.current_match_rid, 'name')
+                or self.QueryContainer.get_info(self.QueryContainer.current_query_rid, 'name'))
+        name = name if isinstance(name, str) and name else None
         if self.button_match.isChecked():
-            self.button_match.setStyleSheet(self.MATCH_STYLE)
+            # already the same individual, pressing again unmatches
+            self.button_match.setText(f"Matched to {name}" if name else "Matched")
+            self.button_match.setStyleSheet(self.MATCHED_STYLE)
         else:
+            self.button_match.setText(f"Match to {name} (M)" if name else "Match as new individual (M)")
             self.button_match.setStyleSheet("")
+        self.button_unmatch.setEnabled(self.button_match.isChecked())
 
     def confirm_match(self):
         """
@@ -648,6 +720,10 @@ class DisplayCompare(UsesProject, QWidget):
         # update text
         self.query_selector.set_total(self.QueryContainer.n_queries)
         self.query_selector.set_current_number(self.QueryContainer.current_query)
+        n_queries = self.QueryContainer.n_queries
+        if isinstance(n_queries, int):
+            self.query_progress.setRange(0, max(1, n_queries))
+            self.query_progress.setValue(self.QueryContainer.current_query + 1)
 
         self.sequence_selector.set_total(len(self.QueryContainer.current_query_rois))
         self.sequence_selector.set_current_number(self.QueryContainer.current_query_sn)
@@ -692,6 +768,11 @@ class DisplayCompare(UsesProject, QWidget):
                               bbox=self.QueryContainer.get_info(self.QueryContainer.current_query_rid, 'bbox'), crop=True)
         metadata = self.QueryContainer.get_info(self.QueryContainer.current_query_rid, "metadata")
         self.format_metadata(self.query_info, metadata)
+        self.query_name.setText(self.display_path(self.QueryContainer.current_query_rid, metadata))
+        self.query_name.setToolTip(str(metadata.get('Filepath', '')))
+        name = metadata.get('Name')
+        self.query_status.setText(name if name else "Unidentified")
+        set_role(self.query_status, "pill-ok" if name else "pill-warn")
         self.toggle_match_button()
         self.toggle_query_favorite()
 
@@ -703,14 +784,22 @@ class DisplayCompare(UsesProject, QWidget):
         # missing embedding (None/NaN) or no match (inf) has no similarity to show
         if distance is None or not math.isfinite(distance):
             self.match_distance.setText("Similarity: N/A")
+            self.similarity_bar.setValue(0)
         else:
             self.match_distance.setText(f"Similarity: {1 - distance:.2f}")
+            self.similarity_bar.setValue(max(0, min(100, round(100 * (1 - distance)))))
 
         self.match_image.load(self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "filepath"),
                               frame=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "frame"),
                               bbox=self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "bbox"), crop=True)
         metadata = self.QueryContainer.get_info(self.QueryContainer.current_match_rid, "metadata")
         self.format_metadata(self.match_info, metadata)
+        name = metadata.get('Name')
+        self.match_name.setText(name if name else "Unnamed")
+        set_role(self.match_name, "pill-ok" if name else "pill-muted")
+        self.match_selector.set_total(len(self.QueryContainer.current_match_rois))
+        self.match_selector.set_current_number(self.QueryContainer.current_match)
+        self.update_candidates()
         self.toggle_match_button()
         self.toggle_match_favorite()
 
@@ -737,6 +826,45 @@ class DisplayCompare(UsesProject, QWidget):
         self.load_query()
         self.load_match()
 
+    def display_path(self, rid, metadata):
+        """
+        The roi's file as shown above its image: the path within its station folder
+
+        relative_path is relative to the imported folder, which often starts with
+        the station's folder; that is dropped since the station is in the metadata.
+        """
+        relative = self.QueryContainer.get_info(rid, "relative_path")
+        if not isinstance(relative, str) or not relative:
+            return os.path.basename(str(metadata.get('Filepath', '')))
+        parts = Path(relative.replace("\\", "/")).parts
+        if len(parts) > 1 and parts[0] == str(metadata.get('Station', '')):
+            parts = parts[1:]
+        return "/".join(parts)
+
+    def update_candidates(self):
+        """Rebuild the candidate strip when the match list changes, then mark the shown candidate"""
+        rois = list(self.QueryContainer.current_match_rois)
+        key = (self.compare_type, self.QueryContainer.current_query_rid, tuple(rois))
+        if key != getattr(self, "_candidate_key", None):
+            self._candidate_key = key
+            if not hasattr(self, "_roi_thumbnails") or self._roi_thumbnails is None:
+                thumbnails = fetch_roi_thumbnails(self.mpDB)
+                self._roi_thumbnails = dict(zip(thumbnails['id'], thumbnails['thumbnail_path']))
+            ranked = {}
+            match_object = getattr(self.QueryContainer, "current_match_object", None)
+            if self.compare_type == 'default' and match_object is not None:
+                ranked = dict(match_object.get_ranked_matches())
+            candidates = []
+            for rid in rois:
+                path = self._roi_thumbnails.get(rid)
+                path = str(self.cfg.THUMBNAIL_DIR / path) if path else None
+                name = self.QueryContainer.get_info(rid, 'name')
+                distance = ranked.get(rid)
+                similarity = f"{1 - distance:.2f}" if distance is not None and math.isfinite(distance) else ""
+                candidates.append((path, name if isinstance(name, str) else None, similarity))
+            self.candidates.set_candidates(candidates)
+        self.candidates.set_current(self.QueryContainer.current_match)
+
     # METADATA TABLE
     def _set_table(self, table):
         table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -756,7 +884,8 @@ class DisplayCompare(UsesProject, QWidget):
         # label columns are fixed, the two value columns (1 and 3) stretch to share the rest equally
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
-        table.setMaximumHeight(250)
+        table.setMaximumHeight(200)
+        table.setMinimumHeight(170)
 
         table.setColumnWidth(0, 120)
         table.setColumnWidth(2, 120)
@@ -764,13 +893,13 @@ class DisplayCompare(UsesProject, QWidget):
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.setStyleSheet("""
             QTableWidget {
-                border: 1px solid;
-                border-radius: 4px;
-                font-size: 15px;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                border: 1px solid palette(mid);
+                border-radius: 10px;
+                font-size: 13px;
+                background: palette(base);
             }
             QTableWidget::item {
-                padding: 6px;
+                padding: 2px 6px;
             }
         """)
 

@@ -284,14 +284,14 @@ class SliderWithLabel(QWidget):
 
         layout = QHBoxLayout(self)
         # text label for the slider value
+        layout.setContentsMargins(0, 0, 0, 0)
         self.label = QLabel(label + ": ")
-        self.label.setStyleSheet("border: 1px solid black;")
         layout.addWidget(self.label)
 
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(min_val, max_val)
         self.slider.setValue(initial)
-        self.slider.setFixedWidth(50)
+        self.slider.setFixedWidth(110)
         self.slider.valueChanged.connect(self.update_text)
         layout.addWidget(self.slider)
         # manual input for the slider value
@@ -381,6 +381,75 @@ class SegmentedControl(QWidget):
 
     def count(self):
         return len(self.buttons)
+
+
+class ViewpointToggle(SegmentedControl):
+    """
+    Left / Any / Right toggle for the compare view
+
+    Same interface as ThreePointSlider (set_index, index, state_changed), which
+    it replaces.
+    """
+    state_changed = pyqtSignal(int)
+
+    def __init__(self, initial=1, parent=None):
+        super().__init__(["Left", "Any", "Right"], parent)
+        self._index = max(0, min(2, int(initial)))
+        self._sync()
+        self.currentIndexChanged.connect(self.state_changed.emit)
+        for button in self.buttons:
+            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+    def set_index(self, idx):
+        self.setCurrentIndex(max(0, min(2, int(idx))))
+
+    def index(self):
+        return self.currentIndex()
+
+
+class CounterNav(QWidget):
+    """
+    'Prefix N of M' with previous/next buttons
+
+    Same interface as SequenceSelector (button_previous, button_next,
+    set_current_number, set_total), as a compact label instead of a text field.
+    """
+    def __init__(self, prefix, buttons=True, parent=None):
+        super().__init__(parent)
+        self.prefix = prefix
+        self.current = 1
+        self.total_n = 0
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        self.button_previous = QPushButton("‹")
+        self.button_next = QPushButton("›")
+        for button in (self.button_previous, self.button_next):
+            button.setFixedSize(30, 30)
+            button.setStyleSheet("padding: 0px; font-size: 16px;")
+            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.label = QLabel("")
+        if buttons:
+            layout.addWidget(self.button_previous)
+        layout.addWidget(self.label)
+        if buttons:
+            layout.addWidget(self.button_next)
+        else:
+            self.button_previous.setVisible(False)
+            self.button_next.setVisible(False)
+        self._update()
+
+    def _update(self):
+        prefix = f"{self.prefix} " if self.prefix else ""
+        self.label.setText(f"{prefix}<b>{self.current}</b> of {self.total_n}")
+
+    def set_current_number(self, number):
+        self.current = number + 1
+        self._update()
+
+    def set_total(self, n):
+        self.total_n = n
+        self._update()
 
 
 class NoHoverDelegate(QStyledItemDelegate):

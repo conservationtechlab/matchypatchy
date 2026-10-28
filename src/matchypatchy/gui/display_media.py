@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 import pandas as pd
 from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBoxLayout,
-                             QHBoxLayout, QLabel, QDialog, QFrame, QLineEdit, QCheckBox, QComboBox)
+                             QHBoxLayout, QLabel, QDialog, QFrame, QLineEdit, QComboBox)
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 
 from matchypatchy.database.media import (IMAGE_EXT, fetch_individual, delete_media, delete_rois, save_edits,

@@ -44,8 +44,10 @@ class NavButton(QPushButton):
         self.badge = QLabel("")
         self.badge.setStyleSheet(f"background: {SIDEBAR_BADGE}; color: #E9ECE9; border-radius: 9px;"
                                  "padding: 1px 8px; font-size: 12px;")
+        self.badge.setFixedHeight(20)
+        self.badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.badge.setVisible(False)
-        layout.addWidget(self.badge)
+        layout.addWidget(self.badge, 0, Qt.AlignmentFlag.AlignVCenter)
 
     def set_badge(self, text):
         """Show text in the badge, hide it for empty text or zero"""

@@ -12,7 +12,7 @@ from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.database.location import fetch_stations, fetch_cameras
 from matchypatchy.database.media import fetch_individual
 from matchypatchy.project import UsesProject
-from matchypatchy.gui.widgets.styles import WARN_SOFT, WARN_INK
+from matchypatchy.gui.widgets.styles import MISSING_HIGHLIGHT
 
 
 class MediaTable(UsesProject, QAbstractTableModel):
@@ -185,11 +185,9 @@ class MediaTable(UsesProject, QAbstractTableModel):
             if role == Qt.ItemDataRole.DisplayRole:
                 value = str(value) if not pd.isna(value) else 'None'
                 return self.VIEWPOINTS.get(value, value)
-            if pd.isna(value):
-                if role == Qt.ItemDataRole.BackgroundRole:
-                    return QColor(WARN_SOFT)
-                if role == Qt.ItemDataRole.ForegroundRole:
-                    return QColor(WARN_INK)
+            # translucent amber over the row color, so the text stays readable in both themes
+            if pd.isna(value) and role == Qt.ItemDataRole.BackgroundRole:
+                return QColor(MISSING_HIGHLIGHT)
 
         # individual
         if self._columns[col] == "individual_id":
