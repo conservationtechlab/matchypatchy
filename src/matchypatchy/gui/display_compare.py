@@ -722,10 +722,22 @@ class DisplayCompare(UsesProject, QWidget):
         self.current_viewpoint = selected_viewpoint
         if not self.has_query():
             return
+
         viewpoints_available = self.QueryContainer.toggle_viewpoint(self.current_viewpoint)
+
         if not viewpoints_available:
-            self.warn(prompt="No images available for this viewpoint. Showing all available images.")
-            self.button_viewpoint.set_index(1)
+            #self.warn(prompt="No images available for this viewpoint. Showing all available images.")
+            if selected_viewpoint != self.current_viewpoint:
+                # only one side in this sequence: ignore the toggle, put the slider back
+                self.button_viewpoint.set_index(self.current_viewpoint, emit=False)
+                return
+            # new query lacks the side that was selected (reset from load_query): show Any
+            self.QueryContainer.toggle_viewpoint(1)
+            selected_viewpoint = 1
+            self.button_viewpoint.set_index(1, emit=False)
+
+        
+        self.current_viewpoint = selected_viewpoint
 
         # update gui counts
         self.sequence_selector.set_total(len(self.QueryContainer.current_query_rois))

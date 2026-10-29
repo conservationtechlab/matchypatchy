@@ -636,18 +636,43 @@ class QueryContainer(BaseQueryContainer):
 
     # VIEWPOINT ----------------------------------------------------------------
     def toggle_viewpoint(self, selected_viewpoint):
-        """Flip between viewpoints in paired images within a sequence"""
+        """
+        Switch the query and match stack to the selected side, staying on the match
+        sequence being compared. Does nothing and returns False if the query
+        sequence or the current match sequence has only the other side.
+        """
+        value = toggle_viewpoint_value(selected_viewpoint)
+        current = self._match_candidate(self.current_match_rid)
+        if selected_viewpoint != 1:
+            sides = {self._get_roi_field(rid, 'viewpoint')
+                     for rid, _ in self.current_match_object.og_ranked_matches
+                     if self._match_candidate(rid) == current}
+            if value not in sides:
+                return False
+        if not self.current_match_object.show_viewpoint(selected_viewpoint):
+            return False
         self.selected_viewpoint = selected_viewpoint
 
-        # filter query and matches by selected viewpoint
-        viewpoint_available = self.current_match_object.show_viewpoint(self.selected_viewpoint)
-
-        # update matches and query rois based on new viewpoint selection
         self.current_query_rois = self.current_match_object.get_ranked_query_rids()
         self.set_within_query_sequence(0)
         self.update_matches()
+        # stay on the sequence being compared, now showing the selected side
+        for i, rid in enumerate(self.current_match_rois):
+            if self._match_candidate(rid) == current:
+                self.set_match(i)
+                break
+        return True
 
-        return viewpoint_available
+    def _match_candidate(self, rid):
+        """
+        Sequence a match roi belongs to, or the roi itself without one.
+
+        Called by toggle_viewpoint to find the rois of the match sequence on screen.
+        Wraps _candidate_key with a single-roi lookup, since toggle_viewpoint has no
+        seq_ids dict and works for both MatchObject and FavoriteMatchObject.
+        """
+        seq = self._get_roi_field(rid, 'sequence_id')
+        return ('roi', rid) if seq is None or pd.isna(seq) else seq
 
     # FAVORITES ----------------------------------------------------------------
     def set_match_favorites(self, active):
