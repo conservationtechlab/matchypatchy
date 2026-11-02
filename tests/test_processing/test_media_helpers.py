@@ -76,7 +76,7 @@ class TestEditObject:
         assert obj.new_value == "F"
 
     def test_supports_none_values(self):
-        obj = EditObject(rid=0, mid=0, reference="age", previous_value=None, new_value=None)
+        obj = EditObject(rid=0, mid=0, reference="name", previous_value=None, new_value=None)
         assert obj.previous_value is None
         assert obj.new_value is None
 
@@ -227,7 +227,7 @@ class TestFetchIndividual:
     def test_has_expected_columns(self, populated_db):
         db, _, ids = populated_db
         result = fetch_individual(db)
-        for col in ("name", "sex", "age"):
+        for col in ("name", "sex"):
             assert col in result.columns
 
     def test_returns_one_individual(self, populated_db):
@@ -356,3 +356,12 @@ class TestSequenceHelpers:
         assert 10 in d[1]
         assert 11 in d[1]
         assert 12 in d[2]
+
+    def test_unassigned_rois_map_to_empty_list(self):
+        """ROIs without an individual are not grouped; the None key maps to an empty list"""
+        # fetch_roi_media returns nulls as None
+        roi_media = self._build_roi_media(ind_id=None).replace({float("nan"): None})
+        d = individual_roi_dict(roi_media)
+        assert list(d) == [None, 2]
+        assert d[None] == []
+        assert d[2] == [12]

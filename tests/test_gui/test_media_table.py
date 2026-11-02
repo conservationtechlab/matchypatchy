@@ -4,6 +4,9 @@ Unit tests for matchypatchy.gui.media_table.MediaTable
 Tests focus on pure-Python logic methods that do not require a running Qt
 display server. Qt widgets are stubbed out by conftest.py.
 """
+from pathlib import Path
+from types import SimpleNamespace
+
 import pandas as pd
 import pytest
 from unittest.mock import MagicMock, patch
@@ -30,9 +33,8 @@ def _make_media_table():
     from matchypatchy.gui.media_table import MediaTable
 
     parent = MagicMock()
-    parent.cfg = MagicMock()
-    parent.cfg.THUMBNAIL_DIR = "/tmp/thumbs"
-    parent.mpDB = MagicMock()
+    parent.project = SimpleNamespace(db=MagicMock(), cfg=MagicMock(THUMBNAIL_DIR=Path("/tmp/thumbs")),
+                                     data_changed=MagicMock())
 
     with patch("matchypatchy.gui.media_table.load_model",
                return_value={"None": "None", "0": "Left", "1": "Right"}):
@@ -134,16 +136,19 @@ class TestSort:
         mt = _make_media_table()
         from PyQt6.QtCore import Qt
         mt._data_filtered = _sample_df()
+        # station_id sorts by displayed station name, which is opposite to id order here
+        mt.STATIONS = pd.DataFrame({"name": ["Beta", "Alpha"]}, index=[1, 2])
         # Sort by station_id (col 4) ascending
         mt.sort(4, Qt.SortOrder.AscendingOrder)
-        assert list(mt._data_filtered["station_id"]) == [1, 1, 2]
+        assert list(mt._data_filtered["station_id"]) == [2, 1, 1]
 
     def test_sort_descending_by_column(self):
         mt = _make_media_table()
         from PyQt6.QtCore import Qt
         mt._data_filtered = _sample_df()
+        mt.STATIONS = pd.DataFrame({"name": ["Beta", "Alpha"]}, index=[1, 2])
         mt.sort(4, Qt.SortOrder.DescendingOrder)
-        assert list(mt._data_filtered["station_id"]) == [2, 1, 1]
+        assert list(mt._data_filtered["station_id"]) == [1, 1, 2]
 
     def test_sort_skips_thumbnail_column(self):
         mt = _make_media_table()
@@ -152,6 +157,22 @@ class TestSort:
         original_order = list(mt._data_filtered["filepath"])
         mt.sort(1, Qt.SortOrder.AscendingOrder)  # column 1 = thumbnail_path
         assert list(mt._data_filtered["filepath"]) == original_order
+
+    def test_cleared_sort_restores_arrival_order(self):
+        """Clicking a header a third time clears the sort, which the view sends as column -1"""
+        mt = _make_media_table()
+        from PyQt6.QtCore import Qt
+        with patch("matchypatchy.gui.media_table.fetch_individual"), \
+                patch("matchypatchy.gui.media_table.fetch_stations"), \
+                patch("matchypatchy.gui.media_table.fetch_cameras"):
+            mt.receiveData(_sample_df())
+        original_order = list(mt._data_filtered["filepath"])
+        mt.STATIONS = pd.DataFrame({"name": ["Beta", "Alpha"]}, index=[1, 2])
+        mt.sort(4, Qt.SortOrder.AscendingOrder)
+        assert list(mt._data_filtered["filepath"]) != original_order
+        mt.sort(-1, Qt.SortOrder.AscendingOrder)
+        assert list(mt._data_filtered["filepath"]) == original_order
+        assert list(mt._data_filtered.index) == [0, 1, 2]
 
     def test_sort_empty_data_is_noop(self):
         mt = _make_media_table()
@@ -177,9 +198,10 @@ class TestReceiveData:
                     mt.receiveData(df)
         assert len(mt._data_filtered) == 3
 
-    def test_receive_data_with_selected_rows(self):
+    def test_receive_data_with_selected_ids(self):
         mt = _make_media_table()
         df = _sample_df()
+        df["id"] = [100, 101, 102]
         df["select"] = 0
         with patch("matchypatchy.gui.media_table.fetch_individual",
                    return_value=pd.DataFrame(columns=["id", "name"])):
@@ -187,10 +209,38 @@ class TestReceiveData:
                        return_value=pd.DataFrame(columns=["id", "name"])):
                 with patch("matchypatchy.gui.media_table.fetch_cameras",
                            return_value=pd.DataFrame(columns=["id", "name"])):
-                    mt.receiveData(df, selected_rows=[0, 2])
+                    mt.receiveData(df, selected_ids=[100, 102])
         assert mt._data_filtered.loc[0, "select"] == 1
         assert mt._data_filtered.loc[1, "select"] == 0
         assert mt._data_filtered.loc[2, "select"] == 1
+
+    def _receive(self, mt, df, ids):
+        with patch("matchypatchy.gui.media_table.fetch_individual",
+                   return_value=pd.DataFrame(columns=["id", "name"])):
+            with patch("matchypatchy.gui.media_table.fetch_stations",
+                       return_value=pd.DataFrame(columns=["id", "name"])):
+                with patch("matchypatchy.gui.media_table.fetch_cameras",
+                           return_value=pd.DataFrame(columns=["id", "name"])):
+                    mt.receiveData(df, selected_ids=ids)
+
+    def test_selection_follows_ids_when_rows_reorder(self):
+        """A tick on id 102 stays on 102 after the data comes back in another order"""
+        mt = _make_media_table()
+        df = _sample_df()
+        df["id"] = [102, 100, 101]   # re-filtered/unsorted order differs from the view
+        df["select"] = 0
+        self._receive(mt, df, [102])
+        assert mt.selectedIds() == [102]
+        assert mt._data_filtered.loc[0, "select"] == 1
+
+    def test_selected_ids_missing_after_filter_is_fine(self):
+        """Ticked rows filtered out of the data are dropped, not a KeyError"""
+        mt = _make_media_table()
+        df = _sample_df().iloc[:1].copy()
+        df["id"] = [100]
+        df["select"] = 0
+        self._receive(mt, df, [100, 105])
+        assert mt.selectedIds() == [100]
 
     def test_receive_data_updates_headers(self):
         mt = _make_media_table()
@@ -227,3 +277,82 @@ class TestUpdateHeaderDict:
         original_columns = list(mt._columns)
         mt.updateHeaderDict(None)
         assert mt._columns == original_columns
+
+
+# ---------------------------------------------------------------------------
+# TestSexColumn
+# ---------------------------------------------------------------------------
+
+def _index(row, col):
+    """Stand-in for a QModelIndex, QtCore is stubbed"""
+    index = MagicMock()
+    index.isValid.return_value = True
+    index.row.return_value = row
+    index.column.return_value = col
+    return index
+
+
+class TestSexColumn:
+    def _roi_table(self):
+        mt = _make_media_table()
+        mt.updateHeaderDict({0: ("select", "Select"),
+                             1: ("individual_id", "Individual"),
+                             2: ("sex", "Sex")})
+        mt._data_filtered = pd.DataFrame({"select": [0, 0], "id": [10, 11], "media_id": [1, 2],
+                                          "individual_id": [100, None], "sex": ["Male", None]})
+        return mt
+
+    @pytest.mark.parametrize("label", ["Unknown", "None"])
+    def test_unknown_sex_is_stored_as_null(self, label):
+        """Unknown (or a legacy 'None') clears the sex instead of saving the text"""
+        mt = self._roi_table()
+        edits = []
+        mt.user_edit.connect(edits.append)
+        assert mt.setData(_index(0, 2), label)
+        assert edits[0].new_value is None
+        assert pd.isna(mt._data_filtered.at[0, "sex"])
+
+    def test_null_sex_shows_unknown_for_identified_rois(self):
+        from PyQt6.QtCore import Qt
+        mt = self._roi_table()
+        mt._data_filtered.at[0, "sex"] = None
+        assert mt.data(_index(0, 2), Qt.ItemDataRole.DisplayRole) == "Unknown"
+        # unidentified rois have no individual to have a sex
+        assert mt.data(_index(1, 2), Qt.ItemDataRole.DisplayRole) is None
+
+
+class TestThumbnail:
+    MT = "matchypatchy.gui.media_table"
+
+    def test_old_small_thumbnail_is_stretched_and_cached(self):
+        from matchypatchy.gui.media_table import MediaTable
+        with patch(f"{self.MT}.QPixmapCache") as cache, patch(f"{self.MT}.QPixmap") as pixmap_class, \
+                patch(f"{self.MT}.THUMBNAIL_SIZE", 200):
+            cache.find.return_value = None
+            small = pixmap_class.return_value
+            small.isNull.return_value = False
+            small.width.return_value, small.height.return_value = 150, 112
+            result = MediaTable._thumbnail(None, "/thumbs/a.jpg")
+        small.scaled.assert_called_once()
+        assert small.scaled.call_args[0][:2] == (200, 200)
+        assert result is small.scaled.return_value
+        cache.insert.assert_called_once_with("/thumbs/a.jpg", result)
+
+    def test_full_size_thumbnail_is_not_rescaled(self):
+        from matchypatchy.gui.media_table import MediaTable
+        with patch(f"{self.MT}.QPixmapCache") as cache, patch(f"{self.MT}.QPixmap") as pixmap_class, \
+                patch(f"{self.MT}.THUMBNAIL_SIZE", 200):
+            cache.find.return_value = None
+            full = pixmap_class.return_value
+            full.isNull.return_value = False
+            full.width.return_value, full.height.return_value = 200, 150
+            result = MediaTable._thumbnail(None, "/thumbs/b.jpg")
+        full.scaled.assert_not_called()
+        assert result is full
+
+    def test_cached_thumbnail_is_not_read_again(self):
+        from matchypatchy.gui.media_table import MediaTable
+        with patch(f"{self.MT}.QPixmapCache") as cache, patch(f"{self.MT}.QPixmap") as pixmap_class:
+            result = MediaTable._thumbnail(None, "/thumbs/c.jpg")
+        assert result is cache.find.return_value
+        pixmap_class.assert_not_called()

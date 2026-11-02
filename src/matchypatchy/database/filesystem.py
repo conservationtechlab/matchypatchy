@@ -1,5 +1,6 @@
 import os
 import platform
+import re
 import subprocess
 from pathlib import Path
 
@@ -23,6 +24,17 @@ def _is_network_path(path: Path) -> tuple[bool, str]:
         return False, "unknown platform, could not verify"
 
 
+def _is_under(path: Path, mount_point: str) -> bool:
+    """Whether path is mount_point or inside it, matching whole path components
+    so /mnt/data2 is not treated as inside /mnt/data"""
+    return path == Path(mount_point) or Path(mount_point) in path.parents
+
+
+def _unescape_mount(field: str) -> str:
+    """Decode the octal escapes (e.g. "\\040" for a space) used in /proc/mounts"""
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), field)
+
+
 def _check_linux(path: Path) -> tuple[bool, str]:
     """Use /proc/mounts to find the filesystem type of the containing mount."""
     network_fs_types = {"cifs", "smb", "smbfs", "nfs", "nfs4", "afpfs", "fuse.sshfs"}
@@ -32,8 +44,9 @@ def _check_linux(path: Path) -> tuple[bool, str]:
         # Find the longest matching mount point (most specific)
         best_match = None
         for mount in mounts:
-            mount_point, fs_type = mount[1], mount[2]
-            if str(path).startswith(mount_point):
+            # /proc/mounts escapes spaces and other characters as octal, e.g. "\040"
+            mount_point, fs_type = _unescape_mount(mount[1]), mount[2]
+            if _is_under(path, mount_point):
                 if best_match is None or len(mount_point) > len(best_match[0]):
                     best_match = (mount_point, fs_type)
         if best_match and best_match[1].lower() in network_fs_types:
@@ -48,14 +61,20 @@ def _check_macos(path: Path) -> tuple[bool, str]:
     network_fs_types = {"smbfs", "nfs", "afpfs", "webdav"}
     try:
         result = subprocess.run(["mount"], capture_output=True, text=True, timeout=5)
+        # Find the longest matching mount point (most specific), "/" matches every path
+        best_match = None
         for line in result.stdout.splitlines():
             # e.g. "//user@server/share on /Volumes/share (smbfs, ...)"
-            if " on " in line and str(path).startswith(line.split(" on ")[1].split(" (")[0]):
-                fs_type = line.split("(")[1].split(",")[0].strip()
-                if fs_type.lower() in network_fs_types:
-                    return True, fs_type
-                return False, fs_type
-        return False, "unknown"
+            if " on " not in line or " (" not in line:
+                continue
+            mount_point = line.split(" on ", 1)[1].rsplit(" (", 1)[0]
+            fs_type = line.rsplit(" (", 1)[1].split(",")[0].strip(" )")
+            if _is_under(path, mount_point):
+                if best_match is None or len(mount_point) > len(best_match[0]):
+                    best_match = (mount_point, fs_type)
+        if best_match and best_match[1].lower() in network_fs_types:
+            return True, best_match[1]
+        return False, best_match[1] if best_match else "unknown"
     except (subprocess.SubprocessError, OSError, IndexError):
         return False, "could not determine"
 

@@ -1,6 +1,7 @@
 """
 Popup for Importing a Manifest
 """
+import logging
 from pathlib import Path
 import pandas as pd
 
@@ -8,30 +9,33 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QProgressBar,
                              QDialogButtonBox, QLabel)
 from PyQt6.QtCore import Qt
 
-from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.database.location import survey_timezone
 from matchypatchy.gui.widgets.gui_assets import ComboBoxSeparator
 
 from matchypatchy.threads.animl_thread import BuildManifestThread
 from matchypatchy.threads.import_thread import FolderImportThread
+from matchypatchy.project import UsesProject
 
 
-class ImportFolderPopup(QDialog):
+logger = logging.getLogger(__name__)
+
+
+class ImportFolderPopup(UsesProject, QDialog):
     """
     Popup for importing data from a folder.
     """
 
     def __init__(self, parent, directory):
         super().__init__(parent)
-        self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.active_survey = parent.active_survey
-        self.timezone = self.mpDB.select_join("survey", "region", "survey.region_id=region.id",
-                                              columns="region.timezone",
-                                              row_cond=f"survey.id={self.active_survey[0]}")[0][0][0]
+        self.timezone = self._survey_timezone(self.active_survey[0])
         self.directory = Path(directory)
         self.data = pd.DataFrame()
         self.import_thread = None
+        # set when the directory has no images, so the caller can ask for another one
+        self.no_images = False
+        self._closed = False
 
         self.setWindowTitle(f'Importing into "{self.active_survey[1]}"')
         layout = QVBoxLayout()
@@ -76,6 +80,19 @@ class ImportFolderPopup(QDialog):
         # build manifest
         self.build_manifest()
 
+    def _survey_timezone(self, survey_id):
+        """Timezone of the survey's region, None (local time) if it has no region"""
+        return survey_timezone(self.mpDB, survey_id)
+
+    def reject(self):
+        """Cancel: stop a running import and close when it has finished"""
+        if self.import_thread is not None and self.import_thread.isRunning():
+            self.import_thread.requestInterruption()
+            # finished -> accept closes the popup once the thread has stopped
+            return
+        self._closed = True
+        super().reject()
+
     # 1. Run Thread on entry
     def build_manifest(self):
         """Start thread to build manifest from folder"""
@@ -87,17 +104,26 @@ class ImportFolderPopup(QDialog):
 
     # 2. Receive data from thread, check if valid
     def get_manifest(self, manifest):
-        """Receive manifest from thread, proceed or alert no images found"""
+        """Receive manifest from thread, proceed or report no images found"""
+        # the user cancelled while the directory was being searched
+        if self._closed:
+            return
         self.progress_bar.hide()
         self.data = manifest
 
         if not self.data.empty:
             self.get_options()
         else:
-            dialog = AlertPopup(self, "No images found! Choose another directory.", title="Alert")
-            if dialog.exec():
-                self.reject()
-            del dialog
+            # OK closes and asks for another directory, Cancel just closes
+            self.station_label.setText("No images found! Choose another directory.")
+            self.buttonBox.accepted.disconnect(self.import_manifest)
+            self.buttonBox.accepted.connect(self.choose_another_directory)
+            self.buttonBox.show()
+
+    def choose_another_directory(self):
+        """Close and flag the caller to reopen the directory picker"""
+        self.no_images = True
+        self.reject()
 
     # 3. Offer Station Options
     def get_options(self):
@@ -128,10 +154,24 @@ class ImportFolderPopup(QDialog):
         station_level = 0 if self.station.currentIndex() == 0 else self.station.currentIndex() - 1
         camera_level = 0 if self.camera.currentIndex() == 0 else self.camera.currentIndex() - 1
 
-        self.logger.info(f"Adding {len(self.data)} files to Database")
+        logger.info(f"Adding {len(self.data)} files to Database")
 
         self.import_thread = FolderImportThread(self, self.active_survey, self.data, station_level, camera_level)
-        self.rejected.connect(self.import_thread.requestInterruption)
         self.import_thread.progress_update.connect(self.progress_bar.setValue)
+        self.import_thread.import_failed.connect(self.show_import_failed)
         self.import_thread.finished.connect(self.accept)
         self.import_thread.start()
+
+    def show_import_failed(self, message):
+        """Show a fatal import error in the popup instead of closing it"""
+        # QThread.finished still fires when run() returns, keep the popup open
+        self.import_thread.finished.disconnect(self.accept)
+        self.progress_bar.hide()
+        self.station.hide()
+        self.camera.hide()
+        self.camera_label.hide()
+        self.station_label.setText(f"Import failed, some files may have been partially imported. "
+                                   f"View the log for details.\n{message}")
+        self.buttonBox.accepted.disconnect(self.import_manifest)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.setDisabled(False)

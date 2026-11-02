@@ -8,14 +8,15 @@ Display Pages:
     1. DisplayMedia
     2. DisplayCompare
 """
+import logging
 import os
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QFileDialog, QDialog,
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QFileDialog,
                              QMenuBar, QStackedLayout, QMenu)
 from PyQt6.QtGui import QAction, QGuiApplication
-from PyQt6.QtCore import QSettings, QTimer
+from PyQt6.QtCore import Qt, QEvent, QSettings, QTimer
 
 from matchypatchy.gui.display_base import DisplayBase
 from matchypatchy.gui.display_media import DisplayMedia
@@ -30,28 +31,41 @@ from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
 from matchypatchy.gui.dialogs.popup_station import StationPopup
 
 from matchypatchy import __version__
-from matchypatchy.config import mpConfig
-from matchypatchy.database.mpdb import MatchyPatchyDB
+from matchypatchy.project import Project
 from matchypatchy.database.filesystem import _is_network_path
+
+
+logger = logging.getLogger(__name__)
+
+
+# theme choices in the config, System follows the platform's light/dark setting
+THEMES = {"System": Qt.ColorScheme.Unknown,
+          "Light": Qt.ColorScheme.Light,
+          "Dark": Qt.ColorScheme.Dark}
 
 
 class MainWindow(QMainWindow):
     """Main GUI class for the MatchyPatchy application."""
-    def __init__(self, logger):
+
+    THEMES = THEMES  # for ConfigPopup, which can't import this module back
+    _repolishing = False  # set while changeEvent restyles, see there
+    def __init__(self):
         super().__init__()
         # Initialize main window settings and components
         self.settings = QSettings("SDZWA", "MatchyPatchy")
-        # load previous home dir or start fresh
-        home_dir = self.load_home_dir()
-        # set logger
-        self.logger = logger
-        # set up config and create dirs if necessary
-        self.cfg = mpConfig(home_dir)
-        logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
-
-        # set up database
-        self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
-        logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
+        # the platform's own size, used until the user picks one in the config
+        # (-1 when the system font is sized in pixels, then use a common size)
+        self.system_font_size = QApplication.instance().font().pointSize()
+        if self.system_font_size <= 0:
+            self.system_font_size = 10
+        # before the views are built, so they lay out at the saved size
+        self.apply_font_size(self.font_size())
+        self.apply_theme(self.theme())
+        # the open project, kept for the life of the window; views read cfg and db through it
+        self.project = Project()
+        # load previous home dir or start fresh, falling back to a default project
+        # if the saved project or its database cannot be loaded
+        self._startup_project()
 
         # set up main window
         self.setWindowTitle(f"MatchyPatchy v{__version__}")
@@ -73,6 +87,18 @@ class MainWindow(QMainWindow):
         container.setLayout(self.pages)
         self._set_base_view()
         self.setCentralWidget(container)
+        # views show the previous project's data until they reload, which they do on entry
+        self.project.changed.connect(self._set_base_view)
+
+    @property
+    def mpDB(self):
+        """Database of the open project"""
+        return self.project.db
+
+    @property
+    def cfg(self):
+        """Config of the open project"""
+        return self.project.cfg
 
     # MENU BAR -----------------------------------------------------------------
     def _createMenuBar(self):
@@ -128,6 +154,103 @@ class MainWindow(QMainWindow):
         help.addAction(help_about)
         help.addAction(help_readme)
         help.addAction(help_license)
+
+    # FONT SIZE ----------------------------------------------------------------
+    def font_size(self):
+        """
+        Saved default font size in pt, the system's size if never set or unreadable
+
+        Read in __init__ and by ConfigPopup to fill its font size field. Stored in
+        QSettings rather than the project config so it stays the same across projects.
+        Falls back to the system size rather than a fixed one because platforms
+        differ (Windows 9pt, macOS 13pt, where a point is also smaller on screen).
+        """
+        try:
+            return int(self.settings.value("font_size", self.system_font_size))
+        except (TypeError, ValueError):
+            return self.system_font_size
+
+    def apply_font_size(self, size):
+        """
+        Set the app's default font size without saving it
+
+        Called in __init__ with the saved size, and by ConfigPopup to preview a size
+        while it's edited and to put the old size back on Cancel. Kept separate from
+        save_font_size so the preview isn't written until Save. Widgets with a size
+        in their stylesheet keep it.
+        """
+        app = QApplication.instance()
+        font = app.font()
+        font.setPointSize(size)
+        app.setFont(font)
+
+    def save_font_size(self, size):
+        """
+        Apply the default font size and keep it for next time, called by ConfigPopup on Save
+
+        Saving the system's size clears the setting instead, so the app keeps following
+        the system if it changes or the settings move to another platform.
+        """
+        if size == self.system_font_size:
+            self.settings.remove("font_size")
+        else:
+            self.settings.setValue("font_size", size)
+        self.apply_font_size(size)
+
+    # THEME --------------------------------------------------------------------
+    def theme(self):
+        """
+        Saved theme, one of THEMES, "System" if never set or not a known theme
+
+        Read in __init__ and by ConfigPopup to fill its theme field. Stored in
+        QSettings next to the font size, so it's the same across projects.
+        """
+        theme = self.settings.value("theme", "System")
+        return theme if theme in THEMES else "System"
+
+    def apply_theme(self, theme):
+        """
+        Switch the app to a light or dark palette, or back to the system's, without saving it
+
+        Called in __init__ with the saved theme, and by ConfigPopup to preview a theme
+        while it's chosen and to put the old one back on Cancel. Kept separate from
+        save_theme so the preview isn't written until Save. Platforms that can't
+        switch schemes keep the system's.
+        """
+        QApplication.instance().styleHints().setColorScheme(THEMES[theme])
+
+    def save_theme(self, theme):
+        """
+        Apply the theme and keep it for next time, called by ConfigPopup on Save
+
+        "System" clears the setting rather than storing it, like the font size.
+        """
+        if theme == "System":
+            self.settings.remove("theme")
+        else:
+            self.settings.setValue("theme", theme)
+        self.apply_theme(theme)
+
+    def changeEvent(self, event):
+        """
+        Restyle every widget after the palette changes, eg. a new theme or the system's switching
+
+        Qt override, called on the window for any state change. Widgets with a
+        stylesheet (like DisplayBase's buttons, which only set a height and font size)
+        keep the colors they were styled with, so without this they stayed dark in
+        Light mode or light in Dark mode. Restyling can send the window another
+        PaletteChange, hence _repolishing.
+        """
+        if event.type() == QEvent.Type.PaletteChange and not self._repolishing:
+            self._repolishing = True
+            try:
+                for widget in QApplication.allWidgets():
+                    widget.style().unpolish(widget)
+                    widget.style().polish(widget)
+                    widget.update()
+            finally:
+                self._repolishing = False
+        super().changeEvent(event)
 
     # PAGE VIEWS ---------------------------------------------------------------
 
@@ -190,8 +313,12 @@ class MainWindow(QMainWindow):
         """Switch to the manual comparison view page with selected IDs.""" 
         self.pages.setCurrentIndex(2)
         self.Compare.setFocus()
-        # wait to load
-        QTimer.singleShot(100, self.Compare.refresh_filters)
+        # wait to load, reset filters before comparing so stale filters are not applied
+        QTimer.singleShot(100, lambda: self._load_manual_view(selected_ids))
+
+    def _load_manual_view(self, selected_ids=None):
+        """Reset compare filters, then compare the selected IDs."""
+        self.Compare.refresh_filters()
         self.Compare.compare_manual(selected_ids=selected_ids)
 
     # FILE =====================================================================
@@ -209,7 +336,7 @@ class MainWindow(QMainWindow):
                                                    os.path.expanduser('~'),
                                                    ("CSV Files (*.csv)"))[0]
             if manifest:
-                self.logger.info(f"Importing from manifest: {manifest}")
+                logger.info(f"Importing from manifest: {manifest}")
                 dialog = ImportCSVPopup(self, manifest)
                 dialog.exec()
                 del dialog
@@ -230,27 +357,17 @@ class MainWindow(QMainWindow):
                                                          QFileDialog.Option.ShowDirsOnly)
             if directory:
                 dialog = ImportFolderPopup(self, directory)
-                self.logger.info(f"Importing from directory: {directory}")
-                if dialog.exec() == QDialog.DialogCode.Rejected:
-                    self.import_folder()
+                logger.info(f"Importing from directory: {directory}")
+                dialog.exec()
+                # ask for another directory only if this one had no images, not on Cancel
+                no_images = dialog.no_images
                 del dialog
+                if no_images:
+                    self.import_folder()
 
     def export(self):
-        data = self.mpDB.export_data()
-        if data is not None:
-            file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv);;All Files (*)")
-            if file_path:
-                # add csv if user didnt enter
-                if not file_path.endswith(".csv"):
-                    file_path += ".csv"
-
-                with open(file_path, 'w') as file:
-                    data.to_csv(file)
-                self.logger.info(f"Data exported to: {file_path}")
-        else:
-            dialog = AlertPopup(self, prompt="No data to export.")
-            dialog.exec()
-            del dialog
+        """Export database to CSV (same export as the Home screen's)"""
+        self.Base.export()
 
     def download_ml(self):
         dialog = MLDownloadPopup(self)
@@ -260,14 +377,50 @@ class MainWindow(QMainWindow):
     # EDIT =====================================================================
 
     def load_home_dir(self):
-        """Load last selected path or use default"""
-        saved_path = self.settings.value("home_dir", None)  # None is default
-        if saved_path and Path(saved_path).exists():
-            return saved_path
+        """Last selected project path, None if none was saved"""
+        return self.settings.value("home_dir", None)  # None is default
+
+    def _startup_project(self):
+        """Open the saved project, or fall back to a default project so the app can still launch"""
+        saved_dir = self.load_home_dir()
+        candidates = [Path.cwd() / "MatchyPatchy-Share",
+                      Path.home() / "MatchyPatchy-Share"]
+
+        failed = []
+        if saved_dir:
+            if Path(saved_dir).exists():
+                candidates.insert(0, saved_dir)
+            else:
+                # eg. an unmounted drive: opening it would create an empty project there,
+                # and the setting is kept so the project opens again once it's back
+                logger.error(f"Saved project folder {saved_dir} not found")
+                failed.append(str(saved_dir))
+
+        for home_dir in candidates:
+            if str(home_dir) in failed:
+                continue
+            try:
+                self.project.open(home_dir)
+            except Exception as e:
+                logger.error(f"Could not load project at {home_dir}: {e}", exc_info=True)
+                failed.append(str(home_dir))
+                continue
+            logger.info(f"Configuration loaded from {self.cfg.HOME_DIR}")
+            logger.info(f"Database initialized at: {str(self.cfg.DB_DIR)}")
+            # first launch: remember the default project
+            if not saved_dir:
+                self.settings.setValue("home_dir", str(home_dir))
+            break
         else:
-            path = str(Path.cwd()) + "/MatchyPatchy-Share"  # Fallback to current working directory
-            self.settings.setValue("home_dir", str(path))
-            return path
+            raise RuntimeError(f"Could not load or create a project at any of: {failed}")
+
+        if failed:
+            # leave the saved home_dir setting alone so the project loads next time if it becomes available
+            msg = (f"Could not load the project database at:\n{failed[0]}\n\n"
+                   f"A default project was opened instead at:\n{self.cfg.HOME_DIR}\n\n"
+                   f"Use Edit > Configuration to select another project. See the log for details.")
+            # show after the main window is up
+            QTimer.singleShot(0, lambda: AlertPopup(self, prompt=msg).exec())
 
     def save_home_dir(self, path):
         """Save selected path"""
@@ -276,9 +429,6 @@ class MainWindow(QMainWindow):
 
     def new_project(self, home_dir):
         """Create a new project in the specified home directory."""
-        # close existing database connection before creating a new project
-        self.mpDB.close()
-
         home_dir = Path(home_dir)
 
         is_remote, fs_info = _is_network_path(home_dir)
@@ -289,42 +439,40 @@ class MainWindow(QMainWindow):
                 f"filesystems and this can cause database corruption or lock errors.\n\n"
                 f"Please choose a folder on your local hard drive first and then sync to the network location instead."
             )
-            self.logger.error(msg)
+            logger.error(msg)
             dialog = AlertPopup(self, prompt=msg)
             dialog.exec()
             del dialog
             return
         
-        self.logger.info(f"Creating project folder: {str(home_dir)}.")
-        self.cfg = mpConfig(home_dir)
-        self.mpDB = MatchyPatchyDB(self.cfg.DB_DIR, self.logger)
+        logger.info(f"Creating project folder: {str(home_dir)}.")
+        try:
+            self.project.open(home_dir)
+        except Exception as e:
+            logger.error(f"Could not create project at {home_dir}: {e}", exc_info=True)
+            dialog = AlertPopup(self, prompt=f"Could not create project at {home_dir}:\n{e}")
+            dialog.exec()
+            del dialog
+            return
         # save settings
         self.settings.setValue("home_dir", str(home_dir))
-        # update pages with the new configuration and database connection
-        self.Base.update_project(self.cfg, self.mpDB)
-        self.Media.update_project(self.cfg, self.mpDB)
-        self.Compare.update_project(self.cfg, self.mpDB)
 
     def change_project(self, project_folder):
         """Change the current project to the specified project folder."""
-        # close existing database connection before creating a new project
-        self.mpDB.close()
-        cfg = mpConfig(project_folder)
-        mpDB = MatchyPatchyDB(cfg.DB_DIR, self.logger)
-        valid = mpDB.key
+        try:
+            self.project.open(project_folder)
+            valid = True
+        except Exception as e:
+            logger.error(f"Could not load project at {project_folder}: {e}", exc_info=True)
+            valid = False
         # Check if the database key is valid
         if valid:
             self.settings.setValue("home_dir", str(project_folder))
-            self.logger.info(f"Updating project folder to {str(project_folder)}.")
-            self.cfg = cfg
-            self.mpDB = mpDB
-            self.Base.update_project(self.cfg, self.mpDB)
-            self.Media.update_project(self.cfg, self.mpDB)
-            self.Compare.update_project(self.cfg, self.mpDB)
+            logger.info(f"Updating project folder to {str(project_folder)}.")
             return True
         # not valid
         else:
-            self.logger.warning(f"Database at {str(project_folder)} is invalid. User prompted to select another path or delete.")
+            logger.warning(f"Database at {str(project_folder)} is invalid. User prompted to select another path or delete.")
             dialog = AlertPopup(self, prompt="Database is invalid. Please select another path or delete.")
             dialog.exec()
             del dialog
@@ -335,18 +483,20 @@ class MainWindow(QMainWindow):
         dialog = ConfigPopup(self)
         dialog.exec()
         del dialog
-        self.Base.update_survey()
 
     def manage_survey(self):
         """Open the survey management popup."""
         dialog = SurveyPopup(self)
         dialog.exec()
-        self.Base.update_survey()
         del dialog
 
     def manage_station(self):
         """Open the station management popup."""
-        self.Base.select_survey()
+        if not self.Base.select_survey():
+            dialog = AlertPopup(self, "Please select a survey before managing stations.")
+            dialog.exec()
+            del dialog
+            return
         dialog = StationPopup(self, active_survey=self.Base.active_survey)
         dialog.exec()
         del dialog
@@ -388,6 +538,5 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Close database connection when window closes"""
-        if hasattr(self, 'mpDB') and self.mpDB:
-            self.mpDB.close()  # Close DB connection
+        self.project.close()
         event.accept()

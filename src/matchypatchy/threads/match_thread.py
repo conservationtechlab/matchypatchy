@@ -17,7 +17,7 @@ class MatchEmbeddingThread(QThread):
         super().__init__()
         self.mpDB = mpDB
         self.rois = rois.drop(['frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h',
-                               'comment', 'name', 'sex', 'age'], axis=1).reset_index()
+                               'comment', 'name', 'sex'], axis=1).reset_index()
         self.sequences = sequences
         self.n = len(sequences)
         self.k = k
@@ -50,6 +50,9 @@ class MatchEmbeddingThread(QThread):
         for i, s in enumerate(self.sequences):
             if not self.isInterruptionRequested():
                 sequence_rois = self.sequences[s]
+                # rois without a sequence group under a null key with no ids
+                if not sequence_rois:
+                    continue
 
                 # get all neighbors for sequence
                 all_neighbors = self.batch_roi_knn(sequence_rois)
@@ -110,8 +113,9 @@ class MatchEmbeddingThread(QThread):
         sequence_rois_set = set(sequence_rois)
         neighbors_df = pd.DataFrame(neighbors, columns=['id', 'distance'])
         
-        # merge neighbor distance with ROI metadata
-        neighbors_df = neighbors_df.merge(self.rois[roi_info], on='id', how='left')
+        # merge neighbor distance with ROI metadata, dropping embeddings whose roi
+        # is gone (deleting a station or survey cascades to rois, not to chroma)
+        neighbors_df = neighbors_df.merge(self.rois[roi_info], on='id', how='inner')
         
         # Vectorized lookup for query ROI data
         query_rois_data = self.rois[self.rois['id'].isin(sequence_rois_set)][roi_info].rename(columns={

@@ -13,16 +13,17 @@ from PyQt6.QtCore import Qt
 from matchypatchy.threads.model_download_thread import get_path
 from matchypatchy.gui.widgets.widget_media import ImageWidget
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
+from matchypatchy.project import UsesProject
 from matchypatchy import config
 
 
-class PairXPopup(QDialog):
+class PairXPopup(UsesProject, QDialog):
     def __init__(self, parent, query, match):
         super().__init__(parent)
         self.setWindowTitle("Match Visualizer")
         self.setMinimumSize(880, 900)
         self.parent = parent
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.query = query
         self.match = match
         self.model = None

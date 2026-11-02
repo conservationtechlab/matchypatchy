@@ -1,6 +1,11 @@
 """
-Class Definition for Query Object
+Query containers for the compare view
+
+BaseQueryContainer holds what every mode shares; QueryContainer is the
+default (KNN) mode. QC and manual mode live in query_qc.py and query_manual.py.
 """
+import logging
+import hashlib
 import json
 from pathlib import Path
 import time
@@ -10,18 +15,269 @@ import pandas as pd
 from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 
 import matchypatchy.database.media as db_roi
-from matchypatchy.threads.match_object import MatchObject
+from matchypatchy.database.media import assign_individual, clear_individual
 from matchypatchy.database.location import fetch_station_names_from_id
+from matchypatchy.threads.match_object import MatchObject, FavoriteMatchObject, toggle_viewpoint_value
 from matchypatchy.threads.model_download_thread import load_model
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
-from matchypatchy.threads.match_object import FavoriteMatchObject
+from matchypatchy.project import UsesProject
+
+
+logger = logging.getLogger(__name__)
+
+
+class BaseQueryContainer(UsesProject, QObject):
+    """
+    ROI lookups, metadata and match actions shared by every query container.
+
+    Subclasses load self.data_raw, filter it into self.data (both indexed by roi id)
+    and manage navigation (current_query_rid, current_match_rid, ...).
+    """
+
+    # LOOKUPS ------------------------------------------------------------------
+    @staticmethod
+    def _clean_iid(v):
+        """None/NaN -> None, otherwise int"""
+        return None if v is None or pd.isna(v) else int(v)
+
+    def _frame_for(self, rid):
+        """Frame holding rid, falling back to the unfiltered data (eg. favorites outside the filter)"""
+        return self.data if rid in self.data.index else self.data_raw
+
+    def _row(self, rid):
+        """Row for rid"""
+        return self._frame_for(rid).loc[rid]
+
+    def _get_roi_field(self, roi_id, field):
+        """Get ROI field, None if the roi is not loaded"""
+        for df in (self.data, self.data_raw):
+            if roi_id in df.index:
+                return df.loc[roi_id, field]
+        return None
+
+    def _get_roi_full_record(self, roi_id):
+        """Get full ROI record, None if the roi is not loaded"""
+        for df in (self.data, self.data_raw):
+            if roi_id in df.index:
+                return df.loc[roi_id].to_dict()
+        return None
+
+    def _update_roi_index(self, updates_dict):
+        """Apply changes to both the filtered and raw frames (existing ids only)"""
+        for df in (self.data, self.data_raw):
+            for roi_id, changes in updates_dict.items():
+                if roi_id in df.index:
+                    for key, value in changes.items():
+                        df.loc[roi_id, key] = value
+
+    def get_info(self, rid, column=None):
+        """Get info from data table for given rid and column"""
+        if column is None:
+            return self._row(rid)
+        elif column == 'bbox':
+            return db_roi.get_roi_bbox(self._frame_for(rid).loc[[rid]])
+        elif column == 'metadata':
+            return self.roi_metadata(self._row(rid))
+        else:
+            return self._get_roi_field(rid, column)
+
+    def roi_metadata(self, roi):
+        """Display relevant metadata in comparison label box"""
+        location = fetch_station_names_from_id(self.mpDB, roi['station_id'], roi['camera_id'])
+
+        roi_renamed = roi.rename(index={"name": "Name",
+                                        "sex": "Sex",
+                                        "filepath": "Filepath",
+                                        "comment": "Comment",
+                                        "timestamp": "Timestamp",
+                                        "station_id": "Station",
+                                        "camera_id": "Camera",
+                                        "sequence_id": "Sequence ID",
+                                        "external_id": "External ID",
+                                        "viewpoint": "Viewpoint"})
+
+        info_dict = roi_renamed[['Name', 'Sex', 'Filepath', 'Timestamp', 'Station', 'Camera',
+                                 'External ID', 'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
+
+        info_dict['Station'] = location['station_name']
+        info_dict['Survey'] = location['survey_name']
+        info_dict['Region'] = location['region_name']
+        info_dict['Camera'] = location['camera_name']
+
+        # Convert viewpoint to human-readable
+        viewpoint_val = info_dict['Viewpoint']
+        if viewpoint_val is None or pd.isna(viewpoint_val):
+            info_dict['Viewpoint'] = 'None'
+        else:
+            try:
+                info_dict['Viewpoint'] = self.VIEWPOINT_DICT[str(int(viewpoint_val))]
+            except (KeyError, ValueError, TypeError):
+                info_dict['Viewpoint'] = 'Unknown'
+
+        return info_dict
+
+    # NAVIGATION (QC and manual; the default container has its own) -------------
+    def set_within_query_sequence(self, n):
+        """Set the query side to the nth roi of the current query"""
+        if not self.current_query_rois:
+            return
+        n = n % len(self.current_query_rois)
+        self.current_query_sn = n  # number within sequence
+        self.current_query_rid = self.current_query_rois[self.current_query_sn]
+        # the match list can contain the query roi; don't show it on both sides
+        if self.current_match_rois and self.current_match_rid == self.current_query_rid:
+            self.set_match(self.current_match + 1)
+
+    def set_match(self, n):
+        """Set the current match index and id, skipping the query roi itself"""
+        if not self.current_match_rois:
+            return
+        size = len(self.current_match_rois)
+        step = -1 if n < self.current_match else 1
+        n = n % size
+        if self.current_match_rois[n] == self.current_query_rid and size > 1:
+            n = (n + step) % size
+        self.current_match = n
+        self.current_match_rid = self.current_match_rois[self.current_match]
+
+    # VIEWPOINT ----------------------------------------------------------------
+    def toggle_viewpoint(self, selected_viewpoint):
+        """
+        Show only rois of the selected viewpoint (toggle 0 Left, 1 Any, 2 Right)
+
+        Filters from the full query/match lists each time, so switching back to Any
+        restores them. Returns False and shows all rois if the viewpoint has none.
+        Subclasses set _all_query_rois and _all_match_rois when the query changes.
+        """
+        self.selected_viewpoint = selected_viewpoint
+        query_rois, match_rois = list(self._all_query_rois), list(self._all_match_rois)
+        available = True
+        if selected_viewpoint != 1:
+            value = toggle_viewpoint_value(selected_viewpoint)
+            query_vp = [r for r in query_rois if value is not None and self._get_roi_field(r, 'viewpoint') == value]
+            match_vp = [r for r in match_rois if value is not None and self._get_roi_field(r, 'viewpoint') == value]
+            if query_vp and match_vp:
+                query_rois, match_rois = query_vp, match_vp
+            else:
+                available = False
+        self.current_query_rois = query_rois
+        self.current_match_rois = match_rois
+        self.set_within_query_sequence(0)
+        # first match is shown on the query side
+        self.set_match(1)
+        return available
+
+    # MATCH STATE --------------------------------------------------------------
+    def is_existing_match(self):
+        """Return whether current query and match have same individual_id"""
+        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
+        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
+        return query_iid is not None and query_iid == match_iid
+
+    def both_unnamed(self):
+        """Return whether both current query and match are unnamed"""
+        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
+        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
+        return query_iid is None and match_iid is None
+
+    def get_query_sequence_id(self):
+        """Get current query sequence ID"""
+        return self._get_roi_field(self.current_query_rid, 'sequence_id')
+
+    def get_match_sequence_id(self):
+        """Get current match sequence ID"""
+        return self._get_roi_field(self.current_match_rid, 'sequence_id')
+
+    # MATCH FUNCTIONS ----------------------------------------------------------
+    def _new_iid_rois(self):
+        """ROIs to name when matching two unnamed rois"""
+        return set(self.current_query_rois) | {self.current_match_rid}
+
+    def new_iid(self, individual_id):
+        """Update records for roi after confirming a match (batched)"""
+        roi_updates = {int(roi): {"individual_id": individual_id, "reviewed": 1}
+                       for roi in self._new_iid_rois()}
+
+        # Update local index
+        self._update_roi_index(roi_updates)
+
+        # Then batch update the database
+        assign_individual(self.mpDB, roi_updates, individual_id)
+
+    def _merge_rois(self):
+        """ROIs to assign to the kept individual when merging, besides the dropped individual's"""
+        return {self.current_query_rid, self.current_match_rid}
+
+    def merge(self):
+        """Merge two individuals after a match, keeping the older (lower) id"""
+        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
+        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
+
+        ids = [i for i in (query_iid, match_iid) if i is not None]
+        if not ids:
+            return
+        keep_id = min(ids)
+
+        # the shown rois plus every roi of the individual being merged away
+        rois = set(self._merge_rois())
+        for iid in set(ids) - {keep_id}:
+            rois.update(self.data_raw.index[self.data_raw['individual_id'] == iid])
+
+        if not rois:
+            logger.warning("merge: no ROIs to update")
+            return
+
+        roi_updates = {int(r): {"individual_id": keep_id, "reviewed": 1}
+                       for r in rois}
+        assign_individual(self.mpDB, roi_updates, keep_id)
+
+        # Update local index
+        self._update_roi_index(roi_updates)
+
+    def _unmatch_rois(self):
+        """ROIs to clear when unmatching"""
+        return {self.current_query_rid}
+
+    def unmatch(self):
+        """Unmatch the current query ROI from the matched ROI"""
+        roi_updates = {int(r): {'individual_id': None, "reviewed": 0}
+                       for r in self._unmatch_rois()}
+        # Update local index
+        self._update_roi_index(roi_updates)
+
+        # update database
+        clear_individual(self.mpDB, roi_updates)
+
+    # REFRESH ------------------------------------------------------------------
+    def refresh_data(self):
+        """
+        Reload the rows currently shown from the database, keeping the filter
+        and navigation as they are (no re-filtering or re-ranking)
+        """
+        shown = self.data.index
+        self.load_data()
+        self.data = self.data_raw[self.data_raw.index.isin(shown)].copy()
+
+    def update_sequences_in_place(self, query_seq_id, match_seq_id):
+        """Refresh after a match"""
+        self.refresh_data()
+
+    def update_partial_sequences(self, sequence_ids):
+        """Refresh after an unmatch"""
+        self.refresh_data()
+
 
 # Neighbors fetched per query = k * KNN_OVERFETCH, so filters can remove some
 # candidates without dropping below k.
 KNN_OVERFETCH = 3
 
+# ROI columns the cached KNN results depend on besides the id: filter_valid drops
+# neighbors of the same individual/sequence or another viewpoint, rank drops ID'd
+# query sequences and puts ID'd/favorite rois first, emb marks rois with an embedding
+KNN_CACHE_COLUMNS = ['individual_id', 'sequence_id', 'viewpoint', 'favorite', 'emb']
 
-class QueryContainer(QObject):
+
+class QueryContainer(BaseQueryContainer):
     """Container class for managing query and match data within the MatchyPatchy GUI."""
     thread_signal = pyqtSignal(bool)
     progress_update = pyqtSignal(int)
@@ -30,10 +286,8 @@ class QueryContainer(QObject):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        self.mpDB = parent.mpDB
-        self.cfg = parent.cfg
+        self.project = parent.project
         self.CACHE_PATH = Path(self.cfg.DB_DIR) / "knn_cache.json"
-        self.logger = parent.logger
         self.metric = parent.distance_metric
         self.k = parent.k
         self.k_cache = self.k * KNN_OVERFETCH
@@ -93,9 +347,11 @@ class QueryContainer(QObject):
         """
         self._stop_requested = False
         self.data_raw = db_roi.fetch_roi_media(self.mpDB)
+        # favorites may have changed
+        self._favorites_cache = None
         self.loaded_data.emit(self.data_raw)
         if self.data_raw.empty:
-            self.logger.warning("No ROI media found in the database.")
+            logger.warning("No ROI media found in the database.")
             return False
         # Must have embeddings to continue
         return not (self.data_raw["emb"] == 0).all()
@@ -160,7 +416,7 @@ class QueryContainer(QObject):
     def stop_calculation(self):
         """Request the match thread to stop calculation"""
         self._stop_requested = True
-        self.logger.info("Stop requested for query container %s", id(self))
+        logger.info("Stop requested for query container %s", id(self))
         if self.match_thread is not None:
             self.match_thread.requestInterruption()
 
@@ -202,7 +458,7 @@ class QueryContainer(QObject):
         # strict only for cache: if headroom ran out, recompute instead of showing < k
         ranked = self._restrict_to_data(self._raw_ranked, strict=self._from_cache)
         if ranked is None:
-            self.logger.info("Cache lacks headroom for this filter, recalculating")
+            logger.info("Cache lacks headroom for this filter, recalculating")
             self.calculate_neighbors()
             return
 
@@ -234,21 +490,27 @@ class QueryContainer(QObject):
 
             if station_ids is None:
                 self.data = pd.DataFrame()
-                self.logger.info("No valid stations found, resulting in empty data.")
+                logger.info("No valid stations found, resulting in empty data.")
                 return False
             else:
                 # Single vectorized filter; copy so later .loc writes don't hit a view
                 self.data = self.data_raw[self.data_raw['station_id'].isin(station_ids)].copy()
 
         if self.data.empty:
-            self.logger.info("Filter removed all data.")
+            logger.info("Filter removed all data.")
             return False
 
         # Rebuild index with filtered data
         self._build_seq_indices()
         self.sequences = db_roi.sequence_roi_dict(self.data)
-        self.logger.info(f"Filtered data contains {len(self.data)} entries.")
+        logger.info(f"Filtered data contains {len(self.data)} entries.")
         return True
+
+    def refresh_data(self):
+        """Reload the shown rows, keeping the filter, then rebuild sequence lookups"""
+        super().refresh_data()
+        self._build_seq_indices()
+        self.sequences = db_roi.sequence_roi_dict(self.data)
 
     def _build_seq_indices(self):
         """Build sequence indices for fast lookups"""
@@ -262,6 +524,9 @@ class QueryContainer(QObject):
 
         # set current query
         self.current_query = n
+        # previous query's knn / favorites match objects no longer apply
+        self.knn_match_object = None
+        self.favorite_match_object = None
         # get corresponding sequence_id and rois
         self.current_match_object = self.ranked_sequences[self.current_query]
         self.current_query_rois = self.current_match_object.get_ranked_query_rids()
@@ -301,16 +566,9 @@ class QueryContainer(QObject):
         self.current_match_rid = self.current_match_rois[self.current_match]
 
     def get_query_sequence_id(self):
-        """Get current query sequence ID"""
+        """Get current query sequence ID from its match object"""
         if self.current_match_object:
             return self.current_match_object.sequence_id
-        return None
-
-    def get_match_sequence_id(self):
-        """Get current match sequence ID"""
-        if self.current_match_object and self.current_match_rois:
-            # Get sequence ID of current match ROI
-            return self._get_roi_field(self.current_match_rid, 'sequence_id')
         return None
 
     def update_sequences_in_place(self, query_seq_id, match_seq_id):
@@ -343,6 +601,14 @@ class QueryContainer(QObject):
         # Using index-based filtering since 'id' is the index
         self.data = pd.concat([self.data[~self.data['sequence_id'].isin(seq_ids)], new_rows])
         self.data_raw = pd.concat([self.data_raw[~self.data_raw['sequence_id'].isin(seq_ids)], new_rows])
+
+        # a merge also moved other rois of the dropped individual, refresh their name/sex
+        iids = new_rows['individual_id'].dropna().unique()
+        others = self.data_raw.index[self.data_raw['individual_id'].isin(iids)
+                                     & ~self.data_raw['sequence_id'].isin(seq_ids)]
+        if len(others):
+            others_df = db_roi.fetch_roi_media(self.mpDB, rids=others.tolist())
+            self._update_roi_index(others_df[['name', 'sex']].to_dict('index'))
 
         # Rebuild indices with updated data
         self._build_seq_indices()
@@ -387,8 +653,10 @@ class QueryContainer(QObject):
     def set_match_favorites(self, active):
         """Set the match favorites active state"""
         if active:
-            # store the current match object before switching to favorites
-            self.knn_match_object = self.current_match_object
+            # store the knn match object before switching to favorites (once, so
+            # re-applying favorites doesn't store the favorites object instead)
+            if self.knn_match_object is None:
+                self.knn_match_object = self.current_match_object
             
             # Use cached favorites if available, otherwise fetch once
             if self._favorites_cache is None:
@@ -397,8 +665,8 @@ class QueryContainer(QObject):
             if self._favorites_cache.empty:
                 return
 
-            query_roi_id = self.knn_match_object.query_data.iloc[0]['id']
-            filtered_neighbors = self._calculate_favorites_similarities(query_roi_id)
+            # similarity to the query roi on screen
+            filtered_neighbors = self._calculate_favorites_similarities(self.current_query_rid)
 
             # Create favorite match object
             self.favorite_match_object = FavoriteMatchObject(
@@ -410,7 +678,8 @@ class QueryContainer(QObject):
             self.current_match_object = self.favorite_match_object
         else:
             # restore the original match object when deactivating favorites
-            self.current_match_object = self.knn_match_object
+            if self.knn_match_object is not None:
+                self.current_match_object = self.knn_match_object
             self.knn_match_object = None
             self.favorite_match_object = None
             self._similarities_cache.clear()
@@ -424,159 +693,41 @@ class QueryContainer(QObject):
         Batch query all similarities at once instead of loop.
         """
         favorite_ids = self._favorites_cache.index.tolist()
-        # Check cache first
-        uncached = [fid for fid in favorite_ids if fid not in self._similarities_cache]
+        # Check cache first, keyed by (query, favorite) since the query changes
+        uncached = [fid for fid in favorite_ids if (query_roi_id, fid) not in self._similarities_cache]
 
         if uncached:
             # Batch calculate similarities for uncached favorites
             batch_similarities = self.mpDB.batch_calculate_similarity(query_roi_id, uncached)
-            self._similarities_cache.update(batch_similarities)
-        
-        # Return cached similarities
-        filtered_neighbors = [(fid, 1 - self._similarities_cache[fid]) for fid in favorite_ids]
+            self._similarities_cache.update({(query_roi_id, fid): sim for fid, sim in batch_similarities.items()})
+
+        # Return cached similarities, skipping favorites without an embedding (None)
+        similarities = [(fid, self._similarities_cache[(query_roi_id, fid)]) for fid in favorite_ids]
+        filtered_neighbors = [(fid, 1 - sim) for fid, sim in similarities if sim is not None]
         return filtered_neighbors
-
-    def _clean_iid(self, v):
-        """None/NaN -> None, otherwise int"""
-        return None if v is None or pd.isna(v) else int(v)
-
-    def is_existing_match(self):
-        """Return whether current query and match have same individual_id"""
-        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
-        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
-        return query_iid is not None and query_iid == match_iid
-
-    def both_unnamed(self):
-        """Return whether both current query and match are unnamed"""
-        return (self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id')) is None and
-                self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id')) is None)
 
     def current_distance(self):
         """Return distance between current sequence and match"""
         matches = self.current_match_object.get_ranked_matches()
         return matches[self.current_match][1] if self.current_match < len(matches) else float('inf')
 
-    def _get_roi_field(self, roi_id, field):
-        """Get ROI field from DataFrame (always fresh)"""
-        if roi_id in self.data.index:
-            return self.data.loc[roi_id, field]
-        return None
-
-    def _get_roi_full_record(self, roi_id):
-        """Get full ROI record from index"""
-        if roi_id in self.data.index:
-            return self.data.loc[roi_id].to_dict()
-        return None
-
-    def _update_roi_index(self, updates_dict):
-        """Apply changes to both the filtered and raw frames (existing ids only)"""
-        for df in (self.data, self.data_raw):
-            for roi_id, changes in updates_dict.items():
-                if roi_id in df.index:
-                    for key, value in changes.items():
-                        df.loc[roi_id, key] = value
-
-    def get_info(self, rid, column=None):
-        """Get info from data table for given rid and column"""
-        if column is None:
-            # Return whole row from index or DataFrame
-            return self.data.loc[rid]
-        elif column == 'bbox':
-            return db_roi.get_roi_bbox(self.data.loc[[rid]])
-        elif column == 'metadata':
-            return self.roi_metadata(self.data.loc[rid])
-        else:
-            return self._get_roi_field(rid, column)
-
-    def roi_metadata(self, roi):
-        """Display relevant metadata in comparison label box"""
-        location = fetch_station_names_from_id(self.mpDB, roi['station_id'], roi['camera_id'])
-
-        roi_renamed = roi.rename(index={"name": "Name",
-                                        "sex": "Sex",
-                                        "age": "Age",
-                                        "filepath": "Filepath",
-                                        "comment": "Comment",
-                                        "timestamp": "Timestamp",
-                                        "station_id": "Station",
-                                        "camera_id": "Camera",
-                                        "sequence_id": "Sequence ID",
-                                        "external_id": "External ID",
-                                        "viewpoint": "Viewpoint"})
-
-        info_dict = roi_renamed[['Name', 'Sex', 'Age', 'Filepath', 'Timestamp', 'Station', 'Camera',
-                                 'External ID', 'Sequence ID', 'Viewpoint', 'Comment']].to_dict()
-
-        info_dict['Station'] = location['station_name']
-        info_dict['Survey'] = location['survey_name']
-        info_dict['Region'] = location['region_name']
-        info_dict['Camera'] = location['camera_name']
-
-        # Convert viewpoint to human-readable
-        viewpoint_val = info_dict['Viewpoint']
-        if viewpoint_val is None or pd.isna(viewpoint_val):
-            info_dict['Viewpoint'] = 'None'
-        else:
-            try:
-                info_dict['Viewpoint'] = self.VIEWPOINT_DICT[str(int(viewpoint_val))]
-            except (KeyError, ValueError, TypeError):
-                info_dict['Viewpoint'] = 'Unknown'
-
-        return info_dict
-
     # MATCH FUNCTIONS ----------------------------------------------------------
-    # Batch database updates
-    def new_iid(self, individual_id):
-        """Update records for roi after confirming a match (batched)"""
-        roi_updates = {roi: {"individual_id": individual_id, "reviewed": 1}
-                       for roi in self.current_query_rois}
-        roi_updates[self.current_match_rid] = {"individual_id": individual_id, "reviewed": 1}
-
-        # Update local index
-        self._update_roi_index(roi_updates)
-
-        # Then batch update the database
-        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
-
-    def merge(self):
-        """Merge two individuals after a match"""
-        query_iid = self._clean_iid(self._get_roi_field(self.current_query_rid, 'individual_id'))
-        match_iid = self._clean_iid(self._get_roi_field(self.current_match_rid, 'individual_id'))
-
-        if query_iid is None and match_iid is None:
-            return
-
-        # keep the older (lower) id
-        ids = [i for i in (query_iid, match_iid) if i is not None]
-        keep_id = min(ids)
-
-        # find all ROIs associated with the query and match sequences
+    def _merge_rois(self):
+        """All ROIs of the query and match sequences"""
         query_seq = self.current_match_object.sequence_id
         match_seq = self._get_roi_field(self.current_match_rid, 'sequence_id')
-        rois = set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, []))
-        for iid in set(ids) - {keep_id}:
-            rois.update(self.data_raw.index[self.data_raw['individual_id'] == iid])
+        # the shown rois too, a match roi without a sequence is not in _seq_index
+        return ({self.current_query_rid, self.current_match_rid}
+                | set(self._seq_index.get(query_seq, [])) | set(self._seq_index.get(match_seq, [])))
 
-        if not rois:
-            self.logger.warning("merge: no ROIs to update")
-            return
+    def _new_iid_rois(self):
+        """Name both whole sequences, like merge"""
+        return self._merge_rois()
 
-        roi_updates = {int(r): {"individual_id": keep_id, "reviewed": 1}
-                       for r in rois}
-        self.mpDB.batch_edit('roi', roi_updates, quiet=True)
-        
-        # Update local index
-        self._update_roi_index(roi_updates)
-
-    def unmatch(self):
-        """Unmatch the current query ROI from the matched ROI"""
-        # Update local index
-        self._update_roi_index({self.current_query_rid: {'individual_id': None, "reviewed": 0}})
-
-        # update database
-        self.mpDB.edit_row('roi', self.current_query_rid,
-                           {'individual_id': None, "reviewed": 0},
-                           allow_none=True, quiet=True)
+    def _unmatch_rois(self):
+        """The whole query sequence, so Unmatch undoes Match"""
+        query_seq = self.current_match_object.sequence_id
+        return {self.current_query_rid} | set(self._seq_index.get(query_seq, []))
 
     # ==========================================================================
     # KNN CACHE MANAGEMENT
@@ -585,7 +736,7 @@ class QueryContainer(QObject):
         """Clear the KNN cache"""
         # delete the file
         self.CACHE_PATH.unlink(missing_ok=True)
-        self.logger.info("KNN cache cleared")
+        logger.info("KNN cache cleared")
 
     @staticmethod
     def _json_default(o):
@@ -603,19 +754,32 @@ class QueryContainer(QObject):
         Convert MatchObject list to serializable dicts.
         Stores IDs and distances only; DataFrames are rebuilt from self.data.
         """
+        seq_ids = self.data_raw['sequence_id'].to_dict() if 'sequence_id' in self.data_raw else {}
         return [{
             'sequence_id': m.sequence_id,
             'neighbors': [(rid, d) for rid, d in m.neighbors],  # [(roi_id, distance), ...]
-            'truncated': len(m.neighbors) >= self.k_cache,
+            # counted in candidate sequences, like the cut in _restrict_to_data
+            'truncated': len(self._nearest_candidates(m.neighbors, seq_ids)) >= self.k_cache,
             'og_ranked_query_rids': list(m.og_ranked_query_rids),
             'og_ranked_matches': [tuple(x) for x in m.og_ranked_matches],  # (rid, dist)
         } for m in ranked_sequences]
+
+    def _cache_key(self):
+        """
+        Hash of the roi state the cached results depend on, so matching, favorites
+        or a redrawn bbox (embedding dropped) invalidate the cache
+        """
+        state = self.data_raw[KNN_CACHE_COLUMNS].apply(pd.to_numeric, errors='coerce')
+        state = state.astype('float64').sort_index()  # None and NaN hash the same
+        hashed = pd.util.hash_pandas_object(state, index=True).values
+        return hashlib.sha1(hashed.tobytes()).hexdigest()
 
     def save_knn_cache(self, serialized):
         """Save UNFILTERED results as JSON (atomic write)."""
         payload = {
             'timestamp': time.time(),
             'n_raw': len(self.data_raw),
+            'state': self._cache_key(),
             'k_cache': self.k_cache,
             'metric': str(self.metric),
             'threshold': self.threshold,
@@ -626,9 +790,9 @@ class QueryContainer(QObject):
             with open(tmp, 'w') as f:
                 json.dump(payload, f, default=self._json_default)
             tmp.replace(self.CACHE_PATH)  # atomic, never a half-written file
-            self.logger.info(f"KNN cache saved to {self.CACHE_PATH}")
+            logger.info(f"KNN cache saved to {self.CACHE_PATH}")
         except Exception as e:
-            self.logger.error(f"Failed to save JSON cache: {e}")
+            logger.error(f"Failed to save JSON cache: {e}")
             tmp.unlink(missing_ok=True)
 
     def load_knn_cache(self):
@@ -640,6 +804,7 @@ class QueryContainer(QObject):
                 cache = json.load(f)
             if (time.time() - cache['timestamp'] > self.cache_timeout
                     or cache.get('n_raw') != len(self.data_raw)
+                    or cache.get('state') != self._cache_key()
                     or cache.get('metric') != str(self.metric)
                     or cache.get('threshold') != self.threshold
                     or cache.get('k_cache', 0) < self.k):
@@ -648,8 +813,26 @@ class QueryContainer(QObject):
             self._from_cache = True
             return True
         except Exception as e:
-            self.logger.error(f"Failed to load JSON cache: {e}")
+            logger.error(f"Failed to load JSON cache: {e}")
             return False
+
+    @staticmethod
+    def _candidate_key(rid, seq_ids):
+        """Candidate a matched roi belongs to: its sequence, or itself without one"""
+        seq = seq_ids.get(rid)
+        return ('roi', rid) if seq is None or pd.isna(seq) else seq
+
+    @classmethod
+    def _nearest_candidates(cls, neighbors, seq_ids):
+        """
+        Candidate sequences in neighbors, nearest first. pad_sequences gives every
+        roi of a matched sequence the distance of its nearest roi.
+        """
+        distances = {}
+        for rid, d in neighbors:
+            key = cls._candidate_key(rid, seq_ids)
+            distances[key] = min(d, distances.get(key, d))
+        return sorted(distances, key=distances.get)
 
     def _restrict_to_data(self, serialized, strict):
         """
@@ -657,6 +840,7 @@ class QueryContainer(QObject):
         Returns list of MatchObjects, or None if strict and the cache ran out of headroom.
         """
         keep = set(self.data.index)  # roi ids are the index
+        seq_ids = self.data['sequence_id'].to_dict()
         out = []
         for s in serialized:
             q_rids = [r for r in s['og_ranked_query_rids'] if r in keep]
@@ -664,13 +848,21 @@ class QueryContainer(QObject):
                 continue  # whole sequence filtered out
 
             neighbors = [(rid, d) for rid, d in s['neighbors'] if rid in keep]
-            if strict and s['truncated'] and len(neighbors) < self.k:
+            candidates = self._nearest_candidates(neighbors, seq_ids)
+            if strict and s['truncated'] and len(candidates) < self.k:
                 return None  # cache was cut off, recompute
-            neighbors = neighbors[:self.k]  # assumes sorted by distance
+            # neighbors are in rank order (ID'd/favorites first), not distance order, and
+            # padded to whole sequences: keep the k nearest candidate sequences, whole
+            nearest = set(candidates[:self.k])
+            neighbors = [(rid, d) for rid, d in neighbors
+                         if self._candidate_key(rid, seq_ids) in nearest]
             if not neighbors:
                 continue
 
-            ranked_matches = [tuple(m) for m in s['og_ranked_matches'] if m[0] in keep][:self.k]
+            # og_ranked_matches is the same rois in viewpoint order; keep exactly the
+            # rois chosen above so every ranked match is in match_data
+            neighbor_ids = {rid for rid, _ in neighbors}
+            ranked_matches = [tuple(m) for m in s['og_ranked_matches'] if m[0] in neighbor_ids]
 
             mo = MatchObject(sequence_id=s['sequence_id'],
                              filtered_neighbors=neighbors,

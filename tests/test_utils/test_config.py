@@ -49,11 +49,6 @@ class TestMpConfigInit:
         cfg = mpConfig(home)
         assert cfg.SEQUENCE_DURATION == 60
 
-    def test_default_sequence_n(self, tmp_path):
-        home = tmp_path / "project"
-        cfg = mpConfig(home)
-        assert cfg.SEQUENCE_N == 3
-
     def test_device_is_string(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
@@ -101,7 +96,7 @@ class TestMpConfigSaveLoad:
             data = yaml.safe_load(f)
         for key in ("DB_DIR", "ML_DIR", "THUMBNAIL_DIR", "VIDEO_FPS",
                     "N_FRAMES", "SMART_FRAMES", "KNN", "SEQUENCE_DURATION",
-                    "SEQUENCE_N", "DEVICE"):
+                    "DEVICE"):
             assert key in data, f"Expected key {key!r} in saved config"
 
     def test_load_restores_knn(self, tmp_path):
@@ -119,6 +114,48 @@ class TestMpConfigSaveLoad:
         cfg.save()
         cfg2 = mpConfig(home)
         assert cfg.SMART_FRAMES == 10
+
+
+# ---------------------------------------------------------------------------
+# mpConfig — moved / copied project
+# ---------------------------------------------------------------------------
+
+class TestMpConfigMovedProject:
+    def test_copied_project_uses_own_folders(self, tmp_path):
+        import shutil
+        old = tmp_path / "projA"
+        mpConfig(old)
+        new = tmp_path / "projB"
+        shutil.copytree(old, new)
+        cfg = mpConfig(new)
+        assert cfg.DB_DIR == new / "Database"
+        assert cfg.ML_DIR == new / "Models"
+        assert cfg.THUMBNAIL_DIR == new / "Thumbnails"
+        assert cfg.FRAME_DIR == new / "Frames"
+
+    def test_moved_project_does_not_recreate_old_folder(self, tmp_path):
+        import shutil
+        old = tmp_path / "projA"
+        mpConfig(old)
+        new = tmp_path / "projB"
+        shutil.move(old, new)
+        cfg = mpConfig(new)
+        assert cfg.DB_DIR == new / "Database"
+        assert not old.exists()
+
+    def test_saved_paths_still_written_for_older_versions(self, tmp_path):
+        import shutil
+        old = tmp_path / "projA"
+        mpConfig(old)
+        new = tmp_path / "projB"
+        shutil.copytree(old, new)
+        cfg = mpConfig(new)
+        cfg.save()
+        with open(new / ".config.yml") as f:
+            data = yaml.safe_load(f)
+        assert data["DB_DIR"] == str(new / "Database")
+        assert data["ML_DIR"] == str(new / "Models")
+        assert data["THUMBNAIL_DIR"] == str(new / "Thumbnails")
 
 
 # ---------------------------------------------------------------------------
@@ -150,9 +187,9 @@ class TestMpConfigUpdate:
     def test_update_does_not_clobber_other_keys(self, tmp_path):
         home = tmp_path / "project"
         cfg = mpConfig(home)
-        original_seq_n = cfg.SEQUENCE_N
+        original_duration = cfg.SEQUENCE_DURATION
         cfg.update({"KNN": 77})
-        assert cfg.SEQUENCE_N == original_seq_n
+        assert cfg.SEQUENCE_DURATION == original_duration
 
 
 # ---------------------------------------------------------------------------
@@ -173,13 +210,6 @@ class TestMpConfigSetDefault:
         cfg.SMART_FRAMES = 99
         cfg.set_default()
         assert cfg.SMART_FRAMES == True
-
-    def test_set_default_resets_sequence_n(self, tmp_path):
-        home = tmp_path / "project"
-        cfg = mpConfig(home)
-        cfg.SEQUENCE_N = 99
-        cfg.set_default()
-        assert cfg.SEQUENCE_N == 3
 
     def test_set_default_resets_fps(self, tmp_path):
         home = tmp_path / "project"

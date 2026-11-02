@@ -7,6 +7,9 @@ import sys
 from pathlib import Path
 import yaml
 import animl
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class mpConfig():
@@ -19,7 +22,7 @@ class mpConfig():
         self.HOME_DIR = home_dir
         self.CONFIG_PATH = home_dir / '.config.yml'
         self.DB_DIR = home_dir / 'Database'
-        self.ML_DIR = home_dir /  'Models'
+        self.ML_DIR = home_dir / 'Models'
         self.THUMBNAIL_DIR = home_dir / 'Thumbnails'
         self.FRAME_DIR = home_dir / 'Frames'
         self.BATCH_SIZE = 1
@@ -31,7 +34,6 @@ class mpConfig():
         self.DETECTOR_KEY = None
         self.KNN = 100
         self.SEQUENCE_DURATION = 60
-        self.SEQUENCE_N = 3
         # Check if CUDA is available and set DEVICE accordingly
         providers = animl.get_onnx_device(quiet=True)
         if "CUDAExecutionProvider" in providers:
@@ -55,33 +57,33 @@ class mpConfig():
         if self.CONFIG_PATH.exists():
             with open(self.CONFIG_PATH, 'r') as cfg_file:
                 cfg = yaml.safe_load(cfg_file)
-                self.DB_DIR = Path(cfg.get('DB_DIR', self.HOME_DIR / 'Database'))
-                self.ML_DIR = Path(cfg.get('ML_DIR', self.HOME_DIR / 'Models'))
-                self.THUMBNAIL_DIR = Path(cfg.get('THUMBNAIL_DIR', self.HOME_DIR / 'Thumbnails'))
-                self.FRAME_DIR = Path(cfg.get('FRAME_DIR', self.HOME_DIR / 'Frames'))
+                # project folders always live inside the opened folder; the saved
+                # absolute paths go stale when a project is moved or copied
+                self.DB_DIR = self.HOME_DIR / 'Database'
+                self.ML_DIR = self.HOME_DIR / 'Models'
+                self.THUMBNAIL_DIR = self.HOME_DIR / 'Thumbnails'
+                self.FRAME_DIR = self.HOME_DIR / 'Frames'
                 self.BATCH_SIZE = cfg.get('BATCH_SIZE', 1)
                 self.VIDEO_FPS = cfg.get('VIDEO_FPS', 1)
                 self.N_FRAMES = cfg.get('N_FRAMES', 3)
                 self.SMART_FRAMES = cfg.get('SMART_FRAMES', True)
-                
+
                 self.REID_KEY = cfg.get('REID_KEY', None)
                 self.VIEWPOINT_KEY = cfg.get('VIEWPOINT_KEY', None)
                 self.DETECTOR_KEY = cfg.get('DETECTOR_KEY', None)
                 self.KNN = cfg.get('KNN', 100)
                 self.SEQUENCE_DURATION = cfg.get('SEQUENCE_DURATION', 60)
-                self.SEQUENCE_N = cfg.get('SEQUENCE_N', 3)
                 self.DEVICE = cfg.get('DEVICE', "CPUExecutionProvider")
 
         # config file not found, save the current defaults
         else:
-            print(f"Configuration file not found at {self.CONFIG_PATH}. Saving default configuration.")
+            logger.info(f"Configuration file not found at {self.CONFIG_PATH}. Saving default configuration.")
             self.HOME_DIR.mkdir(parents=True, exist_ok=True)
             self.set_default()
             self.save()
 
         # make sure all necessary directories exist
         self.create_folders()
-
 
     def save(self):
         """Save the current configuration to the YAML file."""
@@ -99,7 +101,6 @@ class mpConfig():
             'DETECTOR_KEY': self.DETECTOR_KEY,
             'KNN': self.KNN,
             'SEQUENCE_DURATION': self.SEQUENCE_DURATION,
-            'SEQUENCE_N': self.SEQUENCE_N,
             'DEVICE': self.DEVICE,
         }
         with open(self.CONFIG_PATH, 'w') as cfg_file:
@@ -108,7 +109,7 @@ class mpConfig():
     def set_default(self):
         """Reset the configuration to default values."""
         self.DB_DIR = self.HOME_DIR / 'Database'
-        self.ML_DIR = self.HOME_DIR /  'Models'
+        self.ML_DIR = self.HOME_DIR / 'Models'
         self.THUMBNAIL_DIR = self.HOME_DIR / 'Thumbnails'
         self.FRAME_DIR = self.HOME_DIR / 'Frames'
         self.BATCH_SIZE = 1
@@ -120,7 +121,6 @@ class mpConfig():
         self.DETECTOR_KEY = None
         self.KNN = 100
         self.SEQUENCE_DURATION = 60
-        self.SEQUENCE_N = 3
         if "CUDAExecutionProvider" in animl.get_onnx_device(quiet=True):
             self.DEVICE = "CUDAExecutionProvider"
         else:
@@ -181,8 +181,8 @@ def asset_path(relative_path):
         if 'site-packages' in current_location.parts:
             matchypatchy_dir = current_location.parents[0]  # tbd
         else:
-            matchypatchy_dir =current_location.parents[0]
-
+            matchypatchy_dir = current_location.parents[0]
+        # Assumes this function is in src/matchypatchy/
         return matchypatchy_dir / 'assets' / relative_path
 
     return os.path.abspath(relative_path)

@@ -1,11 +1,14 @@
 """
 Tests for matchypatchy.database.mpdb — MatchyPatchyDB class and thread safety.
 """
+import shutil
 import threading
 import sqlite3
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
+from chromadb.api.client import SharedSystemClient
 
 from matchypatchy.database.mpdb import MatchyPatchyDB
 
@@ -44,12 +47,74 @@ class TestInitialisation:
 
     def test_reopen_existing_database(self, tmp_path, null_logger):
         """Opening the same directory a second time should reuse the existing DB."""
-        db1 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db1 = MatchyPatchyDB(str(tmp_path))
         original_key = db1.key
         db1.close()
 
-        db2 = MatchyPatchyDB(str(tmp_path), null_logger)
+        db2 = MatchyPatchyDB(str(tmp_path))
         assert db2.key == original_key
+        db2.close()
+
+
+class TestOpenInvalidDatabase:
+    """Opening a folder that holds an incomplete or foreign database is rejected without changing it"""
+
+    def test_sqlite_without_embeddings_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path))
+        db1.close()
+        shutil.rmtree(tmp_path / "emb.db")
+
+        db2 = MatchyPatchyDB(str(tmp_path))
+        assert db2.key is False
+        db2.close()
+        # no second metadata row and no new embedding database
+        conn = sqlite3.connect(tmp_path / "matchypatchy.db")
+        assert conn.execute("SELECT COUNT(*) FROM metadata").fetchone()[0] == 1
+        conn.close()
+        assert not (tmp_path / "emb.db").exists()
+
+    def test_embeddings_without_sqlite_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path))
+        db1.close()
+        (tmp_path / "matchypatchy.db").unlink()
+
+        db2 = MatchyPatchyDB(str(tmp_path))
+        assert db2.key is False
+        db2.close()
+        assert not (tmp_path / "matchypatchy.db").exists()
+
+    def test_sqlite_without_metadata_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path))
+        db1.close()
+        (tmp_path / "matchypatchy.db").unlink()
+        conn = sqlite3.connect(tmp_path / "matchypatchy.db")
+        conn.execute("CREATE TABLE other (id INTEGER PRIMARY KEY)")
+        conn.commit()
+        conn.close()
+
+        db2 = MatchyPatchyDB(str(tmp_path))
+        assert db2.key is False
+        db2.close()
+
+    def test_non_sqlite_file_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path))
+        db1.close()
+        (tmp_path / "matchypatchy.db").write_bytes(b"not a database" * 100)
+
+        db2 = MatchyPatchyDB(str(tmp_path))
+        assert db2.key is False
+        db2.close()
+
+    def test_embedding_folder_without_collection_is_rejected(self, tmp_path, null_logger):
+        db1 = MatchyPatchyDB(str(tmp_path))
+        db1.close()
+        shutil.rmtree(tmp_path / "emb.db")
+        (tmp_path / "emb.db").mkdir()
+        # chroma caches clients per path in-process, clear it to behave like a fresh launch
+        SharedSystemClient.clear_system_cache()
+
+        db2 = MatchyPatchyDB(str(tmp_path))
+        assert db2.key is False
         db2.close()
 
 
@@ -174,14 +239,13 @@ class TestCRUD:
 
     def test_add_individual(self, tmp_db):
         db, _ = tmp_db
-        iid = db.add_individual("Lion-42", "F", "Juvenile")
+        iid = db.add_individual("Lion-42", "F")
         assert isinstance(iid, int)
         rows = db.select("individual", row_cond=f"id={iid}")
         assert len(rows) == 1
-        name, sex, age = rows[0][1], rows[0][2], rows[0][3]
+        name, sex, = rows[0][1], rows[0][2]
         assert name == "Lion-42"
         assert sex == "F"
-        assert age == "Juvenile"
 
     def test_add_media(self, tmp_db):
         db, _ = tmp_db
@@ -202,7 +266,7 @@ class TestCRUD:
         sha2 = "bbb" * 22
         db.add_media(upload_id, "dup.jpg", sha1, ".jpg", "2024-01-01", station_id)
         result = db.add_media(upload_id, "dup.jpg", sha2, ".jpg", "2024-01-02", station_id)
-        assert result == "duplicate_error"
+        assert result == "duplicate_path"
 
     def test_add_media_duplicate_sha256_returns_error(self, tmp_db):
         db, _ = tmp_db
@@ -211,7 +275,28 @@ class TestCRUD:
         sha = "ccc" * 22
         db.add_media(upload_id, "original.jpg", sha, ".jpg", "2024-01-01", station_id)
         result = db.add_media(upload_id, "copy.jpg", sha, ".jpg", "2024-01-01", station_id)
-        assert result == "duplicate_error"
+        assert result == "duplicate_hash"
+
+    def test_add_media_same_file_again_is_a_duplicate_hash(self, tmp_db):
+        """sqlite reports the path constraint first, but this is the same file, not a new one at that path"""
+        db, _ = tmp_db
+        station_id = db.add_station("S4", 0, 0, 1)
+        upload_id = db.add_upload("/img")
+        sha = "eee" * 22
+        db.add_media(upload_id, "again.jpg", sha, ".jpg", "2024-01-01", station_id)
+        result = db.add_media(upload_id, "again.jpg", sha, ".jpg", "2024-01-01", station_id)
+        assert result == "duplicate_hash"
+
+    def test_add_media_other_integrity_error_is_logged(self, tmp_db, caplog):
+        """A constraint failure other than a duplicate (here a missing station) returns None and logs"""
+        db, _ = tmp_db
+        upload_id = db.add_upload("/img")
+        caplog.clear()
+        result = db.add_media(upload_id, "orphan.jpg", "ddd" * 22, ".jpg", "2024-01-01", 99999)
+        assert result is None
+        errors = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
+        assert len(errors) == 1
+        assert "orphan.jpg" in errors[0]
 
     def test_add_roi(self, tmp_db):
         db, _ = tmp_db
@@ -297,6 +382,25 @@ class TestSelectEditDeleteCount:
         row = db.select("individual", row_cond=f"id={ids['individual_id']}")[0]
         assert row[2] == "F"
 
+    def test_edit_row_empty_update_is_noop(self, populated_db):
+        db, _, ids = populated_db
+        before = db.select("individual", row_cond=f"id={ids['individual_id']}")
+        assert db.edit_row("individual", ids["individual_id"], {}) is True
+        assert db.select("individual", row_cond=f"id={ids['individual_id']}") == before
+
+    def test_batch_edit_skips_empty_updates(self, populated_db):
+        db, _, ids = populated_db
+        result = db.batch_edit("individual", {ids["individual_id"]: {"sex": "F"}, 99999: {}})
+        assert result is True
+        row = db.select("individual", row_cond=f"id={ids['individual_id']}")[0]
+        assert row[2] == "F"
+
+    def test_get_media_with_filepath_without_condition(self, populated_db):
+        db, _, ids = populated_db
+        rows, columns = db.get_media_with_filepath()
+        assert len(rows) == 1
+        assert "filepath" in columns
+
     def test_edit_row_sets_null(self, populated_db):
         db, _, ids = populated_db
         result = db.edit_row("individual", ids["individual_id"], {"sex": None}, allow_none=True)
@@ -332,7 +436,7 @@ class TestSelectEditDeleteCount:
 
     def test_clear(self, populated_db):
         db, _, ids = populated_db
-        db.add_individual("ToBeCleared", None, None)
+        db.add_individual("ToBeCleared")
         result = db.clear("individual")
         assert result is True
         assert db.count("individual") == 0
@@ -482,6 +586,35 @@ class TestExportHelpers:
         assert df is not None
         assert not df.empty
 
+    def test_export_data_mixed_timestamp_formats(self, tmp_db):
+        """CSV import keeps timestamps as typed, export parses what it can and keeps the rest"""
+        db, _ = tmp_db
+        station_id = db.add_station("S", 0, 0, 1)
+        upload_id = db.add_upload("/img")
+        timestamps = ["2024-01-01 10:00:00", "2024:01:02 03:04:05", "dawn", None]
+        for n, timestamp in enumerate(timestamps):
+            mid = db.add_media(upload_id, f"{n}.jpg", f"ts_sha_{n}" * 8, ".jpg", timestamp, station_id)
+            db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+
+        df = db.export_data()
+
+        assert [str(t) if t is not None else None for t in df.sort_values("relative_path")["timestamp"]] == [
+            "2024-01-01 10:00:00", "2024-01-02 03:04:05", "dawn", None]
+
+    def test_export_data_no_media_has_a_camera(self, tmp_db):
+        """Cameras exist, but every media.camera_id is NULL"""
+        db, _ = tmp_db
+        station_id = db.add_station("S", 0, 0, 1)
+        db.add_camera("Cam1", station_id)
+        upload_id = db.add_upload("/img")
+        mid = db.add_media(upload_id, "a.jpg", "nocam_sha" * 7, ".jpg", "2024-01-01 10:00:00", station_id)
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+
+        df = db.export_data()
+
+        assert df["camera_id"].tolist() == [None]
+        assert df["camera_name"].tolist() == [None]
+
     def test_retrieve_key(self, tmp_db):
         db, _ = tmp_db
         version, mpkey, chromakey = db.retrieve_key()
@@ -493,3 +626,48 @@ class TestExportHelpers:
         rows, columns = db.stations()
         assert rows is not None
         assert len(rows) >= 1
+
+
+class TestParameterisedQueries:
+    """Values are bound as parameters, so text with quotes needs no escaping"""
+
+    def test_query_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        db.add_individual("O'Brien", None)
+        assert db.query("SELECT name FROM individual WHERE name=?", ("O'Brien",)) == [("O'Brien",)]
+
+    def test_query_failure_returns_none(self, tmp_db, caplog):
+        db, _ = tmp_db
+        assert db.query("SELECT nope FROM individual") is None
+        assert [r.levelname for r in caplog.records] == ["ERROR"]
+
+    def test_select_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        iid = db.add_individual("O'Brien", None)
+        assert db.select("individual", "id", row_cond="name=?", params=("O'Brien",)) == [(iid,)]
+
+    def test_delete_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        keep = db.add_individual("Keep", None)
+        db.add_individual("O'Brien", None)
+        assert db.delete("individual", "name=?", ("O'Brien",)) is True
+        assert db.select("individual", "id") == [(keep,)]
+
+    def test_delete_with_params_removes_cascaded_embeddings(self, tmp_db):
+        db, _ = tmp_db
+        station = db.add_station("St. Mary's", None, None, 1)
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h1", ".jpg", "2024-01-01 10:00:00", station)
+        rid = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        db.add_emb(rid, [0.1, 0.2, 0.3])
+        assert db.delete("station", "name=?", ("St. Mary's",)) is True
+        assert db.count("roi") == 0
+        assert db.collection.get(ids=[str(rid)])["ids"] == []
+
+    def test_numpy_values_bind_as_numbers(self, tmp_db):
+        """Ids read from a DataFrame are numpy ints; bound as blobs they would match nothing"""
+        db, _ = tmp_db
+        iid = db.add_individual("A", None)
+        assert db.query("SELECT name FROM individual WHERE id=?", (np.int64(iid),)) == [("A",)]
+        assert db.edit_row("individual", iid, {"name": "B"}) is True
+        rid_station = db.add_station("S", np.float64(1.5), None, np.int64(1))
+        assert db.query("SELECT survey_id, typeof(survey_id), lat FROM station WHERE id=?", (rid_station,)) == [(1, "integer", 1.5)]

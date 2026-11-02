@@ -1,12 +1,17 @@
 """
 GUI Window for viewing images
 """
+import logging
+from pathlib import Path
 import pandas as pd
 from PyQt6.QtWidgets import (QHeaderView, QPushButton, QTableView, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QComboBox, QDialog)
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from matchypatchy.database.media import IMAGE_EXT, fetch_roi, fetch_individual
+from matchypatchy.database.media import (IMAGE_EXT, fetch_individual, delete_media, delete_rois, save_edits,
+                                         media_without_rois)
+from matchypatchy.database.location import camera_names
+from matchypatchy.database.thumbnails import THUMBNAIL_SIZE
 from matchypatchy.gui.media_table import MediaTable
 from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
@@ -14,25 +19,39 @@ from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButto
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 from matchypatchy.threads.table_thread import FetchTableThread
 from matchypatchy.threads.model_download_thread import load_model
+from matchypatchy.threads.match_object import viewpoint_value
+from matchypatchy.project import UsesProject
 
 
-class DisplayMedia(QWidget):
+logger = logging.getLogger(__name__)
+
+
+class DisplayMedia(UsesProject, QWidget):
     """GUI class for displaying and managing media content."""
 
     SAVE_STYLE = """ QPushButton { background-color: #2a3e5e; color: white; }"""
+    # widths of the columns that don't use the default, by column name
+    COLUMN_WIDTHS = {"select": 50,
+                     "thumbnail_path": THUMBNAIL_SIZE + 10,
+                     "filepath": 50,  # stretches to fill the rest
+                     "ext": 80,
+                     "timestamp": 180}
     edit_stack_signal = pyqtSignal(list)  # Signal to send edit stack to main GUI
 
     def __init__(self, parent, data_type=1):
         super().__init__()
         self.parent = parent
-        self.logger = parent.logger
-        self.cfg = parent.cfg
-        self.mpDB = parent.mpDB
+        self.project = parent.project
         self.VIEWPOINTS = load_model('VIEWPOINTS')
         # 0 for Media, 1 for ROI
         self.data_type = data_type
         self.valid_stations = []
         self.selected_rows = []
+        # whether Missing/Unspecified ROI was applied when a # of Rois was clicked, for Back
+        self._back_to_no_roi = False
+        # table loads, a newer load supersedes older ones still running
+        self._load_id = 0
+        self._loaders = []
 
         # data and edit stack
         self._data_raw = pd.DataFrame()
@@ -108,6 +127,11 @@ class DisplayMedia(QWidget):
         button_clear_filter.clicked.connect(self.clear_filters)
         second_layer.addWidget(button_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         second_layer.addWidget(button_clear_filter, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        # leaves the rois of a clicked # of Rois, only shown there
+        self.button_back = QPushButton("Back to All Media")
+        self.button_back.clicked.connect(self.back_to_media)
+        self.button_back.setVisible(False)
+        second_layer.addWidget(self.button_back, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         second_layer.addStretch()
         layout.addLayout(second_layer)
 
@@ -119,13 +143,16 @@ class DisplayMedia(QWidget):
         self.view.setSortingEnabled(True)
         self.view.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.view.horizontalHeader().setSortIndicatorShown(True)
+        # clicking a header cycles ascending, descending, then back to unsorted
+        self.view.horizontalHeader().setSortIndicatorClearable(True)
         self.view.horizontalHeader().setSectionsClickable(True)
-        self.view.verticalHeader().setDefaultSectionSize(150)  # row size = thumbnail with
-        self.view.horizontalHeader().setDefaultSectionSize(80)
+        self.view.verticalHeader().setDefaultSectionSize(THUMBNAIL_SIZE + 10)  # row size = thumbnail with
+        self.view.horizontalHeader().setDefaultSectionSize(100)
         self.view.verticalHeader().sectionDoubleClicked.connect(self.edit_row)
-        self.view.setColumnWidth(0, 30)  # Set the width of the select column
-        self.view.setColumnWidth(1, 150)  # Set the width of the thumbnail column
-        self.view.setColumnWidth(2, 50)  # Set the width of the filepath column, allow stretch
+        self.view.doubleClicked.connect(self.edit_thumbnail)
+        self.view.clicked.connect(self.show_media_rois)
+        self._set_column_widths()
+
         self.view.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
 
 
@@ -138,12 +165,17 @@ class DisplayMedia(QWidget):
         layout.addWidget(self.count_label, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
         self.setLayout(layout)
+        self.project.changed.connect(self.drop_edits)
 
-    def update_project(self, cfg, mpDB):
-        """Update database object"""
-        self.cfg = cfg
-        self.mpDB = mpDB
-        self.filterbar.update_project(mpDB)
+    def drop_edits(self):
+        """
+        Discard unsaved edits when another project is opened
+
+        Connected to project.changed in __init__. The edits refer to rois of the
+        previous project, so saving them would write to the wrong rows.
+        """
+        self.edit_stack = []
+        self.check_undo_button()
 
     # ==========================================================================
     # NAVIGATION
@@ -171,9 +203,8 @@ class DisplayMedia(QWidget):
         else:
             rois = None
             if self.data_type == 1:
-                selected_rows = self.view.selectionModel().selectedRows()
-                rois = self.media_table._data_filtered.loc[[index.row() for index in selected_rows], "id"]
-                rois = rois.tolist()
+                # rows ticked in the Select column, not the highlighted rows
+                rois = self.media_table.selectedIds()
                 if len(rois) > 1:
                     dialog = AlertPopup(self, prompt=f"Would you like to compare the {len(rois)} selected ROIs?")
                     if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -201,23 +232,21 @@ class DisplayMedia(QWidget):
         if hasattr(self, 'alert_box') and self.alert_box is not None:
             self.alert_box.update_prompt(prompt)
 
-    def hide_progress(self):
-        """Hide the progress bar in the progress popup"""
-        if hasattr(self, 'alert_box') and self.alert_box is not None:
-            self.alert_box.progress_bar.hide()
-
     def update_progress(self, progress):
         """Update the progress bar in the progress popup"""
+        # set_value, not set_counter, which closes the popup once the bar is full
+        # while the table is still being built
         if hasattr(self, 'alert_box') and self.alert_box is not None:
-            self.alert_box.set_counter(progress)
+            self.alert_box.set_value(progress)
 
     def set_progress_max(self, max_value):
-        """Set the maximum value for the progress bar"""
+        """Set the maximum value for the progress bar, 0 shows a busy bar"""
         # connects to FetchTableThread's progress_max signal
         if hasattr(self, 'alert_box') and self.alert_box is not None:
-            self.update_prompt("Collecting missing thumbnails...")
+            self.alert_box.set_min(0)
             self.alert_box.set_max(max_value)
-            self.alert_box.progress_bar.setFormat("%v/%m")   # shows percentage, e.g. 42%
+            self.alert_box.reset_counter()
+            self.alert_box.progress_bar.setFormat("%v/%m")   # shows count, e.g. 42/100
 
     def close_alert(self):
         """Close the alert popup"""
@@ -235,6 +264,15 @@ class DisplayMedia(QWidget):
         """
         # wipe previous selections
         self.filterbar.refresh_filters(prefilter=prefilter)
+        # individual, unidentified and clicked media filters only apply to rois
+        if prefilter and ('individual_id' in prefilter or prefilter.get('unidentified_only')
+                          or prefilter.get('media_ids')):
+            if self.data_type != 1:
+                self.data_type = 1
+                # change_type would load the table again
+                self.show_type.blockSignals(True)
+                self.show_type.setCurrentIndex(self.data_type)
+                self.show_type.blockSignals(False)
         # get current filters
         self.filters = self.filterbar.get_filters()
         self.valid_stations = self.filterbar.get_valid_stations()
@@ -257,6 +295,8 @@ class DisplayMedia(QWidget):
         self.filterbar.favorites_visible(self.data_type == 1)
         self.filterbar.viewpoint_visible(self.data_type == 1)
         self.filterbar.no_roi_visible(self.data_type == 0)
+        self.filterbar.media_only_visible(self.data_type == 1)
+        self.button_back.setVisible(self.data_type == 1 and self.filters['media_ids'] is not False)
 
     def clear_filters(self):
         """Clear all filters and refresh the table"""
@@ -268,25 +308,73 @@ class DisplayMedia(QWidget):
     # =========================================================================
 
     # CHANGE VIEW TYPE (FULL IMAGE / ROI)
-    def change_type(self):
-        """Change between full image and ROI view"""
+    def _drop_edits_to_change_view(self):
+        """
+        Ask before discarding unsaved edits for a change of view, False if the user declines
+
+        Called by change_type and show_media_rois, which both reload the table as the other
+        data type, so the edit stack's rows no longer apply. Kept separate so both ask the
+        same question and clear the undo button the same way.
+        """
         if len(self.edit_stack) > 0:
             dialog = AlertPopup(self, prompt="Are you sure you want to change view? There are unsaved changes that will be lost.")
             cont = dialog.exec()
             del dialog
             if cont == QDialog.DialogCode.Rejected:
-                self.show_type.blockSignals(True)
-                self.show_type.setCurrentIndex(self.data_type)
-                self.show_type.blockSignals(False)
-                return
+                return False
         # Clear unsaved edits since user confirmed they want to change view
         self.edit_stack.clear()
         self.check_undo_button()
-            
+        return True
+
+    def change_type(self):
+        """Change between full image and ROI view"""
+        if not self._drop_edits_to_change_view():
+            self.show_type.blockSignals(True)
+            self.show_type.setCurrentIndex(self.data_type)
+            self.show_type.blockSignals(False)
+            return
+
         # change type to selected
         self.data_type = self.show_type.currentIndex()
         # reload table
         self.toggle_filterbar_datatype()
+        self.load_table()
+
+    def show_media_rois(self, index):
+        """
+        Show the rois of the media whose # of Rois cell was clicked
+
+        Connected to the view's clicked signal; other cells, the roi view and media
+        without rois are ignored. The other filters are cleared so every roi shows.
+        """
+        if self.data_type != 0 or self.media_table._columns[index.column()] != "roi_count":
+            return
+        row = self.media_table._data_filtered.iloc[index.row()]
+        if pd.isna(row["roi_count"]) or int(row["roi_count"]) == 0:
+            return
+        if not self._drop_edits_to_change_view():
+            return
+        self._back_to_no_roi = self.filters['no_roi_mids'] is not False
+        # switches the view to rois
+        self.refresh_filters(prefilter={'media_ids': [int(row["id"])]})
+        self.load_table()
+
+    def back_to_media(self):
+        """
+        Leave a clicked media's rois for all media
+
+        Missing/Unspecified ROI is put back on if it was applied when the count was
+        clicked, its media looked up again since rois may have been drawn; the other
+        filters stay cleared
+        """
+        if not self._drop_edits_to_change_view():
+            return
+        self.data_type = 0
+        self.show_type.blockSignals(True)
+        self.show_type.setCurrentIndex(self.data_type)
+        self.show_type.blockSignals(False)
+        self.refresh_filters(prefilter={'no_roi_mids': True} if self._back_to_no_roi else None)
         self.load_table()
 
     # 1. RUN ON ENTRY
@@ -294,6 +382,8 @@ class DisplayMedia(QWidget):
         """Load media/roi data into table based on current data_type"""
         # check if there are rois first
         self.show_alert("Loading media...")
+        # nothing measurable until the loader starts generating thumbnails
+        self.set_progress_max(0)
         roi_n = self.mpDB.count('roi')
         media_n = self.mpDB.count('media')
 
@@ -307,11 +397,13 @@ class DisplayMedia(QWidget):
             del dialog
             return False
         else:
+            # kept above the loader's stage text so it is not overwritten
+            note = ""
             if self.data_type == 1 and roi_n == 0:
                 # no rois, default to full images
                 self.data_type = 0
-                self.update_prompt("No rois found, defaulting to full images.")
-                self.hide_progress()
+                note = "No rois found, defaulting to full images.\n"
+                self.update_prompt(note)
 
                 self.show_type.blockSignals(True)
                 self.show_type.setCurrentIndex(self.data_type)
@@ -319,25 +411,67 @@ class DisplayMedia(QWidget):
 
             # load table with current data type
             self.individual_list = fetch_individual(self.mpDB)
+            # a previous load still running is for the old view type or filters
+            self._stop_loader()
+            self._load_id += 1
+            load_id = self._load_id
             self.dataloader = FetchTableThread(self)
-            self.dataloader.loaded_data.connect(lambda data: self.handle_data_loaded(data))
+            # keep a reference until the thread finishes so it is not garbage collected
+            self._loaders.append(self.dataloader)
+            self.dataloader.finished.connect(lambda loader=self.dataloader: self._forget_loader(loader))
+            self.dataloader.loaded_data.connect(lambda data, load_id=load_id: self.handle_data_loaded(data, load_id))
             self.dataloader.progress_max.connect(lambda n_missing: self.set_progress_max(n_missing))
             self.dataloader.progress_update.connect(lambda progress: self.update_progress(progress))
+            self.dataloader.progress_prompt.connect(lambda prompt, note=note: self.update_prompt(note + prompt))
             # Connect the progress popup's rejected signal to stop the query container's calculation
             if hasattr(self, 'alert_box') and self.alert_box:
                 self.alert_box.rejected.connect(self.dataloader.requestInterruption)
-            self.dataloader.done.connect(self.close_alert)  # Close the progress dialog when done
+            # Close the progress dialog when done
+            self.dataloader.done.connect(lambda load_id=load_id: self._loader_done(load_id))
             self.dataloader.start()
             return True
 
-    def handle_data_loaded(self, data=None):
+    def _stop_loader(self):
+        """Interrupt and disconnect the running FetchTableThread, if any"""
+        loader = getattr(self, 'dataloader', None)
+        if loader is None or not loader.isRunning():
+            return
+        loader.requestInterruption()
+        for signal in (loader.loaded_data, loader.progress_max, loader.progress_update,
+                       loader.progress_prompt, loader.done):
+            try:
+                signal.disconnect()
+            except TypeError:
+                pass  # nothing connected
+
+    def _forget_loader(self, loader):
+        """Drop the reference to a finished FetchTableThread"""
+        if loader in self._loaders:
+            self._loaders.remove(loader)
+
+    def _loader_done(self, load_id):
+        """Close the progress popup when the current load finishes"""
+        if load_id == self._load_id:
+            self.close_alert()
+
+    def handle_data_loaded(self, data=None, load_id=None):
         """Handle data loaded from the FetchTableThread"""
+        # ignore results from a load that was superseded, eg. by changing view type,
+        # they do not match the current headers
+        if load_id is not None and load_id != self._load_id:
+            return
         self._data_raw = data
         self.apply_edits()  # Apply any pending edits to the raw data before filtering
         self.filter_data()  # Apply filters to the raw data to get the filtered data
         headers = self._get_headers()
+        # widths set by hand are kept until the view type swaps the columns
+        columns_changed = self.media_table._columns != [h[0] for h in headers.values()]
         self.media_table.receiveData(self._data_filtered, headers=headers) # Send the filtered data to the media table for display
+        # reloaded rows come back unticked
+        self.button_select.setChecked(False)
         self._apply_sort()
+        if columns_changed:
+            self._set_column_widths()
         self._set_delegates()
         self.update_count_label()
         self.update_edd_buttons()
@@ -345,11 +479,17 @@ class DisplayMedia(QWidget):
     def refresh_table(self, reload=False):
         """Refresh the table by reapplying edits and filters"""
         if reload:
+            # rois may have been added or removed, so the No ROI list is out of date
+            # (keeps self.filters otherwise as last applied, not the unapplied filterbar choices)
+            if self.filters['no_roi_mids'] is not False:
+                self.filters['no_roi_mids'] = media_without_rois(self.mpDB)
             self.load_table()
         else:
+            # keep ticked rows by id, their positions change when re-filtered and sorted
+            selected_ids = self.media_table.selectedIds()
             self.apply_edits()
             self.filter_data()
-            self.media_table.receiveData(self._data_filtered, selected_rows=self.selected_rows)
+            self.media_table.receiveData(self._data_filtered, selected_ids=selected_ids)
             self._apply_sort()
             self.update_count_label()
             self.update_edd_buttons()
@@ -382,7 +522,7 @@ class DisplayMedia(QWidget):
         if self._data_filtered.empty:
             return
         # self.valid_cameras =  # select all cameras for now
-        self.valid_cameras = dict(self.mpDB.select("camera", columns="id, name"))
+        self.valid_cameras = dict(camera_names(self.mpDB))
         # Location Filter (depends on prefilterd stations from MediaDisplay)
         if self.valid_stations:
             self._data_filtered = self._data_filtered[self._data_filtered['station_id'].isin(list(self.valid_stations.keys()))]
@@ -398,7 +538,9 @@ class DisplayMedia(QWidget):
         if self.data_type == 1:
             # Viewpoint Filter
             if self.filters['active_viewpoint'][0] > 0:
-                self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'] == self.filters['active_viewpoint'][0] - 1]
+                # filter by the stored value labelled with the selected side
+                value = viewpoint_value(self.filters['active_viewpoint'][1])
+                self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'] == value]
             elif self.filters['active_viewpoint'][0] is None:
                 self._data_filtered = self._data_filtered[self._data_filtered['viewpoint'].isna()]
             # Individual Filter
@@ -412,6 +554,9 @@ class DisplayMedia(QWidget):
             # Favorites Filter
             if self.filters['favorites_only']:
                 self._data_filtered = self._data_filtered[self._data_filtered['favorite'] == 1]
+            # Clicked Media Filter
+            if self.filters['media_ids'] is not False:
+                self._data_filtered = self._data_filtered[self._data_filtered['media_id'].isin(self.filters['media_ids'])]
         else:
             if self.filters['no_roi_mids'] is not False:
                 self._data_filtered = self._data_filtered[self._data_filtered['id'].isin(self.filters['no_roi_mids'])]
@@ -494,37 +639,33 @@ class DisplayMedia(QWidget):
         if len(self.edit_stack) > 0:
             print("Undoing last edit:", self.edit_stack[-1])
             self.edit_stack.pop()
+            self.check_undo_button()
             self.refresh_table()
 
     # EDIT POPUP ---------------------------------------------------------------
 
     def save(self):
-        """Save changes to the media table in queue order rather than stack"""
-        #self.media_table.save_changes()
-        for edit in self.edit_stack:
-            replace_dict = {edit.reference: edit.new_value}
-            # roi view
-            if self.data_type == 1:
-                # edit media table value
-                if edit.reference in {'station_id', 'sequence_id', 'external_id', 'comment'}:
-                    self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
-                # edit individual table value
-                elif edit.reference in {'age', 'sex'}:
-                    iid = self._data_filtered.loc[self._data_filtered['id'] == edit.rid, 'individual_id'].values[0]
-                    iid = int(iid) if pd.notna(iid) else None
-                    if iid is not None:
-                        self.mpDB.edit_row("individual", iid, replace_dict, allow_none=False, quiet=False)
-                # edit roi table value
-                else:
-                    self.mpDB.edit_row("roi", edit.rid, replace_dict, allow_none=False, quiet=False)
-            # media view
-            else:
-                self.mpDB.edit_row("media", edit.mid, replace_dict, allow_none=False, quiet=False)
+        """Save changes to the database in the order they were made"""
+        failed = save_edits(self.mpDB, self.edit_stack, self._individual_of, media_only=self.data_type == 0)
 
-        # reload data and refresh table
-        self.edit_stack = []
-        #self.clear_and_load_contents(self.data_type)
+        # keep unsaved edits so they are not silently lost
+        self.edit_stack = failed
         self.check_undo_button()
+        if failed:
+            dialog = AlertPopup(self, prompt=f"{len(failed)} change(s) could not be saved, see the log for details.")
+            dialog.exec()
+            del dialog
+        # reload so filters and undo work from the saved values
+        self.refresh_table(reload=True)
+
+    def _individual_of(self, rid):
+        """
+        A roi's individual as loaded, for save_edits to apply sex edits to
+
+        Looks in the unfiltered data, the roi may be hidden by the current filter.
+        """
+        rows = self._data_raw.loc[self._data_raw['id'] == rid, 'individual_id']
+        return rows.iloc[0] if len(rows) else None
 
     def edit_row(self, row):
         """Edit a single row"""
@@ -543,20 +684,34 @@ class DisplayMedia(QWidget):
                 video_row['media_id'] = mid
                 # clear out roi columns for video row so mediawidget behaves correctly
                 video_row[['id', 'frame', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h',
-                           'viewpoint', 'individual_id', 'age', 'sex']] = pd.NA
+                           'viewpoint', 'individual_id', 'sex']] = pd.NA
                 data = pd.concat([data, video_row], ignore_index=True)  # add video row
 
         # Launch Media Edit Popup
-        roi_updated = False
+        if not self._media_found(data):
+            return
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
-            roi_updated = dialog.roi_updated
             self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
-            del dialog
+        # rows deleted or rois redrawn in the popup need a reload, even after Cancel
+        roi_updated = dialog.roi_updated
+        # free the popup (and its media player), it is parented to this view
+        dialog.deleteLater()
+        del dialog
         # reload data and update buttons
         self.refresh_table(reload=roi_updated)
+
+    def edit_thumbnail(self, index):
+        """
+        Edit a single row when its thumbnail is double-clicked.
+
+        Connected to the view's doubleClicked signal. Only the thumbnail column opens the
+        popup, double-clicking the editable columns edits them in place instead.
+        """
+        if self.media_table._columns[index.column()] == "thumbnail_path":
+            self.edit_row(index.row())
 
     def edit_row_multiple(self):
         """Edit multiple selected rows"""
@@ -564,14 +719,39 @@ class DisplayMedia(QWidget):
         data = self.media_table._data_filtered.iloc[self.selected_rows].reset_index(drop=True)
         current_image_index = 0
         # Launch Media Edit Popup
+        if not self._media_found(data):
+            return
         dialog = MediaEditPopup(self, data, self.data_type, current_image_index=current_image_index)
         if dialog.exec():
             edit_stack = dialog.get_edit_stack()
             self.edit_stack.extend(edit_stack)  # send to media table
             self.check_undo_button()
-            del dialog
+        # rows deleted or rois redrawn in the popup need a reload
+        roi_updated = dialog.roi_updated
+        # free the popup (and its media player), it is parented to this view
+        dialog.deleteLater()
+        del dialog
         # reload data and update buttons
-        self.refresh_table()
+        self.refresh_table(reload=roi_updated)
+
+    def _media_found(self, data):
+        """
+        Whether every media file in data exists, warning the user if not.
+
+        Called by edit_row and edit_row_multiple before opening MediaEditPopup, which
+        crashes on a missing file, e.g. when the source directories moved and have not
+        been updated. Kept separate so both share the check and the message.
+        """
+        missing = [f for f in data['filepath'].dropna().unique() if not Path(f).is_file()]
+        if not missing:
+            return True
+        logger.warning(f"Could not find {len(missing)} media file(s), e.g. {missing[0]}")
+        dialog = AlertPopup(self, prompt=f"Could not find {len(missing)} media file(s), e.g.\n{missing[0]}\n\n"
+                                         "If the media has moved, update its location in\n"
+                                         "Edit > Configuration > Edit Source Directories.")
+        dialog.exec()
+        del dialog
+        return False
 
     def duplicate(self):
         """Duplicate selected rows in the database."""
@@ -594,20 +774,12 @@ class DisplayMedia(QWidget):
         if len(self.selected_rows) > 0:
             dialog = AlertPopup(self, f"""Are you sure you want to delete {len(self.selected_rows)} files? This cannot be undone.""", title="Warning")
             if dialog.exec():
-                for row in self.selected_rows:
-                    if self.data_type == 0:
-                        id = int(self.media_table._data_filtered.at[row, "id"])
-                        # delete all rois associated with this media
-                        rois = fetch_roi(self.mpDB, media_id=id)
-                        if len(rois) > 0:
-                            for roi in rois['roi_id']:
-                                self.mpDB.delete_emb(roi)
-                        # cascade delete will handle associated roi_thumbnails and roi entries
-                        self.mpDB.delete('media', f'id={id}')
-                    else:
-                        id = int(self.media_table._data_filtered.at[row, "id"])
-                        self.mpDB.delete_emb(id)
-                        self.mpDB.delete('roi', f'id={id}')
+                ids = self.media_table._data_filtered.loc[self.selected_rows, "id"].tolist()
+                # media take their rois, thumbnails and embeddings with them
+                if self.data_type == 0:
+                    delete_media(self.mpDB, ids)
+                else:
+                    delete_rois(self.mpDB, ids)
                 # Reload updated data
                 self.load_table()
             del dialog
@@ -627,40 +799,47 @@ class DisplayMedia(QWidget):
                            8: ["viewpoint", "Viewpoint"],
                            9: ["individual_id", "Individual"],
                            10: ["sex", "Sex"],
-                           11: ["age", "Age"],
-                           12: ["reviewed", "Reviewed"],
-                           13: ["favorite", "Favorite"],
-                           14: ["comment", "Comment"]}
+                           11: ["reviewed", "Reviewed"],
+                           12: ["favorite", "Favorite"],
+                           13: ["comment", "Comment"]}
             else:
                 headers = {0: ["select", "Select"],
                            1: ["thumbnail_path", "Thumbnail"],
                            2: ["filepath", "Filepath"],
-                           3: ["timestamp", "Timestamp"],
-                           4: ["station_id", "Station"],
-                           5: ["camera_id", "Camera"],
-                           6: ["sequence_id", "Sequence ID"],
-                           7: ["external_id", "External ID"],
-                           8: ["comment", "Comment"],
-                           9: ["roi_count", "# of Rois"]}
+                           3: ["ext", "Extension"],
+                           4: ["timestamp", "Timestamp"],
+                           5: ["station_id", "Station"],
+                           6: ["camera_id", "Camera"],
+                           7: ["sequence_id", "Sequence ID"],
+                           8: ["external_id", "External ID"],
+                           9: ["comment", "Comment"],
+                           10: ["roi_count", "# of Rois"]}
             return headers
+
+    def _set_column_widths(self):
+        """
+        Size the table's columns by name, the rest at the header's default width
+
+        Called from __init__ and by handle_data_loaded when the headers change, since
+        the view keeps widths by position and the two data types put different columns
+        at the same position (eg. Extension is only in the media view).
+        """
+        default = self.view.horizontalHeader().defaultSectionSize()
+        for i, column in enumerate(self.media_table._columns):
+            self.view.setColumnWidth(i, self.COLUMN_WIDTHS.get(column, default))
 
     def _set_delegates(self):
         """Set delegates for the table based on the data type"""
         VIEWPOINT_COLUMN = 8
         SEX_COLUMN = 10
-        AGE_COLUMN = 11    
 
         if self.data_type == 1:  # ROI view
             combo_items = list(self.VIEWPOINTS.values())[1:]
             self.view.setItemDelegateForColumn(VIEWPOINT_COLUMN, ComboBoxDelegate(combo_items, self))
             # SEX COMBOBOX
-            combo_items = ['None', 'Male', 'Female']
+            combo_items = ['Unknown', 'Male', 'Female']
             self.view.setItemDelegateForColumn(SEX_COLUMN, ComboBoxDelegate(combo_items, self))
-            # AGE COMBOBOX
-            combo_items = ['None', 'Juvenile', 'Subadult', 'Adult']
-            self.view.setItemDelegateForColumn(AGE_COLUMN, ComboBoxDelegate(combo_items, self))
 
         else:
             self.view.setItemDelegateForColumn(VIEWPOINT_COLUMN, None)
             self.view.setItemDelegateForColumn(SEX_COLUMN, None)
-            self.view.setItemDelegateForColumn(AGE_COLUMN, None)
