@@ -12,9 +12,11 @@ from PIL import Image
 
 class TestVideoPlayerBarGetFrame:
     def _bar(self, fps, position=2000):
+        from matchypatchy.gui.widgets.widget_media import VideoPlayerBar
         bar = MagicMock()
         bar.player.metaData.return_value.value.return_value = fps
         bar.player.position.return_value = position
+        bar.get_fps = lambda: VideoPlayerBar.get_fps(bar)
         return bar
 
     def test_frame_from_frame_rate(self):
@@ -25,6 +27,43 @@ class TestVideoPlayerBarGetFrame:
         """No frame rate metadata (or not loaded yet): value() is None"""
         from matchypatchy.gui.widgets.widget_media import VideoPlayerBar
         assert VideoPlayerBar.get_frame(self._bar(None)) == 60
+
+
+class TestVideoPlayerBarStepFrame:
+    def _bar(self, position, duration=2000, fps=25.0):
+        from matchypatchy.gui.widgets.widget_media import VideoPlayerBar
+        bar = MagicMock()
+        bar.player.metaData.return_value.value.return_value = fps
+        bar.player.position.return_value = position
+        bar.player.duration.return_value = duration
+        bar.get_fps = lambda: VideoPlayerBar.get_fps(bar)
+        bar.get_frame = lambda: VideoPlayerBar.get_frame(bar)
+        return bar
+
+    def _step(self, bar, step):
+        from matchypatchy.gui.widgets.widget_media import VideoPlayerBar
+        VideoPlayerBar.step_frame(bar, step)
+        bar.player.pause.assert_called_once()
+        calls = bar.player.setPosition.call_args_list
+        return calls[0][0][0] if calls else None
+
+    def test_forward_seeks_to_middle_of_next_frame(self):
+        # frame 10 at 25 fps, frame 11 spans 440-480 ms
+        position = self._step(self._bar(400), 1)
+        assert position == 460
+        assert int(position / 1000 * 25) == 11
+
+    def test_back_seeks_to_previous_frame(self):
+        position = self._step(self._bar(400), -1)
+        assert int(position / 1000 * 25) == 9
+
+    def test_back_stops_at_first_frame(self):
+        position = self._step(self._bar(0), -1)
+        assert int(position / 1000 * 25) == 0
+
+    def test_forward_stops_at_last_frame(self):
+        # frame 49 is the last of a 2000 ms video at 25 fps
+        assert self._step(self._bar(1980), 1) is None
 
 
 def _image_widget_class():
