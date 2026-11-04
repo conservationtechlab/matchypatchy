@@ -246,3 +246,88 @@ class TestRelativePathUniqueness:
 
         assert again == "duplicate_path"
         assert db.count("media") == 1
+
+
+# Stations repeating a name within a survey, as folder imports ("Default Station") and the
+# station manager could add them before schema 3. Survey 2 reuses "Site01", which is allowed.
+DUPLICATE_STATIONS = """
+INSERT INTO survey (id, name, region_id) VALUES (2, 'Other Survey', 1);
+INSERT INTO station (id, name, lat, long, survey_id) VALUES (2, 'Site01', 32.5, -117.1, 1);
+INSERT INTO station (id, name, survey_id) VALUES (3, 'Default Station', 1);
+INSERT INTO station (id, name, survey_id) VALUES (4, 'Default Station', 1);
+INSERT INTO station (id, name, survey_id) VALUES (5, 'Site01', 2);
+INSERT INTO camera (id, name, station_id) VALUES (1, 'cam1', 1);
+INSERT INTO camera (id, name, station_id) VALUES (2, 'cam1', 2);
+INSERT INTO camera (id, name, station_id) VALUES (3, 'cam2', 2);
+INSERT INTO camera (id, name, station_id) VALUES (4, 'cam1', 5);
+INSERT INTO media (id, base_dir_id, relative_path, sha256, ext, timestamp, station_id, camera_id)
+    VALUES (4, 1, 'Site01b/IMG_0001.JPG', 'hash5', '.jpg', '2023-01-02 00:00:00', 2, 2);
+INSERT INTO media (id, base_dir_id, relative_path, sha256, ext, timestamp, station_id, camera_id)
+    VALUES (5, 1, 'Site01b/IMG_0002.JPG', 'hash6', '.jpg', '2023-01-02 00:01:00', 2, 3);
+INSERT INTO media (id, base_dir_id, relative_path, sha256, ext, timestamp, station_id)
+    VALUES (6, 1, 'IMG_0003.JPG', 'hash7', '.jpg', '2023-01-02 00:02:00', 4);
+INSERT INTO media (id, base_dir_id, relative_path, sha256, ext, timestamp, station_id, camera_id)
+    VALUES (7, 1, 'Other/IMG_0001.JPG', 'hash8', '.jpg', '2023-01-02 00:03:00', 5, 4);
+"""
+
+
+@pytest.fixture
+def station_migrated_db(tmp_path, null_logger, monkeypatch):
+    """A schema 2 database with repeated station names, opened (and migrated) by the current version"""
+    _old_database(tmp_path, schema_version=1)
+    conn = sqlite3.connect(tmp_path / "matchypatchy.db")
+    with monkeypatch.context() as m:
+        m.setattr(setup, "SCHEMA_VERSION", 2)
+        assert setup.migrate_database(conn, tmp_path / "matchypatchy.db") == 2
+    conn.executescript(DUPLICATE_STATIONS)
+    conn.commit()
+    conn.close()
+    db = MatchyPatchyDB(str(tmp_path))
+    yield db
+    db.close()
+
+
+class TestMigrateStationNamesUniqueWithinSurvey:
+    def test_opens_and_validates(self, station_migrated_db):
+        db = station_migrated_db
+        assert db.key == KEY
+        assert db.db.execute("SELECT schema_version FROM metadata").fetchone()[0] == SCHEMA_VERSION
+
+    def test_repeats_merge_into_oldest_station(self, station_migrated_db):
+        db = station_migrated_db
+        assert sorted(db.select("station", columns="id, name, survey_id")) == [
+            (1, "Site01", 1), (3, "Default Station", 1), (5, "Site01", 2)]
+
+    def test_merged_station_takes_missing_lat_long(self, station_migrated_db):
+        db = station_migrated_db
+        assert db.select("station", columns="lat, long", row_cond="id=1") == [(32.5, -117.1)]
+
+    def test_media_and_cameras_move_to_kept_station(self, station_migrated_db):
+        db = station_migrated_db
+        assert db.select("media", columns="id, station_id, camera_id", row_cond="id >= 4") == [
+            (4, 1, 1), (5, 1, 3), (6, 3, None), (7, 5, 4)]
+        # cam1 of the merged station joins cam1 of the kept one, cam2 moves over, survey 2's cam1 stays
+        assert db.select("camera", columns="id, name, station_id") == [
+            (1, "cam1", 1), (3, "cam2", 1), (4, "cam1", 5)]
+
+    def test_name_repeated_within_survey_is_refused(self, station_migrated_db):
+        db = station_migrated_db
+        assert db.add_station("Site01", None, None, 1) is None
+        assert db.add_station("Site01", None, None, 2) is None
+        assert db.add_station("Site02", None, None, 1) is not None
+
+
+class TestStationNameUniqueness:
+    def test_same_name_in_two_surveys(self, tmp_db):
+        db, _ = tmp_db
+        other = db.add_survey("Other", None, None, None)
+        first = db.add_station("Site01", None, None, 1)
+        second = db.add_station("Site01", None, None, other)
+        assert None not in (first, second)
+        assert first != second
+
+    def test_same_name_in_one_survey_is_refused(self, tmp_db):
+        db, _ = tmp_db
+        db.add_station("Site01", None, None, 1)
+        assert db.add_station("Site01", None, None, 1) is None
+        assert db.count("station") == 1
