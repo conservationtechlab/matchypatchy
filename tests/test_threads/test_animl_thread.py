@@ -103,23 +103,54 @@ def _cfg(tmp_path, smart_frames=True, n_frames=2):
 
 
 class TestBuildManifestThread:
-    def test_calls_build_file_manifest_and_emits_manifest(self, monkeypatch):
-        expected = pd.DataFrame([{"filepath": "/x.jpg"}])
+    def test_builds_each_folder_and_emits_one_manifest(self, monkeypatch, tmp_path):
+        (tmp_path / "sub").mkdir()
         calls = []
 
-        def _build_file_manifest(directory, exif, data_timezone):
-            calls.append((directory, exif, data_timezone))
-            return expected
+        def _build_file_manifest(directory, exif, data_timezone, recursive):
+            calls.append((Path(directory), exif, data_timezone, recursive))
+            return pd.DataFrame([{"filepath": str(Path(directory, "x.jpg"))}])
 
         monkeypatch.setattr(animl_thread.animl, "build_file_manifest", _build_file_manifest)
-        thread = animl_thread.BuildManifestThread("/data", "UTC")
+        thread = animl_thread.BuildManifestThread(tmp_path, "UTC")
         thread.manifest = SignalSpy()
 
         thread.run()
 
-        assert calls == [("/data", True, "UTC")]
+        assert sorted(calls) == [(tmp_path, True, "UTC", False), (tmp_path / "sub", True, "UTC", False)]
         assert len(thread.manifest.calls) == 1
-        assert thread.manifest.calls[0][0].equals(expected)
+        emitted = thread.manifest.calls[0][0]
+        assert sorted(emitted["filepath"]) == [str(tmp_path / "sub" / "x.jpg"), str(tmp_path / "x.jpg")]
+        assert list(emitted.index) == [0, 1]
+
+    def test_empty_folders_emit_empty_manifest(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(animl_thread.animl, "build_file_manifest", lambda *a, **k: pd.DataFrame())
+        thread = animl_thread.BuildManifestThread(tmp_path, None)
+        thread.manifest = SignalSpy()
+
+        thread.run()
+
+        assert thread.manifest.calls[0][0].empty
+
+    def test_interruption_stops_between_folders_without_emitting(self, monkeypatch, tmp_path):
+        """Cancelling the import popup stops the scan instead of reading every file"""
+        for name in ("a", "b", "c"):
+            (tmp_path / name).mkdir()
+        thread = animl_thread.BuildManifestThread(tmp_path, None)
+        thread.manifest = SignalSpy()
+        calls = []
+
+        def _build_file_manifest(directory, **_kwargs):
+            calls.append(directory)
+            thread.requestInterruption()  # cancelled while the first folder is read
+            return pd.DataFrame([{"filepath": "x.jpg"}])
+
+        monkeypatch.setattr(animl_thread.animl, "build_file_manifest", _build_file_manifest)
+
+        thread.run()
+
+        assert len(calls) == 1
+        assert thread.manifest.calls == []
 
 
 class TestVerifyNewBaseDirsThread:
