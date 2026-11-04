@@ -1,12 +1,13 @@
 """
 Filterbar Widget for MatchyPatchy GUI
 """
+from collections import Counter
 
 from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QSizePolicy, QCheckBox, QComboBox
 from PyQt6.QtGui import QStandardItemModel
 from PyQt6.QtCore import Qt
 
-from matchypatchy.database.location import region_names, survey_names, station_names
+from matchypatchy.database.location import region_names, survey_names, station_names, station_survey_names
 from matchypatchy.database.individual import individual_names
 from matchypatchy.database.media import media_without_rois
 from matchypatchy.project import UsesProject
@@ -115,7 +116,7 @@ class FilterBar(UsesProject, QWidget):
         else:
             survey_ids = None
         self.valid_stations = dict(station_names(self.mpDB, survey_ids=survey_ids))
-        self.station_list_ordered = [(0, 'Station')] + list(self.valid_stations.items())
+        self.station_list_ordered = [(0, 'Station')] + self._station_items()
         self._fill(self.station_select, self.station_list_ordered, station_id)
         self.individual_list_ordered = [(0, 'Individual')] + individual_names(self.mpDB)
         self._fill(self.individual_select, self.individual_list_ordered, individual_id)
@@ -316,9 +317,24 @@ class FilterBar(UsesProject, QWidget):
             self.valid_stations = dict(station_names(self.mpDB, survey_ids=[s[0] for s in survey_ids]))
 
         # Update station list to reflect active survey
-        self.station_list_ordered = [(0, 'Station')] + list(self.valid_stations.items())
+        self.station_list_ordered = [(0, 'Station')] + self._station_items()
         self.station_select.addItems([el[1] for el in self.station_list_ordered])
         self.station_select.blockSignals(False)
+
+    def _station_items(self):
+        """
+        (id, label) of the valid stations for the station combobox
+
+        Called by filter_stations and lists_written, which both rebuild the list.
+        Station names repeat across surveys, so with more than one survey listed a
+        repeated name is labelled with its survey ("Site01 (Survey 2023)") to tell
+        them apart. valid_stations keeps the plain names, the media view shows them.
+        """
+        counts = Counter(self.valid_stations.values())
+        repeated = [sid for sid, name in self.valid_stations.items() if counts[name] > 1]
+        surveys = station_survey_names(self.mpDB, repeated)
+        return [(sid, f"{name} ({surveys[sid]})" if sid in surveys else name)
+                for sid, name in self.valid_stations.items()]
 
     def get_filters(self):
         """

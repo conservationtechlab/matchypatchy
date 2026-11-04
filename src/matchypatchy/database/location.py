@@ -107,6 +107,18 @@ def station_names(mpDB, survey_ids=None):
     return mpDB.query(f"SELECT id, name FROM station WHERE survey_id IN ({placeholders});", survey_ids) or []
 
 
+def station_survey_names(mpDB, station_ids):
+    """{station id: name of its survey} for station_ids"""
+    station_ids = [int(s) for s in station_ids]
+    if not station_ids:
+        return {}
+    placeholders = ", ".join("?" * len(station_ids))
+    rows = mpDB.query(f"""SELECT station.id, survey.name FROM station
+                          JOIN survey ON survey.id = station.survey_id
+                          WHERE station.id IN ({placeholders});""", station_ids) or []
+    return dict(rows)
+
+
 def camera_names(mpDB):
     """(id, name) of every camera"""
     return mpDB.query("SELECT id, name FROM camera;") or []

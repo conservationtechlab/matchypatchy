@@ -1366,6 +1366,7 @@ class TestFilterBarListsWritten:
         bar.mpDB = db
         bar._chosen_id = FilterBar._chosen_id
         bar._fill = FilterBar._fill
+        bar._station_items = lambda: FilterBar._station_items(bar)
         bar.region_list_ordered = [(0, "Region")] + db.query("SELECT id, name FROM region")
         bar.survey_list_ordered = [(0, "Survey")] + db.query("SELECT id, name FROM survey")
         bar.station_list_ordered = [(0, "Station")] + db.query("SELECT id, name FROM station")
@@ -1400,6 +1401,24 @@ class TestFilterBarListsWritten:
         assert bar.station_select.currentText() == "St"
         # stations listed for the chosen survey only
         assert bar.station_select.items == ["Station", "St", "St2"]
+
+    def test_repeated_station_names_labelled_with_survey(self, tmp_db):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        db, _ = tmp_db
+        s1 = db.add_survey("S1", None, None, None)
+        s2 = db.add_survey("S2", None, None, None)
+        a1, a2 = db.add_station("A", None, None, s1), db.add_station("A", None, None, s2)
+        b = db.add_station("B", None, None, s2)
+        bar = self._bar(db)
+        # no survey chosen: every station, the repeated name told apart by survey
+        FilterBar.lists_written(bar, "station")
+        assert bar.station_list_ordered == [(0, "Station"), (a1, "A (S1)"), (a2, "A (S2)"), (b, "B")]
+        # the media view maps ids to the plain names
+        assert bar.valid_stations == {a1: "A", a2: "A", b: "B"}
+        # one survey chosen: no repeats, no labels
+        self._choose(bar.survey_select, bar.survey_list_ordered, s2)
+        FilterBar.lists_written(bar, "station")
+        assert bar.station_select.items == ["Station", "A", "B"]
 
     def test_deleted_choice_goes_back_to_all(self, tmp_db):
         from matchypatchy.gui.widgets.widget_filterbar import FilterBar
