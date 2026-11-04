@@ -941,11 +941,65 @@ class TestStationPopup:
         from matchypatchy.gui.dialogs.popup_station import StationPopup
         popup = MagicMock()
         popup.survey_id = (1, "Survey")
+        popup._name_taken.return_value = False
         popup.mpDB.add_station.return_value = None
         with patch(f"{STATION}.StationFillPopup") as fill_cls:
             fill_cls.return_value.exec.return_value = True
             StationPopup.add(popup)
         popup._warn.assert_called_once()
+
+    def _popup(self, stations):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = MagicMock()
+        popup.survey_id = (1, "Survey")
+        popup.station_list_ordered = stations
+        popup._name_taken = lambda name, station_id=None: StationPopup._name_taken(popup, name, station_id)
+        return popup
+
+    def test_name_taken_in_survey(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = self._popup([(1, "Site01"), (2, "Site02")])
+        assert StationPopup._name_taken(popup, "Site01") is True
+        assert StationPopup._name_taken(popup, "Site03") is False
+        # the station being edited keeps its own name
+        assert StationPopup._name_taken(popup, "Site01", station_id=1) is False
+        assert StationPopup._name_taken(popup, "Site02", station_id=1) is True
+
+    def test_add_repeated_name_warns_without_adding(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = self._popup([(1, "Site01")])
+        with patch(f"{STATION}.StationFillPopup") as fill_cls:
+            fill_cls.return_value.exec.return_value = True
+            fill_cls.return_value.get_name.return_value = "Site01"
+            StationPopup.add(popup)
+        popup.mpDB.add_station.assert_not_called()
+        assert "already exists in Survey" in popup._warn.call_args[0][0]
+
+    def test_rename_to_repeated_name_warns_without_saving(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = self._popup([(1, "Site01"), (2, "Site02")])
+        popup.list.currentRow.return_value = 1
+        with patch(f"{STATION}.StationFillPopup") as fill_cls, \
+                patch(f"{STATION}.get_station", return_value=("Site02", None, None)), \
+                patch(f"{STATION}.update_station") as update:
+            fill_cls.return_value.exec.return_value = True
+            fill_cls.return_value.get_name.return_value = "Site01"
+            StationPopup.edit(popup)
+        update.assert_not_called()
+        assert "already exists in Survey" in popup._warn.call_args[0][0]
+
+    def test_edit_keeping_name_saves(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = self._popup([(1, "Site01"), (2, "Site02")])
+        popup.list.currentRow.return_value = 1
+        with patch(f"{STATION}.StationFillPopup") as fill_cls, \
+                patch(f"{STATION}.get_station", return_value=("Site02", None, None)), \
+                patch(f"{STATION}.update_station", return_value=True) as update:
+            fill_cls.return_value.exec.return_value = True
+            fill_cls.return_value.get_name.return_value = "Site02"
+            StationPopup.edit(popup)
+        update.assert_called_once()
+        popup._warn.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
