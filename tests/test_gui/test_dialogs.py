@@ -421,6 +421,18 @@ class TestImportFolderCancel:
         ImportFolderPopup.reject(popup)
         popup.import_thread.requestInterruption.assert_called_once()
 
+    def test_cancel_during_search_stops_it_and_closes(self):
+        from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
+        popup = MagicMock(spec=ImportFolderPopup)  # spec so super().reject() accepts it
+        popup.import_thread = None
+        popup.build_thread = MagicMock()
+        popup.build_thread.isRunning.return_value = True
+        with patch(f"{FOLDER}.QDialog.reject") as close:
+            ImportFolderPopup.reject(popup)
+        popup.build_thread.requestInterruption.assert_called_once()
+        assert popup._closed is True
+        close.assert_called_once()
+
     def test_manifest_after_cancel_is_ignored(self):
         from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
         import pandas as pd
