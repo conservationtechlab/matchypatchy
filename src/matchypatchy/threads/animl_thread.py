@@ -3,6 +3,7 @@ QThread Class for Processing BBox, Frames, BuildFileManifest with ANIML
 
 """
 import logging
+import os
 from pathlib import Path
 import animl
 import pandas as pd
@@ -31,7 +32,25 @@ class BuildManifestThread(QThread):
         self.timezone = timezone
 
     def run(self):
-        self.data = animl.build_file_manifest(self.directory, exif=True, data_timezone=self.timezone)
+        """
+        Build the manifest one folder at a time, stopping between folders on interruption
+
+        animl.build_file_manifest reads every file's exif in one call and can't be
+        interrupted, so a recursive call kept scanning after the import popup was
+        cancelled. Calling it per folder (non-recursive) keeps animl's exif and
+        timestamp handling while letting Cancel stop the scan. Nothing is emitted
+        when interrupted.
+        """
+        parts = []
+        for directory, _, _ in os.walk(self.directory):
+            if self.isInterruptionRequested():
+                return
+            part = animl.build_file_manifest(directory, exif=True, data_timezone=self.timezone, recursive=False)
+            if not part.empty:
+                parts.append(part)
+        if self.isInterruptionRequested():
+            return
+        self.data = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
         self.manifest.emit(self.data)
 
 
