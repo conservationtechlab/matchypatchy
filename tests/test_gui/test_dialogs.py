@@ -502,7 +502,8 @@ class TestFolderImportCamera:
         thread.COMMIT_INTERVAL = FolderImportThread.COMMIT_INTERVAL
         thread.active_survey = (1, "S")
         thread.isInterruptionRequested.return_value = False
-        thread.mpDB.select.return_value = [(1,)]
+        # the upload exists, the survey has no default station yet
+        thread.mpDB.select.side_effect = lambda table, **kwargs: [(1,)] if table == "uploads" else []
         thread.mpDB.add_station.return_value = 3
         thread.camera.return_value = 7
         with patch("matchypatchy.threads.import_thread.get_sha256", return_value="h"), \
@@ -512,6 +513,33 @@ class TestFolderImportCamera:
         thread.import_failed.emit.assert_not_called()
         thread.camera.assert_called_once_with(str(image), 3)
         assert thread.mpDB.add_media.call_args.kwargs["camera_id"] == 7
+
+
+class TestFolderImportDefaultStation:
+    """Imports without a station level share the survey's one "Default Station" """
+
+    def _thread(self, db):
+        from matchypatchy.threads.import_thread import FolderImportThread
+        thread = MagicMock()
+        thread.mpDB = db
+        thread.default_station = None
+        return thread, FolderImportThread._default_station
+
+    def test_second_import_reuses_default_station(self, tmp_db):
+        db, _ = tmp_db
+        first, default_station = self._thread(db)
+        second, _ = self._thread(db)
+        station = default_station(first, 1)
+        assert default_station(second, 1) == station
+        assert db.count("station") == 1
+
+    def test_each_survey_gets_its_own(self, tmp_db):
+        db, _ = tmp_db
+        other = db.add_survey("Other", None, None, None)
+        first, default_station = self._thread(db)
+        second, _ = self._thread(db)
+        assert default_station(first, 1) != default_station(second, other)
+        assert db.count("station") == 2
 
 
 # ---------------------------------------------------------------------------
