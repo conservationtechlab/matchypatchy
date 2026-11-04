@@ -534,6 +534,16 @@ class VideoPlayerBar(QWidget):
         self.button_play.setFixedWidth(60)
         self.button_pause.setFixedWidth(60)
 
+        # Frame step buttons
+        self.button_frame_back = QPushButton("|◀")
+        self.button_frame_forward = QPushButton("▶|")
+        self.button_frame_back.setToolTip("Previous frame")
+        self.button_frame_forward.setToolTip("Next frame")
+        self.button_frame_back.clicked.connect(lambda: self.step_frame(-1))
+        self.button_frame_forward.clicked.connect(lambda: self.step_frame(1))
+        self.button_frame_back.setFixedWidth(60)
+        self.button_frame_forward.setFixedWidth(60)
+
         # Seek slider
         self.seek_slider = QSlider(Qt.Orientation.Horizontal)
         self.seek_slider.setRange(0, 0)
@@ -554,6 +564,8 @@ class VideoPlayerBar(QWidget):
         playback_layout = QHBoxLayout()
         playback_layout.addWidget(self.button_play, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         playback_layout.addWidget(self.button_pause, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        playback_layout.addWidget(self.button_frame_back, 0, alignment=Qt.AlignmentFlag.AlignLeft)
+        playback_layout.addWidget(self.button_frame_forward, 0, alignment=Qt.AlignmentFlag.AlignLeft)
         playback_layout.addSpacing(10)
         playback_layout.addWidget(QLabel("Seek:"))
         playback_layout.addWidget(self.seek_slider)
@@ -593,13 +605,37 @@ class VideoPlayerBar(QWidget):
         """Set audio volume"""
         self.audio_output.setVolume(value / 100)
 
+    def get_fps(self):
+        """
+        Frame rate of the loaded video, rounded
+
+        Shared by get_frame() and step_frame() so stepping lands on the same frame
+        numbers that get_frame() reports (and that a box drawn on the frame saves).
+        Falls back to 30 before the metadata loads, or when the video has no frame rate
+        """
+        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate) or 0)
+        return fps if fps > 0 else 30
+
     def get_frame(self):
         """Get current frame number based on position"""
-        # None before the metadata loads, or when the video has no frame rate
-        fps = round(self.player.metaData().value(QMediaMetaData.Key.VideoFrameRate) or 0)
-        if fps <= 0:
-            fps = 30
-        return int(self.player.position() / 1000 * fps)
+        return int(self.player.position() / 1000 * self.get_fps())
+
+    def step_frame(self, step):
+        """
+        Pause and move the given number of frames forward (+) or back (-)
+
+        Seeks to the middle of the target frame rather than its start, the player
+        position is in whole ms, so a seek to the start of a frame can truncate into
+        the previous one and get_frame() would report the wrong frame
+        """
+        self.player.pause()
+        fps = self.get_fps()
+        frame = max(0, self.get_frame() + step)
+        position = int((frame + 0.5) * 1000 / fps)
+        duration = self.player.duration()
+        if duration > 0 and position > duration:
+            return  # already on the last frame
+        self.player.setPosition(position)
 
 
 class VideoViewer(QDialog):
