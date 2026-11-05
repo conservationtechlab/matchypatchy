@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
 # Databases created before schema versioning have no schema_version column and are treated as version 1.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Tables rebuilt by a migration, {name} lets the migration create them under a temporary name.
 # A relative path is only unique within its base directory: D:/2023/Site01/IMG_0001.JPG and
@@ -41,6 +41,16 @@ MEDIA_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
                 FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
                 FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);'''
+
+# Station names repeat across surveys (each survey has its own "Site01"), but not within one
+STATION_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                lat REAL,
+                long REAL,
+                survey_id INTEGER NOT NULL,
+                UNIQUE (name, survey_id),
+                FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);'''
 
 INDIVIDUAL_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 id INTEGER PRIMARY KEY,
@@ -94,14 +104,7 @@ def setup_database(key, filepath, db=None):
                 FOREIGN KEY (region_id) REFERENCES region (id) ON DELETE SET NULL);''')
 
         # STATION
-        cursor.execute(
-            '''CREATE TABLE IF NOT EXISTS station (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                lat REAL,
-                long REAL,
-                survey_id INTEGER NOT NULL,
-                FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);''')
+        cursor.execute(STATION_TABLE.format(name="station"))
 
         # CAMERA
         cursor.execute(
@@ -273,7 +276,53 @@ def _migrate_1_to_2(db):
                   WHERE EXISTS (SELECT 1 FROM roi WHERE roi.media_id = media.id AND roi.bbox_w != -1);""")
 
 
-MIGRATIONS = {1: _migrate_1_to_2}
+def _migrate_2_to_3(db):
+    """
+    Make station names unique within a survey
+
+    Older builds could add a second station with a name already used in its survey:
+    every folder import without a station level added a new "Default Station", and
+    the station manager didn't check names. Each set of same-named stations in a survey
+    is merged into its oldest (lowest id) station before the constraint is added: media
+    and cameras move to it, and it takes a duplicate's lat/long where it has none.
+    Cameras that end up with the same name under that station are merged the same way,
+    the importers look them up by name within a station so a repeat would be ambiguous.
+    """
+    duplicates = db.execute("""SELECT s.id, keep.id FROM station s
+                               JOIN (SELECT MIN(id) AS id, name, survey_id FROM station
+                                     GROUP BY name, survey_id HAVING COUNT(*) > 1) keep
+                                 ON s.name = keep.name AND s.survey_id = keep.survey_id
+                               WHERE s.id != keep.id
+                               ORDER BY s.id;""").fetchall()
+    for duplicate_id, keep_id in duplicates:
+        db.execute("""UPDATE station SET
+                          lat = COALESCE(lat, (SELECT lat FROM station WHERE id = :dup)),
+                          long = COALESCE(long, (SELECT long FROM station WHERE id = :dup))
+                      WHERE id = :keep;""", {"dup": duplicate_id, "keep": keep_id})
+        db.execute("UPDATE media SET station_id = ? WHERE station_id = ?;", (keep_id, duplicate_id))
+        db.execute("UPDATE camera SET station_id = ? WHERE station_id = ?;", (keep_id, duplicate_id))
+        db.execute("DELETE FROM station WHERE id = ?;", (duplicate_id,))
+    if duplicates:
+        logger.info(f"Merged {len(duplicates)} station(s) that repeated a name within their survey")
+
+    keep_station_ids = {keep_id for _, keep_id in duplicates}
+    camera_duplicates = db.execute("""SELECT c.id, keep.id FROM camera c
+                                      JOIN (SELECT MIN(id) AS id, name, station_id FROM camera
+                                            GROUP BY name, station_id HAVING COUNT(*) > 1) keep
+                                        ON c.name = keep.name AND c.station_id = keep.station_id
+                                      WHERE c.id != keep.id;""").fetchall()
+    for duplicate_id, keep_id in camera_duplicates:
+        # only under stations that took in a duplicate, leave the rest of the cameras as they were
+        station_id = db.execute("SELECT station_id FROM camera WHERE id = ?;", (keep_id,)).fetchone()[0]
+        if station_id not in keep_station_ids:
+            continue
+        db.execute("UPDATE media SET camera_id = ? WHERE camera_id = ?;", (keep_id, duplicate_id))
+        db.execute("DELETE FROM camera WHERE id = ?;", (duplicate_id,))
+
+    _rebuild_table(db, "station", STATION_TABLE)
+
+
+MIGRATIONS = {1: _migrate_1_to_2, 2: _migrate_2_to_3}
 
 
 def migrate_database(db, filepath):

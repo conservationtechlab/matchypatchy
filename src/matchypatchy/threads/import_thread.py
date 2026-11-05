@@ -952,9 +952,21 @@ class FolderImportThread(QThread):
         return str(Path(filepath).relative_to(base_dir))
 
     def _default_station(self, survey_id):
-        """Get or create the default station, for media without a station level"""
+        """
+        Get or create the default station, for media without a station level
+
+        Reuses the survey's "Default Station" from an earlier import, station names are
+        unique within a survey so adding a second one would fail
+        """
         if not self.default_station:
-            self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
+            row_cond = f'name={sql_text("Default Station")} AND survey_id={int(survey_id)}'
+            existing = self.mpDB.select("station", columns="id", row_cond=row_cond)
+            if existing:
+                self.default_station = existing[0][0]
+            else:
+                self.default_station = self.mpDB.add_station("Default Station", None, None, int(survey_id))
+            if self.default_station is None:
+                raise RuntimeError(f"Failed to add the default station (survey_id: {survey_id}), see log for database error")
         return self.default_station
 
     def station(self, filepath, survey_id):

@@ -3,7 +3,7 @@ from matchypatchy.database import individual
 
 
 def _roi(db, individual_id=None):
-    station = db.add_station("S", None, None, 1)
+    station = db.add_station(f"S{individual_id}", None, None, 1)  # names are unique within a survey
     mid = db.add_media(db.add_upload(f"/u{individual_id}"), "x.jpg", f"h{individual_id}", ".jpg", "2024", station)
     return db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1, individual_id=individual_id)
 
