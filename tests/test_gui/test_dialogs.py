@@ -502,7 +502,8 @@ class TestFolderImportCamera:
         thread.COMMIT_INTERVAL = FolderImportThread.COMMIT_INTERVAL
         thread.active_survey = (1, "S")
         thread.isInterruptionRequested.return_value = False
-        thread.mpDB.select.return_value = [(1,)]
+        # the upload exists, the survey has no default station yet
+        thread.mpDB.select.side_effect = lambda table, **kwargs: [(1,)] if table == "uploads" else []
         thread.mpDB.add_station.return_value = 3
         thread.camera.return_value = 7
         with patch("matchypatchy.threads.import_thread.get_sha256", return_value="h"), \
@@ -512,6 +513,33 @@ class TestFolderImportCamera:
         thread.import_failed.emit.assert_not_called()
         thread.camera.assert_called_once_with(str(image), 3)
         assert thread.mpDB.add_media.call_args.kwargs["camera_id"] == 7
+
+
+class TestFolderImportDefaultStation:
+    """Imports without a station level share the survey's one "Default Station" """
+
+    def _thread(self, db):
+        from matchypatchy.threads.import_thread import FolderImportThread
+        thread = MagicMock()
+        thread.mpDB = db
+        thread.default_station = None
+        return thread, FolderImportThread._default_station
+
+    def test_second_import_reuses_default_station(self, tmp_db):
+        db, _ = tmp_db
+        first, default_station = self._thread(db)
+        second, _ = self._thread(db)
+        station = default_station(first, 1)
+        assert default_station(second, 1) == station
+        assert db.count("station") == 1
+
+    def test_each_survey_gets_its_own(self, tmp_db):
+        db, _ = tmp_db
+        other = db.add_survey("Other", None, None, None)
+        first, default_station = self._thread(db)
+        second, _ = self._thread(db)
+        assert default_station(first, 1) != default_station(second, other)
+        assert db.count("station") == 2
 
 
 # ---------------------------------------------------------------------------
@@ -913,11 +941,65 @@ class TestStationPopup:
         from matchypatchy.gui.dialogs.popup_station import StationPopup
         popup = MagicMock()
         popup.survey_id = (1, "Survey")
+        popup._name_taken.return_value = False
         popup.mpDB.add_station.return_value = None
         with patch(f"{STATION}.StationFillPopup") as fill_cls:
             fill_cls.return_value.exec.return_value = True
             StationPopup.add(popup)
         popup._warn.assert_called_once()
+
+    def _popup(self, stations):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = MagicMock()
+        popup.survey_id = (1, "Survey")
+        popup.station_list_ordered = stations
+        popup._name_taken = lambda name, station_id=None: StationPopup._name_taken(popup, name, station_id)
+        return popup
+
+    def test_name_taken_in_survey(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = self._popup([(1, "Site01"), (2, "Site02")])
+        assert StationPopup._name_taken(popup, "Site01") is True
+        assert StationPopup._name_taken(popup, "Site03") is False
+        # the station being edited keeps its own name
+        assert StationPopup._name_taken(popup, "Site01", station_id=1) is False
+        assert StationPopup._name_taken(popup, "Site02", station_id=1) is True
+
+    def test_add_repeated_name_warns_without_adding(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = self._popup([(1, "Site01")])
+        with patch(f"{STATION}.StationFillPopup") as fill_cls:
+            fill_cls.return_value.exec.return_value = True
+            fill_cls.return_value.get_name.return_value = "Site01"
+            StationPopup.add(popup)
+        popup.mpDB.add_station.assert_not_called()
+        assert "already exists in Survey" in popup._warn.call_args[0][0]
+
+    def test_rename_to_repeated_name_warns_without_saving(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = self._popup([(1, "Site01"), (2, "Site02")])
+        popup.list.currentRow.return_value = 1
+        with patch(f"{STATION}.StationFillPopup") as fill_cls, \
+                patch(f"{STATION}.get_station", return_value=("Site02", None, None)), \
+                patch(f"{STATION}.update_station") as update:
+            fill_cls.return_value.exec.return_value = True
+            fill_cls.return_value.get_name.return_value = "Site01"
+            StationPopup.edit(popup)
+        update.assert_not_called()
+        assert "already exists in Survey" in popup._warn.call_args[0][0]
+
+    def test_edit_keeping_name_saves(self):
+        from matchypatchy.gui.dialogs.popup_station import StationPopup
+        popup = self._popup([(1, "Site01"), (2, "Site02")])
+        popup.list.currentRow.return_value = 1
+        with patch(f"{STATION}.StationFillPopup") as fill_cls, \
+                patch(f"{STATION}.get_station", return_value=("Site02", None, None)), \
+                patch(f"{STATION}.update_station", return_value=True) as update:
+            fill_cls.return_value.exec.return_value = True
+            fill_cls.return_value.get_name.return_value = "Site02"
+            StationPopup.edit(popup)
+        update.assert_called_once()
+        popup._warn.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1284,6 +1366,7 @@ class TestFilterBarListsWritten:
         bar.mpDB = db
         bar._chosen_id = FilterBar._chosen_id
         bar._fill = FilterBar._fill
+        bar._station_items = lambda: FilterBar._station_items(bar)
         bar.region_list_ordered = [(0, "Region")] + db.query("SELECT id, name FROM region")
         bar.survey_list_ordered = [(0, "Survey")] + db.query("SELECT id, name FROM survey")
         bar.station_list_ordered = [(0, "Station")] + db.query("SELECT id, name FROM station")
@@ -1318,6 +1401,24 @@ class TestFilterBarListsWritten:
         assert bar.station_select.currentText() == "St"
         # stations listed for the chosen survey only
         assert bar.station_select.items == ["Station", "St", "St2"]
+
+    def test_repeated_station_names_labelled_with_survey(self, tmp_db):
+        from matchypatchy.gui.widgets.widget_filterbar import FilterBar
+        db, _ = tmp_db
+        s1 = db.add_survey("S1", None, None, None)
+        s2 = db.add_survey("S2", None, None, None)
+        a1, a2 = db.add_station("A", None, None, s1), db.add_station("A", None, None, s2)
+        b = db.add_station("B", None, None, s2)
+        bar = self._bar(db)
+        # no survey chosen: every station, the repeated name told apart by survey
+        FilterBar.lists_written(bar, "station")
+        assert bar.station_list_ordered == [(0, "Station"), (a1, "A (S1)"), (a2, "A (S2)"), (b, "B")]
+        # the media view maps ids to the plain names
+        assert bar.valid_stations == {a1: "A", a2: "A", b: "B"}
+        # one survey chosen: no repeats, no labels
+        self._choose(bar.survey_select, bar.survey_list_ordered, s2)
+        FilterBar.lists_written(bar, "station")
+        assert bar.station_select.items == ["Station", "A", "B"]
 
     def test_deleted_choice_goes_back_to_all(self, tmp_db):
         from matchypatchy.gui.widgets.widget_filterbar import FilterBar
