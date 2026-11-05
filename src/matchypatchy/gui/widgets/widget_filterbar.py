@@ -1,13 +1,12 @@
 """
 Filterbar Widget for MatchyPatchy GUI
 """
-from collections import Counter
 
 from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QSizePolicy, QCheckBox, QComboBox
 from PyQt6.QtGui import QStandardItemModel
 from PyQt6.QtCore import Qt
 
-from matchypatchy.database.location import region_names, survey_names, station_names, station_survey_names
+from matchypatchy.database.location import region_names, survey_names, station_names, fetch_stations
 from matchypatchy.database.individual import individual_names
 from matchypatchy.database.media import media_without_rois
 from matchypatchy.project import UsesProject
@@ -330,11 +329,17 @@ class FilterBar(UsesProject, QWidget):
         repeated name is labelled with its survey ("Site01 (Survey 2023)") to tell
         them apart. valid_stations keeps the plain names, the media view shows them.
         """
-        counts = Counter(self.valid_stations.values())
-        repeated = [sid for sid, name in self.valid_stations.items() if counts[name] > 1]
-        surveys = station_survey_names(self.mpDB, repeated)
-        return [(sid, f"{name} ({surveys[sid]})" if sid in surveys else name)
-                for sid, name in self.valid_stations.items()]
+        names = list(self.valid_stations.values())
+        stations = fetch_stations(self.mpDB, reset_index=True)
+        surveys = dict(survey_names(self.mpDB))
+        station_items = []
+        for station_id, name in self.valid_stations.items():
+            # repeated name, add its survey
+            if names.count(name) > 1:
+                survey_id = stations.loc[station_id, "survey_id"]
+                name = f"{name} ({surveys[survey_id]})"
+            station_items.append((station_id, name))
+        return station_items
 
     def get_filters(self):
         """
