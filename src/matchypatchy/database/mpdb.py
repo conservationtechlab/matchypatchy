@@ -31,16 +31,6 @@ for _numpy_type in (np.float16, np.float32, np.float64):
 sqlite3.register_adapter(np.bool_, bool)
 
 
-def sql_text(value):
-    """
-    Quote a value as an SQL string literal for row_cond strings
-
-    Escapes single quotes (O'Brien), and avoids double quotes, which SQLite
-    reads as a column name first (name="name" would match every row)
-    """
-    return "'" + str(value).replace("'", "''") + "'"
-
-
 def parse_timestamps(timestamps):
     """
     Parse media timestamps for export, which may be in mixed formats
