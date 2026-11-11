@@ -646,6 +646,35 @@ class TestParameterisedQueries:
         iid = db.add_individual("O'Brien", None)
         assert db.select("individual", "id", row_cond="name=?", params=("O'Brien",)) == [(iid,)]
 
+    def test_select_join_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        station = db.add_station("St. Mary's", None, None, 1)
+        db.add_station("Other", None, None, 1)
+        rows, _ = db.select_join("station", "survey", "station.survey_id = survey.id",
+                                 columns="station.id", row_cond="station.name=?", params=("St. Mary's",))
+        assert rows == [(station,)]
+
+    def test_stations_binds_params(self, tmp_db):
+        db, _ = tmp_db
+        station = db.add_station("St. Mary's", None, None, 1)
+        db.add_station("Other", None, None, 1)
+        rows, _ = db.stations(row_cond="station.name=?", params=("St. Mary's",))
+        assert [row[0] for row in rows] == [station]
+
+    def test_media_helpers_bind_params(self, tmp_db):
+        db, _ = tmp_db
+        station = db.add_station("S", None, None, 1)
+        upload = db.add_upload("/a")
+        mid = db.add_media(upload, "o'brien.jpg", "h1", ".jpg", "2024-01-01 10:00:00", station)
+        other = db.add_media(upload, "other.jpg", "h2", ".jpg", "2024-01-01 10:00:00", station)
+        rid = db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        db.add_roi(other, 0, 0.1, 0.1, 0.1, 0.1)
+
+        rows, columns = db.get_media_with_filepath(row_cond="m.relative_path=?", params=("o'brien.jpg",))
+        assert [row[columns.index("id")] for row in rows] == [mid]
+        rows, columns = db.all_media(row_cond="relative_path=?", params=("o'brien.jpg",))
+        assert [row[columns.index("id")] for row in rows] == [rid]
+
     def test_delete_binds_params(self, tmp_db):
         db, _ = tmp_db
         keep = db.add_individual("Keep", None)
