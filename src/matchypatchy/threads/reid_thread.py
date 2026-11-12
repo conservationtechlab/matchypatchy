@@ -45,7 +45,7 @@ class ReIDThread(QThread):
             return
 
         # need only media that has corresponding ROIs
-        media = self.mpDB._command(f"""
+        media = self.mpDB.query(f"""
             SELECT roi.id, roi.media_id,
                 {filepath_sql('uploads.base_dir', 'media.relative_path')} AS filepath,
                 media.external_id, media.camera_id, media.sequence_id

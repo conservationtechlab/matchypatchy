@@ -138,8 +138,25 @@ class TestDataChanged:
         assert tables == []
         project.close()
 
+    def test_fetches_are_not_reported(self, tmp_path):
+        """Reading media, rois and thumbnails changes nothing, so must not refresh the lists"""
+        from matchypatchy.database.media import fetch_media, fetch_roi
+        from matchypatchy.database.thumbnails import check_missing_thumbnails
+        project, tables = self._written(tmp_path)
+        db = project.db
+        mid = db.add_media(db.add_upload("/a"), "x.jpg", "h", ".jpg", "2024-01-01 10:00:00",
+                           db.add_station("St", None, None, 1))
+        db.add_roi(mid, 0, 0.1, 0.1, 0.1, 0.1)
+        tables.clear()
+        fetch_media(db, ids=[mid])
+        fetch_media(db, counts=True)
+        fetch_roi(db, media_id=mid)
+        check_missing_thumbnails(db, tmp_path, data_type=0)
+        assert tables == []
+        project.close()
+
     def test_console_commands_report_every_listed_table(self, tmp_path):
         project, tables = self._written(tmp_path)
-        project.db._command("UPDATE survey SET year_start=2024;")
+        project.db.run_user_sql("UPDATE survey SET year_start=2024;")
         assert sorted(tables) == sorted(["region", "survey", "station", "camera", "individual"])
         project.close()
