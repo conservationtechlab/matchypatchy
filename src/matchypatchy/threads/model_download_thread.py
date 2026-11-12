@@ -19,12 +19,16 @@ from matchypatchy.config import asset_path
 
 logger = logging.getLogger(__name__)
 
-MODELS_YML_URL = "https://sandiegozoo.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml"
+MODELS_YML_URL = "https://sandiegozoo.app.box.com/shared/static/8o59iqmvjfic9btuarijfk30oocr5xkf.yml"
 
+DEV = True
 
 def user_data_dir():
     """Return the user data directory for storing models.yml."""
     # macOS
+    if DEV:
+        return asset_path("models.yml").parent
+
     if sys.platform == "darwin":
         return Path.home() / "Library/Application Support/MatchyPatchy"
     # Windows
@@ -100,20 +104,35 @@ def _as_list(value):
     return [value] if isinstance(value, str) else list(value)
 
 
-def get_path(ML_DIR, key):
+def get_path(ML_DIR, key, models=None):
     """
     Path to the ML model's main (first) file in ML_DIR, None if not downloaded
 
     A model is only usable when all of its files are present (eg. a .onnx and
     its .onnx.data), so an interrupted download doesn't count as downloaded
+
+    models: the MODELS dict from models.yml, pass it in to avoid re-reading the yml
     """
     if key is None:
         return None
-    MODELS = load_model('MODELS')
-    paths = [Path(ML_DIR) / name for name in _as_list(MODELS[key][0])]
+    if models is None:
+        models = load_model('MODELS')
+    paths = [Path(ML_DIR) / name for name in _as_list(models[key][0])]
     if paths and all(path.exists() for path in paths):
         return paths[0]
     return None
+
+
+def downloaded_models(ML_DIR, models=None):
+    """Models whose files are all downloaded, {key: path to the main file}"""
+    if models is None:
+        models = load_model('MODELS')
+    found = {}
+    for key in models:
+        path = get_path(ML_DIR, key, models)
+        if path is not None:
+            found[key] = path
+    return found
 
 
 def delete(ML_DIR, key):

@@ -36,14 +36,29 @@ class MLDownloadPopup(QDialog):
 
         # Create layout for the checkboxes and add it to the dialog
         layout = QVBoxLayout(self)
-        self.checkbox_layout = QGridLayout()
-        layout.addLayout(self.checkbox_layout)
-        # Add checkboxes to the grid layout in two columns
         self.models = list(self.models)  # convert to ordered list
-        for i, m in enumerate(self.models):
-            checkbox = QCheckBox(m)
-            checkbox.stateChanged.connect(self.toggle_checkbox)
-            self.checkbox_layout.addWidget(checkbox, i, 0)
+        self.checkboxes = {}  # {model key: QCheckBox}
+        # Group the checkboxes under a label per model type
+        sections = [("Detector Models", self.ml_cfg.get('DETECTOR_MODELS') or []),
+                    ("Re-Identification Models", self.ml_cfg.get('REID_MODELS') or []),
+                    ("Viewpoint Models", self.ml_cfg.get('VIEWPOINT_MODELS') or [])]
+        listed = {m for _, keys in sections for m in keys}
+        # anything in MODELS that isn't assigned a type
+        sections.append(("Other Models", [m for m in self.models if m not in listed]))
+        for title, keys in sections:
+            keys = [m for m in keys if m in self.models]
+            if not keys:
+                continue
+            if self.checkboxes:
+                layout.addSpacing(10)
+            label = QLabel(title)
+            label.setStyleSheet("font-weight: bold;")
+            layout.addWidget(label)
+            for m in keys:
+                checkbox = QCheckBox(m)
+                checkbox.stateChanged.connect(self.toggle_checkbox)
+                layout.addWidget(checkbox)
+                self.checkboxes[m] = checkbox
 
         # Add OK and Cancel buttons
         layout.addSpacing(20)
@@ -73,26 +88,16 @@ class MLDownloadPopup(QDialog):
 
     def discover_models(self):
         """Models whose files are all downloaded, {key: path}"""
-        models_dict = {}
-        for m in self.models:
-            path = model_download_thread.get_path(self.ml_dir, m)
-            if path is not None:
-                models_dict[m] = path
-        return models_dict
+        return model_download_thread.downloaded_models(self.ml_dir, self.ml_cfg['MODELS'])
 
     def set_checkboxes(self):
         """Set checkboxes for already downloaded models"""
         for m in self.available_models.keys():
-            checkbox = self.checkbox_layout.itemAtPosition(self.models.index(m), 0).widget()
-            checkbox.setChecked(True)
+            self.checkboxes[m].setChecked(True)
 
     def toggle_checkbox(self):
         """Check which models are checked, see if any new ones are checked"""
-        all_available = set()
-        for i, m in enumerate(self.models):
-            checkbox = self.checkbox_layout.itemAtPosition(i, 0).widget()
-            if checkbox.isChecked():
-                all_available.add(m)
+        all_available = {m for m, checkbox in self.checkboxes.items() if checkbox.isChecked()}
 
         # See if any are newly checked (not downloaded or already queued)
         newly_checked = all_available - set(self.available_models.keys()) - self.pending
@@ -128,7 +133,7 @@ class MLDownloadPopup(QDialog):
             self.warning_label.setText(f"{key}: {message}")
             self.warning_label.show()
             # untick so it can be ticked again to retry
-            checkbox = self.checkbox_layout.itemAtPosition(self.models.index(key), 0).widget()
+            checkbox = self.checkboxes[key]
             checkbox.blockSignals(True)
             checkbox.setChecked(False)
             checkbox.blockSignals(False)
@@ -222,23 +227,11 @@ class MLOptionsPopup(QDialog):
 
     def discover_models(self):
         """Models whose files are all downloaded, {key: path to the main file}"""
-        models_dict = {}
-        for m in self.ml_cfg['MODELS']:
-            path = model_download_thread.get_path(self.ml_dir, m)
-            if path is not None:
-                models_dict[m] = path
-        return models_dict
+        return model_download_thread.downloaded_models(self.ml_dir, self.ml_cfg['MODELS'])
 
     def get_subset(self, subset):
-        """Get the available models of subset type"""
-        models_dict = {}
-        for m in self.ml_cfg[subset]:
-            if m in self.available_models.keys():
-                path = self.ml_dir / self.available_models[m]
-                if path.exists():
-                    models_dict[m] = path
-        # if looking for a particular model, give back path
-        return list(models_dict)
+        """Downloaded models of the given type (eg. 'REID_MODELS'), in models.yml order"""
+        return [m for m in self.ml_cfg.get(subset) or [] if m in self.available_models]
 
     def select_sequence(self):
         """Return whether sequence is checked"""
