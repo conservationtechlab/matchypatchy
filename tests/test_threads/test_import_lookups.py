@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from matchypatchy.database.mpdb import MatchyPatchyDB, sql_text
+from matchypatchy.database.mpdb import MatchyPatchyDB
 
 
 @pytest.fixture
@@ -30,19 +30,19 @@ def _thread(db, cls, **attrs):
     return thread
 
 
-class TestSqlText:
-    def test_quotes(self):
-        assert sql_text("O'Brien") == "'O''Brien'"
-
-    @pytest.mark.parametrize("name", ["O'Brien", "name", 'say "hi"'])
-    def test_round_trip(self, db, name):
-        sid = db.add_station(name, None, None, 1)
-        assert db.select("station", "id", row_cond=f"name={sql_text(name)}") == [(sid,)]
-
-
 class TestQuotedLookups:
     def test_station_name_with_quote(self, db):
         from matchypatchy.threads.import_thread import FolderImportThread
         thread = _thread(db, None, station_level=1)
         first = FolderImportThread.station(thread, "/O'Brien/img.jpg", 1)
         assert FolderImportThread.station(thread, "/O'Brien/img.jpg", 1) == first
+
+    @pytest.mark.parametrize("name", ["O'Brien", "name", 'say "hi"'])
+    def test_existing_station_found_by_name(self, db, name):
+        """Names are bound, so quotes and a name equal to a column name match only that station"""
+        from matchypatchy.threads.import_thread import FolderImportThread
+        db.add_station("Other", None, None, 1)
+        sid = db.add_station(name, None, None, 1)
+        thread = _thread(db, None, station_level=1)
+        assert FolderImportThread.station(thread, f"/{name}/img.jpg", 1) == sid
+        assert len(db.select("station", "id")) == 2

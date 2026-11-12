@@ -75,7 +75,7 @@ class VerifyNewBaseDirsThread(QThread):
             if not self.isInterruptionRequested():
                 base_dir_id = update[0]
                 directory = update[1]
-                media = self.mpDB.select("media", columns="relative_path, sha256", row_cond=f"base_dir_id = {base_dir_id}")
+                media = self.mpDB.select("media", columns="relative_path, sha256", row_cond="base_dir_id=?", params=(base_dir_id,))
                 # Saving only swaps base_dir, so each file must sit at its relative path under the new directory
                 expected = set()
                 hash_not_found_in_new_directory = []

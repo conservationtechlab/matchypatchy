@@ -31,16 +31,6 @@ for _numpy_type in (np.float16, np.float32, np.float64):
 sqlite3.register_adapter(np.bool_, bool)
 
 
-def sql_text(value):
-    """
-    Quote a value as an SQL string literal for row_cond strings
-
-    Escapes single quotes (O'Brien), and avoids double quotes, which SQLite
-    reads as a column name first (name="name" would match every row)
-    """
-    return "'" + str(value).replace("'", "''") + "'"
-
-
 def parse_timestamps(timestamps):
     """
     Parse media timestamps for export, which may be in mixed formats
@@ -825,7 +815,8 @@ class MatchyPatchyDB():
             logger.error(f"Failed fetch on {table}: {error}")
             return None
 
-    def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None, quiet=True):
+    def select_join(self, table, join_table, join_cond, columns="*", row_cond: Optional[str] = None,
+                    params=(), quiet=True):
         """
         Select columns based on optional row_cond with inner join of join_table
         Returns each row as a tuple
@@ -835,7 +826,8 @@ class MatchyPatchyDB():
             - join_table (str): table to join
             - join_cond (str): condition for JOIN clause
             - columns (str): columns to select, default "*"
-            - row_cond (str): optional condition for WHERE clause
+            - row_cond (str): optional condition for WHERE clause, with ? for each of params
+            - params: values bound to the ? in row_cond
             - quiet (bool): if False, prints the executed command
         """
         try:
@@ -845,8 +837,8 @@ class MatchyPatchyDB():
             else:
                 command = f'SELECT {columns} FROM {table} INNER JOIN {join_table} ON {join_cond};'
             if not quiet:
-                print(command)
-            cursor.execute(command)
+                print(command, params)
+            cursor.execute(command, params)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
@@ -854,12 +846,13 @@ class MatchyPatchyDB():
             logger.error(f"Failed fetch on {table} with join on {join_table}: {error}")
             return None, None
 
-    def get_media_with_filepath(self, row_cond: Optional[str] = None):
+    def get_media_with_filepath(self, row_cond: Optional[str] = None, params=()):
         """
         Get media along with its full file path based on an optional row condition.
 
         Args
-            - row_cond (str): optional condition for WHERE clause
+            - row_cond (str): optional condition for WHERE clause, with ? for each of params
+            - params: values bound to the ? in row_cond
 
         Returns
             - rows (list of tuples): fetched rows
@@ -873,7 +866,7 @@ class MatchyPatchyDB():
             if row_cond is not None:
                 command += f" WHERE {row_cond}"
             command += ";"
-            cursor.execute(command)
+            cursor.execute(command, params)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
@@ -881,8 +874,14 @@ class MatchyPatchyDB():
             logger.error(f"Failed get_media_with_filepath fetch: {error}")
             return None, None
 
-    def all_media(self, row_cond: Optional[str] = None):
-        """Return joined roi and media info for Media Table"""
+    def all_media(self, row_cond: Optional[str] = None, params=()):
+        """
+        Return joined roi and media info for Media Table
+
+        Args
+            - row_cond (str): optional condition for WHERE clause, with ? for each of params
+            - params: values bound to the ? in row_cond
+        """
         try:
             cursor = self.db.cursor()
             columns = f"""roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
@@ -900,7 +899,7 @@ class MatchyPatchyDB():
                             INNER JOIN media ON roi.media_id = media.id
                             LEFT JOIN uploads ON media.base_dir_id = uploads.id
                             LEFT JOIN individual ON roi.individual_id = individual.id;"""
-            cursor.execute(command)
+            cursor.execute(command, params)
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
@@ -930,8 +929,14 @@ class MatchyPatchyDB():
             logger.error(f"Failed to update base path for id {base_dir_id}: {error}")
             return False
 
-    def stations(self, row_cond=None):
-        """Return joined station, survey, region info"""
+    def stations(self, row_cond=None, params=()):
+        """
+        Return joined station, survey, region info
+
+        Args
+            - row_cond (str): optional condition for WHERE clause, with ? for each of params
+            - params: values bound to the ? in row_cond
+        """
         try:
             cursor = self.db.cursor()
             columns = """station.id, station.name, lat, long, station.survey_id, survey.name, region.name"""
@@ -942,7 +947,7 @@ class MatchyPatchyDB():
             else:
                 command = f"""SELECT {columns} FROM station LEFT JOIN survey ON station.survey_id = survey.id
                                                 LEFT JOIN region ON survey.region_id = region.id;"""
-            cursor.execute(command)
+            cursor.execute(command, params)
             rows = cursor.fetchall()  # returns in tuple
             # rename columns to avoid issues with '.' in column names when importing
             column_names = columns.split(", ")
