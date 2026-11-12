@@ -70,16 +70,18 @@ def native_relative_path(relative_path):
     return str(relative_path).replace(other, os.sep)
 
 
-def fetch_media(mpDB, ids=None, counts=False, quiet=True):
+def fetch_media(mpDB, ids=None, counts=False):
     """
     Fetches all media info with full paths, converts to dataframe
     """
     # select ids, an empty list selects nothing (not everything)
     if ids is not None:
-        ids_str = ', '.join(map(str, ids))
-        row_cond = f"WHERE m.id IN ({ids_str})"
+        ids = [int(i) for i in ids]
+        row_cond = f"WHERE m.id IN ({', '.join('?' * len(ids))})"
+        params = ids
     else:
         row_cond = None
+        params = ()
 
     # fetch counts for media table data_type=0
     if counts:
@@ -101,7 +103,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                    "timestamp", 'station_id', "camera_id", 'sequence_id',
                    "external_id", 'comment', 'roi_count', 'filepath']
 
-        media = mpDB._command(query, quiet=quiet)
+        media = mpDB.query(query, params)
 
     # Query media with joined full paths no counts
     else:
@@ -120,7 +122,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                    "timestamp", 'station_id', "camera_id", 'sequence_id',
                    "external_id", 'comment', 'filepath']
 
-        media = mpDB._command(query, quiet=quiet)
+        media = mpDB.query(query, params)
 
     # convert to dataframe and return
     if media:
@@ -145,10 +147,12 @@ def fetch_roi(mpDB, media_id=None):
         LEFT JOIN uploads u ON m.base_dir_id = u.id
     """
 
+    params = ()
     if media_id:
-        query += f" WHERE r.media_id = {media_id}"
+        query += " WHERE r.media_id = ?"
+        params = (int(media_id),)
 
-    manifest = mpDB._command(query)
+    manifest = mpDB.query(query, params)
 
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
