@@ -293,10 +293,14 @@ class MatchyPatchyDB():
             logger.error(f"Failed query {sql} with {params}: {error}")
             return None
 
-    def _command(self, command, quiet=True):
+    def run_user_sql(self, command, quiet=True):
         """
-        Execute a specific sql query to fetch data
-        Meant for one-time use
+        Run SQL typed by the user, return its rows
+
+        Called by the Database Command box in advanced settings (ConfigPopup.command).
+        The statement is arbitrary, so it can't bind params and may write to any table:
+        every listed table is reported changed. Code should use query() instead, which
+        binds values and doesn't send change notifications for reads.
         """
         try:
             if not quiet:

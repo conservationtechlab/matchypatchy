@@ -157,6 +157,6 @@ class TestDataChanged:
 
     def test_console_commands_report_every_listed_table(self, tmp_path):
         project, tables = self._written(tmp_path)
-        project.db._command("UPDATE survey SET year_start=2024;")
+        project.db.run_user_sql("UPDATE survey SET year_start=2024;")
         assert sorted(tables) == sorted(["region", "survey", "station", "camera", "individual"])
         project.close()

@@ -441,9 +441,9 @@ class TestSelectEditDeleteCount:
         assert result is True
         assert db.count("individual") == 0
 
-    def test_command(self, populated_db):
+    def test_run_user_sql(self, populated_db):
         db, _, ids = populated_db
-        rows = db._command("SELECT COUNT(*) FROM media;")
+        rows = db.run_user_sql("SELECT COUNT(*) FROM media;")
         assert rows is not None
         assert rows[0][0] == 1
 
