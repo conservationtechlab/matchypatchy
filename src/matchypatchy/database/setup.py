@@ -4,6 +4,7 @@ Set Up matchypatchy Database
 from contextlib import contextmanager
 import logging
 from datetime import datetime
+import re
 import shutil
 import sqlite3
 import chromadb
@@ -348,11 +349,59 @@ def migrate_database(db, filepath):
     return version
 
 
+# Each Re-ID model gets its own chroma collection: a collection's dimension is fixed by
+# its first vector, and embeddings from different models can't be compared anyway.
+# The original collection holds the project key and MiewID embeddings, which were
+# stored before there was a collection per model
+KEY_COLLECTION = "embedding_collection"
+KEY_COLLECTION_MODELS = {"MiewID_v3", "miewid_v3"}  # models.yml renamed the key
+EMB_COLLECTION_PREFIX = "emb_"
+
+
+def emb_collection_name(model):
+    """Name of the chroma collection holding a Re-ID model's embeddings, the key collection for None"""
+    if model is None or model in KEY_COLLECTION_MODELS:
+        return KEY_COLLECTION
+    # chroma names allow [a-zA-Z0-9._-], starting and ending alphanumeric
+    slug = re.sub(r"[^A-Za-z0-9._-]", "_", str(model)).strip("._-")
+    return f"{EMB_COLLECTION_PREFIX}{slug}"
+
+
+def is_emb_collection(name):
+    """Whether a chroma collection name holds embeddings"""
+    return name == KEY_COLLECTION or name.startswith(EMB_COLLECTION_PREFIX)
+
+
+def emb_collection(client, key, model):
+    """Get a Re-ID model's embedding collection, creating it on first use"""
+    name = emb_collection_name(model)
+    try:
+        return client.get_collection(name=name)
+    except Exception:
+        # the key collection is made with the project and never created here
+        if name == KEY_COLLECTION:
+            raise
+    try:
+        return client.create_collection(
+            name=name,
+            metadata={
+                "description": f"Embeddings from {model}",
+                "created": str(datetime.now()),
+                "hnsw:space": "cosine",
+                "key": key,
+                "model": str(model),
+            }
+        )
+    except Exception:
+        # another thread created it first
+        return client.get_collection(name=name)
+
+
 def setup_chromadb(key, filepath):
     """Set up ChromaDB vector database for embeddings"""
     client = chromadb.PersistentClient(str(filepath), settings=Settings(anonymized_telemetry=False))
     client.create_collection(
-        name="embedding_collection",
+        name=KEY_COLLECTION,
         metadata={
             "description": "Embedding Collection",
             "created": str(datetime.now()),
