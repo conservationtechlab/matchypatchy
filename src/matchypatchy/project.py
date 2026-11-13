@@ -51,6 +51,8 @@ class Project(QObject):
         if not db.key:
             db.close()
             raise ValueError(f"Database at {cfg.DB_DIR} is invalid.")
+        # match with the embeddings of the Re-ID model last used to process
+        db.set_emb_model(cfg.REID_KEY)
         db.add_change_listener(self.data_changed.emit)
 
         old_db = self._db

@@ -300,7 +300,12 @@ class DisplayBase(UsesProject, QWidget):
             dialog = AlertPopup(self, f"Model(s) not downloaded: {', '.join(missing)}")
             dialog.show()
         elif self.mpDB.count("media") > 0:
-            self.cfg.update(mloptions)
+            # processing without a Re-ID model keeps matching on the last one used
+            saved = {k: v for k, v in mloptions.items() if not (k == 'REID_KEY' and v is None)}
+            self.cfg.update(saved)
+            if mloptions['REID_KEY'] is not None:
+                # roi.emb now marks the rois this model still has to embed
+                self.mpDB.set_emb_model(mloptions['REID_KEY'])
             dialog = AlertPopup(self, "Processing Images...",
                                 title="Processing Images",
                                 progressbar=True, cancel_only=True)

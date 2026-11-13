@@ -30,7 +30,8 @@ class ReIDThread(QThread):
         self.cfg = cfg
         self.device = self.cfg.DEVICE
         self.batch_size = 1  # set to 1 for now
-        self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
+        self.reid_key = mloptions['REID_KEY']
+        self.reid_filepath = get_path(self.cfg.ML_DIR, self.reid_key)
         self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
         self.failed = set()  # files that couldn't be read
 
@@ -119,7 +120,7 @@ class ReIDThread(QThread):
             self.prompt_update.emit("No Re-ID model selected, skipping embedding extraction...")
             return
 
-        # filter rois without embeddings
+        # filter rois without embeddings, roi.emb follows the model set with mpDB.set_emb_model
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
@@ -134,13 +135,13 @@ class ReIDThread(QThread):
                         continue
                     roi_id = row.at[i, 'roi_id']
                     try:
-                        emb = animl.extract_miew_embeddings(model, row)[0]
+                        emb = animl.extract_reid_embeddings(model, row)[0]
                     except ValueError:
                         # nothing to stack: the file couldn't be loaded
                         self._file_failed(row.at[i, 'filepath'])
                         continue
 
-                    self.mpDB.add_emb(roi_id, emb)
+                    self.mpDB.add_emb(roi_id, emb, model=self.reid_key)
                     self.mpDB.edit_row("roi", roi_id, {"emb": 1})
             if not self.isInterruptionRequested():
                 self.progress_update.emit(100)
