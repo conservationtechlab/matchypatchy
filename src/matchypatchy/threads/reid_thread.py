@@ -32,9 +32,9 @@ class ReIDThread(QThread):
         self.batch_size = 1  # set to 1 for now
         self.reid_key = mloptions['REID_KEY']
         self.viewpoint_key = mloptions['VIEWPOINT_KEY']
-        self.reid_path = get_path(self.cfg.ML_DIR, self.reid_key)
+        self.reid_filepath = get_path(self.cfg.ML_DIR, self.reid_key)
         self.reid_params = get_model_params(self.reid_key)
-        self.viewpoint_path = get_path(self.cfg.ML_DIR, self.viewpoint_key)
+        self.viewpoint_filepath = get_path(self.cfg.ML_DIR, self.viewpoint_key)
         self.viewpoint_params = get_model_params(self.viewpoint_key)
         self.failed = set()  # files that couldn't be read
 
@@ -129,7 +129,7 @@ class ReIDThread(QThread):
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
-            model = animl.load_miew(self.reid_filepath, device=self.device)
+            model = animl.load_reid(self.reid_filepath, device=self.device)
 
             for i in range(len(filtered_rois)):
                 if not self.isInterruptionRequested():
@@ -141,8 +141,7 @@ class ReIDThread(QThread):
                     roi_id = row.at[i, 'roi_id']
                     try:
                         emb = animl.extract_reid_embeddings(model, row, 
-                                                            resize_width=self.reid_params[0],
-                                                            resize_height=self.reid_params[0],
+                                                            resize=self.reid_params[0],
                                                             normalize=self.reid_params[1])[0]
                     except ValueError:
                         # nothing to stack: the file couldn't be loaded

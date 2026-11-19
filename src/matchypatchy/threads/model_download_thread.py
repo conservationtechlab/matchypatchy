@@ -127,10 +127,11 @@ def get_model_params(key):
     """
     Return the model parameters for a given model key, or None if not specified.
     """
+    if key is None:
+        return None, None
     models = load_model('MODELS')
-    resize = models[key][2] if len(models[key]) > 2 else None
-    normalize = {"mean": models[key][3] if len(models[key]) > 3 else None,
-                 "std": models[key][4] if len(models[key]) > 4 else None}
+    resize = models[key][2]
+    normalize = {"mean": models[key][3], "std": models[key][4]}
 
     return resize, normalize
 
