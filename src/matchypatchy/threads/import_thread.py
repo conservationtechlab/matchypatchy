@@ -210,7 +210,7 @@ class CSVMigrateThread(QThread):
                 # individual
                 individual_id = self.individual(row.individual_id, row.name, row.sex)
 
-                # roi
+                # roi, its embeddings must be reprocessed in the new project
                 rid = self.mpDB.add_roi(media_id,
                                         row.frame,
                                         bbox_x,
@@ -221,7 +221,6 @@ class CSVMigrateThread(QThread):
                                         reviewed=row.reviewed if not pd.isna(row.reviewed) else 0,
                                         favorite=row.favorite if not pd.isna(row.favorite) else 0,
                                         individual_id=individual_id,
-                                        emb=0,  # do not add emb, must be reprocessed in new project
                                         commit=False)
                 # save thumbnail for new roi, a box-less one has nothing to crop
                 if bbox_w != -1:
@@ -541,7 +540,6 @@ class CSVImportThread(QThread):
                                                reviewed=reviewed,
                                                individual_id=individual_id,
                                                favorite=favorite,
-                                               emb=0,
                                                commit=False)
                     # save thumbnails
                     if bbox_w != -1:

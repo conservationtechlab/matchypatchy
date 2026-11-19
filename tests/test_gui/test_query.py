@@ -29,6 +29,7 @@ def _make_parent(db=None, cache_dir=None):
     """Build a minimal parent mock that QueryContainer expects."""
     parent = MagicMock()
     parent.mpDB = db or MagicMock()
+    parent.mpDB.emb_model = None  # saved in the knn cache, a mock isn't json
     parent.cfg = MagicMock()
     parent.cfg.DB_DIR = str(cache_dir)
     parent.project.db, parent.project.cfg = parent.mpDB, parent.cfg
@@ -835,6 +836,11 @@ class TestKnnCache:
         assert qc_raw._from_cache is True
         assert qc_raw._raw_ranked[0]["sequence_id"] == 1
         assert qc_raw._raw_ranked[0]["neighbors"] == [[12, 0.1], [13, 0.3]]
+
+    def test_cache_from_another_reid_model_is_rejected(self, qc_raw):
+        qc_raw.save_knn_cache(self._serialized())
+        qc_raw.mpDB.emb_model = "MegaDescriptor_l_384"
+        assert qc_raw.load_knn_cache() is False
 
     def test_saved_payload_metadata(self, qc_raw):
         qc_raw.save_knn_cache(self._serialized())

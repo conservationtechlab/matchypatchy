@@ -15,9 +15,11 @@ import numpy as np
 import pandas as pd
 
 from matchypatchy.database.setup import (setup_database, setup_chromadb, migrate_database,
-                                         schema_signature, expected_schema_signature, SCHEMA_VERSION)
+                                         schema_signature, expected_schema_signature, SCHEMA_VERSION,
+                                         KEY_COLLECTION, emb_collection, emb_collection_name, emb_model_key,
+                                         is_emb_collection)
 from matchypatchy.database.location import TZ_CONVERT_DICT
-from matchypatchy.database.media import filepath_sql
+from matchypatchy.database.media import emb_sql, filepath_sql
 
 
 logger = logging.getLogger(__name__)
@@ -85,6 +87,8 @@ class MatchyPatchyDB():
         self.chroma_filepath = Path(DB_PATH) / 'emb.db'
         self.local = threading.local()  # Thread-local storage
         self._change_listeners = []  # called with a table name after it is written to
+        # Re-ID model whose embeddings knn and similarity use, see set_emb_model
+        self.emb_model = emb_model_key(None)
 
         db_exists = self.filepath.is_file()
         chroma_exists = self.chroma_filepath.is_dir()
@@ -95,7 +99,7 @@ class MatchyPatchyDB():
                 # initialize
                 self.db  # Trigger property initialization
                 self.chroma  # Trigger property initialization
-                self.collection  # Trigger property initialization
+                self.chroma.get_collection(name=KEY_COLLECTION)  # not a MatchyPatchy database without it
                 # upgrade outdated schemas, then check key
                 if self.migrate():
                     self.key = self.validate()
@@ -103,6 +107,7 @@ class MatchyPatchyDB():
                     self.key = False
                 if self.key:
                     self.prune_orphan_embeddings()
+                    self.sync_roi_embeddings()
             # not a MatchyPatchy database, eg. no embedding collection or not an sqlite file
             except Exception as e:
                 logger.error(f"Could not open database at {DB_PATH}: {e}", exc_info=True)
@@ -127,7 +132,6 @@ class MatchyPatchyDB():
         # setup new databases
         setup_database(self.key, self.filepath)
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
-        self.collection = self.chroma.get_collection(name="embedding_collection")
         # add default region and survey
         timezone = str(datetime.datetime.now().astimezone().tzname())
         timezone = TZ_CONVERT_DICT.get(timezone, timezone)
@@ -157,15 +161,11 @@ class MatchyPatchyDB():
 
     @property
     def collection(self):
-        """Get or create the embedding collection"""
-        if not hasattr(self.local, 'collection') or self.local.collection is None:
-            self.local.collection = self.chroma.get_collection(name="embedding_collection")
+        """Embedding collection of the active Re-ID model (self.emb_model) for the current thread"""
+        name = emb_collection_name(self.emb_model)
+        if getattr(self.local, 'collection', None) is None or self.local.collection.name != name:
+            self.local.collection = emb_collection(self.chroma, self.key, self.emb_model)
         return self.local.collection
-
-    @collection.setter
-    def collection(self, value):
-        """Store an embedding collection in thread-local storage"""
-        self.local.collection = value
 
     def close(self):
         """Close database and Chroma connections"""
@@ -183,7 +183,7 @@ class MatchyPatchyDB():
         cursor.execute("SELECT mp_version, key FROM metadata WHERE id=1;")
         db_build_version, mpkey = cursor.fetchone()
 
-        collection = self.chroma.get_collection(name="embedding_collection")
+        collection = self.chroma.get_collection(name=KEY_COLLECTION)
         chroma_key = collection.metadata['key']
 
         return db_build_version, mpkey, chroma_key
@@ -230,7 +230,7 @@ class MatchyPatchyDB():
             logger.error("Selected DB is not a MatchyPatchy database, metadata is missing.")
             return False
         db_build_version, mpkey = metadata
-        chroma_key = self.collection.metadata['key']
+        chroma_key = self.chroma.get_collection(name=KEY_COLLECTION).metadata['key']
 
         if match_schema:
             # confirm databases match
@@ -527,7 +527,6 @@ class MatchyPatchyDB():
                 reviewed: int = 0,
                 favorite: int = 0,
                 individual_id: Optional[int] = None,
-                emb: int = 0,
                 commit: bool = True,
                 quiet: bool = True):
         """
@@ -542,14 +541,15 @@ class MatchyPatchyDB():
             - reviewed (int) NOT NULL
             - favorite (int) NOT NULL
             - individual_id (int) references individual(id)
-            - emb (int) references chroma embedding id
+
+        Its embeddings are recorded in roi_embedding by add_emb.
         """
         try:
             cursor = self.db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                         viewpoint, reviewed, favorite, individual_id, emb)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+                         viewpoint, reviewed, favorite, individual_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (int(media_id),
                           int(frame),
                           float(round(bbox_x, 4)),
@@ -559,8 +559,7 @@ class MatchyPatchyDB():
                           viewpoint,
                           int(reviewed),
                           int(favorite),
-                          individual_id,
-                          emb)
+                          individual_id)
             if not quiet:
                 print(f"Executing SQL command: {command} with data: {data_tuple}")
             cursor.execute(command, data_tuple)
@@ -881,11 +880,13 @@ class MatchyPatchyDB():
         Args
             - row_cond (str): optional condition for WHERE clause, with ? for each of params
             - params: values bound to the ? in row_cond
+
+        emb is 1 for rois with an embedding from the active Re-ID model (self.emb_model)
         """
         try:
             cursor = self.db.cursor()
             columns = f"""roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                        roi.media_id, roi.individual_id, emb, base_dir_id, relative_path, ext, timestamp,
+                        roi.media_id, roi.individual_id, {emb_sql('roi.id')} AS emb, base_dir_id, relative_path, ext, timestamp,
                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex,
                         {filepath_sql('uploads.base_dir', 'media.relative_path')} AS filepath"""
             if row_cond:
@@ -899,7 +900,8 @@ class MatchyPatchyDB():
                             INNER JOIN media ON roi.media_id = media.id
                             LEFT JOIN uploads ON media.base_dir_id = uploads.id
                             LEFT JOIN individual ON roi.individual_id = individual.id;"""
-            cursor.execute(command, params)
+            # emb's ? comes before row_cond's
+            cursor.execute(command, (self.emb_model, *params))
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
@@ -1042,13 +1044,101 @@ class MatchyPatchyDB():
             return False
 
     # EMBEDDINGS ===============================================================
-    def add_emb(self, emb_id, embedding):
-        """Add embedding to chroma vector database"""
-        self.collection.add(embeddings=[embedding], ids=[str(emb_id)])
+    # Each Re-ID model's embeddings live in their own collection, keyed by roi id.
+    # knn and similarity use the active model's (self.emb_model), deletes reach all of them
+    def set_emb_model(self, model):
+        """
+        Make model's embeddings the ones matching uses, None for the original (MiewID) collection
+
+        emb_model is stored as emb_model_key(model), the name roi_embedding records the
+        model under, so the emb column of roi fetches marks the rois this model has embedded.
+        """
+        self.emb_model = emb_model_key(model)
+        self.local.collection = None
+
+    def emb_models(self):
+        """
+        (model, number of rois) for every Re-ID model with embeddings, by model name
+
+        Lists the embedding sets the match page can switch between (DisplayCompare.refresh_emb_models).
+        """
+        rows = self.query("SELECT model, COUNT(*) FROM roi_embedding GROUP BY model ORDER BY model;")
+        return [(model, count) for model, count in rows or []]
+
+    def emb_ids(self):
+        """Ids of the rois with an embedding from the active model"""
+        return {int(i) for i in self.collection.get(include=[])["ids"]}
+
+    def _collection_model(self, collection):
+        """
+        Model key a collection's embeddings are recorded under in roi_embedding
+
+        None for a collection that doesn't say, which sync_roi_embeddings then leaves alone.
+        Collections record the model they were created for in their metadata, the key
+        collection predates that and always holds MiewID.
+        """
+        if collection.name == KEY_COLLECTION:
+            return emb_model_key(None)
+        model = (collection.metadata or {}).get("model")
+        return emb_model_key(model) if model else None
+
+    def sync_roi_embeddings(self):
+        """
+        Make roi_embedding list exactly the embeddings each model's collection holds
+
+        add_emb and delete_embs keep the two in step, this catches what they can't: a
+        database migrated from the roi.emb flag, embeddings written by an older build,
+        or a crash between a chroma write and its SQLite one. Called when the database
+        opens, after prune_orphan_embeddings. Never stops a database opening.
+        """
+        try:
+            roi_ids = {row[0] for row in self.db.execute("SELECT id FROM roi;")}
+            expected = set()
+            unknown = set()  # names of collections that don't say their model
+            for collection in self._emb_collections():
+                model = self._collection_model(collection)
+                if model is None:
+                    unknown.add(collection.name)
+                    continue
+                ids = {int(i) for i in collection.get(include=[])["ids"]} & roi_ids
+                expected.update((roi_id, model) for roi_id in ids)
+            # rows that may belong to a collection that doesn't say its model can't be checked
+            recorded = {row for row in self.db.execute("SELECT roi_id, model FROM roi_embedding;")
+                        if emb_collection_name(row[1]) not in unknown}
+            to_add = sorted(expected - recorded)
+            to_remove = sorted(recorded - expected)
+            self.db.executemany("INSERT OR IGNORE INTO roi_embedding (roi_id, model) VALUES (?, ?);", to_add)
+            self.db.executemany("DELETE FROM roi_embedding WHERE roi_id = ? AND model = ?;", to_remove)
+            self.db.commit()
+        except Exception as error:
+            self.db.rollback()
+            logger.error(f"Failed to sync roi embeddings with the embedding collections: {error}")
+            return
+        if to_add or to_remove:
+            logger.info(f"Synced roi embeddings: {len(to_add)} recorded, {len(to_remove)} removed")
+
+    def _emb_collections(self):
+        """Every model's embedding collection"""
+        names = [getattr(c, 'name', c) for c in self.chroma.list_collections()]
+        return [self.chroma.get_collection(name=name) for name in names if is_emb_collection(name)]
+
+    def add_emb(self, emb_id, embedding, model=None):
+        """
+        Add embedding to the active model's collection, or to model's when given
+
+        Re-ID passes the model it ran, so its embeddings never land in another model's collection
+        """
+        collection = self.collection if model is None else emb_collection(self.chroma, self.key, model)
+        collection.add(embeddings=[embedding], ids=[str(emb_id)])
+        # only for a roi that exists, an embedding without one is pruned on the next open
+        self.db.execute("""INSERT OR IGNORE INTO roi_embedding (roi_id, model)
+                           SELECT id, ? FROM roi WHERE id = ?;""",
+                        (self.emb_model if model is None else emb_model_key(model), int(emb_id)))
+        self.db.commit()
 
     def delete_emb(self, emb_id):
-        """Delete embedding from chroma vector database"""
-        self.collection.delete(ids=[str(emb_id)])
+        """Delete a roi's embeddings from every model's collection"""
+        self.delete_embs([emb_id])
 
     def prune_orphan_embeddings(self):
         """
@@ -1058,7 +1148,9 @@ class MatchyPatchyDB():
         where they take up nearest-neighbour slots. Never stops a database opening.
         """
         try:
-            emb_ids = {int(i) for i in self.collection.get(include=[])["ids"]}
+            emb_ids = set()
+            for collection in self._emb_collections():
+                emb_ids.update(int(i) for i in collection.get(include=[])["ids"])
             roi_ids = {row[0] for row in self.db.execute("SELECT id FROM roi;")}
             orphans = sorted(emb_ids - roi_ids)
         except Exception as error:
@@ -1069,15 +1161,28 @@ class MatchyPatchyDB():
             self.delete_embs(orphans)
 
     def delete_embs(self, emb_ids):
-        """Delete embeddings from chroma vector database, ids without an embedding are ignored"""
+        """Delete embeddings from every model's collection, ids without an embedding are ignored"""
         # chroma rejects an empty list
         if not emb_ids:
             return
+        ids = [str(emb_id) for emb_id in emb_ids]
         try:
-            self.collection.delete(ids=[str(emb_id) for emb_id in emb_ids])
+            # rows of deleted rois are already gone through the cascade, a redrawn box keeps its roi
+            self.db.executemany("DELETE FROM roi_embedding WHERE roi_id = ?;", [(int(i),) for i in emb_ids])
+            self.db.commit()
+        except sqlite3.Error as error:
+            logger.error(f"Failed to delete {len(emb_ids)} roi embedding records: {error}")
+        try:
+            collections = self._emb_collections()
         except Exception as error:
-            # the rois are already gone, matching skips embeddings without a roi
             logger.error(f"Failed to delete {len(emb_ids)} embeddings: {error}")
+            return
+        for collection in collections:
+            try:
+                collection.delete(ids=ids)
+            except Exception as error:
+                # the rois are already gone, matching skips embeddings without a roi
+                logger.error(f"Failed to delete {len(emb_ids)} embeddings from {collection.name}: {error}")
 
     def knn(self, query_id, k=3):
         """Get k nearest neighbors of a query ROI from chroma vector database"""
@@ -1159,8 +1264,11 @@ class MatchyPatchyDB():
         return similarities
 
     def clear_emb(self):
-        """Clear vector database and rebuild (no way to delete)"""
-        self.chroma.delete_collection(name="embedding_collection")
+        """Delete every model's embeddings and rebuild the key collection (no way to empty one)"""
+        self.db.execute("DELETE FROM roi_embedding;")
+        self.db.commit()
+        for collection in self._emb_collections():
+            self.chroma.delete_collection(name=collection.name)
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)
-        self.collection = self.chroma.get_collection(name="embedding_collection")
+        self.local.collection = None
         logger.info("Chroma vector database cleared and rebuilt.")

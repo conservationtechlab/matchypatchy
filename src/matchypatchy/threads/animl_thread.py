@@ -12,10 +12,8 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.database.media import get_sha256, native_relative_path
-from matchypatchy.threads.model_download_thread import get_path
+from matchypatchy.threads.model_download_thread import get_path, get_model_params
 
-
-MEGADETECTORv1000_SIZE = 960
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +113,7 @@ class AnimlThread(QThread):
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
+        self.resize = get_model_params(DETECTOR_KEY)[0]
 
         self.media = None  # loaded in run(), off the GUI thread
         self.rois = None
@@ -129,8 +128,10 @@ class AnimlThread(QThread):
         self.prompt_update.emit("Loading media...")
         self._load_media()
         if self.DETECTOR_KEY is not None:
+            # remove size from the model key to get the model type for animl.load_detector
+            model_type = '_'.join(self.DETECTOR_KEY.split('_')[0:2]).lower()
             self.prompt_update.emit("Loading detector...")
-            self.detector = animl.load_detector(self.md_filepath, device=self.device)
+            self.detector = animl.load_detector(self.md_filepath, model_type=model_type, device=self.device)
         # imported ROIs without a box stay as they are when there's no detector to find one
         if self.detector is None:
             self.rois = self.rois.iloc[0:0]
@@ -198,13 +199,12 @@ class AnimlThread(QThread):
                 bbox_w = roi['bbox_w']
                 bbox_h = roi['bbox_h']
 
-                # do not add emb_id, to be determined later
+                # embedded later by Process
                 roi_id = self.mpDB.add_roi(roi['id'],  #media id
                                            frame,
                                            bbox_x, bbox_y, bbox_w, bbox_h,
                                            viewpoint=None,
-                                           individual_id=None,
-                                           emb=0)
+                                           individual_id=None)
                 # save thumbnails
                 roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
                                                    roi['filepath'],
@@ -243,7 +243,7 @@ class AnimlThread(QThread):
                 bbox_w = roi['bbox_w']
                 bbox_h = roi['bbox_h']
 
-                # do not add emb_id, to be determined later
+                # embedded later by Process
                 self.mpDB.edit_row('roi',
                                     roi['id'],
                                     {"bbox_x": bbox_x, "bbox_y": bbox_y,
@@ -284,12 +284,11 @@ class AnimlThread(QThread):
                     bbox_w = roi['bbox_w']
                     bbox_h = roi['bbox_h']
 
-                    # do not add emb_id, to be determined later
+                    # embedded later by Process
                     roi_id = self.mpDB.add_roi(media_id, int(frame),
                                                bbox_x, bbox_y, bbox_w, bbox_h,
                                                viewpoint=None,
-                                               individual_id=None,
-                                               emb=0)
+                                               individual_id=None)
                     # save thumbnails
                     roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
                                                        roi['filepath'], roi['ext'], frame,
@@ -326,8 +325,8 @@ class AnimlThread(QThread):
         """Run the detector on the manifest's files, None if none of them could be read"""
         results = animl.detect(self.detector,
                                manifest,
-                               MEGADETECTORv1000_SIZE,
-                               MEGADETECTORv1000_SIZE,
+                               self.resize,
+                               self.resize,
                                confidence_threshold=self.confidence_threshold,
                                use_progress_bar=False,
                                **kwargs)

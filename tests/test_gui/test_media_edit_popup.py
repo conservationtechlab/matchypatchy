@@ -118,7 +118,7 @@ class TestSaveRoi:
             confirm.exec.return_value = qdialog.DialogCode.Accepted
             MediaEditPopup.save_roi(dialog)
         dialog.mpDB.edit_row.assert_called_once_with(
-            "roi", 10, {"frame": 0, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "emb": 0})
+            "roi", 10, {"frame": 0, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5})
         dialog.mpDB.delete_emb.assert_called_once_with(10)
         dialog.mpDB.batch_update_thumbnails.assert_called_once_with(
             "roi_thumbnails", "fid", {10: {"filepath": "new.jpg"}})
@@ -150,7 +150,7 @@ class TestSaveRoi:
     def test_box_on_media_fills_its_boxless_roi(self):
         dialog, prompt = self._draw_on_media(boxless=40)
         dialog.mpDB.edit_row.assert_called_once_with(
-            "roi", 40, {"frame": 12, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "emb": 0})
+            "roi", 40, {"frame": 12, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5})
         dialog.mpDB.batch_update_thumbnails.assert_called_once_with(
             "roi_thumbnails", "fid", {40: {"filepath": "new.jpg"}})
         dialog.mpDB.add_roi.assert_not_called()
@@ -172,7 +172,7 @@ class TestSaveRoi:
             confirm.exec.return_value = qdialog.DialogCode.Accepted
             MediaEditPopup.save_roi(dialog)
         dialog.mpDB.edit_row.assert_called_once_with(
-            "roi", 40, {"frame": 12, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5, "emb": 0})
+            "roi", 40, {"frame": 12, "bbox_x": 0.3, "bbox_y": 0.4, "bbox_w": 0.25, "bbox_h": 0.5})
         dialog.mpDB.add_roi.assert_not_called()
         # the placeholder's row shows the box, the full video row stays a video
         assert dialog.data.loc[0, ["frame", "bbox_w", "thumbnail_path"]].tolist() == [12, 0.25, "new.jpg"]
