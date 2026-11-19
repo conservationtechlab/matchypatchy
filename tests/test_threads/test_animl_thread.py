@@ -336,7 +336,7 @@ class TestAnimlThread:
 
         # one full-frame ROI per image, no detector run
         assert db.add_roi_calls == [
-            ((3, 0, 0, 0, 1, 1), {"viewpoint": None, "individual_id": None, "emb": 0})
+            ((3, 0, 0, 0, 1, 1), {"viewpoint": None, "individual_id": None})
         ]
         assert db.edit_row_calls == []
 
@@ -462,7 +462,7 @@ class TestAnimlThread:
         thread.detect_videos()
 
         assert db.add_roi_calls == [
-            ((5, 3, 0, 0, 1, 1), {"viewpoint": None, "individual_id": None, "emb": 0})
+            ((5, 3, 0, 0, 1, 1), {"viewpoint": None, "individual_id": None})
         ]
 
     def test_rois_without_box_are_left_when_detector_none(self, tmp_path, monkeypatch):

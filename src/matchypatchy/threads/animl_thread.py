@@ -197,13 +197,12 @@ class AnimlThread(QThread):
                 bbox_w = roi['bbox_w']
                 bbox_h = roi['bbox_h']
 
-                # do not add emb_id, to be determined later
+                # embedded later by Process
                 roi_id = self.mpDB.add_roi(roi['id'],  #media id
                                            frame,
                                            bbox_x, bbox_y, bbox_w, bbox_h,
                                            viewpoint=None,
-                                           individual_id=None,
-                                           emb=0)
+                                           individual_id=None)
                 # save thumbnails
                 roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
                                                    roi['filepath'],
@@ -242,7 +241,7 @@ class AnimlThread(QThread):
                 bbox_w = roi['bbox_w']
                 bbox_h = roi['bbox_h']
 
-                # do not add emb_id, to be determined later
+                # embedded later by Process
                 self.mpDB.edit_row('roi',
                                     roi['id'],
                                     {"bbox_x": bbox_x, "bbox_y": bbox_y,
@@ -283,12 +282,11 @@ class AnimlThread(QThread):
                     bbox_w = roi['bbox_w']
                     bbox_h = roi['bbox_h']
 
-                    # do not add emb_id, to be determined later
+                    # embedded later by Process
                     roi_id = self.mpDB.add_roi(media_id, int(frame),
                                                bbox_x, bbox_y, bbox_w, bbox_h,
                                                viewpoint=None,
-                                               individual_id=None,
-                                               emb=0)
+                                               individual_id=None)
                     # save thumbnails
                     roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
                                                        roi['filepath'], roi['ext'], frame,

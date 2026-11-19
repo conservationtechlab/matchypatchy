@@ -10,8 +10,19 @@ def _ids(db, model):
     return sorted(int(i) for i in collection.get(include=[])["ids"])
 
 
-def _flags(db):
-    return dict(db.db.execute("SELECT id, emb FROM roi;").fetchall())
+def _recorded(db):
+    """roi_embedding as {roi id: sorted models}"""
+    recorded = {}
+    for roi_id, model in db.db.execute("SELECT roi_id, model FROM roi_embedding;"):
+        recorded.setdefault(roi_id, []).append(model)
+    return {roi_id: sorted(models) for roi_id, models in recorded.items()}
+
+
+def _emb_column(db):
+    """emb of fetch_roi (1 for an embedding from the active model) as {roi id: emb}"""
+    from matchypatchy.database.media import fetch_roi
+    rois = fetch_roi(db)
+    return dict(zip(rois["roi_id"], rois["emb"]))
 
 
 @pytest.fixture
@@ -61,18 +72,65 @@ def test_knn_and_similarity_use_the_active_model(rois):
     assert db.calculate_similarity(roi_ids[0], roi_ids[2]) is not None
 
 
-def test_set_emb_model_syncs_roi_flags(rois):
+def test_add_emb_records_each_model(rois):
+    db, roi_ids = rois
+    mega = "MegaDescriptor_l_384"
+
+    assert _recorded(db) == {roi_ids[0]: [mega, "MiewID_v3"], roi_ids[1]: [mega, "MiewID_v3"],
+                             roi_ids[2]: ["MiewID_v3"]}
+
+
+def test_emb_column_follows_the_active_model(rois):
     db, roi_ids = rois
 
     db.set_emb_model("MegaDescriptor_l_384")
-    assert _flags(db) == {roi_ids[0]: 1, roi_ids[1]: 1, roi_ids[2]: 0}
+    assert _emb_column(db) == {roi_ids[0]: 1, roi_ids[1]: 1, roi_ids[2]: 0}
 
     db.set_emb_model("MiewID_v3")
-    assert _flags(db) == {roi_id: 1 for roi_id in roi_ids}
+    assert _emb_column(db) == {roi_id: 1 for roi_id in roi_ids}
 
     # a model nothing has been embedded with yet
     db.set_emb_model("New_Model")
-    assert _flags(db) == {roi_id: 0 for roi_id in roi_ids}
+    assert _emb_column(db) == {roi_id: 0 for roi_id in roi_ids}
+
+
+def test_key_collection_aliases_name_one_model(rois):
+    db, roi_ids = rois
+
+    for model in (None, "miewid_v3", "MiewID_v3"):
+        db.set_emb_model(model)
+        assert db.emb_model == "MiewID_v3"
+        assert _emb_column(db) == {roi_id: 1 for roi_id in roi_ids}
+
+
+def test_redrawn_box_drops_every_models_record(rois):
+    from matchypatchy.database.media import update_roi_box
+    db, roi_ids = rois
+
+    assert update_roi_box(db, roi_ids[0], 0, 0.3, 0.3, 0.2, 0.2) is True
+
+    assert roi_ids[0] not in _recorded(db)
+    assert roi_ids[1] in _recorded(db)
+
+
+def test_add_emb_for_a_missing_roi_records_nothing(rois):
+    db, _ = rois
+    db.add_emb(999, [1.0, 0.0, 0.0], model="MiewID_v3")
+    assert 999 not in _recorded(db)
+
+
+def test_sync_rebuilds_records_from_the_collections(rois):
+    db, roi_ids = rois
+    mega = "MegaDescriptor_l_384"
+    expected = _recorded(db)
+    # lost, and stale rows, eg. a database migrated from roi.emb or a crash mid-write
+    db.db.execute("DELETE FROM roi_embedding WHERE model = 'MiewID_v3';")
+    db.db.execute("INSERT INTO roi_embedding (roi_id, model) VALUES (?, ?);", (roi_ids[2], mega))
+    db.db.commit()
+
+    db.sync_roi_embeddings()
+
+    assert _recorded(db) == expected
 
 
 def test_deletes_reach_every_model(rois):
@@ -89,6 +147,7 @@ def test_clear_emb_clears_every_model(rois):
 
     db.clear_emb()
 
+    assert _recorded(db) == {}
     names = [getattr(c, "name", c) for c in db.chroma.list_collections()]
     assert names == [KEY_COLLECTION]
     assert _ids(db, "MiewID_v3") == []

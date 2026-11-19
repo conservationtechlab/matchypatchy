@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
 # Databases created before schema versioning have no schema_version column and are treated as version 1.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Tables rebuilt by a migration, {name} lets the migration create them under a temporary name.
 # A relative path is only unique within its base directory: D:/2023/Site01/IMG_0001.JPG and
@@ -52,6 +52,30 @@ STATION_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 survey_id INTEGER NOT NULL,
                 UNIQUE (name, survey_id),
                 FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);'''
+
+ROI_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
+                id INTEGER PRIMARY KEY,
+                media_id INTEGER NOT NULL,
+                frame INTEGER NOT NULL,
+                bbox_x REAL NOT NULL,
+                bbox_y REAL NOT NULL,
+                bbox_w REAL NOT NULL,
+                bbox_h REAL NOT NULL,
+                viewpoint INTEGER,
+                reviewed INTEGER NOT NULL,
+                favorite INTEGER NOT NULL,
+                individual_id INTEGER,
+                FOREIGN KEY(media_id) REFERENCES media (id) ON DELETE CASCADE,
+                FOREIGN KEY(individual_id) REFERENCES individual (id) ON DELETE SET NULL);'''
+
+# One row per Re-ID model a roi has an embedding from (model is emb_model_key(...)), none if
+# it has no embeddings. Mirrors the chroma collections so SQL can tell which rois each model
+# still has to embed. Kept by MatchyPatchyDB.add_emb/delete_embs, rebuilt by sync_roi_embeddings
+ROI_EMBEDDING_TABLE = '''CREATE TABLE IF NOT EXISTS roi_embedding (
+                roi_id INTEGER NOT NULL,
+                model TEXT NOT NULL,
+                PRIMARY KEY (roi_id, model),
+                FOREIGN KEY (roi_id) REFERENCES roi (id) ON DELETE CASCADE);'''
 
 INDIVIDUAL_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 id INTEGER PRIMARY KEY,
@@ -126,22 +150,8 @@ def setup_database(key, filepath, db=None):
         cursor.execute(MEDIA_TABLE.format(name="media"))
 
         # ROI
-        cursor.execute(
-            '''CREATE TABLE IF NOT EXISTS roi (
-                id INTEGER PRIMARY KEY,
-                media_id INTEGER NOT NULL,
-                frame INTEGER NOT NULL,
-                bbox_x REAL NOT NULL,
-                bbox_y REAL NOT NULL,
-                bbox_w REAL NOT NULL,
-                bbox_h REAL NOT NULL,
-                viewpoint INTEGER,
-                reviewed INTEGER NOT NULL,
-                favorite INTEGER NOT NULL,
-                individual_id INTEGER,
-                emb INTEGER,
-                FOREIGN KEY(media_id) REFERENCES media (id) ON DELETE CASCADE,
-                FOREIGN KEY(individual_id) REFERENCES individual (id) ON DELETE SET NULL);''')
+        cursor.execute(ROI_TABLE.format(name="roi"))
+        cursor.execute(ROI_EMBEDDING_TABLE)
 
         # INDIVIDUAL
         cursor.execute(INDIVIDUAL_TABLE.format(name="individual"))
@@ -323,7 +333,20 @@ def _migrate_2_to_3(db):
     _rebuild_table(db, "station", STATION_TABLE)
 
 
-MIGRATIONS = {1: _migrate_1_to_2, 2: _migrate_2_to_3}
+def _migrate_3_to_4(db):
+    """
+    Replace the roi.emb flag with the roi_embedding table
+
+    roi.emb was a single 0/1, it couldn't say which Re-ID model a roi was embedded by
+    or that it had embeddings from more than one. The table is filled from the chroma
+    collections when the database opens (MatchyPatchyDB.sync_roi_embeddings), the
+    migration can't reach them.
+    """
+    _rebuild_table(db, "roi", ROI_TABLE)
+    db.execute(ROI_EMBEDDING_TABLE)
+
+
+MIGRATIONS = {1: _migrate_1_to_2, 2: _migrate_2_to_3, 3: _migrate_3_to_4}
 
 
 def migrate_database(db, filepath):
@@ -355,7 +378,21 @@ def migrate_database(db, filepath):
 # stored before there was a collection per model
 KEY_COLLECTION = "embedding_collection"
 KEY_COLLECTION_MODELS = {"MiewID_v3", "miewid_v3"}  # models.yml renamed the key
+KEY_COLLECTION_MODEL = "MiewID_v3"  # current models.yml key of the key collection's model
 EMB_COLLECTION_PREFIX = "emb_"
+
+
+def emb_model_key(model):
+    """
+    Key roi.emb records for a Re-ID model's embeddings
+
+    None (projects from before REID_KEY was saved) and the old MiewID key share the key
+    collection, so they become its current key and name one model in roi_embedding.
+    Called by MatchyPatchyDB wherever it reads or writes roi_embedding.model.
+    """
+    if model is None or model in KEY_COLLECTION_MODELS:
+        return KEY_COLLECTION_MODEL
+    return str(model)
 
 
 def emb_collection_name(model):

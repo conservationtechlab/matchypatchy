@@ -125,7 +125,7 @@ class ReIDThread(QThread):
             self.prompt_update.emit("No Re-ID model selected, skipping embedding extraction...")
             return
 
-        # filter rois without embeddings, roi.emb follows the model set with mpDB.set_emb_model
+        # rois without an embedding from the active model (mpDB.set_emb_model), see emb_sql
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
@@ -149,8 +149,8 @@ class ReIDThread(QThread):
                         self._file_failed(row.at[i, 'filepath'])
                         continue
 
+                    # also records the roi in roi_embedding under this model
                     self.mpDB.add_emb(roi_id, emb, model=self.reid_key)
-                    self.mpDB.edit_row("roi", roi_id, {"emb": 1})
             if not self.isInterruptionRequested():
                 self.progress_update.emit(100)
 

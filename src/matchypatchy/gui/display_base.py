@@ -304,7 +304,7 @@ class DisplayBase(UsesProject, QWidget):
             saved = {k: v for k, v in mloptions.items() if not (k == 'REID_KEY' and v is None)}
             self.cfg.update(saved)
             if mloptions['REID_KEY'] is not None:
-                # roi.emb now marks the rois this model still has to embed
+                # roi fetches now mark the rois this model has embedded, Re-ID embeds the rest
                 self.mpDB.set_emb_model(mloptions['REID_KEY'])
             dialog = AlertPopup(self, "Processing Images...",
                                 title="Processing Images",

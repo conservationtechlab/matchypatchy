@@ -16,10 +16,10 @@ import pandas as pd
 
 from matchypatchy.database.setup import (setup_database, setup_chromadb, migrate_database,
                                          schema_signature, expected_schema_signature, SCHEMA_VERSION,
-                                         KEY_COLLECTION, emb_collection, emb_collection_name,
+                                         KEY_COLLECTION, emb_collection, emb_collection_name, emb_model_key,
                                          is_emb_collection)
 from matchypatchy.database.location import TZ_CONVERT_DICT
-from matchypatchy.database.media import filepath_sql
+from matchypatchy.database.media import emb_sql, filepath_sql
 
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ class MatchyPatchyDB():
         self.local = threading.local()  # Thread-local storage
         self._change_listeners = []  # called with a table name after it is written to
         # Re-ID model whose embeddings knn and similarity use, see set_emb_model
-        self.emb_model = None
+        self.emb_model = emb_model_key(None)
 
         db_exists = self.filepath.is_file()
         chroma_exists = self.chroma_filepath.is_dir()
@@ -107,6 +107,7 @@ class MatchyPatchyDB():
                     self.key = False
                 if self.key:
                     self.prune_orphan_embeddings()
+                    self.sync_roi_embeddings()
             # not a MatchyPatchy database, eg. no embedding collection or not an sqlite file
             except Exception as e:
                 logger.error(f"Could not open database at {DB_PATH}: {e}", exc_info=True)
@@ -526,7 +527,6 @@ class MatchyPatchyDB():
                 reviewed: int = 0,
                 favorite: int = 0,
                 individual_id: Optional[int] = None,
-                emb: int = 0,
                 commit: bool = True,
                 quiet: bool = True):
         """
@@ -541,14 +541,15 @@ class MatchyPatchyDB():
             - reviewed (int) NOT NULL
             - favorite (int) NOT NULL
             - individual_id (int) references individual(id)
-            - emb (int) references chroma embedding id
+
+        Its embeddings are recorded in roi_embedding by add_emb.
         """
         try:
             cursor = self.db.cursor()
             command = """INSERT INTO roi
                         (media_id, frame, bbox_x, bbox_y, bbox_w, bbox_h,
-                         viewpoint, reviewed, favorite, individual_id, emb)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
+                         viewpoint, reviewed, favorite, individual_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"""
             data_tuple = (int(media_id),
                           int(frame),
                           float(round(bbox_x, 4)),
@@ -558,8 +559,7 @@ class MatchyPatchyDB():
                           viewpoint,
                           int(reviewed),
                           int(favorite),
-                          individual_id,
-                          emb)
+                          individual_id)
             if not quiet:
                 print(f"Executing SQL command: {command} with data: {data_tuple}")
             cursor.execute(command, data_tuple)
@@ -880,11 +880,13 @@ class MatchyPatchyDB():
         Args
             - row_cond (str): optional condition for WHERE clause, with ? for each of params
             - params: values bound to the ? in row_cond
+
+        emb is 1 for rois with an embedding from the active Re-ID model (self.emb_model)
         """
         try:
             cursor = self.db.cursor()
             columns = f"""roi.id, frame, bbox_x ,bbox_y, bbox_w, bbox_h, viewpoint, reviewed,
-                        roi.media_id, roi.individual_id, emb, base_dir_id, relative_path, ext, timestamp,
+                        roi.media_id, roi.individual_id, {emb_sql('roi.id')} AS emb, base_dir_id, relative_path, ext, timestamp,
                         station_id, sequence_id, camera_id, external_id, comment, favorite, name, sex,
                         {filepath_sql('uploads.base_dir', 'media.relative_path')} AS filepath"""
             if row_cond:
@@ -898,7 +900,8 @@ class MatchyPatchyDB():
                             INNER JOIN media ON roi.media_id = media.id
                             LEFT JOIN uploads ON media.base_dir_id = uploads.id
                             LEFT JOIN individual ON roi.individual_id = individual.id;"""
-            cursor.execute(command, params)
+            # emb's ? comes before row_cond's
+            cursor.execute(command, (self.emb_model, *params))
             column_names = [description[0] for description in cursor.description]
             rows = cursor.fetchall()  # returns in tuple
             return rows, column_names
@@ -1047,34 +1050,63 @@ class MatchyPatchyDB():
         """
         Make model's embeddings the ones matching uses, None for the original (MiewID) collection
 
-        roi.emb then marks the rois with an embedding from this model, so Process
-        computes the missing ones and matching warns about them.
+        emb_model is stored as emb_model_key(model), the name roi_embedding records the
+        model under, so the emb column of roi fetches marks the rois this model has embedded.
         """
-        self.emb_model = model
+        self.emb_model = emb_model_key(model)
         self.local.collection = None
-        self.sync_emb_flags()
 
     def emb_ids(self):
         """Ids of the rois with an embedding from the active model"""
         return {int(i) for i in self.collection.get(include=[])["ids"]}
 
-    def sync_emb_flags(self):
-        """Set roi.emb to whether each roi has an embedding from the active model"""
+    def _collection_model(self, collection):
+        """
+        Model key a collection's embeddings are recorded under in roi_embedding
+
+        None for a collection that doesn't say, which sync_roi_embeddings then leaves alone.
+        Collections record the model they were created for in their metadata, the key
+        collection predates that and always holds MiewID.
+        """
+        if collection.name == KEY_COLLECTION:
+            return emb_model_key(None)
+        model = (collection.metadata or {}).get("model")
+        return emb_model_key(model) if model else None
+
+    def sync_roi_embeddings(self):
+        """
+        Make roi_embedding list exactly the embeddings each model's collection holds
+
+        add_emb and delete_embs keep the two in step, this catches what they can't: a
+        database migrated from the roi.emb flag, embeddings written by an older build,
+        or a crash between a chroma write and its SQLite one. Called when the database
+        opens, after prune_orphan_embeddings. Never stops a database opening.
+        """
         try:
-            emb_ids = self.emb_ids()
-            flagged = {row[0] for row in self.db.execute("SELECT id FROM roi WHERE emb = 1;")}
             roi_ids = {row[0] for row in self.db.execute("SELECT id FROM roi;")}
-            to_set = sorted((emb_ids & roi_ids) - flagged)
-            to_clear = sorted(flagged - emb_ids)
-            self.db.executemany("UPDATE roi SET emb = 1 WHERE id = ?;", [(i,) for i in to_set])
-            self.db.executemany("UPDATE roi SET emb = 0 WHERE id = ?;", [(i,) for i in to_clear])
+            expected = set()
+            unknown = set()  # names of collections that don't say their model
+            for collection in self._emb_collections():
+                model = self._collection_model(collection)
+                if model is None:
+                    unknown.add(collection.name)
+                    continue
+                ids = {int(i) for i in collection.get(include=[])["ids"]} & roi_ids
+                expected.update((roi_id, model) for roi_id in ids)
+            # rows that may belong to a collection that doesn't say its model can't be checked
+            recorded = {row for row in self.db.execute("SELECT roi_id, model FROM roi_embedding;")
+                        if emb_collection_name(row[1]) not in unknown}
+            to_add = sorted(expected - recorded)
+            to_remove = sorted(recorded - expected)
+            self.db.executemany("INSERT OR IGNORE INTO roi_embedding (roi_id, model) VALUES (?, ?);", to_add)
+            self.db.executemany("DELETE FROM roi_embedding WHERE roi_id = ? AND model = ?;", to_remove)
             self.db.commit()
         except Exception as error:
             self.db.rollback()
-            logger.error(f"Failed to sync roi embedding flags for {self.emb_model}: {error}")
+            logger.error(f"Failed to sync roi embeddings with the embedding collections: {error}")
             return
-        if to_set or to_clear:
-            logger.info(f"Embedding flags for {self.emb_model}: {len(to_set)} set, {len(to_clear)} cleared")
+        if to_add or to_remove:
+            logger.info(f"Synced roi embeddings: {len(to_add)} recorded, {len(to_remove)} removed")
 
     def _emb_collections(self):
         """Every model's embedding collection"""
@@ -1089,6 +1121,11 @@ class MatchyPatchyDB():
         """
         collection = self.collection if model is None else emb_collection(self.chroma, self.key, model)
         collection.add(embeddings=[embedding], ids=[str(emb_id)])
+        # only for a roi that exists, an embedding without one is pruned on the next open
+        self.db.execute("""INSERT OR IGNORE INTO roi_embedding (roi_id, model)
+                           SELECT id, ? FROM roi WHERE id = ?;""",
+                        (self.emb_model if model is None else emb_model_key(model), int(emb_id)))
+        self.db.commit()
 
     def delete_emb(self, emb_id):
         """Delete a roi's embeddings from every model's collection"""
@@ -1120,6 +1157,12 @@ class MatchyPatchyDB():
         if not emb_ids:
             return
         ids = [str(emb_id) for emb_id in emb_ids]
+        try:
+            # rows of deleted rois are already gone through the cascade, a redrawn box keeps its roi
+            self.db.executemany("DELETE FROM roi_embedding WHERE roi_id = ?;", [(int(i),) for i in emb_ids])
+            self.db.commit()
+        except sqlite3.Error as error:
+            logger.error(f"Failed to delete {len(emb_ids)} roi embedding records: {error}")
         try:
             collections = self._emb_collections()
         except Exception as error:
@@ -1213,6 +1256,8 @@ class MatchyPatchyDB():
 
     def clear_emb(self):
         """Delete every model's embeddings and rebuild the key collection (no way to empty one)"""
+        self.db.execute("DELETE FROM roi_embedding;")
+        self.db.commit()
         for collection in self._emb_collections():
             self.chroma.delete_collection(name=collection.name)
         self.chroma = setup_chromadb(self.key, self.chroma_filepath)

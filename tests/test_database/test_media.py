@@ -274,10 +274,11 @@ class TestEditsAndDeletes:
         from matchypatchy.database.media import update_roi_box
         db, _ = tmp_db
         _, rid = self._roi(db)
-        db.edit_row("roi", rid, {"emb": 1, "favorite": 1})
+        db.edit_row("roi", rid, {"favorite": 1})
         assert update_roi_box(db, rid, 2, 0.123456, 0.2, 0.3, 0.4) is True
-        assert db.select("roi", "frame, bbox_x, bbox_w, emb, favorite", row_cond="id=?", params=(rid,)) == [(2, 0.1235, 0.3, 0, 1)]
+        assert db.select("roi", "frame, bbox_x, bbox_w, favorite", row_cond="id=?", params=(rid,)) == [(2, 0.1235, 0.3, 1)]
         assert not self._has_emb(db, rid)
+        assert db.select("roi_embedding", "roi_id", row_cond="roi_id=?", params=(rid,)) == []
 
     def test_set_favorite(self, tmp_db):
         from matchypatchy.database.media import set_favorite

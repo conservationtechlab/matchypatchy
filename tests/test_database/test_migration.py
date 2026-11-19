@@ -8,6 +8,13 @@ from matchypatchy.database.mpdb import MatchyPatchyDB
 from matchypatchy.database.setup import SCHEMA_VERSION, setup_chromadb
 
 
+def chromadb_client(path):
+    """Client on a test project's embedding database, to write embeddings before it is opened"""
+    import chromadb
+    from chromadb.config import Settings
+    return chromadb.PersistentClient(str(path / "emb.db"), settings=Settings(anonymized_telemetry=False))
+
+
 KEY = "12345"
 
 # Schema of a database built by a released version, before schema versioning
@@ -166,6 +173,21 @@ class TestMigrateToCurrent:
         assert db.select("individual", columns="id, name, sex") == [(1, "Jaguar-1", "Female")]
         assert db.select("media_thumbnails", columns="fid, filepath") == [(1, "media1.jpg")]
         assert db.select("roi_thumbnails", columns="fid, filepath") == [(1, "roi1.jpg")]
+
+    def test_emb_flag_is_replaced_by_roi_embedding(self, migrated_db):
+        db, _ = migrated_db
+        assert "emb" not in [c[1] for c in db.db.execute("PRAGMA table_info(roi)")]
+        assert db.select("roi_embedding", columns="roi_id, model") == []
+
+    def test_roi_embedding_is_filled_from_the_collections_on_open(self, tmp_path, null_logger):
+        """The migration can't see chroma, opening records the embeddings already there"""
+        _old_database(tmp_path)
+        setup.emb_collection(chromadb_client(tmp_path), KEY, None).add(embeddings=[[1.0, 0.0, 0.0]], ids=["1"])
+
+        db = MatchyPatchyDB(str(tmp_path))
+
+        assert db.select("roi_embedding", columns="roi_id, model") == [(1, "MiewID_v3")]
+        db.close()
 
     def test_age_is_dropped(self, migrated_db):
         db, _ = migrated_db
