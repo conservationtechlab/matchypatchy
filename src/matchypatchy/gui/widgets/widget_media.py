@@ -78,7 +78,6 @@ class MediaWidget(QWidget):
         # VIDEO
         elif Path(self.filepath).suffix.lower() in VIDEO_EXT:
             if frame is not None:
-                print(f"Loading video frame {frame} for {self.filepath}")
                 # display frame instead of video
                 self.player.stop()
                 self.playbackbar.setVisible(False)
@@ -223,7 +222,6 @@ class ImageWidget(QLabel):
         Args:
             frame (int): Frame number to load
         """
-        print(self.image_path, selected_frame)
         cap = cv2.VideoCapture(self.image_path)
         cap.set(cv2.CAP_PROP_POS_FRAMES, int(selected_frame))
         ret, frame = cap.read()
