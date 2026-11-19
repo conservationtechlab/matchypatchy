@@ -123,6 +123,18 @@ def get_path(ML_DIR, key, models=None):
     return None
 
 
+def get_model_params(key):
+    """
+    Return the model parameters for a given model key, or None if not specified.
+    """
+    models = load_model('MODELS')
+    resize = models[key][2] if len(models[key]) > 2 else None
+    normalize = {"mean": models[key][3] if len(models[key]) > 3 else None,
+                 "std": models[key][4] if len(models[key]) > 4 else None}
+
+    return resize, normalize
+
+
 def downloaded_models(ML_DIR, models=None):
     """Models whose files are all downloaded, {key: path to the main file}"""
     if models is None:

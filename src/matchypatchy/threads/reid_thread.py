@@ -10,7 +10,7 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.threads.model_download_thread import get_path
+from matchypatchy.threads.model_download_thread import get_path, get_model_params
 from matchypatchy.database.media import fetch_roi, filepath_sql
 
 # from matchypatchy.pairx.core import explain
@@ -31,8 +31,11 @@ class ReIDThread(QThread):
         self.device = self.cfg.DEVICE
         self.batch_size = 1  # set to 1 for now
         self.reid_key = mloptions['REID_KEY']
-        self.reid_filepath = get_path(self.cfg.ML_DIR, self.reid_key)
-        self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
+        self.viewpoint_key = mloptions['VIEWPOINT_KEY']
+        self.reid_path = get_path(self.cfg.ML_DIR, self.reid_key)
+        self.reid_params = get_model_params(self.reid_key)
+        self.viewpoint_path = get_path(self.cfg.ML_DIR, self.viewpoint_key)
+        self.viewpoint_params = get_model_params(self.viewpoint_key)
         self.failed = set()  # files that couldn't be read
 
     def run(self):
@@ -54,7 +57,8 @@ class ReIDThread(QThread):
             JOIN media ON roi.media_id = media.id
             LEFT JOIN uploads ON media.base_dir_id = uploads.id
         """)
-        self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
+        self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath",
+                                                  "external_id", "camera_id", "sequence_id"])
 
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
         self.rois['filepath'] = self.rois['roi_id'].map(self.image_paths)
@@ -94,11 +98,12 @@ class ReIDThread(QThread):
                 # one ROI per generator: it silently drops files it can't load,
                 # so results can't be paired with ROIs by position in a longer manifest
                 dataloader = animl.ManifestGenerator(filtered_rois.iloc[[i]],
-                                                      resize_width=480,
-                                                      resize_height=480,
-                                                      crop=True,
-                                                      batch_size=1,
-                                                      num_workers=0)
+                                                     resize_width=self.viewpoint_params[0],
+                                                     resize_height=self.viewpoint_params[0],
+                                                     normalize=self.viewpoint_params[1],
+                                                     crop=True,
+                                                     batch_size=1,
+                                                     num_workers=0)
                 batch = next(iter(dataloader), None)
                 if batch is None:
                     self._file_failed(filtered_rois.at[i, 'filepath'])
@@ -135,7 +140,10 @@ class ReIDThread(QThread):
                         continue
                     roi_id = row.at[i, 'roi_id']
                     try:
-                        emb = animl.extract_reid_embeddings(model, row)[0]
+                        emb = animl.extract_reid_embeddings(model, row, 
+                                                            resize_width=self.reid_params[0],
+                                                            resize_height=self.reid_params[0],
+                                                            normalize=self.reid_params[1])[0]
                     except ValueError:
                         # nothing to stack: the file couldn't be loaded
                         self._file_failed(row.at[i, 'filepath'])

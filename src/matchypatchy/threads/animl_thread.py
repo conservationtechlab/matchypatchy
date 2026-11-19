@@ -12,10 +12,8 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.database.media import get_sha256, native_relative_path
-from matchypatchy.threads.model_download_thread import get_path
+from matchypatchy.threads.model_download_thread import get_path, get_model_params
 
-
-MEGADETECTORv1000_SIZE = 960
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +113,7 @@ class AnimlThread(QThread):
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
+        self.resize = get_model_params(DETECTOR_KEY)[0]
 
         self.media = None  # loaded in run(), off the GUI thread
         self.rois = None
@@ -326,8 +325,8 @@ class AnimlThread(QThread):
         """Run the detector on the manifest's files, None if none of them could be read"""
         results = animl.detect(self.detector,
                                manifest,
-                               MEGADETECTORv1000_SIZE,
-                               MEGADETECTORv1000_SIZE,
+                               self.resize,
+                               self.resize,
                                confidence_threshold=self.confidence_threshold,
                                use_progress_bar=False,
                                **kwargs)
