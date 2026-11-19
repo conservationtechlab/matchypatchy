@@ -347,3 +347,46 @@ class TestProjectChanged:
 
         dc._teardown_query_container.assert_called_once()
         assert dc.QueryContainer.mpDB is new_db
+
+
+class TestEmbeddingSelect:
+    def _display(self, active="MiewID_v3", models=(("MegaDescriptor_l_384", 2), ("MiewID_v3", 3))):
+        dc = MagicMock()
+        dc.mpDB.emb_model = active
+        dc.mpDB.emb_models.return_value = list(models)
+        return dc
+
+    def test_lists_models_with_counts_and_selects_the_active_one(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = self._display()
+        dc.emb_select.findData.return_value = 1
+        DisplayCompare.refresh_emb_models(dc)
+        dc.emb_select.clear.assert_called_once()
+        assert [c.args for c in dc.emb_select.addItem.call_args_list] == [
+            ("MegaDescriptor_l_384 (2)", "MegaDescriptor_l_384"), ("MiewID_v3 (3)", "MiewID_v3")]
+        dc.emb_select.findData.assert_called_once_with("MiewID_v3")
+        dc.emb_select.setCurrentIndex.assert_called_once_with(1)
+
+    def test_active_model_without_embeddings_is_listed(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = self._display(active="New_Model", models=[("MiewID_v3", 3)])
+        DisplayCompare.refresh_emb_models(dc)
+        assert ("New_Model (0)", "New_Model") in [c.args for c in dc.emb_select.addItem.call_args_list]
+
+    def test_recalculate_switches_to_the_picked_model(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = self._display()
+        dc.emb_select.currentData.return_value = "MegaDescriptor_l_384"
+        DisplayCompare.recalculate_matches(dc)
+        dc.mpDB.set_emb_model.assert_called_once_with("MegaDescriptor_l_384")
+        dc.cfg.update.assert_called_once_with({"REID_KEY": "MegaDescriptor_l_384"})
+        dc.initialize.assert_called_once_with(clear_cache=True)
+
+    def test_recalculate_with_the_active_model_keeps_it(self):
+        from matchypatchy.gui.display_compare import DisplayCompare
+        dc = self._display()
+        dc.emb_select.currentData.return_value = "MiewID_v3"
+        DisplayCompare.recalculate_matches(dc)
+        dc.mpDB.set_emb_model.assert_not_called()
+        dc.cfg.update.assert_not_called()
+        dc.initialize.assert_called_once_with(clear_cache=True)

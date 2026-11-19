@@ -80,6 +80,11 @@ def test_add_emb_records_each_model(rois):
                              roi_ids[2]: ["MiewID_v3"]}
 
 
+def test_emb_models_counts_rois_per_model(rois):
+    db, _ = rois
+    assert db.emb_models() == [("MegaDescriptor_l_384", 2), ("MiewID_v3", 3)]
+
+
 def test_emb_column_follows_the_active_model(rois):
     db, roi_ids = rois
 

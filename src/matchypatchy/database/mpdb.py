@@ -1056,6 +1056,15 @@ class MatchyPatchyDB():
         self.emb_model = emb_model_key(model)
         self.local.collection = None
 
+    def emb_models(self):
+        """
+        (model, number of rois) for every Re-ID model with embeddings, by model name
+
+        Lists the embedding sets the match page can switch between (DisplayCompare.refresh_emb_models).
+        """
+        rows = self.query("SELECT model, COUNT(*) FROM roi_embedding GROUP BY model ORDER BY model;")
+        return [(model, count) for model, count in rows or []]
+
     def emb_ids(self):
         """Ids of the rois with an embedding from the active model"""
         return {int(i) for i in self.collection.get(include=[])["ids"]}
