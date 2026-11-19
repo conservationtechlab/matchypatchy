@@ -328,7 +328,7 @@ class AnimlThread(QThread):
                                self.resize,
                                self.resize,
                                confidence_threshold=self.confidence_threshold,
-                               use_progress_bar=False,
+                               quiet=True,
                                **kwargs)
         # animl.detect silently leaves out files it can't load
         read = {result['filepath'] for result in results}
