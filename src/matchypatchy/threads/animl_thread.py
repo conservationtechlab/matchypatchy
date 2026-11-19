@@ -128,8 +128,10 @@ class AnimlThread(QThread):
         self.prompt_update.emit("Loading media...")
         self._load_media()
         if self.DETECTOR_KEY is not None:
+            # remove size from the model key to get the model type for animl.load_detector
+            model_type = '_'.join(self.DETECTOR_KEY.split('_')[0:2]).lower()
             self.prompt_update.emit("Loading detector...")
-            self.detector = animl.load_detector(self.md_filepath, device=self.device)
+            self.detector = animl.load_detector(self.md_filepath, model_type=model_type, device=self.device)
         # imported ROIs without a box stay as they are when there's no detector to find one
         if self.detector is None:
             self.rois = self.rois.iloc[0:0]
