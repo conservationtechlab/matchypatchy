@@ -79,6 +79,7 @@ def _make_thread(monkeypatch, n_rois, unreadable=()):
     thread.batch_size = 1
     thread.viewpoint_filepath = "/fake/viewpoint.onnx"
     thread.reid_filepath = None
+    thread.reid_key = None
     thread.isInterruptionRequested = lambda: False
     thread.progress_update = SignalSpy()
     thread.failed = set()
@@ -146,7 +147,7 @@ class TestGetEmbeddings:
         thread.reid_filepath = "/fake/miew.onnx"
         thread.rois["emb"] = 0
         db.add_emb_calls = []
-        db.add_emb = lambda roi_id, emb: db.add_emb_calls.append(roi_id)
+        db.add_emb = lambda roi_id, emb, model=None: db.add_emb_calls.append(roi_id)
         monkeypatch.setattr(reid_thread.animl, "load_miew", lambda *_a, **_k: None, raising=False)
 
         def _extract(_model, manifest):

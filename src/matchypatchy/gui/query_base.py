@@ -783,6 +783,7 @@ class QueryContainer(BaseQueryContainer):
             'k_cache': self.k_cache,
             'metric': str(self.metric),
             'threshold': self.threshold,
+            'emb_model': self.mpDB.emb_model,
             'ranked_sequences': serialized,
         }
         tmp = self.CACHE_PATH.with_suffix('.tmp')
@@ -807,6 +808,7 @@ class QueryContainer(BaseQueryContainer):
                     or cache.get('state') != self._cache_key()
                     or cache.get('metric') != str(self.metric)
                     or cache.get('threshold') != self.threshold
+                    or cache.get('emb_model') != self.mpDB.emb_model
                     or cache.get('k_cache', 0) < self.k):
                 return False
             self._raw_ranked = cache['ranked_sequences']

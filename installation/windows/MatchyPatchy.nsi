@@ -21,7 +21,7 @@
   !define VARIANT "cpu"
 !endif
 !ifndef APP_VERSION
-  !define APP_VERSION "0.2.6"
+  !define APP_VERSION "0.2.7"
 !endif
 
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\MatchyPatchy"
