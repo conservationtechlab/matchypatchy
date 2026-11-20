@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 
 if "animl" not in sys.modules:
@@ -20,6 +21,19 @@ if "animl" not in sys.modules:
     sys.modules["animl"] = animl_stub
 
 from matchypatchy.threads import animl_thread
+
+
+@pytest.fixture(autouse=True)
+def _model_params(monkeypatch):
+    """
+    get_model_params reads the real models.yml, which has no "md" key
+
+    AnimlThread.__init__ calls it with DETECTOR_KEY, so without this every
+    thread built with DETECTOR_KEY="md" raised KeyError before the test ran.
+    Returns (resize, normalize) like the real one, (None, None) for no model.
+    """
+    monkeypatch.setattr(animl_thread, "get_model_params",
+                        lambda key: (None, None) if key is None else (1280, True))
 
 
 class SignalSpy:
