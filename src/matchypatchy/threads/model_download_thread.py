@@ -131,7 +131,13 @@ def get_model_params(key):
         return None, None
     models = load_model('MODELS')
     resize = models[key][2]
-    normalize = {"mean": models[key][3], "std": models[key][4]}
+    mean, std = models[key][3], models[key][4]
+    # Null mean/std in models.yml: plain [0, 1] scaling (animl's normalize=True).
+    # A dict holding None values would reach animl's reshape and fail every image.
+    if mean is None or std is None:
+        normalize = True
+    else:
+        normalize = {"mean": mean, "std": std}
 
     return resize, normalize
 
