@@ -167,7 +167,6 @@ class TestIndividualPopupSetEditview:
 
         parent = MagicMock()
         parent.mpDB = MagicMock()
-        parent.mpDB._command.return_value = []
         parent.mpDB.select.return_value = [(0,)]
 
         popup = IndividualPopup.__new__(IndividualPopup)

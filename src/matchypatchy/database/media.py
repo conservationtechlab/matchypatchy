@@ -87,10 +87,12 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     # select ids, an empty list selects nothing (not everything)
     if ids is not None:
-        ids_str = ', '.join(map(str, ids))
-        row_cond = f"WHERE m.id IN ({ids_str})"
+        ids = [int(i) for i in ids]
+        row_cond = f"WHERE m.id IN ({', '.join('?' * len(ids))})"
+        params = ids
     else:
         row_cond = None
+        params = ()
 
     # fetch counts for media table data_type=0
     if counts:
@@ -112,7 +114,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                    "timestamp", 'station_id', "camera_id", 'sequence_id',
                    "external_id", 'comment', 'roi_count', 'filepath']
 
-        media = mpDB._command(query, quiet=quiet)
+        media = mpDB.query(query, params, quiet=quiet)
 
     # Query media with joined full paths no counts
     else:
@@ -131,7 +133,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                    "timestamp", 'station_id', "camera_id", 'sequence_id',
                    "external_id", 'comment', 'filepath']
 
-        media = mpDB._command(query, quiet=quiet)
+        media = mpDB.query(query, params, quiet=quiet)
 
     # convert to dataframe and return
     if media:
@@ -142,7 +144,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     return pd.DataFrame()
 
 
-def fetch_roi(mpDB, media_id=None):
+def fetch_roi(mpDB, media_id=None, quiet=True):
     """
     Fetches roi table with media filepaths, converts to dataframe
     """
@@ -161,7 +163,7 @@ def fetch_roi(mpDB, media_id=None):
         query += " WHERE r.media_id = ?"
         params.append(int(media_id))
 
-    manifest = mpDB.query(query, params)
+    manifest = mpDB.query(query, params, quiet=quiet)
 
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",

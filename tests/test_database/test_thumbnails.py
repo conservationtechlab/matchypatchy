@@ -8,9 +8,9 @@ from matchypatchy.database import thumbnails
 
 
 def _mpdb(no_thumbnail_rows, thumbnail_rows):
-    """mpDB mock: _command returns ids without a thumbnail row, select returns (fid, filepath) rows"""
+    """mpDB mock: query returns ids without a thumbnail row, select returns (fid, filepath) rows"""
     mpDB = MagicMock()
-    mpDB._command.return_value = no_thumbnail_rows
+    mpDB.query.return_value = no_thumbnail_rows
     mpDB.select.return_value = thumbnail_rows
     return mpDB
 
@@ -30,7 +30,7 @@ class TestCheckMissingThumbnails:
         assert thumbnails.check_missing_thumbnails(mpDB, tmp_path, data_type=0) == [3]
 
     def test_failed_query_does_not_raise(self, tmp_path):
-        """_command returns None on an sqlite error"""
+        """query returns None on an sqlite error"""
         mpDB = _mpdb(None, [(3, "gone.jpg")])
         assert thumbnails.check_missing_thumbnails(mpDB, tmp_path, data_type=1) == [3]
 
