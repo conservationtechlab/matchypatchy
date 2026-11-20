@@ -276,15 +276,18 @@ class MatchyPatchyDB():
                 for listener in self._change_listeners:
                     listener(changed)
 
-    def query(self, sql, params=()):
+    def query(self, sql, params=(), quiet=True):
         """
         Run one SQL statement with its values bound as parameters, return its rows
 
         For the named functions in matchypatchy.database, which pass values as
         params instead of formatting them into the SQL. Returns None and logs if
-        the statement fails.
+        the statement fails. Set quiet=False to print the statement and params
+        when debugging.
         """
         try:
+            if not quiet:
+                print(sql, params)
             cursor = self.db.execute(sql, params)
             rows = cursor.fetchall()
             self.db.commit()
