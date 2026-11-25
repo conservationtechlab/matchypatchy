@@ -113,6 +113,7 @@ install -m 0755 "$SCRIPT_DIR/DEBIAN/postinst" "$STAGE_DEB/DEBIAN/postinst"
 install -m 0755 "$SCRIPT_DIR/DEBIAN/postrm"   "$STAGE_DEB/DEBIAN/postrm"
 
 INSTALLED_SIZE="$(du -sk "$STAGE_DEB" | cut -f1)"
+CONFLICTS=""  # Define conflicts (empty by default, add packages if conflicts exist)
 cat > "$STAGE_DEB/DEBIAN/control" <<EOF_CONTROL
 Package: $PKG
 Version: $VERSION

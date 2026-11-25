@@ -33,6 +33,7 @@ class ImportFolderPopup(UsesProject, QDialog):
         self.directory = Path(directory)
         self.data = pd.DataFrame()
         self.import_thread = None
+        self.build_thread = None
         # set when the directory has no images, so the caller can ask for another one
         self.no_images = False
         self._closed = False
@@ -85,11 +86,14 @@ class ImportFolderPopup(UsesProject, QDialog):
         return survey_timezone(self.mpDB, survey_id)
 
     def reject(self):
-        """Cancel: stop a running import and close when it has finished"""
+        """Cancel: stop a running import and close when it has finished, or stop the directory search and close"""
         if self.import_thread is not None and self.import_thread.isRunning():
             self.import_thread.requestInterruption()
             # finished -> accept closes the popup once the thread has stopped
             return
+        # the search stops after the folder it is reading, nothing to keep so close now
+        if self.build_thread is not None and self.build_thread.isRunning():
+            self.build_thread.requestInterruption()
         self._closed = True
         super().reject()
 

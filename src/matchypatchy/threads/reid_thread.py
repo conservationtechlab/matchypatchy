@@ -10,7 +10,7 @@ import pandas as pd
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from matchypatchy.models import get_path
+from matchypatchy.models import get_path, get_model_params
 from matchypatchy.database.media import fetch_roi, filepath_sql
 
 # from matchypatchy.pairx.core import explain
@@ -30,8 +30,12 @@ class ReIDThread(QThread):
         self.cfg = cfg
         self.device = self.cfg.DEVICE
         self.batch_size = 1  # set to 1 for now
-        self.reid_filepath = get_path(self.cfg.ML_DIR, mloptions['REID_KEY'])
-        self.viewpoint_filepath = get_path(self.cfg.ML_DIR, mloptions['VIEWPOINT_KEY'])
+        self.reid_key = mloptions['REID_KEY']
+        self.viewpoint_key = mloptions['VIEWPOINT_KEY']
+        self.reid_filepath = get_path(self.cfg.ML_DIR, self.reid_key)
+        self.reid_params = get_model_params(self.reid_key)
+        self.viewpoint_filepath = get_path(self.cfg.ML_DIR, self.viewpoint_key)
+        self.viewpoint_params = get_model_params(self.viewpoint_key)
         self.failed = set()  # files that couldn't be read
 
     def run(self):
@@ -45,7 +49,7 @@ class ReIDThread(QThread):
             return
 
         # need only media that has corresponding ROIs
-        media = self.mpDB._command(f"""
+        media = self.mpDB.query(f"""
             SELECT roi.id, roi.media_id,
                 {filepath_sql('uploads.base_dir', 'media.relative_path')} AS filepath,
                 media.external_id, media.camera_id, media.sequence_id
@@ -53,7 +57,8 @@ class ReIDThread(QThread):
             JOIN media ON roi.media_id = media.id
             LEFT JOIN uploads ON media.base_dir_id = uploads.id
         """)
-        self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath", "external_id", "camera_id", "sequence_id"])
+        self.media = pd.DataFrame(media, columns=["roi_id", "media_id", "filepath",
+                                                  "external_id", "camera_id", "sequence_id"])
 
         self.image_paths = pd.Series(self.media["filepath"].values, index=self.media["roi_id"]).to_dict()
         self.rois['filepath'] = self.rois['roi_id'].map(self.image_paths)
@@ -93,11 +98,12 @@ class ReIDThread(QThread):
                 # one ROI per generator: it silently drops files it can't load,
                 # so results can't be paired with ROIs by position in a longer manifest
                 dataloader = animl.ManifestGenerator(filtered_rois.iloc[[i]],
-                                                      resize_width=480,
-                                                      resize_height=480,
-                                                      crop=True,
-                                                      batch_size=1,
-                                                      num_workers=0)
+                                                     resize_width=self.viewpoint_params[0],
+                                                     resize_height=self.viewpoint_params[0],
+                                                     normalize=self.viewpoint_params[1],
+                                                     crop=True,
+                                                     batch_size=1,
+                                                     num_workers=0)
                 batch = next(iter(dataloader), None)
                 if batch is None:
                     self._file_failed(filtered_rois.at[i, 'filepath'])
@@ -119,11 +125,11 @@ class ReIDThread(QThread):
             self.prompt_update.emit("No Re-ID model selected, skipping embedding extraction...")
             return
 
-        # filter rois without embeddings
+        # rois without an embedding from the active model (mpDB.set_emb_model), see emb_sql
         filtered_rois = self.rois[self.rois['emb'] == 0]
         if len(filtered_rois) > 0:
             filtered_rois.reset_index(drop=True, inplace=True)
-            model = animl.load_miew(self.reid_filepath, device=self.device)
+            model = animl.load_reid(self.reid_filepath, device=self.device)
 
             for i in range(len(filtered_rois)):
                 if not self.isInterruptionRequested():
@@ -134,14 +140,16 @@ class ReIDThread(QThread):
                         continue
                     roi_id = row.at[i, 'roi_id']
                     try:
-                        emb = animl.extract_miew_embeddings(model, row)[0]
+                        emb = animl.extract_reid_embeddings(model, row, 
+                                                            resize=self.reid_params[0],
+                                                            normalize=self.reid_params[1])[0]
                     except ValueError:
                         # nothing to stack: the file couldn't be loaded
                         self._file_failed(row.at[i, 'filepath'])
                         continue
 
-                    self.mpDB.add_emb(roi_id, emb)
-                    self.mpDB.edit_row("roi", roi_id, {"emb": 1})
+                    # also records the roi in roi_embedding under this model
+                    self.mpDB.add_emb(roi_id, emb, model=self.reid_key)
             if not self.isInterruptionRequested():
                 self.progress_update.emit(100)
 

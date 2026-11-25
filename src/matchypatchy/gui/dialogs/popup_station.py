@@ -78,10 +78,13 @@ class StationPopup(UsesProject, QDialog):
         """Add new station"""
         dialog = StationFillPopup(self)
         if dialog.exec():
-            station_id = self.mpDB.add_station(dialog.get_name(), dialog.get_lat(),
-                                               dialog.get_long(), self.survey_id[0])
-            if station_id is None:
-                self._warn(f"Could not add station '{dialog.get_name()}', see the log for details.")
+            if self._name_taken(dialog.get_name()):
+                self._warn(f"A station named '{dialog.get_name()}' already exists in {self.survey_id[1]}.")
+            else:
+                station_id = self.mpDB.add_station(dialog.get_name(), dialog.get_lat(),
+                                                   dialog.get_long(), self.survey_id[0])
+                if station_id is None:
+                    self._warn(f"Could not add station '{dialog.get_name()}', see the log for details.")
         del dialog
         # refresh the station list after adding a new station
         self.update()
@@ -93,11 +96,23 @@ class StationPopup(UsesProject, QDialog):
         name, lat, long = get_station(self.mpDB, station_id)
         dialog = StationFillPopup(self, name=name, lat=lat, long=long)
         if dialog.exec():
-            if not update_station(self.mpDB, station_id, dialog.get_name(), dialog.get_lat(), dialog.get_long()):
+            if self._name_taken(dialog.get_name(), station_id):
+                self._warn(f"A station named '{dialog.get_name()}' already exists in {self.survey_id[1]}.")
+            elif not update_station(self.mpDB, station_id, dialog.get_name(), dialog.get_lat(), dialog.get_long()):
                 self._warn(f"Could not save station '{dialog.get_name()}', see the log for details.")
         del dialog
         # refresh the station list after editing a station
         self.update()
+
+    def _name_taken(self, name, station_id=None):
+        """
+        Whether another station in this survey already has this name
+
+        Called by add and edit before saving. The database refuses a repeated name
+        within a survey anyway; checking here lets the alert say why instead of
+        pointing at the log. station_id is the station being edited, which may keep its name.
+        """
+        return any(sid != station_id and sname == name for sid, sname in self.station_list_ordered)
 
     def _warn(self, prompt):
         """Show a single alert"""

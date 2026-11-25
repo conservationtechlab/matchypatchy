@@ -59,6 +59,17 @@ def filepath_sql(base_dir, relative_path):
             f"REPLACE({relative_path}, '{other}', '{os.sep}')")
 
 
+def emb_sql(roi_id):
+    """
+    SQL expression that is 1 if the roi has an embedding from the active Re-ID model, else 0
+
+    Binds one ? to mpDB.emb_model, so it goes first in the query's params. Used by every
+    query that returns the emb column (mpdb.all_media, fetch_roi) and rois_without_embeddings,
+    so the rois matching can use and the ones Process still has to embed agree.
+    """
+    return f"EXISTS (SELECT 1 FROM roi_embedding e WHERE e.roi_id = {roi_id} AND e.model = ?)"
+
+
 def native_relative_path(relative_path):
     """
     relative_path with the current OS's separators, the Python twin of filepath_sql.
@@ -76,10 +87,12 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     """
     # select ids, an empty list selects nothing (not everything)
     if ids is not None:
-        ids_str = ', '.join(map(str, ids))
-        row_cond = f"WHERE m.id IN ({ids_str})"
+        ids = [int(i) for i in ids]
+        row_cond = f"WHERE m.id IN ({', '.join('?' * len(ids))})"
+        params = ids
     else:
         row_cond = None
+        params = ()
 
     # fetch counts for media table data_type=0
     if counts:
@@ -101,7 +114,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                    "timestamp", 'station_id', "camera_id", 'sequence_id',
                    "external_id", 'comment', 'roi_count', 'filepath']
 
-        media = mpDB._command(query, quiet=quiet)
+        media = mpDB.query(query, params, quiet=quiet)
 
     # Query media with joined full paths no counts
     else:
@@ -120,7 +133,7 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
                    "timestamp", 'station_id', "camera_id", 'sequence_id',
                    "external_id", 'comment', 'filepath']
 
-        media = mpDB._command(query, quiet=quiet)
+        media = mpDB.query(query, params, quiet=quiet)
 
     # convert to dataframe and return
     if media:
@@ -131,24 +144,26 @@ def fetch_media(mpDB, ids=None, counts=False, quiet=True):
     return pd.DataFrame()
 
 
-def fetch_roi(mpDB, media_id=None):
+def fetch_roi(mpDB, media_id=None, quiet=True):
     """
     Fetches roi table with media filepaths, converts to dataframe
     """
     query = f"""
         SELECT
             r.id, r.media_id, r.frame, r.bbox_x, r.bbox_y, r.bbox_w, r.bbox_h,
-            r.viewpoint, r.reviewed, r.favorite, r.individual_id, r.emb,
+            r.viewpoint, r.reviewed, r.favorite, r.individual_id, {emb_sql('r.id')} AS emb,
             {filepath_sql('u.base_dir', 'm.relative_path')} AS filepath
         FROM roi r
         JOIN media m ON r.media_id = m.id
         LEFT JOIN uploads u ON m.base_dir_id = u.id
     """
 
+    params = [mpDB.emb_model]
     if media_id:
-        query += f" WHERE r.media_id = {media_id}"
+        query += " WHERE r.media_id = ?"
+        params.append(int(media_id))
 
-    manifest = mpDB._command(query)
+    manifest = mpDB.query(query, params, quiet=quiet)
 
     if manifest:
         rois = pd.DataFrame(manifest, columns=["roi_id", "media_id", "frame", "bbox_x", "bbox_y", "bbox_w", "bbox_h",
@@ -302,13 +317,12 @@ def update_roi_box(mpDB, roi_id, frame, bbox_x, bbox_y, bbox_w, bbox_h):
     """
     Move a roi's box, keeping its id, individual, viewpoint and favorite
 
-    Its embedding no longer matches the box, so it is dropped and emb set to 0,
+    Its embeddings no longer match the box, so every model's is dropped,
     which the next Process run picks up. False if the box couldn't be saved.
     """
     saved = mpDB.edit_row("roi", roi_id, {"frame": frame,
                                           "bbox_x": round(bbox_x, 4), "bbox_y": round(bbox_y, 4),
-                                          "bbox_w": round(bbox_w, 4), "bbox_h": round(bbox_h, 4),
-                                          "emb": 0})
+                                          "bbox_w": round(bbox_w, 4), "bbox_h": round(bbox_h, 4)})
     if saved:
         mpDB.delete_emb(roi_id)
     return saved
@@ -422,7 +436,7 @@ def uploads_with_media_counts(mpDB):
                          GROUP BY uploads.id;""") or []
 
 def rois_without_embeddings(mpDB):
-    """Ids of rois that have no embeddings"""
-    rows = mpDB.query("""SELECT DISTINCT roi.id FROM roi
-                         WHERE roi.emb = 0;""")
+    """Ids of rois that have no embedding from the active Re-ID model (mpDB.emb_model)"""
+    rows = mpDB.query(f"""SELECT roi.id FROM roi
+                          WHERE NOT {emb_sql('roi.id')};""", (mpDB.emb_model,))
     return [row[0] for row in rows or []]

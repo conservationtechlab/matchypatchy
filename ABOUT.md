@@ -1,4 +1,4 @@
-*Version: 0.2.6a1*
+*Version: 0.2.7*
 
 [User Manual](https://conservationtechlab.github.io/matchypatchy/)
 

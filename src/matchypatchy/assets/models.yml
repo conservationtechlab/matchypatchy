@@ -1,22 +1,55 @@
-VERSION: 1
+VERSION: 2
 
-MODELS: 
-  "MegaDetector": 
+# filepath
+# - 
+
+MODELS:
+  "MegaDetector_v5a_640": 
+    - ["md_v5a0.0_640.onnx"]
+    - ["https://sandiegozoo.box.com/shared/static/d43886otbxx6785wkvr4o11hp9d66xq4.onnx"]
+    - 640
+    - Null
+    - Null
+  "MegaDetector_v5a_1280": 
+    - ["md_v5a0.0_1280.onnx"]
+    - ["https://sandiegozoo.box.com/shared/static/592r22g1nz7078es5kuqwdsfh49k9wq1.onnx"]
+    - 1280
+    - Null
+    - Null
+  "MegaDetector_v1000_sorrel": 
     - ["md_v1000.0.0-sorrel.onnx"]
     - ["https://sandiegozoo.box.com/shared/static/7z9xagk8zweu6op3dgdk386jf9ayl2gt.onnx"]
-  "miewid_v3": 
+    - 960
+    - Null
+    - Null
+  "MiewID_v3": 
     - ["miewid_v3.onnx", "miewid_v3.onnx.data"]
     - ["https://sandiegozoo.box.com/shared/static/ppm0odjgscvpj9lf5ax86p3fqu5vraxw.onnx",
        "https://sandiegozoo.box.com/shared/static/xi1dijx35ta2tqtu2sa28bd09ve9li6f.data"]
+    - 440
+    - [0.485, 0.456, 0.406]
+    - [0.229, 0.224, 0.225]
+  "MegaDescriptor_L-384": 
+    - ["megadescriptor_l_384.onnx", "megadescriptor_l_384.onnx.data"]
+    - ["https://sandiegozoo.box.com/shared/static/rk8zydorzpgebwr6caqv51x4iyax2aoz.onnx",
+       "https://sandiegozoo.box.com/shared/static/c7f9qcer2x8wt52vb0exbt8b910jd912.data"]
+    - 384
+    - [0.5, 0.5, 0.5]
+    - [0.5, 0.5, 0.5]
   "Jaguar Viewpoint": 
     - ["sdzwa_jaguar_viewpoint.onnx", "sdzwa_jaguar_viewpoint.onnx.data"]
     - ["https://sandiegozoo.box.com/shared/static/nkuku5aeicg9hugo0hogdjxg667xodlb.onnx",
        "https://sandiegozoo.box.com/shared/static/3563emet6b6tubtgtqce8144dlq3z8y5.data"]
+    - 480
+    - Null
+    - Null
 
 DETECTOR_MODELS: 
-  - "MegaDetector"
+  - "MegaDetector_v5a_640"
+  - "MegaDetector_v5a_1280"
+  - "MegaDetector_v1000_sorrel"
 
-REID_MODELS: ["miewid_v3"]
+REID_MODELS: ["MiewID_v3", "MegaDescriptor_L-384"]
 VIEWPOINT_MODELS: ["Jaguar Viewpoint"]
 
 VIEWPOINTS:

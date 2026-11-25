@@ -25,6 +25,7 @@ from matchypatchy.gui.dialogs.popup_alert import AlertPopup
 from matchypatchy.gui.dialogs.popup_config import ConfigPopup
 from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
 from matchypatchy.gui.dialogs.popup_readme import READMEPopup
+from matchypatchy.gui.dialogs.popup_log import LogPopup
 from matchypatchy.gui.dialogs.popup_survey import SurveyPopup
 from matchypatchy.gui.dialogs.popup_import_csv import ImportCSVPopup
 from matchypatchy.gui.dialogs.popup_import_folder import ImportFolderPopup
@@ -150,10 +151,14 @@ class MainWindow(QMainWindow):
         help_readme.triggered.connect(self.help)
         help_license = QAction("View License", self)
         help_license.triggered.connect(self.license)
+        help_log = QAction("View Log", self)
+        help_log.triggered.connect(self.view_log)
 
         help.addAction(help_about)
         help.addAction(help_readme)
         help.addAction(help_license)
+        help.addSeparator()
+        help.addAction(help_log)
 
     # FONT SIZE ----------------------------------------------------------------
     def font_size(self):
@@ -523,6 +528,12 @@ class MainWindow(QMainWindow):
     def license(self):
         """Open License Popup"""
         dialog = READMEPopup(self, doc_type="LICENSE")
+        dialog.exec()
+        del dialog
+
+    def view_log(self):
+        """Open Log Popup"""
+        dialog = LogPopup(self)
         dialog.exec()
         del dialog
 

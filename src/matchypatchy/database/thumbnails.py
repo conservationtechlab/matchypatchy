@@ -184,10 +184,10 @@ def check_missing_thumbnails(mpDB, thumbnail_dir, data_type):
         thumbnails = fetch_media_thumbnails(mpDB)
 
     # Find ids in source_table that do not have entries in thumbnails table
-    missing = mpDB._command(f"""SELECT {source_table}.id FROM {source_table}
+    missing = mpDB.query(f"""SELECT {source_table}.id FROM {source_table}
                             LEFT JOIN {table} ON {source_table}.id = {table}.{fid_col}
-                            WHERE {table}.{fid_col} IS NULL;""", quiet=True)
-    # _command returns None if the query failed (already logged)
+                            WHERE {table}.{fid_col} IS NULL;""")
+    # query returns None if the query failed (already logged)
     missing_ids = [row[0] for row in missing] if missing else []
 
     # Also check for files that are listed but the file is missing, or that are the not-found placeholder

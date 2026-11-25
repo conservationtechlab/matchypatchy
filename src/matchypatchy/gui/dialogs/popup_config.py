@@ -307,7 +307,7 @@ class ConfigPopup(UsesProject, QDialog):
     def command(self):
         """Execute custom command on database."""
         new_cmd = self.command_line.text()
-        self.mpDB._command(new_cmd, quiet=False)
+        self.mpDB.run_user_sql(new_cmd, quiet=False)
 
     def refresh(self):
         """Show the current project's values, eg. after switching project"""

@@ -15,6 +15,25 @@ Matchypatchy is a stand-alone executable built in Python. Download it [here](). 
 [Github Repository](https://github.com/conservationtechlab/matchypatchy)
 <br/>
 
+### Installing with pip
+
+```bash
+pip install matchypatchy           # runs on CPU everywhere
+pip install "matchypatchy[gpu]"    # adds CUDA 12 / cuDNN 9 for NVIDIA GPUs (Windows, Linux)
+```
+
+To install pinned versions from a clone of the repository instead, use `pip install --no-deps -r requirements-cpu.txt` or `pip install --no-deps -r requirements-gpu.txt`. These files list every package already, and `--no-deps` stops pip from adding `onnxruntime-gpu` on top of the CPU file's `onnxruntime`.
+
+On Windows and Linux, MatchyPatchy uses the GPU automatically when it can, and otherwise runs on CPU. The plain install can also use the GPU if CUDA 12 and cuDNN 9 are already installed system-wide. The `[gpu]` extra installs them from pip instead, so you only need an NVIDIA driver that supports CUDA 12. macOS always runs on CPU.
+
+If the GPU isn't offered as a device, check that `onnxruntime` (the CPU-only build) isn't installed alongside `onnxruntime-gpu`. Both install into the same folder, so whichever is installed last wins. To fix it:
+
+```bash
+pip uninstall -y onnxruntime onnxruntime-gpu
+pip install onnxruntime-gpu==1.22.0
+```
+<br/>
+
 ---
 ## Getting Started
 <br/>

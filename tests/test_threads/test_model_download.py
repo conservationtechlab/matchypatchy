@@ -32,9 +32,13 @@ class TestGetPath:
         assert self._get(tmp_path, None) is None
 
 
-def _popup(pending=(), available=()):
+def _popup(pending=(), available=(), checked=()):
     popup = MagicMock()
     popup.models = list(MODELS)
+    # the dialog keeps {model key: QCheckBox}
+    popup.checkboxes = {k: MagicMock() for k in MODELS}
+    for k, checkbox in popup.checkboxes.items():
+        checkbox.isChecked.return_value = k in checked
     popup.pending = set(pending)
     popup.available_models = {k: f"/{k}" for k in available}
     return popup
@@ -43,8 +47,7 @@ def _popup(pending=(), available=()):
 class TestDownloadPopup:
     def test_ticking_skips_downloaded_and_queued_models(self):
         from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
-        popup = _popup(pending={"MiewID"})
-        popup.checkbox_layout.itemAtPosition.return_value.widget.return_value.isChecked.return_value = True
+        popup = _popup(pending={"MiewID"}, checked=MODELS)
         MLDownloadPopup.toggle_checkbox(popup)
         popup.download_ml.assert_called_once_with({"MD"})
 
@@ -68,6 +71,6 @@ class TestDownloadPopup:
         from matchypatchy.gui.dialogs.popup_ml import MLDownloadPopup
         popup = _popup(pending={"MD"})
         MLDownloadPopup.on_download_result(popup, "MD", False, "Network error")
-        checkbox = popup.checkbox_layout.itemAtPosition.return_value.widget.return_value
+        checkbox = popup.checkboxes["MD"]
         checkbox.setChecked.assert_called_once_with(False)
         popup.warning_label.setText.assert_called_once_with("MD: Network error")

@@ -10,7 +10,7 @@ import pandas as pd
 if "animl" not in sys.modules:
     animl_stub = types.ModuleType("animl")
     animl_stub.load_classifier = lambda *args, **kwargs: (None, None)
-    animl_stub.load_miew = lambda *args, **kwargs: None
+    animl_stub.load_reid = lambda *args, **kwargs: None
     animl_stub.softmax = lambda x: x
     sys.modules["animl"] = animl_stub
 
@@ -78,7 +78,11 @@ def _make_thread(monkeypatch, n_rois, unreadable=()):
     thread.device = "cpu"
     thread.batch_size = 1
     thread.viewpoint_filepath = "/fake/viewpoint.onnx"
+    # (resize, normalize) as get_model_params returns them
+    thread.viewpoint_params = (480, True)
     thread.reid_filepath = None
+    thread.reid_params = (440, True)
+    thread.reid_key = None
     thread.isInterruptionRequested = lambda: False
     thread.progress_update = SignalSpy()
     thread.failed = set()
@@ -146,15 +150,15 @@ class TestGetEmbeddings:
         thread.reid_filepath = "/fake/miew.onnx"
         thread.rois["emb"] = 0
         db.add_emb_calls = []
-        db.add_emb = lambda roi_id, emb: db.add_emb_calls.append(roi_id)
-        monkeypatch.setattr(reid_thread.animl, "load_miew", lambda *_a, **_k: None, raising=False)
+        db.add_emb = lambda roi_id, emb, model=None: db.add_emb_calls.append(roi_id)
+        monkeypatch.setattr(reid_thread.animl, "load_reid", lambda *_a, **_k: None, raising=False)
 
-        def _extract(_model, manifest):
+        def _extract(_model, manifest, **_kwargs):
             # like animl: stacking no results raises
             images = [batch[0] for batch in FakeManifestGenerator(manifest)]
             return np.vstack(images)
 
-        monkeypatch.setattr(reid_thread.animl, "extract_miew_embeddings", _extract, raising=False)
+        monkeypatch.setattr(reid_thread.animl, "extract_reid_embeddings", _extract, raising=False)
 
         thread.get_embeddings()
 

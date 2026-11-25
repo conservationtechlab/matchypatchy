@@ -3,6 +3,7 @@ QThread Class for Processing BBox, Frames, BuildFileManifest with ANIML
 
 """
 import logging
+import os
 from pathlib import Path
 import animl
 import pandas as pd
@@ -11,10 +12,8 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.database.media import get_sha256, native_relative_path
-from matchypatchy.models import get_path
+from matchypatchy.models import get_path, get_model_params
 
-
-MEGADETECTORv1000_SIZE = 960
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,25 @@ class BuildManifestThread(QThread):
         self.timezone = timezone
 
     def run(self):
-        self.data = animl.build_file_manifest(self.directory, exif=True, data_timezone=self.timezone)
+        """
+        Build the manifest one folder at a time, stopping between folders on interruption
+
+        animl.build_file_manifest reads every file's exif in one call and can't be
+        interrupted, so a recursive call kept scanning after the import popup was
+        cancelled. Calling it per folder (non-recursive) keeps animl's exif and
+        timestamp handling while letting Cancel stop the scan. Nothing is emitted
+        when interrupted.
+        """
+        parts = []
+        for directory, _, _ in os.walk(self.directory):
+            if self.isInterruptionRequested():
+                return
+            part = animl.build_file_manifest(directory, exif=True, data_timezone=self.timezone, recursive=False)
+            if not part.empty:
+                parts.append(part)
+        if self.isInterruptionRequested():
+            return
+        self.data = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
         self.manifest.emit(self.data)
 
 
@@ -56,7 +73,7 @@ class VerifyNewBaseDirsThread(QThread):
             if not self.isInterruptionRequested():
                 base_dir_id = update[0]
                 directory = update[1]
-                media = self.mpDB.select("media", columns="relative_path, sha256", row_cond=f"base_dir_id = {base_dir_id}")
+                media = self.mpDB.select("media", columns="relative_path, sha256", row_cond="base_dir_id=?", params=(base_dir_id,))
                 # Saving only swaps base_dir, so each file must sit at its relative path under the new directory
                 expected = set()
                 hash_not_found_in_new_directory = []
@@ -96,6 +113,7 @@ class AnimlThread(QThread):
         self.confidence_threshold = 0.1
         self.DETECTOR_KEY = DETECTOR_KEY
         self.md_filepath = get_path(self.ml_dir, DETECTOR_KEY)
+        self.resize = get_model_params(DETECTOR_KEY)[0]
 
         self.media = None  # loaded in run(), off the GUI thread
         self.rois = None
@@ -110,8 +128,11 @@ class AnimlThread(QThread):
         self.prompt_update.emit("Loading media...")
         self._load_media()
         if self.DETECTOR_KEY is not None:
+            # remove size from the model key to get the model type for animl.load_detector
+            model_type = '_'.join(self.DETECTOR_KEY.split('_')[0:2]).lower()
             self.prompt_update.emit("Loading detector...")
-            self.detector = animl.load_detector(self.md_filepath, device=self.device)
+            self.detector = animl.load_detector(self.md_filepath, model_type=model_type, 
+                                                device=self.device, quiet=False)
         # imported ROIs without a box stay as they are when there's no detector to find one
         if self.detector is None:
             self.rois = self.rois.iloc[0:0]
@@ -179,13 +200,12 @@ class AnimlThread(QThread):
                 bbox_w = roi['bbox_w']
                 bbox_h = roi['bbox_h']
 
-                # do not add emb_id, to be determined later
+                # embedded later by Process
                 roi_id = self.mpDB.add_roi(roi['id'],  #media id
                                            frame,
                                            bbox_x, bbox_y, bbox_w, bbox_h,
                                            viewpoint=None,
-                                           individual_id=None,
-                                           emb=0)
+                                           individual_id=None)
                 # save thumbnails
                 roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
                                                    roi['filepath'],
@@ -224,7 +244,7 @@ class AnimlThread(QThread):
                 bbox_w = roi['bbox_w']
                 bbox_h = roi['bbox_h']
 
-                # do not add emb_id, to be determined later
+                # embedded later by Process
                 self.mpDB.edit_row('roi',
                                     roi['id'],
                                     {"bbox_x": bbox_x, "bbox_y": bbox_y,
@@ -265,12 +285,11 @@ class AnimlThread(QThread):
                     bbox_w = roi['bbox_w']
                     bbox_h = roi['bbox_h']
 
-                    # do not add emb_id, to be determined later
+                    # embedded later by Process
                     roi_id = self.mpDB.add_roi(media_id, int(frame),
                                                bbox_x, bbox_y, bbox_w, bbox_h,
                                                viewpoint=None,
-                                               individual_id=None,
-                                               emb=0)
+                                               individual_id=None)
                     # save thumbnails
                     roi_thumbnail = save_roi_thumbnail(self.thumbnail_dir,
                                                        roi['filepath'], roi['ext'], frame,
@@ -307,10 +326,10 @@ class AnimlThread(QThread):
         """Run the detector on the manifest's files, None if none of them could be read"""
         results = animl.detect(self.detector,
                                manifest,
-                               MEGADETECTORv1000_SIZE,
-                               MEGADETECTORv1000_SIZE,
+                               self.resize,
+                               self.resize,
                                confidence_threshold=self.confidence_threshold,
-                               use_progress_bar=False,
+                               quiet=True,
                                **kwargs)
         # animl.detect silently leaves out files it can't load
         read = {result['filepath'] for result in results}

@@ -22,7 +22,7 @@ def two_surveys(tmp_db):
         station_id = db.add_station("Site01", None, None, survey_id)
         upload_id = db.add_upload(f"D:/{year}")
         media_id = db.add_media(upload_id, f"{year}.jpg", f"hash{year}", ".jpg", f"{year}-01-01", station_id)
-        rois = [db.add_roi(media_id, 0, 0.1, 0.1, 0.2, 0.2, emb=1) for _ in range(2)]
+        rois = [db.add_roi(media_id, 0, 0.1, 0.1, 0.2, 0.2) for _ in range(2)]
         for roi_id in rois:
             db.add_emb(roi_id, [float(n), float(roi_id), 1.0])
         ids[year] = {"survey": survey_id, "station": station_id, "upload": upload_id,
@@ -85,7 +85,7 @@ def test_orphaned_embeddings_are_pruned_on_open(tmp_path, null_logger):
     station_id = db.add_station("Site01", None, None, 1)
     upload_id = db.add_upload("D:/2023")
     media_id = db.add_media(upload_id, "a.jpg", "hash", ".jpg", "2023-01-01", station_id)
-    roi_id = db.add_roi(media_id, 0, 0.1, 0.1, 0.2, 0.2, emb=1)
+    roi_id = db.add_roi(media_id, 0, 0.1, 0.1, 0.2, 0.2)
     db.add_emb(roi_id, [1.0, 0.0, 0.0])
     # left behind by a station delete before embeddings were cleaned up with their rois
     db.add_emb(999, [0.0, 1.0, 0.0])

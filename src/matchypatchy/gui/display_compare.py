@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from PIL import Image
 
-from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+from PyQt6.QtWidgets import (QPushButton, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
                              QHeaderView, QTableWidget, QTableWidgetItem)
 from PyQt6.QtCore import Qt, QEvent, QTimer
 from PyQt6.QtGui import QPalette, QColor
@@ -72,8 +72,14 @@ class DisplayCompare(UsesProject, QWidget):
         self.threshold_slider.slider_value_changed.connect(self.change_threshold)
         first_layer.addWidget(self.threshold_slider, 0, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # embeddings to match with, applied by Recalculate Matches
+        first_layer.addWidget(QLabel("Embeddings:"))
+        self.emb_select = QComboBox()
+        self.emb_select.setToolTip("Re-ID model whose embeddings Recalculate Matches uses")
+        first_layer.addWidget(self.emb_select)
+
         button_recalc = QPushButton("Recalculate Matches")
-        button_recalc.clicked.connect(lambda: self.initialize(clear_cache=True))
+        button_recalc.clicked.connect(self.recalculate_matches)
         first_layer.addWidget(button_recalc)
 
         button_recalc = QPushButton("Quality Control by Individual")
@@ -344,8 +350,39 @@ class DisplayCompare(UsesProject, QWidget):
     # ==========================================================================
     # ON ENTRY
     # ==========================================================================
+    def refresh_emb_models(self):
+        """
+        List the embedding sets in emb_select, with the active one selected
+
+        Called by initialize, so the list picks up models Process has run since and
+        an unapplied pick goes back to the model the matches were calculated with.
+        The active model is listed even with no embeddings yet, so the box always shows it.
+        """
+        models = dict(self.mpDB.emb_models())
+        models.setdefault(self.mpDB.emb_model, 0)
+        self.emb_select.clear()
+        for model in sorted(models):
+            self.emb_select.addItem(f"{model} ({models[model]})", model)
+        self.emb_select.setCurrentIndex(self.emb_select.findData(self.mpDB.emb_model))
+
+    def recalculate_matches(self):
+        """
+        Recalculate Matches button: match with the embeddings picked in emb_select, ignoring the cache
+
+        The pick is saved as the project's REID_KEY, the model matching uses when the
+        project is reopened (Project.open) and the one PairX explains with. Processing
+        with another Re-ID model replaces it, as before.
+        """
+        model = self.emb_select.currentData()
+        if model is not None and model != self.mpDB.emb_model:
+            logger.info(f"Matching with {model} embeddings")
+            self.mpDB.set_emb_model(model)
+            self.cfg.update({'REID_KEY': model})
+        self.initialize(clear_cache=True)
+
     def initialize(self, clear_cache=False):
         """Calculate neighbors for all query ROIs, load first query and match"""
+        self.refresh_emb_models()
         # Disable individual select until feature is implemented on QC
         self.k = self.cfg.KNN  # default knn
         self.compare_type = 'default'

@@ -4,6 +4,7 @@ Set Up matchypatchy Database
 from contextlib import contextmanager
 import logging
 from datetime import datetime
+import re
 import shutil
 import sqlite3
 import chromadb
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Increment when the SQLite schema changes and add a matching entry to MIGRATIONS.
 # Databases created before schema versioning have no schema_version column and are treated as version 1.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 # Tables rebuilt by a migration, {name} lets the migration create them under a temporary name.
 # A relative path is only unique within its base directory: D:/2023/Site01/IMG_0001.JPG and
@@ -41,6 +42,40 @@ MEDIA_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 FOREIGN KEY (station_id) REFERENCES station (id) ON DELETE CASCADE,
                 FOREIGN KEY (camera_id) REFERENCES camera (id) ON DELETE SET NULL,
                 FOREIGN KEY (sequence_id) REFERENCES sequence (id) ON DELETE SET NULL);'''
+
+# Station names repeat across surveys (each survey has its own "Site01"), but not within one
+STATION_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                lat REAL,
+                long REAL,
+                survey_id INTEGER NOT NULL,
+                UNIQUE (name, survey_id),
+                FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);'''
+
+ROI_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
+                id INTEGER PRIMARY KEY,
+                media_id INTEGER NOT NULL,
+                frame INTEGER NOT NULL,
+                bbox_x REAL NOT NULL,
+                bbox_y REAL NOT NULL,
+                bbox_w REAL NOT NULL,
+                bbox_h REAL NOT NULL,
+                viewpoint INTEGER,
+                reviewed INTEGER NOT NULL,
+                favorite INTEGER NOT NULL,
+                individual_id INTEGER,
+                FOREIGN KEY(media_id) REFERENCES media (id) ON DELETE CASCADE,
+                FOREIGN KEY(individual_id) REFERENCES individual (id) ON DELETE SET NULL);'''
+
+# One row per Re-ID model a roi has an embedding from (model is emb_model_key(...)), none if
+# it has no embeddings. Mirrors the chroma collections so SQL can tell which rois each model
+# still has to embed. Kept by MatchyPatchyDB.add_emb/delete_embs, rebuilt by sync_roi_embeddings
+ROI_EMBEDDING_TABLE = '''CREATE TABLE IF NOT EXISTS roi_embedding (
+                roi_id INTEGER NOT NULL,
+                model TEXT NOT NULL,
+                PRIMARY KEY (roi_id, model),
+                FOREIGN KEY (roi_id) REFERENCES roi (id) ON DELETE CASCADE);'''
 
 INDIVIDUAL_TABLE = '''CREATE TABLE IF NOT EXISTS {name} (
                 id INTEGER PRIMARY KEY,
@@ -94,14 +129,7 @@ def setup_database(key, filepath, db=None):
                 FOREIGN KEY (region_id) REFERENCES region (id) ON DELETE SET NULL);''')
 
         # STATION
-        cursor.execute(
-            '''CREATE TABLE IF NOT EXISTS station (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                lat REAL,
-                long REAL,
-                survey_id INTEGER NOT NULL,
-                FOREIGN KEY (survey_id) REFERENCES survey (id) ON DELETE CASCADE);''')
+        cursor.execute(STATION_TABLE.format(name="station"))
 
         # CAMERA
         cursor.execute(
@@ -122,22 +150,8 @@ def setup_database(key, filepath, db=None):
         cursor.execute(MEDIA_TABLE.format(name="media"))
 
         # ROI
-        cursor.execute(
-            '''CREATE TABLE IF NOT EXISTS roi (
-                id INTEGER PRIMARY KEY,
-                media_id INTEGER NOT NULL,
-                frame INTEGER NOT NULL,
-                bbox_x REAL NOT NULL,
-                bbox_y REAL NOT NULL,
-                bbox_w REAL NOT NULL,
-                bbox_h REAL NOT NULL,
-                viewpoint INTEGER,
-                reviewed INTEGER NOT NULL,
-                favorite INTEGER NOT NULL,
-                individual_id INTEGER,
-                emb INTEGER,
-                FOREIGN KEY(media_id) REFERENCES media (id) ON DELETE CASCADE,
-                FOREIGN KEY(individual_id) REFERENCES individual (id) ON DELETE SET NULL);''')
+        cursor.execute(ROI_TABLE.format(name="roi"))
+        cursor.execute(ROI_EMBEDDING_TABLE)
 
         # INDIVIDUAL
         cursor.execute(INDIVIDUAL_TABLE.format(name="individual"))
@@ -273,7 +287,66 @@ def _migrate_1_to_2(db):
                   WHERE EXISTS (SELECT 1 FROM roi WHERE roi.media_id = media.id AND roi.bbox_w != -1);""")
 
 
-MIGRATIONS = {1: _migrate_1_to_2}
+def _migrate_2_to_3(db):
+    """
+    Make station names unique within a survey
+
+    Older builds could add a second station with a name already used in its survey:
+    every folder import without a station level added a new "Default Station", and
+    the station manager didn't check names. Each set of same-named stations in a survey
+    is merged into its oldest (lowest id) station before the constraint is added: media
+    and cameras move to it, and it takes a duplicate's lat/long where it has none.
+    Cameras that end up with the same name under that station are merged the same way,
+    the importers look them up by name within a station so a repeat would be ambiguous.
+    """
+    duplicates = db.execute("""SELECT s.id, keep.id FROM station s
+                               JOIN (SELECT MIN(id) AS id, name, survey_id FROM station
+                                     GROUP BY name, survey_id HAVING COUNT(*) > 1) keep
+                                 ON s.name = keep.name AND s.survey_id = keep.survey_id
+                               WHERE s.id != keep.id
+                               ORDER BY s.id;""").fetchall()
+    for duplicate_id, keep_id in duplicates:
+        db.execute("""UPDATE station SET
+                          lat = COALESCE(lat, (SELECT lat FROM station WHERE id = :dup)),
+                          long = COALESCE(long, (SELECT long FROM station WHERE id = :dup))
+                      WHERE id = :keep;""", {"dup": duplicate_id, "keep": keep_id})
+        db.execute("UPDATE media SET station_id = ? WHERE station_id = ?;", (keep_id, duplicate_id))
+        db.execute("UPDATE camera SET station_id = ? WHERE station_id = ?;", (keep_id, duplicate_id))
+        db.execute("DELETE FROM station WHERE id = ?;", (duplicate_id,))
+    if duplicates:
+        logger.info(f"Merged {len(duplicates)} station(s) that repeated a name within their survey")
+
+    keep_station_ids = {keep_id for _, keep_id in duplicates}
+    camera_duplicates = db.execute("""SELECT c.id, keep.id FROM camera c
+                                      JOIN (SELECT MIN(id) AS id, name, station_id FROM camera
+                                            GROUP BY name, station_id HAVING COUNT(*) > 1) keep
+                                        ON c.name = keep.name AND c.station_id = keep.station_id
+                                      WHERE c.id != keep.id;""").fetchall()
+    for duplicate_id, keep_id in camera_duplicates:
+        # only under stations that took in a duplicate, leave the rest of the cameras as they were
+        station_id = db.execute("SELECT station_id FROM camera WHERE id = ?;", (keep_id,)).fetchone()[0]
+        if station_id not in keep_station_ids:
+            continue
+        db.execute("UPDATE media SET camera_id = ? WHERE camera_id = ?;", (keep_id, duplicate_id))
+        db.execute("DELETE FROM camera WHERE id = ?;", (duplicate_id,))
+
+    _rebuild_table(db, "station", STATION_TABLE)
+
+
+def _migrate_3_to_4(db):
+    """
+    Replace the roi.emb flag with the roi_embedding table
+
+    roi.emb was a single 0/1, it couldn't say which Re-ID model a roi was embedded by
+    or that it had embeddings from more than one. The table is filled from the chroma
+    collections when the database opens (MatchyPatchyDB.sync_roi_embeddings), the
+    migration can't reach them.
+    """
+    _rebuild_table(db, "roi", ROI_TABLE)
+    db.execute(ROI_EMBEDDING_TABLE)
+
+
+MIGRATIONS = {1: _migrate_1_to_2, 2: _migrate_2_to_3, 3: _migrate_3_to_4}
 
 
 def migrate_database(db, filepath):
@@ -299,11 +372,73 @@ def migrate_database(db, filepath):
     return version
 
 
+# Each Re-ID model gets its own chroma collection: a collection's dimension is fixed by
+# its first vector, and embeddings from different models can't be compared anyway.
+# The original collection holds the project key and MiewID embeddings, which were
+# stored before there was a collection per model
+KEY_COLLECTION = "embedding_collection"
+KEY_COLLECTION_MODELS = {"MiewID_v3", "miewid_v3"}  # models.yml renamed the key
+KEY_COLLECTION_MODEL = "MiewID_v3"  # current models.yml key of the key collection's model
+EMB_COLLECTION_PREFIX = "emb_"
+
+
+def emb_model_key(model):
+    """
+    Key roi.emb records for a Re-ID model's embeddings
+
+    None (projects from before REID_KEY was saved) and the old MiewID key share the key
+    collection, so they become its current key and name one model in roi_embedding.
+    Called by MatchyPatchyDB wherever it reads or writes roi_embedding.model.
+    """
+    if model is None or model in KEY_COLLECTION_MODELS:
+        return KEY_COLLECTION_MODEL
+    return str(model)
+
+
+def emb_collection_name(model):
+    """Name of the chroma collection holding a Re-ID model's embeddings, the key collection for None"""
+    if model is None or model in KEY_COLLECTION_MODELS:
+        return KEY_COLLECTION
+    # chroma names allow [a-zA-Z0-9._-], starting and ending alphanumeric
+    slug = re.sub(r"[^A-Za-z0-9._-]", "_", str(model)).strip("._-")
+    return f"{EMB_COLLECTION_PREFIX}{slug}"
+
+
+def is_emb_collection(name):
+    """Whether a chroma collection name holds embeddings"""
+    return name == KEY_COLLECTION or name.startswith(EMB_COLLECTION_PREFIX)
+
+
+def emb_collection(client, key, model):
+    """Get a Re-ID model's embedding collection, creating it on first use"""
+    name = emb_collection_name(model)
+    try:
+        return client.get_collection(name=name)
+    except Exception:
+        # the key collection is made with the project and never created here
+        if name == KEY_COLLECTION:
+            raise
+    try:
+        return client.create_collection(
+            name=name,
+            metadata={
+                "description": f"Embeddings from {model}",
+                "created": str(datetime.now()),
+                "hnsw:space": "cosine",
+                "key": key,
+                "model": str(model),
+            }
+        )
+    except Exception:
+        # another thread created it first
+        return client.get_collection(name=name)
+
+
 def setup_chromadb(key, filepath):
     """Set up ChromaDB vector database for embeddings"""
     client = chromadb.PersistentClient(str(filepath), settings=Settings(anonymized_telemetry=False))
     client.create_collection(
-        name="embedding_collection",
+        name=KEY_COLLECTION,
         metadata={
             "description": "Embedding Collection",
             "created": str(datetime.now()),
