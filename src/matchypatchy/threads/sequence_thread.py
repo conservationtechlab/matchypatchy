@@ -1,8 +1,10 @@
 """
 QThread Class for Processing Sequence
 
-Pair_ID should be given in advance since there is likely
-some mismatch between camera timestamps and they won't be exactly the same
+Media at the same station within SEQUENCE_DURATION of a sequence's first image
+share that sequence, whichever camera took them, so paired cameras at a station
+form one sequence. Any clock offset between paired cameras counts against the
+duration, since timestamps are compared as recorded.
 
 """
 import pandas as pd
