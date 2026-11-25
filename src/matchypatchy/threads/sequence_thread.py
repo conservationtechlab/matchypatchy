@@ -14,7 +14,7 @@ from matchypatchy.database.media import fetch_media
 
 
 class SequenceThread(QThread):
-    """Thread for processing media sequences based on station, camera, and timestamp."""
+    """Thread for processing media sequences based on station and timestamp."""
     prompt_update = pyqtSignal(str)  # Signal to update the alert prompt
     done = pyqtSignal()
 
@@ -39,8 +39,7 @@ class SequenceThread(QThread):
                 if self.isInterruptionRequested():
                     return
                 if current_sequence:
-                    # station and camera are the same, timestamp under threshold
-                    # images without a camera each get their own sequence
+                    # same station, timestamp under threshold of the sequence's first image
                     if (image['station_id'] == current_sequence[0]['station_id']) and \
                        (image['timestamp'] - current_sequence[0]['timestamp'] <= self.max_time):
                         current_sequence.append(image)
@@ -79,7 +78,7 @@ class SequenceThread(QThread):
 
     def _load_media(self):
         """
-        Fetch all media sorted by station, camera and time
+        Fetch all media sorted by station and time
 
         Called at the start of run() rather than in __init__: the thread is built on the
         GUI thread, where fetching and parsing every timestamp froze the progress popup
@@ -87,4 +86,6 @@ class SequenceThread(QThread):
         """
         self.media = fetch_media(self.mpDB)
         self.media['timestamp'] = pd.to_datetime(self.media['timestamp'], format='mixed')
-        self.media = self.media.sort_values(by=['station_id', 'camera_id', 'timestamp'])
+        # not by camera: grouping ignores it, so a camera-first sort would put one
+        # camera's later images before another camera's earlier ones at the station
+        self.media = self.media.sort_values(by=['station_id', 'timestamp'], kind='stable')

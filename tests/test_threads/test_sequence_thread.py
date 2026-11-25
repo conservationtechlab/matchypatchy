@@ -30,21 +30,35 @@ def _thread(monkeypatch, rows, flag=True):
     return SequenceThread(FakeDB(), cfg, flag)
 
 
-def test_images_without_a_camera_get_their_own_sequence(monkeypatch):
-    # null camera_id comes back from the database as NaN in a float column
+def test_cameras_at_a_station_share_sequences_by_time(monkeypatch):
+    # camera is not part of the sequence calculation, including a missing camera
+    # (null camera_id comes back from the database as NaN in a float column)
     thread = _thread(monkeypatch, [
-        (1, 1, float("nan"), "2024-01-01 00:00:00", None),
-        (2, 1, float("nan"), "2024-01-01 00:00:10", None),
-        (3, 1, 7.0, "2024-01-01 00:00:00", None),
-        (4, 1, 7.0, "2024-01-01 00:00:10", None),
+        (1, 1, 7.0, "2024-01-01 00:00:00", None),
+        (2, 1, 8.0, "2024-01-01 00:00:10", None),
+        (3, 1, float("nan"), "2024-01-01 00:00:20", None),
+        (4, 2, 7.0, "2024-01-01 00:00:05", None),
     ])
     thread.run()
 
     sequence_of = thread.mpDB.sequence_of
-    # can't tell which camera took them, so they can't be compared
-    assert sequence_of[1] != sequence_of[2]
-    assert sequence_of[3] == sequence_of[4]
-    assert len(set(sequence_of.values())) == 3
+    assert sequence_of[1] == sequence_of[2] == sequence_of[3]
+    assert sequence_of[4] != sequence_of[1]   # other station
+
+
+def test_one_cameras_later_images_do_not_absorb_anothers_earlier_ones(monkeypatch):
+    # camera 7 at 0s and 1000s, camera 8 at 10s: 8's image belongs with 7's first,
+    # which needs media in time order across cameras, not camera by camera
+    thread = _thread(monkeypatch, [
+        (1, 1, 7.0, "2024-01-01 00:00:00", None),
+        (2, 1, 7.0, "2024-01-01 00:16:40", None),
+        (3, 1, 8.0, "2024-01-01 00:00:10", None),
+    ])
+    thread.run()
+
+    sequence_of = thread.mpDB.sequence_of
+    assert sequence_of[1] == sequence_of[3]
+    assert sequence_of[2] != sequence_of[1]
 
 
 def test_cancel_stops_writing_sequences(monkeypatch):
