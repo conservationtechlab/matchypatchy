@@ -7,12 +7,16 @@ form one sequence. Any clock offset between paired cameras counts against the
 duration, since timestamps are compared as recorded.
 
 """
+import logging
 import pandas as pd
 from datetime import timedelta
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.media import fetch_media
+
+
+logger = logging.getLogger(__name__)
 
 
 class SequenceThread(QThread):
@@ -28,11 +32,15 @@ class SequenceThread(QThread):
         self.media = None  # loaded in run(), off the GUI thread
 
     def run(self):
+        logger.info("Sequence processing started (calculate sequences: %s, duration: %s s)",
+                    self.flag, int(self.max_time.total_seconds()))
         self.prompt_update.emit("Loading media...")
         self._load_media()
+        logger.info("Loaded %d media", len(self.media))
         # if process sequence option is checked, will rewrite sequence_id
         if self.flag:
             self.prompt_update.emit("Processing sequences...")
+            logger.info("Grouping %d media into sequences", len(self.media))
 
             sequences = []
             current_sequence = []
@@ -57,6 +65,8 @@ class SequenceThread(QThread):
                 sequences.append(current_sequence)
 
             # update media entries
+            logger.info("Writing %d sequences covering %d media",
+                        len(sequences), sum(len(group) for group in sequences))
             for group in sequences:
                 if self.isInterruptionRequested():
                     return
@@ -69,6 +79,7 @@ class SequenceThread(QThread):
         else:
             # only add sequence_id where blank
             self.media = self.media[self.media['sequence_id'].isna()]
+            logger.info("Giving %d media without a sequence their own sequence", len(self.media))
             for _, image in self.media.iterrows():
                 if self.isInterruptionRequested():
                     return
