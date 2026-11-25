@@ -96,7 +96,7 @@ def _raw(seq_id, query_rids, neighbors, truncated=False):
 def _fake_match(seq_id, neighbors, query_rids):
     """Stand-in for a MatchObject as returned by MatchEmbeddingThread."""
     return SimpleNamespace(
-        sequence_id=seq_id,
+        query_sequence_id=seq_id,
         neighbors=neighbors,
         og_ranked_query_rids=query_rids,
         og_ranked_matches=neighbors,
@@ -1074,7 +1074,7 @@ class TestMatchActions:
         qc.current_query_rid = 10
         qc.current_query_rois = [10, 11]
         qc.current_match_rid = 13
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.new_iid(500)
 
         table, updates = qc.mpDB.batch_edit.call_args.args
@@ -1092,7 +1092,7 @@ class TestMatchActions:
         qc.current_query_rid = 10
         qc.current_query_rois = [10]                # 11 hidden by the viewpoint filter
         qc.current_match_rid = 13
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.new_iid(500)
         assert set(qc.mpDB.batch_edit.call_args.args[1]) == {10, 11, 13, 14}
 
@@ -1103,7 +1103,7 @@ class TestMatchActions:
         qc.current_query_rid = 10
         qc.current_query_rois = [10, 11]
         qc.current_match_rid = 13
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.new_iid(500)
         assert set(qc.mpDB.batch_edit.call_args.args[1]) == {10, 11, 13}
 
@@ -1111,7 +1111,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 10       # iid 100, seq 1
         qc.current_match_rid = 13       # iid 200, seq 3
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.merge()
 
         table, updates = qc.mpDB.batch_edit.call_args.args
@@ -1128,7 +1128,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 13       # iid 200
         qc.current_match_rid = 10       # iid 100
-        qc.current_match_object = SimpleNamespace(sequence_id=3)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=3)
         qc.merge()
         updates = qc.mpDB.batch_edit.call_args.args[1]
         assert all(u["individual_id"] == 100 for u in updates.values())
@@ -1138,7 +1138,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 12       # unnamed, seq 2
         qc.current_match_rid = 10       # iid 100, seq 1
-        qc.current_match_object = SimpleNamespace(sequence_id=2)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=2)
         qc.merge()
         updates = qc.mpDB.batch_edit.call_args.args[1]
         assert set(updates) == {12, 10, 11}
@@ -1149,7 +1149,7 @@ class TestMatchActions:
         qc.data.loc[12, "individual_id"] = np.nan
         qc.current_query_rid = 12
         qc.current_match_rid = 10
-        qc.current_match_object = SimpleNamespace(sequence_id=2)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=2)
         qc.merge()
         updates = qc.mpDB.batch_edit.call_args.args[1]
         assert all(u["individual_id"] == 100 for u in updates.values())
@@ -1158,7 +1158,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 12
         qc.current_match_rid = 12
-        qc.current_match_object = SimpleNamespace(sequence_id=2)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=2)
         qc.merge()
         qc.mpDB.batch_edit.assert_not_called()
 
@@ -1167,7 +1167,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 10       # seq 1 = rois 10, 11
         qc.current_match_rid = 13
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.unmatch()
         cleared = {"individual_id": None, "reviewed": 0}
         qc.mpDB.batch_edit.assert_called_once_with(
