@@ -1,5 +1,5 @@
 """
-Unit tests for matchypatchy.gui.query_base.QueryContainer
+Unit tests for matchypatchy.algorithm.query_base.QueryContainer
 
 QueryContainer holds query/match navigation state and exposes pure-Python
 helper methods that can be exercised without a real Qt display server.

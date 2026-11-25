@@ -314,7 +314,7 @@ class TestViewpointFilter:
 
     @pytest.fixture(autouse=True)
     def _labels(self):
-        with patch("matchypatchy.threads.match_object.load_model",
+        with patch("matchypatchy.models.load_model",
                    return_value={"Any": "Any", "None": "None", "0": "Left", "1": "Right"}):
             yield
 

@@ -117,7 +117,7 @@ LEFT, ANY, RIGHT = 0, 1, 2  # compare view toggle positions
 
 @pytest.fixture
 def viewpoint_labels():
-    with patch("matchypatchy.threads.match_object.load_model", return_value=VIEWPOINTS):
+    with patch("matchypatchy.models.load_model", return_value=VIEWPOINTS):
         yield
 
 
@@ -125,13 +125,13 @@ class TestViewpointToggle:
     """Stored viewpoints: 10 Left(0), 11 Right(1), 12 Left(0), 13 None, 14 Right(1)"""
 
     def test_toggle_positions_follow_model_labels(self, viewpoint_labels):
-        from matchypatchy.threads.match_object import toggle_viewpoint_value
+        from matchypatchy.models import toggle_viewpoint_value
         assert toggle_viewpoint_value(LEFT) == 0
         assert toggle_viewpoint_value(RIGHT) == 1
         assert toggle_viewpoint_value(ANY) is None
 
     def test_match_object_left_shows_left_labelled_rois(self, viewpoint_labels):
-        from matchypatchy.threads.match_object import MatchObject
+        from matchypatchy.algorithm.match_object import MatchObject
         query = pd.DataFrame({"id": [10, 11], "viewpoint": [0, 1]})
         matches = pd.DataFrame({"id": [12, 14], "viewpoint": [0, 1]})
         mo = MatchObject(1, [(12, 0.1), (14, 0.2)], query, matches)

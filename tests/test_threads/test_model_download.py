@@ -3,15 +3,15 @@ Model download helpers and the model download dialog's bookkeeping
 """
 from unittest.mock import MagicMock, patch
 
-MDT = "matchypatchy.threads.model_download_thread"
+MODELS_MOD = "matchypatchy.models"
 MODELS = {"MiewID": [["miew.onnx", "miew.onnx.data"], ["u1", "u2"]],
           "MD": ["md.pt", "u3"]}
 
 
 class TestGetPath:
     def _get(self, ml_dir, key):
-        from matchypatchy.threads.model_download_thread import get_path
-        with patch(f"{MDT}.load_model", return_value=MODELS):
+        from matchypatchy.models import get_path
+        with patch(f"{MODELS_MOD}.load_model", return_value=MODELS):
             return get_path(ml_dir, key)
 
     def test_interrupted_download_is_not_available(self, tmp_path):

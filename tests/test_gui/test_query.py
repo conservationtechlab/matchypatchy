@@ -1,5 +1,5 @@
 """
-Unit tests for matchypatchy.gui.query_base.QueryContainer
+Unit tests for matchypatchy.algorithm.query_base.QueryContainer
 
 QueryContainer holds query/match navigation state, the KNN cache, and the
 filter-after-cache pipeline:
@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-QUERY = "matchypatchy.gui.query_base"
+QUERY = "matchypatchy.algorithm.query_base"
 QUERY_BASE = QUERY
 
 

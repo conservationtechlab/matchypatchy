@@ -1,5 +1,5 @@
 """
-Unit tests for matchypatchy.gui.query_manual.ManualQueryContainer distances
+Unit tests for matchypatchy.algorithm.query_manual.ManualQueryContainer distances
 """
 import math
 from unittest.mock import MagicMock, patch
