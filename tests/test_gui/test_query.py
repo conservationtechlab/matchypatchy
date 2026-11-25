@@ -19,6 +19,8 @@ import pytest
 
 QUERY = "matchypatchy.algorithm.query_base"
 QUERY_BASE = QUERY
+# models.yml viewpoint labels: stored value 0 is Left, 1 is Right
+VIEWPOINTS = {"Any": "Any", "None": "None", "0": "Left", "1": "Right"}
 
 
 # ---------------------------------------------------------------------------
@@ -450,16 +452,32 @@ class TestQueryNavigation:
         self.qc.set_match(1)            # rid 13 -> sequence 3
         assert self.qc.get_match_sequence_id() == 3
 
-    def test_toggle_viewpoint_refreshes_rois(self):
+    def _viewpoint_query(self):
+        """Query 0 on screen with roi data, so the match sequence's sides can be read"""
+        self.qc.data = _sample_roi_df()
         self.qc.set_query(0)
         mo = self.qc.current_match_object
+        mo.og_ranked_matches = [(12, 0.1), (13, 0.3)]
+        return mo
+
+    def test_toggle_viewpoint_refreshes_rois(self):
+        mo = self._viewpoint_query()
         mo.show_viewpoint.return_value = True
         mo.get_ranked_query_rids.return_value = [11]
-        assert self.qc.toggle_viewpoint(2) is True
+        with patch("matchypatchy.models.load_model", return_value=VIEWPOINTS):
+            assert self.qc.toggle_viewpoint(2) is True   # match 12 is Right
         mo.show_viewpoint.assert_called_once_with(2)
         assert self.qc.selected_viewpoint == 2
         assert self.qc.current_query_rois == [11]
         assert self.qc.current_query_rid == 11
+
+    def test_toggle_viewpoint_rejects_side_missing_from_match_sequence(self):
+        """Match sequence 2 (roi 12) is only Right, so Left leaves the view as is"""
+        mo = self._viewpoint_query()
+        with patch("matchypatchy.models.load_model", return_value=VIEWPOINTS):
+            assert self.qc.toggle_viewpoint(0) is False
+        mo.show_viewpoint.assert_not_called()
+        assert self.qc.selected_viewpoint != 0
 
 
 # ---------------------------------------------------------------------------
