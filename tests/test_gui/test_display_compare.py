@@ -1,5 +1,5 @@
 """
-Unit tests for matchypatchy.gui.query_base.QueryContainer
+Unit tests for matchypatchy.algorithm.query_base.QueryContainer
 
 QueryContainer holds query/match navigation state and exposes pure-Python
 helper methods that can be exercised without a real Qt display server.
@@ -27,10 +27,10 @@ def _make_parent(db=None):
 
 def _make_qc(db=None):
     """Instantiate QueryContainer with a mocked parent."""
-    from matchypatchy.gui.query_base import QueryContainer
+    from matchypatchy.algorithm.query_base import QueryContainer
     parent = _make_parent(db)
-    with patch("matchypatchy.gui.query_base.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
-        with patch("matchypatchy.gui.query_base.MatchEmbeddingThread"):
+    with patch("matchypatchy.algorithm.query_base.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
+        with patch("matchypatchy.algorithm.query_base.MatchEmbeddingThread"):
             qc = QueryContainer(parent)
     return qc
 
@@ -49,6 +49,10 @@ def _sample_roi_df():
             "emb":           [1,   1,   0,   1],
             "sequence_id":   [1,   1,   2,   3],
             "favorite":      [0,   1,   0,   0],
+            "timestamp":     ["2024-01-01 10:00:00", "2024-01-01 10:00:01",
+                              "2024-01-01 11:00:00", "2024-01-01 12:00:00"],
+            "filepath":      ["a.jpg", "b.jpg", "c.jpg", "d.jpg"],
+            "frame":         [0,   0,   0,   0],
         },
         index=[10, 11, 12, 13],
     )
@@ -154,12 +158,12 @@ class TestQueryNavigation:
         mo0 = MagicMock()
         mo0.get_ranked_query_rids.return_value = [10, 11]
         mo0.get_ranked_matches.return_value = [(12, 0.1), (13, 0.3)]
-        mo0.sequence_id = 1
+        mo0.query_sequence_id = 1
 
         mo1 = MagicMock()
         mo1.get_ranked_query_rids.return_value = [12]
         mo1.get_ranked_matches.return_value = [(10, 0.2)]
-        mo1.sequence_id = 2
+        mo1.query_sequence_id = 2
 
         self.qc.ranked_sequences = [mo0, mo1]
         self.qc.n_queries = 2
@@ -283,7 +287,7 @@ class TestFinishCalculating:
     def test_saves_and_finalizes_when_sequences_present(self):
         qc = _make_qc()
         seq = MagicMock()
-        seq.sequence_id = 1
+        seq.query_sequence_id = 1
         seq.neighbors = [(12, 0.1)]
         seq.og_ranked_query_rids = [10]
         seq.og_ranked_matches = [(12, 0.1)]

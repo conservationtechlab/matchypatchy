@@ -12,7 +12,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from matchypatchy.database.thumbnails import save_roi_thumbnail
 from matchypatchy.database.media import get_sha256, native_relative_path
-from matchypatchy.threads.model_download_thread import get_path, get_model_params
+from matchypatchy.models import get_path, get_model_params
 
 
 logger = logging.getLogger(__name__)

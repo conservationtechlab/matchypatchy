@@ -312,9 +312,12 @@ class TestSequenceHelpers:
     def _build_roi_media(self, seq_id=1, ind_id=1):
         """Helper to create a minimal roi_media DataFrame."""
         return pd.DataFrame([
-            {"id": 10, "sequence_id": seq_id, "individual_id": ind_id, "timestamp": "2024-01-01 10:00:00"},
-            {"id": 11, "sequence_id": seq_id, "individual_id": ind_id, "timestamp": "2024-01-01 10:00:01"},
-            {"id": 12, "sequence_id": 2,      "individual_id": 2,      "timestamp": "2024-01-01 11:00:00"},
+            {"id": 10, "sequence_id": seq_id, "individual_id": ind_id, "timestamp": "2024-01-01 10:00:00",
+             "filepath": "a.jpg", "frame": 0},
+            {"id": 11, "sequence_id": seq_id, "individual_id": ind_id, "timestamp": "2024-01-01 10:00:01",
+             "filepath": "b.jpg", "frame": 0},
+            {"id": 12, "sequence_id": 2,      "individual_id": 2,      "timestamp": "2024-01-01 11:00:00",
+             "filepath": "c.jpg", "frame": 0},
         ]).set_index("id")
 
     def test_get_sequence_returns_list(self):
@@ -342,6 +345,16 @@ class TestSequenceHelpers:
         assert 10 in d[1]
         assert 11 in d[1]
         assert 12 in d[2]
+
+    def test_sequence_roi_dict_lists_rois_in_capture_order(self):
+        """Timestamp first (mixed formats parsed), then filepath and frame, then roi id"""
+        roi_media = pd.DataFrame([
+            {"id": 20, "sequence_id": 1, "timestamp": "2024-01-01 10:00:05", "filepath": "a.jpg", "frame": 0},
+            {"id": 21, "sequence_id": 1, "timestamp": "2024-01-01T10:00:01", "filepath": "b.jpg", "frame": 0},
+            {"id": 22, "sequence_id": 1, "timestamp": "2024-01-01 10:00:01", "filepath": "a.jpg", "frame": 3},
+            {"id": 23, "sequence_id": 1, "timestamp": "2024-01-01 10:00:01", "filepath": "a.jpg", "frame": 1},
+        ]).set_index("id")
+        assert sequence_roi_dict(roi_media) == {1: [23, 22, 21, 20]}
 
     def test_individual_roi_dict_keys_are_individual_ids(self):
         roi_media = self._build_roi_media()

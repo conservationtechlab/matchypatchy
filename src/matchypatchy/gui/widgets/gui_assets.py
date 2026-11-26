@@ -100,7 +100,7 @@ class ThreePointSlider(QWidget):
         self.slider.setPageStep(1)
         self.slider.setTickInterval(1)
         self.slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.slider.setTracking(True)
+        self.slider.setTracking(False)
         self.slider.setStyleSheet("""
                 QSlider::groove:horizontal { height: 3px; background: #5e5e5e; border-radius: 3px; }
                 QSlider::sub-page:horizontal { background: transparent; }
@@ -142,35 +142,23 @@ class ThreePointSlider(QWidget):
 
         # Signals
         self.slider.valueChanged.connect(self._on_value_changed)
-        self.slider.sliderReleased.connect(self._snap_to_tick)
 
         # Ensure initial state is emitted
         self._on_value_changed(self.slider.value())
 
-    def _snap_to_tick(self):
-        """Snap to nearest integer (defensive)."""
-        val = self.slider.value()
-        snapped = int(round(val))
-        if snapped != val:
-            # setting value will trigger valueChanged
-            self.slider.setValue(snapped)
-        # explicitly emit current index
-        self.state_changed.emit(self.slider.value())
-
     def _on_value_changed(self, val: int):
         """Keep visual label and emit integer index."""
-        idx = int(round(val))
         # Force integer if anything weird happens
-        if idx != val:
-            self.slider.blockSignals(True)
-            self.slider.setValue(idx)
-            self.slider.blockSignals(False)
-        self.state_changed.emit(idx)
+        self.state_changed.emit(val)
 
-    def set_index(self, idx: int):
-        """Set the current index, clamped to the valid range."""
+    def set_index(self, idx: int, emit: bool = True):
+        """Set the current index, clamped to the valid range. 
+           emit=False moves the handle without signalling
+        """
         idx = max(0, min(2, int(idx)))
+        self.slider.blockSignals(not emit)
         self.slider.setValue(idx)
+        self.slider.blockSignals(False)
 
     def index(self) -> int:
         """Get the current index as an integer."""

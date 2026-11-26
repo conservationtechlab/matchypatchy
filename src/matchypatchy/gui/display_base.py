@@ -27,8 +27,7 @@ from matchypatchy.gui.dialogs.popup_ml import MLOptionsPopup
 from matchypatchy.threads.sequence_thread import SequenceThread
 from matchypatchy.threads.animl_thread import AnimlThread
 from matchypatchy.threads.reid_thread import ReIDThread
-from matchypatchy.threads.model_download_thread import get_path
-
+from matchypatchy.models import get_path
 from matchypatchy import config
 from matchypatchy.project import UsesProject
 

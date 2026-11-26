@@ -1,5 +1,5 @@
 """
-Unit tests for matchypatchy.gui.query_base.QueryContainer
+Unit tests for matchypatchy.algorithm.query_base.QueryContainer
 
 QueryContainer holds query/match navigation state, the KNN cache, and the
 filter-after-cache pipeline:
@@ -17,8 +17,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-QUERY = "matchypatchy.gui.query_base"
+QUERY = "matchypatchy.algorithm.query_base"
 QUERY_BASE = QUERY
+# models.yml viewpoint labels: stored value 0 is Left, 1 is Right
+VIEWPOINTS = {"Any": "Any", "None": "None", "0": "Left", "1": "Right"}
 
 
 # ---------------------------------------------------------------------------
@@ -41,7 +43,7 @@ def _make_parent(db=None, cache_dir=None):
 
 def _make_qc(cache_dir, db=None):
     """Instantiate QueryContainer with a mocked parent and a temp cache dir."""
-    from matchypatchy.gui.query_base import QueryContainer
+    from matchypatchy.algorithm.query_base import QueryContainer
     parent = _make_parent(db, cache_dir)
     with patch(f"{QUERY}.load_model", return_value={"0": "Left", "1": "Any", "2": "Right"}):
         qc = QueryContainer(parent)
@@ -96,7 +98,7 @@ def _raw(seq_id, query_rids, neighbors, truncated=False):
 def _fake_match(seq_id, neighbors, query_rids):
     """Stand-in for a MatchObject as returned by MatchEmbeddingThread."""
     return SimpleNamespace(
-        sequence_id=seq_id,
+        query_sequence_id=seq_id,
         neighbors=neighbors,
         og_ranked_query_rids=query_rids,
         og_ranked_matches=neighbors,
@@ -162,7 +164,7 @@ class TestQueryContainerInit:
         assert qc.threshold == 75
 
     def test_k_cache_is_overfetched(self, qc):
-        from matchypatchy.gui.query_base import KNN_OVERFETCH
+        from matchypatchy.algorithm.query_base import KNN_OVERFETCH
         assert qc.k == 3
         assert qc.k_cache == qc.k * KNN_OVERFETCH
 
@@ -379,12 +381,12 @@ class TestQueryNavigation:
         mo0 = MagicMock()
         mo0.get_ranked_query_rids.return_value = [10, 11]
         mo0.get_ranked_matches.return_value = [(12, 0.1), (13, 0.3)]
-        mo0.sequence_id = 1
+        mo0.query_sequence_id = 1
 
         mo1 = MagicMock()
         mo1.get_ranked_query_rids.return_value = [12]
         mo1.get_ranked_matches.return_value = [(10, 0.2)]
-        mo1.sequence_id = 2
+        mo1.query_sequence_id = 2
 
         qc.ranked_sequences = [mo0, mo1]
         qc.n_queries = 2
@@ -450,16 +452,32 @@ class TestQueryNavigation:
         self.qc.set_match(1)            # rid 13 -> sequence 3
         assert self.qc.get_match_sequence_id() == 3
 
-    def test_toggle_viewpoint_refreshes_rois(self):
+    def _viewpoint_query(self):
+        """Query 0 on screen with roi data, so the match sequence's sides can be read"""
+        self.qc.data = _sample_roi_df()
         self.qc.set_query(0)
         mo = self.qc.current_match_object
+        mo.og_ranked_matches = [(12, 0.1), (13, 0.3)]
+        return mo
+
+    def test_toggle_viewpoint_refreshes_rois(self):
+        mo = self._viewpoint_query()
         mo.show_viewpoint.return_value = True
         mo.get_ranked_query_rids.return_value = [11]
-        assert self.qc.toggle_viewpoint(2) is True
+        with patch("matchypatchy.models.load_model", return_value=VIEWPOINTS):
+            assert self.qc.toggle_viewpoint(2) is True   # match 12 is Right
         mo.show_viewpoint.assert_called_once_with(2)
         assert self.qc.selected_viewpoint == 2
         assert self.qc.current_query_rois == [11]
         assert self.qc.current_query_rid == 11
+
+    def test_toggle_viewpoint_rejects_side_missing_from_match_sequence(self):
+        """Match sequence 2 (roi 12) is only Right, so Left leaves the view as is"""
+        mo = self._viewpoint_query()
+        with patch("matchypatchy.models.load_model", return_value=VIEWPOINTS):
+            assert self.qc.toggle_viewpoint(0) is False
+        mo.show_viewpoint.assert_not_called()
+        assert self.qc.selected_viewpoint != 0
 
 
 # ---------------------------------------------------------------------------
@@ -639,7 +657,7 @@ class TestFinalize:
         assert emitted == [True]
         assert qc_raw.n_queries == 1
         assert qc_raw.filter_matched is True
-        assert qc_raw.ranked_sequences[0].sequence_id == 1
+        assert qc_raw.ranked_sequences[0].query_sequence_id == 1
         assert len(qc_raw.data) == 4            # filter ran
 
     def test_filter_narrows_neighbors(self, qc_raw, fake_match_object):
@@ -706,7 +724,7 @@ class TestRestrictToData:
         out = self.qc._restrict_to_data([_raw(1, [10, 11], [(12, 0.1), (13, 0.3)])], strict=False)
         assert len(out) == 1
         mo = out[0]
-        assert mo.sequence_id == 1
+        assert mo.query_sequence_id == 1
         assert mo.filtered_neighbors == [(12, 0.1), (13, 0.3)]
         assert mo.og_ranked_query_rids == [10, 11]
         assert mo.ranked_matches == [(12, 0.1), (13, 0.3)]
@@ -1074,7 +1092,7 @@ class TestMatchActions:
         qc.current_query_rid = 10
         qc.current_query_rois = [10, 11]
         qc.current_match_rid = 13
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.new_iid(500)
 
         table, updates = qc.mpDB.batch_edit.call_args.args
@@ -1092,7 +1110,7 @@ class TestMatchActions:
         qc.current_query_rid = 10
         qc.current_query_rois = [10]                # 11 hidden by the viewpoint filter
         qc.current_match_rid = 13
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.new_iid(500)
         assert set(qc.mpDB.batch_edit.call_args.args[1]) == {10, 11, 13, 14}
 
@@ -1103,7 +1121,7 @@ class TestMatchActions:
         qc.current_query_rid = 10
         qc.current_query_rois = [10, 11]
         qc.current_match_rid = 13
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.new_iid(500)
         assert set(qc.mpDB.batch_edit.call_args.args[1]) == {10, 11, 13}
 
@@ -1111,7 +1129,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 10       # iid 100, seq 1
         qc.current_match_rid = 13       # iid 200, seq 3
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.merge()
 
         table, updates = qc.mpDB.batch_edit.call_args.args
@@ -1128,7 +1146,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 13       # iid 200
         qc.current_match_rid = 10       # iid 100
-        qc.current_match_object = SimpleNamespace(sequence_id=3)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=3)
         qc.merge()
         updates = qc.mpDB.batch_edit.call_args.args[1]
         assert all(u["individual_id"] == 100 for u in updates.values())
@@ -1138,7 +1156,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 12       # unnamed, seq 2
         qc.current_match_rid = 10       # iid 100, seq 1
-        qc.current_match_object = SimpleNamespace(sequence_id=2)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=2)
         qc.merge()
         updates = qc.mpDB.batch_edit.call_args.args[1]
         assert set(updates) == {12, 10, 11}
@@ -1149,7 +1167,7 @@ class TestMatchActions:
         qc.data.loc[12, "individual_id"] = np.nan
         qc.current_query_rid = 12
         qc.current_match_rid = 10
-        qc.current_match_object = SimpleNamespace(sequence_id=2)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=2)
         qc.merge()
         updates = qc.mpDB.batch_edit.call_args.args[1]
         assert all(u["individual_id"] == 100 for u in updates.values())
@@ -1158,7 +1176,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 12
         qc.current_match_rid = 12
-        qc.current_match_object = SimpleNamespace(sequence_id=2)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=2)
         qc.merge()
         qc.mpDB.batch_edit.assert_not_called()
 
@@ -1167,7 +1185,7 @@ class TestMatchActions:
         qc = self.qc
         qc.current_query_rid = 10       # seq 1 = rois 10, 11
         qc.current_match_rid = 13
-        qc.current_match_object = SimpleNamespace(sequence_id=1)
+        qc.current_match_object = SimpleNamespace(query_sequence_id=1)
         qc.unmatch()
         cleared = {"individual_id": None, "reviewed": 0}
         qc.mpDB.batch_edit.assert_called_once_with(
@@ -1200,7 +1218,7 @@ class TestFavorites:
         self.qc = qc
         qc.data_raw = _sample_roi_df()          # only id 11 is a favorite
         self.knn = MagicMock()
-        self.knn.sequence_id = 1
+        self.knn.query_sequence_id = 1
         self.knn.query_data = pd.DataFrame({"id": [10]})
         self.knn.get_ranked_matches.return_value = [(12, 0.1)]
         qc.current_match_object = self.knn

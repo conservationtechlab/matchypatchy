@@ -18,9 +18,8 @@ from matchypatchy.gui.dialogs.popup_media_edit import MediaEditPopup
 from matchypatchy.gui.widgets.gui_assets import VerticalSeparator, StandardButton, ComboBoxDelegate
 from matchypatchy.gui.widgets.widget_filterbar import FilterBar
 from matchypatchy.threads.table_thread import FetchTableThread
-from matchypatchy.threads.model_download_thread import load_model
-from matchypatchy.threads.match_object import viewpoint_value
 from matchypatchy.project import UsesProject
+from matchypatchy.models import load_model, viewpoint_value
 
 
 logger = logging.getLogger(__name__)

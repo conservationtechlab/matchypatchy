@@ -17,10 +17,10 @@ from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 import matchypatchy.database.media as db_roi
 from matchypatchy.database.media import assign_individual, clear_individual
 from matchypatchy.database.location import fetch_station_names_from_id
-from matchypatchy.threads.match_object import MatchObject, FavoriteMatchObject, toggle_viewpoint_value
-from matchypatchy.threads.model_download_thread import load_model
+from matchypatchy.algorithm.match_object import MatchObject, FavoriteMatchObject
 from matchypatchy.threads.match_thread import MatchEmbeddingThread
 from matchypatchy.project import UsesProject
+from matchypatchy.models import load_model, toggle_viewpoint_value
 
 
 logger = logging.getLogger(__name__)
@@ -568,7 +568,7 @@ class QueryContainer(BaseQueryContainer):
     def get_query_sequence_id(self):
         """Get current query sequence ID from its match object"""
         if self.current_match_object:
-            return self.current_match_object.sequence_id
+            return self.current_match_object.query_sequence_id
         return None
 
     def update_sequences_in_place(self, query_seq_id, match_seq_id):
@@ -636,18 +636,43 @@ class QueryContainer(BaseQueryContainer):
 
     # VIEWPOINT ----------------------------------------------------------------
     def toggle_viewpoint(self, selected_viewpoint):
-        """Flip between viewpoints in paired images within a sequence"""
+        """
+        Switch the query and match stack to the selected side, staying on the match
+        sequence being compared. Does nothing and returns False if the query
+        sequence or the current match sequence has only the other side.
+        """
+        value = toggle_viewpoint_value(selected_viewpoint)
+        current = self._match_candidate(self.current_match_rid)
+        if selected_viewpoint != 1:
+            sides = {self._get_roi_field(rid, 'viewpoint')
+                     for rid, _ in self.current_match_object.og_ranked_matches
+                     if self._match_candidate(rid) == current}
+            if value not in sides:
+                return False
+        if not self.current_match_object.show_viewpoint(selected_viewpoint):
+            return False
         self.selected_viewpoint = selected_viewpoint
 
-        # filter query and matches by selected viewpoint
-        viewpoint_available = self.current_match_object.show_viewpoint(self.selected_viewpoint)
-
-        # update matches and query rois based on new viewpoint selection
         self.current_query_rois = self.current_match_object.get_ranked_query_rids()
         self.set_within_query_sequence(0)
         self.update_matches()
+        # stay on the sequence being compared, now showing the selected side
+        for i, rid in enumerate(self.current_match_rois):
+            if self._match_candidate(rid) == current:
+                self.set_match(i)
+                break
+        return True
 
-        return viewpoint_available
+    def _match_candidate(self, rid):
+        """
+        Sequence a match roi belongs to, or the roi itself without one.
+
+        Called by toggle_viewpoint to find the rois of the match sequence on screen.
+        Wraps _candidate_key with a single-roi lookup, since toggle_viewpoint has no
+        seq_ids dict and works for both MatchObject and FavoriteMatchObject.
+        """
+        seq = self._get_roi_field(rid, 'sequence_id')
+        return ('roi', rid) if seq is None or pd.isna(seq) else seq
 
     # FAVORITES ----------------------------------------------------------------
     def set_match_favorites(self, active):
@@ -670,7 +695,7 @@ class QueryContainer(BaseQueryContainer):
 
             # Create favorite match object
             self.favorite_match_object = FavoriteMatchObject(
-                self.knn_match_object.sequence_id,
+                self.knn_match_object.query_sequence_id,
                 filtered_neighbors,
                 query_data=self.knn_match_object.query_data,
                 match_data=self._favorites_cache
@@ -714,7 +739,7 @@ class QueryContainer(BaseQueryContainer):
     # MATCH FUNCTIONS ----------------------------------------------------------
     def _merge_rois(self):
         """All ROIs of the query and match sequences"""
-        query_seq = self.current_match_object.sequence_id
+        query_seq = self.current_match_object.query_sequence_id
         match_seq = self._get_roi_field(self.current_match_rid, 'sequence_id')
         # the shown rois too, a match roi without a sequence is not in _seq_index
         return ({self.current_query_rid, self.current_match_rid}
@@ -726,7 +751,7 @@ class QueryContainer(BaseQueryContainer):
 
     def _unmatch_rois(self):
         """The whole query sequence, so Unmatch undoes Match"""
-        query_seq = self.current_match_object.sequence_id
+        query_seq = self.current_match_object.query_sequence_id
         return {self.current_query_rid} | set(self._seq_index.get(query_seq, []))
 
     # ==========================================================================
@@ -756,7 +781,7 @@ class QueryContainer(BaseQueryContainer):
         """
         seq_ids = self.data_raw['sequence_id'].to_dict() if 'sequence_id' in self.data_raw else {}
         return [{
-            'sequence_id': m.sequence_id,
+            'sequence_id': m.query_sequence_id,
             'neighbors': [(rid, d) for rid, d in m.neighbors],  # [(roi_id, distance), ...]
             # counted in candidate sequences, like the cut in _restrict_to_data
             'truncated': len(self._nearest_candidates(m.neighbors, seq_ids)) >= self.k_cache,
@@ -866,7 +891,7 @@ class QueryContainer(BaseQueryContainer):
             neighbor_ids = {rid for rid, _ in neighbors}
             ranked_matches = [tuple(m) for m in s['og_ranked_matches'] if m[0] in neighbor_ids]
 
-            mo = MatchObject(sequence_id=s['sequence_id'],
+            mo = MatchObject(query_sequence_id=s['sequence_id'],
                              filtered_neighbors=neighbors,
                              query_data=self.data.loc[q_rids].reset_index(),
                              match_data=self.data.loc[[rid for rid, _ in neighbors]].reset_index())

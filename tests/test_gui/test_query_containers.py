@@ -32,12 +32,12 @@ def _roi_media():
 def _container(kind):
     parent = MagicMock()
     if kind == "qc":
-        from matchypatchy.gui.query_qc import QC_QueryContainer as cls
-        module = "matchypatchy.gui.query_qc"
+        from matchypatchy.algorithm.query_qc import QC_QueryContainer as cls
+        module = "matchypatchy.algorithm.query_qc"
         args = ()
     else:
-        from matchypatchy.gui.query_manual import ManualQueryContainer as cls
-        module = "matchypatchy.gui.query_manual"
+        from matchypatchy.algorithm.query_manual import ManualQueryContainer as cls
+        module = "matchypatchy.algorithm.query_manual"
         args = ([10, 11, 12, 13, 14],)
     with patch(f"{module}.load_model", return_value={}):
         container = cls(parent, *args)
@@ -97,7 +97,7 @@ class TestRefreshData:
     def test_keeps_the_filtered_rows(self):
         container = _container("manual")
         container.data = container.data.loc[[10, 12]]
-        with patch("matchypatchy.gui.query_manual.db_roi.fetch_roi_media",
+        with patch("matchypatchy.algorithm.query_manual.db_roi.fetch_roi_media",
                    side_effect=lambda *a, **k: _roi_media()):
             container.refresh_data()
         assert sorted(container.data.index) == [10, 12]
@@ -117,7 +117,7 @@ LEFT, ANY, RIGHT = 0, 1, 2  # compare view toggle positions
 
 @pytest.fixture
 def viewpoint_labels():
-    with patch("matchypatchy.threads.match_object.load_model", return_value=VIEWPOINTS):
+    with patch("matchypatchy.models.load_model", return_value=VIEWPOINTS):
         yield
 
 
@@ -125,13 +125,13 @@ class TestViewpointToggle:
     """Stored viewpoints: 10 Left(0), 11 Right(1), 12 Left(0), 13 None, 14 Right(1)"""
 
     def test_toggle_positions_follow_model_labels(self, viewpoint_labels):
-        from matchypatchy.threads.match_object import toggle_viewpoint_value
+        from matchypatchy.models import toggle_viewpoint_value
         assert toggle_viewpoint_value(LEFT) == 0
         assert toggle_viewpoint_value(RIGHT) == 1
         assert toggle_viewpoint_value(ANY) is None
 
     def test_match_object_left_shows_left_labelled_rois(self, viewpoint_labels):
-        from matchypatchy.threads.match_object import MatchObject
+        from matchypatchy.algorithm.match_object import MatchObject
         query = pd.DataFrame({"id": [10, 11], "viewpoint": [0, 1]})
         matches = pd.DataFrame({"id": [12, 14], "viewpoint": [0, 1]})
         mo = MatchObject(1, [(12, 0.1), (14, 0.2)], query, matches)
